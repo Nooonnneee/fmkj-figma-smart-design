@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+.figma
+.env*
+deploy/*.env
+media
+*.log
+.tmp-*

@@ -1,0 +1,72 @@
+import { postgresAdapter } from '@payloadcms/db-postgres'
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import { s3Storage } from '@payloadcms/storage-s3'
+import path from 'path'
+import { buildConfig } from 'payload'
+import { fileURLToPath } from 'url'
+
+import { migrations } from './migrations'
+import { sharedConfig } from './payload.shared'
+
+/**
+ * 自建服务器版配置：PostgreSQL；图片存本地目录，或可选的 S3 兼容对象存储（阿里云 OSS、腾讯云 COS 等）。
+ * Docker 构建时会把 `@payload-config` 指向这个文件；Figma Make 里仍使用 payload.config.ts。
+ * 所需环境变量见 .env.selfhost.example 和 DEPLOY.md。
+ */
+const dirname = path.dirname(fileURLToPath(import.meta.url))
+
+const useS3 = Boolean(process.env.S3_BUCKET)
+
+const required = (name: string) => {
+  const value = process.env[name]
+  if (!value) throw new Error(`缺少环境变量 ${name}，请参考 .env.selfhost.example`)
+  return value
+}
+
+// 没有配置 S3 时，图片存在服务器本地目录（Docker 里挂载为数据卷）。
+const collections = useS3
+  ? sharedConfig.collections
+  : sharedConfig.collections.map((c) =>
+      c.slug === 'media' ? { ...c, upload: { staticDir: path.resolve(/*turbopackIgnore: true*/ process.env.MEDIA_DIR || 'media') } } : c,
+    )
+
+export default buildConfig({
+  ...sharedConfig,
+  collections,
+  secret: required('PAYLOAD_SECRET'),
+  serverURL: process.env.PUBLIC_URL || undefined,
+  editor: lexicalEditor(),
+  db: postgresAdapter({
+    pool: {
+      connectionString: required('DATABASE_URI'),
+      max: process.env.DATABASE_POOL_MAX ? Number(process.env.DATABASE_POOL_MAX) : undefined,
+    },
+    // 沿用 Figma 数据库里的 UUID 主键，迁移数据时关联关系保持不变。
+    idType: 'uuid',
+    // 允许导入脚本写入原 ID（data-import.ts 依赖这一项）。
+    allowIDOnCreate: true,
+    migrationDir: path.resolve(dirname, 'migrations'),
+    // 生产容器启动时自动执行尚未运行的迁移（standalone 镜像里没有 payload CLI）。
+    prodMigrations: migrations,
+    // 启动前由 `payload migrate` 建表/升级，运行时不自动改表结构。
+    push: false,
+  }),
+  storage: useS3
+    ? [
+    s3Storage({
+      collections: { media: true },
+      bucket: required('S3_BUCKET'),
+      config: {
+        region: process.env.S3_REGION || 'auto',
+        endpoint: process.env.S3_ENDPOINT || undefined,
+        // MinIO 等自建存储需要路径风格；阿里云 OSS / 腾讯云 COS 用默认的虚拟主机风格。
+        forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
+        credentials: {
+          accessKeyId: required('S3_ACCESS_KEY_ID'),
+          secretAccessKey: required('S3_SECRET_ACCESS_KEY'),
+        },
+      },
+    }),
+      ]
+    : [],
+})

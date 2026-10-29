@@ -1,0 +1,63 @@
+# 用法见 deploy/DEPLOY.md。先复制 deploy/selfhost.env.example 为 .env 并填写。
+services:
+  db:
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fmkj
+      POSTGRES_USER: fmkj
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 设置 POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U fmkj -d fmkj']
+      interval: 5s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      target: runner
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:24-bookworm-slim}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
+        PUBLIC_URL: ${PUBLIC_URL:?请在 .env 设置 PUBLIC_URL}
+    image: fmkj-app
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URI: postgres://fmkj:${POSTGRES_PASSWORD}@db:5432/fmkj
+    volumes:
+      - media:/data/media
+    # 只监听本机，由 Nginx 反向代理并提供 HTTPS。
+    ports:
+      - '127.0.0.1:3000:3000'
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # 运维工具（导入数据、设置密码）。不常驻：docker compose run --rm tools ...
+  tools:
+    profiles: ['tools']
+    build:
+      context: .
+      target: tools
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:24-bookworm-slim}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
+    image: fmkj-tools
+    env_file: .env
+    environment:
+      DATABASE_URI: postgres://fmkj:${POSTGRES_PASSWORD}@db:5432/fmkj
+      MEDIA_DIR: /data/media
+    volumes:
+      - media:/data/media
+      - ./import:/import:ro
+    entrypoint: ['pnpm', 'exec', 'payload']
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  media:
