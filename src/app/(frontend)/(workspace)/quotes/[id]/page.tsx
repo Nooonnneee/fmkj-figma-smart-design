@@ -1,9 +1,10 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 
 import { appAuth } from '@/lib/app-auth'
 import { getPayloadClient } from '@/lib/payload'
 import { getCatalog } from '@/lib/cached-data'
-import type { Media, Project } from '@/payload-types'
+import type { StoredScene } from '@/lib/point-scene'
+import type { Media, Project, Quote } from '@/payload-types'
 
 import { canEditProjects } from '../../projects/data'
 import { QuoteEditor, type ProductOption } from './quote-editor'
@@ -14,12 +15,36 @@ export default async function QuotePage({ params, searchParams }: { params: Prom
   const { id } = await params
   const { pending } = await searchParams
   const user = await appAuth.getCurrentUser()
+  if (!user) redirect('/login')
   const payload = await getPayloadClient()
   const quote = await payload
-    .findByID({ collection: 'quotes', id, depth: 1, user, overrideAccess: false, populate: { projects: { name: true, customerName: true }, products: { name: true }, media: { url: true } } })
+    .findByID({
+      collection: 'quotes',
+      id,
+      depth: 1,
+      user,
+      overrideAccess: false,
+      populate: { projects: { name: true, customerName: true, pointMap: true, defaultProducts: true }, products: { name: true }, media: { url: true } },
+    })
     .catch(() => null)
   if (!quote) notFound()
   const project = typeof quote.project === 'object' ? (quote.project as Project) : null
+  const rawScene = (project?.pointMap ?? null) as Partial<StoredScene> | null
+  const projectScene = rawScene?.elements ? { elements: rawScene.elements, files: rawScene.files ?? {} } : null
+  const siblingQuotes = project
+    ? (
+        await payload.find({
+          collection: 'quotes',
+          where: { project: { equals: project.id } },
+          sort: '-updatedAt',
+          limit: 20,
+          depth: 0,
+          user,
+          overrideAccess: false,
+          select: { title: true, status: true, total: true },
+        })
+      ).docs.map((q) => ({ id: String((q as Quote).id), title: (q as Quote).title, total: (q as Quote).total ?? 0 }))
+    : []
 
   const catalog = await getCatalog()
   const byId = new Map(catalog.map((p) => [p.id, p]))
@@ -74,6 +99,9 @@ export default async function QuotePage({ params, searchParams }: { params: Prom
         fees: (quote.fees ?? []).map((f) => ({ key: f.id ?? crypto.randomUUID(), name: f.name, amount: f.amount })),
       }}
       project={project ? { id: String(project.id), name: project.name, customerName: project.customerName } : null}
+      projectQuotes={siblingQuotes}
+      projectScene={projectScene}
+      projectDefaults={project?.defaultProducts ?? null}
       products={options}
       costs={costs}
       readOnly={!canEditProjects(user?.role)}

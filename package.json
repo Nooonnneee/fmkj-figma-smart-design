@@ -28,6 +28,7 @@
     "cmdk": "^1.1.1",
     "graphql": "^16.8.1",
     "html-react-parser": "^5.2.10",
+    "html-to-image": "1.11.13",
     "input-otp": "1.4.1",
     "lucide-react": "^1.63.0",
     "monaco-editor": "0.55.1",

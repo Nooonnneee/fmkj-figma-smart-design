@@ -8,7 +8,9 @@ import { appAuth } from '@/lib/app-auth'
 import { getPayloadClient } from '@/lib/payload'
 import { QUOTE_STATUSES } from '@/lib/quotes'
 import { getCatalog, getCompanyInfo } from '@/lib/cached-data'
-import { isPointData, parseDefaults, summarizePoints, type PointCustomData } from '@/lib/point-map-items'
+import { DEVICE_TYPE_ORDER } from '@/lib/device-types'
+import { isPointData, parseDefaults, pointDeviceType, summarizePoints, type PointCustomData } from '@/lib/point-map-items'
+import { inferScopeFromTitle, inPointScope, isPointScope, POINT_SCOPES, type PointScope } from '@/lib/point-scopes'
 import { setProjectDefault } from '@/lib/project-defaults'
 import type { Media, User } from '@/payload-types'
 
@@ -30,17 +32,22 @@ export async function createQuoteFromProject(form: FormData) {
   if (!auth.user) redirect('/login')
   const { user } = auth
   const projectId = String(form.get('projectId') ?? '')
+  const rawScope = form.get('scope')
+  const scope: PointScope = isPointScope(rawScope) ? rawScope : 'all'
   const payload = await getPayloadClient()
   const project = await payload.findByID({ collection: 'projects', id: projectId, depth: 0, user, overrideAccess: false })
 
   const elements = ((project.pointMap as { elements?: unknown[] } | null)?.elements ?? []) as { isDeleted?: boolean; customData?: PointCustomData }[]
-  const points = elements.filter((el) => !el?.isDeleted && isPointData(el?.customData)).map((el) => el.customData!)
+  const allPoints = elements.filter((el) => !el?.isDeleted && isPointData(el?.customData)).map((el) => el.customData!)
 
   const catalog = await getCatalog()
   const byId = new Map(catalog.map((p) => [p.id, p]))
+  // 按点位图当前所选范围过滤（例如「不含灯具」或「仅开关」不会把灯具算进报价单）
+  const points = allPoints.filter((cd) => inPointScope(pointDeviceType(cd, byId), scope))
   const summary = summarizePoints(points, byId, parseDefaults(project.defaultProducts))
   const items = [...summary.products.entries()]
     .map(([id, row]) => ({ p: byId.get(id)!, row }))
+    .sort((a, b) => DEVICE_TYPE_ORDER.indexOf(a.p.deviceType ?? a.row.deviceType) - DEVICE_TYPE_ORDER.indexOf(b.p.deviceType ?? b.row.deviceType))
     .map(({ p, row }) => ({
       product: p.id,
       deviceType: (p.deviceType ?? row.deviceType) as never,
@@ -54,15 +61,118 @@ export async function createQuoteFromProject(form: FormData) {
 
   const company = await getCompanyInfo()
   const existing = await payload.count({ collection: 'quotes', where: { project: { equals: project.id } }, user, overrideAccess: false })
+  const scopeSuffix = scope === 'all' ? '' : `（${POINT_SCOPES.find((s) => s.value === scope)!.label}）`
   const quote = await payload.create({
     collection: 'quotes',
-    data: { title: `${project.name} 报价${existing.totalDocs ? ` ${existing.totalDocs + 1}` : ''}`, project: project.id, status: 'draft', items, fees: [], discount: 0, notes: company.quoteNotes ?? null },
+    data: { title: `${project.name} 报价${scopeSuffix}${existing.totalDocs ? ` ${existing.totalDocs + 1}` : ''}`, project: project.id, status: 'draft', items, fees: [], discount: 0, notes: company.quoteNotes ?? null },
     user,
     overrideAccess: false,
     depth: 0,
   })
   revalidatePath(`/projects/${project.id}`)
   redirect(summary.pendingTotal ? `/quotes/${quote.id}?pending=${summary.pendingTotal}` : `/quotes/${quote.id}`)
+}
+
+/**
+ * 把项目点位图的最新点位同步到已有报价单（双向无缝切换核心）：
+ * - 保留报价单里已修改过的临时单价、已更换的同类型号、附加费用、优惠和备注；
+ * - 更新各设备类型的数量，新增点位图里新出现的设备类型，移除点位图里已删光的设备类型。
+ */
+export async function syncQuoteFromPointMap(
+  quoteId: string,
+  explicitScope?: PointScope,
+): Promise<{ ok: true; quoteId: string; pending: number; total: number; scope: PointScope } | { ok: false; error: string }> {
+  const auth = await requireEditor()
+  if (!auth.user) return { ok: false, error: auth.error }
+  const { user } = auth
+  const payload = await getPayloadClient()
+  const quote = await payload
+    .findByID({ collection: 'quotes', id: quoteId, depth: 0, user, overrideAccess: false })
+    .catch(() => null)
+  if (!quote) return { ok: false, error: '报价不存在或已被删除' }
+  const projectId = typeof quote.project === 'object' ? String(quote.project.id) : String(quote.project ?? '')
+  if (!projectId) return { ok: false, error: '该报价未关联项目' }
+
+  const project = await payload
+    .findByID({ collection: 'projects', id: projectId, depth: 0, user, overrideAccess: false })
+    .catch(() => null)
+  if (!project) return { ok: false, error: '关联的项目不存在' }
+
+  const scope: PointScope = explicitScope && isPointScope(explicitScope) ? explicitScope : inferScopeFromTitle(quote.title)
+  const elements = ((project.pointMap as { elements?: unknown[] } | null)?.elements ?? []) as { isDeleted?: boolean; customData?: PointCustomData }[]
+  const allPoints = elements.filter((el) => !el?.isDeleted && isPointData(el?.customData)).map((el) => el.customData!)
+
+  const catalog = await getCatalog()
+  const byId = new Map(catalog.map((p) => [p.id, p]))
+  const points = allPoints.filter((cd) => inPointScope(pointDeviceType(cd, byId), scope))
+  const summary = summarizePoints(points, byId, parseDefaults(project.defaultProducts))
+
+  const mediaId = (v: unknown) => (v && typeof v === 'object' ? String((v as Media).id) : typeof v === 'string' ? v : null)
+  const storedItems = quote.items ?? []
+  // 先按产品 ID 索引已有行，再按设备类型索引（用于保留用户在报价单里换过的型号和改过的临时单价）
+  const byProductId = new Map<string, (typeof storedItems)[number]>()
+  const byDeviceType = new Map<string, (typeof storedItems)[number]>()
+  for (const row of storedItems) {
+    const pid = mediaId(row.product)
+    if (pid && !byProductId.has(pid)) byProductId.set(pid, row)
+    if (row.deviceType && !byDeviceType.has(row.deviceType)) byDeviceType.set(row.deviceType, row)
+  }
+
+  const entries = [...summary.products.entries()].map(([id, row]) => ({ p: byId.get(id)!, row }))
+  entries.sort((a, b) => DEVICE_TYPE_ORDER.indexOf(a.p.deviceType ?? a.row.deviceType) - DEVICE_TYPE_ORDER.indexOf(b.p.deviceType ?? b.row.deviceType))
+
+  const nextItems = entries.map(({ p, row }) => {
+    const exact = byProductId.get(p.id)
+    const sameType = !exact && row.fromDefault === row.count && row.deviceType ? byDeviceType.get(row.deviceType) : undefined
+    const keep = exact ?? sameType
+    if (keep) {
+      const keepPid = mediaId(keep.product) ?? p.id
+      const keepImg = mediaId(keep.image) ?? p.image?.id ?? null
+      return {
+        ...(keep.id ? { id: keep.id } : {}),
+        product: keepPid,
+        deviceType: (keep.deviceType ?? p.deviceType ?? row.deviceType) as never,
+        image: keepImg,
+        name: keep.name || p.name,
+        sku: keep.sku ?? p.sku,
+        unit: keep.unit ?? p.unit,
+        // 保留用户在报价单上临时修改过的单价
+        price: typeof keep.price === 'number' ? keep.price : p.price,
+        quantity: row.count,
+      }
+    }
+    return {
+      product: p.id,
+      deviceType: (p.deviceType ?? row.deviceType) as never,
+      image: p.image?.id ?? null,
+      name: p.name,
+      sku: p.sku,
+      unit: p.unit,
+      price: p.price,
+      quantity: row.count,
+    }
+  })
+
+  const baseTitle = (quote.title ?? `${project.name} 报价`).replace(/（(全部|不含灯具|仅开关|开关\+灯光)）/g, '')
+  const scopeSuffix = scope === 'all' ? '' : `（${POINT_SCOPES.find((s) => s.value === scope)!.label}）`
+  const nextTitle = `${baseTitle}${scopeSuffix}`
+
+  try {
+    const updated = await payload.update({
+      collection: 'quotes',
+      id: quoteId,
+      data: { title: nextTitle, items: nextItems },
+      user,
+      overrideAccess: false,
+      depth: 0,
+    })
+    revalidatePath(`/quotes/${quoteId}`)
+    revalidatePath(`/projects/${projectId}`)
+    return { ok: true, quoteId, pending: summary.pendingTotal, total: updated.total ?? 0, scope }
+  } catch (error) {
+    console.error('[quotes] sync failed', error)
+    return { ok: false, error: '同步失败，请稍后重试' }
+  }
 }
 
 /** 在报价里换型号时，可同时把新型号设为项目默认型号。 */

@@ -10,6 +10,7 @@ export const metadata = { title: '公司信息 · FMKJ 项目管理' }
 
 export default async function SettingsPage() {
   const user = await appAuth.getCurrentUser()
+  if (!user) redirect('/login')
   if (user?.role !== 'admin') redirect('/projects')
   const payload = await getPayloadClient()
   const settings = await payload.findGlobal({ slug: 'company-settings', depth: 1, user, overrideAccess: false })

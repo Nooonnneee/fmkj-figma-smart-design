@@ -1,5 +1,6 @@
 import Form from 'next/form'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { FolderKanban, Plus, Search } from 'lucide-react'
 import type { Where } from 'payload'
 
@@ -24,6 +25,7 @@ const fmtDate = (iso?: string | null) =>
 
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ q?: string; stage?: string }> }) {
   const user = await appAuth.getCurrentUser()
+  if (!user) redirect('/login')
   const { q = '', stage = '' } = await searchParams
   const payload = await getPayloadClient()
 

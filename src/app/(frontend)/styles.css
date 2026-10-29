@@ -208,6 +208,28 @@
   transform: translateY(0);
 }
 
+/* 画布类页面（点位图）铺满内容区，不受页面最大宽度限制 */
+[data-slot="sidebar-inset"] > main:has(> .full-bleed-page) {
+  max-width: none;
+}
+
+/* 侧栏滚动区域：内容按容器宽度换行，长产品名不会把面板撑宽 */
+.point-map-aside [data-slot="scroll-area-viewport"] > div {
+  display: block !important;
+  min-width: 0 !important;
+}
+
+/* 点位图画布：缩放由页面上的「图纸铺满 = 100%」控件负责，隐藏 Excalidraw 自带的缩放和素材库 */
+.point-map-canvas .excalidraw .zoom-actions,
+.point-map-canvas .excalidraw .default-sidebar-trigger {
+  display: none !important;
+}
+
+/* 选中设备后在图纸上点击放置 */
+.point-map-canvas.is-armed .excalidraw .excalidraw__canvas.interactive {
+  cursor: crosshair !important;
+}
+
 @media print {
   @page {
     size: A4;

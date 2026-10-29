@@ -45,7 +45,7 @@ export function SwapProductDialog({
   const [platform, setPlatform] = useState('')
   const [picked, setPicked] = useState<string | null>(null)
   const [scope, setScope] = useState<SwapScope>('line')
-  const [setDefault, setSetDefault] = useState(false)
+  const [setDefault, setSetDefault] = useState(true)
 
   const candidates = useMemo(
     () => products.filter((p) => p.status === 'active' && line?.deviceType && p.deviceType === line.deviceType),
@@ -80,7 +80,7 @@ export function SwapProductDialog({
       setPlatform('')
       setPicked(null)
       setScope('line')
-      setSetDefault(false)
+      setSetDefault(true)
     }
     onOpenChange(o)
   }

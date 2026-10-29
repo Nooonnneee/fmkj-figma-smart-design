@@ -1,5 +1,6 @@
 import Form from 'next/form'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { FileText, Search } from 'lucide-react'
 import type { Where } from 'payload'
 
@@ -19,6 +20,7 @@ export const metadata = { title: '报价 · FMKJ 项目管理' }
 
 export default async function QuotesPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string }> }) {
   const user = await appAuth.getCurrentUser()
+  if (!user) redirect('/login')
   const { q = '', status = '' } = await searchParams
   const payload = await getPayloadClient()
 

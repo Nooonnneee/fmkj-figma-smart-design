@@ -1,5 +1,6 @@
 import Form from 'next/form'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { Check, ChevronDown, ChevronLeft, ChevronRight, ImageIcon, PackageSearch, Search, SlidersHorizontal, X } from 'lucide-react'
 
 import { BrandLogo } from '@/components/brand-logo'
@@ -53,6 +54,7 @@ const toNumber = (v: string) => (v.trim() === '' ? null : Number.isFinite(Number
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<Params> }) {
   const user = await appAuth.getCurrentUser()
+  if (!user) redirect('/login')
   const sp = await searchParams
   const f = Object.fromEntries(KEYS.map((k) => [k, typeof sp[k] === 'string' ? sp[k]!.trim() : ''])) as Record<(typeof KEYS)[number], string>
   const brandSet = new Set(f.brand ? f.brand.split(',').filter(Boolean) : [])

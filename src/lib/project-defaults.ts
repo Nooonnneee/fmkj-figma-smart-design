@@ -27,7 +27,9 @@ export async function setProjectDefault(user: User, projectId: string, deviceTyp
   if (productId) defaults[deviceType] = productId as string
   else delete defaults[deviceType]
   try {
-    await payload.update({ collection: 'projects', id: projectId, data: { defaultProducts: defaults }, user, overrideAccess: false, depth: 0, select: { updatedAt: true } })
+    // 托管数据库更新 JSON 时会合并对象，删除的键要显式写成 null 才会真正清除
+    const data = productId ? defaults : { ...defaults, [deviceType]: null }
+    await payload.update({ collection: 'projects', id: projectId, data: { defaultProducts: data }, user, overrideAccess: false, depth: 0, select: { updatedAt: true } })
     return { ok: true, defaults }
   } catch (error) {
     if ((error as { status?: number })?.status === 403) return { ok: false, error: '没有权限修改该项目', status: 403 }

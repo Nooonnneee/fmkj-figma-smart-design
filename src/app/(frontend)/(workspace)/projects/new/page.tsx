@@ -12,6 +12,7 @@ export const metadata = { title: '新建项目 · FMKJ 项目管理' }
 
 export default async function NewProjectPage() {
   const user = await appAuth.getCurrentUser()
+  if (!user) redirect('/login')
   if (!canEditProjects(user?.role)) redirect('/projects')
   const owners = await listOwnerOptions()
 

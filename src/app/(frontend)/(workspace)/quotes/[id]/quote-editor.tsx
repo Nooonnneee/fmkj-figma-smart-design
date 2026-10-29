@@ -3,14 +3,18 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, ArrowLeftRight, ChevronLeft, ImageIcon, Loader2, Plus, Printer, Save, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowLeftRight, ChevronDown, ChevronLeft, FileDown, FileText, ImageIcon, Layers, Loader2, MapPinned, Plus, Printer, ReceiptText, RefreshCw, RotateCcw, Save, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { DeviceSymbol } from '@/components/device-symbol'
+import { PlanFigure } from '@/components/plan-figure'
+import { PointMarker } from '@/components/point-marker'
+import { ProductThumb } from '@/components/product-thumb'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -18,9 +22,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { DEVICE_TYPE_ORDER, deviceTypeLabel } from '@/lib/device-types'
+import { inferScopeFromTitle, POINT_SCOPES, type PointScope } from '@/lib/point-scopes'
+import type { StoredScene } from '@/lib/point-scene'
+import { buildQuoteFloorGroups } from '@/lib/quote-areas'
 import { QUOTE_STATUSES, quoteTotals, yuan } from '@/lib/quotes'
+import { cn } from '@/lib/utils'
 
-import { saveQuote, setQuoteProjectDefault } from '../actions'
+import { saveQuote, setQuoteProjectDefault, syncQuoteFromPointMap } from '../actions'
 import { SwapProductDialog, type SwapScope } from './swap-product-dialog'
 
 export type ProductOption = {
@@ -54,9 +62,55 @@ type QuoteState = { id: string; title: string; status: string; discount: number;
 
 const toNum = (v: string) => (v.trim() === '' ? 0 : Number(v))
 
+/** 受控数字输入框：输入时保持原始文本（方便输入小数点），失焦或外部变更时同步数值 */
+function EditableNumber({
+  value,
+  onChange,
+  label,
+  disabled,
+  className = 'w-24',
+}: {
+  value: number
+  onChange: (n: number) => void
+  label: string
+  disabled?: boolean
+  className?: string
+}) {
+  const [text, setText] = useState(() => String(value))
+  const [focused, setFocused] = useState(false)
+  useEffect(() => {
+    if (!focused) setText(String(value))
+  }, [value, focused])
+  return (
+    <Input
+      type="number"
+      min={0}
+      step="any"
+      inputMode="decimal"
+      aria-label={label}
+      value={focused ? text : String(value)}
+      disabled={disabled}
+      className={cn('h-7 px-2 text-right tabular-nums', className)}
+      onFocus={() => {
+        setFocused(true)
+        setText(String(value))
+      }}
+      onBlur={() => setFocused(false)}
+      onChange={(e) => {
+        setText(e.target.value)
+        const n = toNum(e.target.value)
+        if (Number.isFinite(n) && n >= 0) onChange(n)
+      }}
+    />
+  )
+}
+
 export function QuoteEditor({
   quote: initial,
   project,
+  projectQuotes = [],
+  projectScene,
+  projectDefaults,
   products,
   costs,
   readOnly,
@@ -64,6 +118,9 @@ export function QuoteEditor({
 }: {
   quote: QuoteState
   project: { id: string; name: string; customerName: string } | null
+  projectQuotes?: { id: string; title: string; total: number }[]
+  projectScene?: Partial<StoredScene> | null
+  projectDefaults?: unknown
   products: ProductOption[]
   /** 仅管理员 / 经理会收到成本；为 null 时不显示成本与毛利。 */
   costs: Record<string, number> | null
@@ -77,6 +134,20 @@ export function QuoteEditor({
   const [pickerOpen, setPickerOpen] = useState(false)
   const [swapKey, setSwapKey] = useState<string | null>(null)
   const [saving, startSaving] = useTransition()
+  const [syncing, setSyncing] = useState(false)
+
+  useEffect(() => {
+    setQuote(initial)
+    setDirty(false)
+  }, [initial])
+
+  const floorGroups = useMemo(
+    () => buildQuoteFloorGroups(projectScene, projectDefaults, products, quote.items),
+    [projectScene, projectDefaults, products, quote.items],
+  )
+  const [viewMode, setViewMode] = useState<'floors' | 'summary'>(() => (floorGroups.length > 0 ? 'floors' : 'summary'))
+  const [planMode, setPlanMode] = useState<'symbol' | 'product' | 'hide'>('symbol')
+  const currentScope = useMemo(() => inferScopeFromTitle(quote.title), [quote.title])
 
   const update = (patch: Partial<QuoteState>) => {
     setQuote((q) => ({ ...q, ...patch }))
@@ -93,6 +164,8 @@ export function QuoteEditor({
   }
 
   const activeProducts = useMemo(() => products.filter((p) => p.status === 'active'), [products])
+  const catalogPriceById = useMemo(() => new Map(products.map((p) => [p.id, p.price])), [products])
+  const catalogPriceOf = (productId: string | null) => (productId ? catalogPriceById.get(productId) : undefined)
   const pickerGroups = useMemo(
     () =>
       DEVICE_TYPE_ORDER.map((t) => ({ type: t, items: activeProducts.filter((p) => p.deviceType === t) }))
@@ -159,27 +232,57 @@ export function QuoteEditor({
       then?.()
     })
 
-  const openPrint = () => {
-    const go = () => window.open(`/print/quotes/${quote.id}`, '_blank')
+  const openPrint = (autoPdf = false) => {
+    const url = autoPdf ? `/print/quotes/${quote.id}?auto=pdf` : `/print/quotes/${quote.id}`
+    const go = () => router.push(url)
     if (dirty && !readOnly) save(go)
     else go()
   }
 
+  /** 无缝跳回点位图（如有未保存的临时改价或换型号，先自动保存再跳转；支持直接定位到指定楼层、房间或点位代号） */
+  const switchToPointMap = (opts?: { sheet?: string; area?: string; point?: string }) => {
+    if (!project) return
+    const params = new URLSearchParams({ quoteId: quote.id, scope: currentScope })
+    if (opts?.sheet) params.set('sheet', opts.sheet)
+    if (opts?.area) params.set('area', opts.area)
+    if (opts?.point) params.set('point', opts.point)
+    const url = `/projects/${project.id}/point-map?${params.toString()}`
+    const go = () => router.push(url)
+    if (dirty && !readOnly) save(go)
+    else go()
+  }
+
+  const switchToProposal = () => {
+    if (!project) return
+    const url = `/print/projects/${project.id}/proposal?scope=${currentScope}`
+    const go = () => router.push(url)
+    if (dirty && !readOnly) save(go)
+    else go()
+  }
+
+  /** 从点位图同步最新点位数量到当前报价（保留临时改价、换过的型号与附加费用） */
+  const syncFromPointMap = async (targetScope: PointScope = currentScope) => {
+    if (syncing || saving) return
+    const runSync = async () => {
+      setSyncing(true)
+      try {
+        const res = await syncQuoteFromPointMap(quote.id, targetScope)
+        if (!res.ok) {
+          toast.error(res.error)
+          return
+        }
+        toast.success(`已从点位图同步（${POINT_SCOPES.find((s) => s.value === res.scope)?.fullLabel}）`)
+        router.refresh()
+      } finally {
+        setSyncing(false)
+      }
+    }
+    if (dirty && !readOnly) save(() => void runSync())
+    else await runSync()
+  }
+
   const numInput = (value: number, onChange: (n: number) => void, label: string, className = 'w-24') => (
-    <Input
-      type="number"
-      min={0}
-      step="any"
-      inputMode="decimal"
-      aria-label={label}
-      className={`h-8 text-right tabular-nums ${className}`}
-      defaultValue={value}
-      disabled={readOnly}
-      onChange={(e) => {
-        const n = toNum(e.target.value)
-        if (Number.isFinite(n)) onChange(n)
-      }}
-    />
+    <EditableNumber value={value} onChange={onChange} label={label} disabled={readOnly} className={cn('h-8', className)} />
   )
 
   return (
@@ -194,12 +297,68 @@ export function QuoteEditor({
         onConfirm={applySwap}
       />
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
-          <Link href={project ? `/projects/${project.id}` : '/quotes'}><ChevronLeft className="size-4" />{project ? '返回项目' : '报价列表'}</Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
+            <Link href={project ? `/projects/${project.id}` : '/quotes'}><ChevronLeft className="size-4" />{project ? '返回项目' : '报价列表'}</Link>
+          </Button>
+          {project ? (
+            <div className="flex items-center rounded-lg bg-muted p-0.5" role="navigation" aria-label="工作台视图切换">
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                disabled={saving || syncing}
+                className="h-7 rounded-md px-2.5 text-xs"
+                onClick={() => switchToPointMap()}
+              >
+                <MapPinned className="size-3.5" />点位图
+              </Button>
+              <div className="flex items-center">
+                <Button type="button" size="xs" variant="ghost" className="h-7 rounded-md bg-background px-2.5 text-xs font-medium shadow-sm">
+                  <ReceiptText className="size-3.5" />报价单
+                  <span className="text-[11px] font-normal text-muted-foreground tabular-nums">{yuan(totals.total)}</span>
+                </Button>
+                {projectQuotes.length > 1 ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button type="button" variant="ghost" size="icon-xs" className="h-7 w-5" aria-label="切换其他报价单">
+                        <ChevronDown className="size-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      {projectQuotes.map((q) => (
+                        <DropdownMenuItem
+                          key={q.id}
+                          onSelect={() => {
+                            if (q.id === quote.id) return
+                            const go = () => router.push(`/quotes/${q.id}`)
+                            if (dirty && !readOnly) save(go)
+                            else go()
+                          }}
+                        >
+                          <span className={cn('flex-1 truncate', q.id === quote.id && 'font-semibold')}>{q.title}</span>
+                          <span className="ml-3 text-xs text-muted-foreground tabular-nums">{yuan(q.total)}</span>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
+              </div>
+              <Button type="button" size="xs" variant="ghost" disabled={saving || syncing} className="h-7 rounded-md px-2.5 text-xs" onClick={switchToProposal}>
+                <FileText className="size-3.5" />方案预览
+              </Button>
+            </div>
+          ) : null}
+        </div>
         <div className="flex items-center gap-2">
           {readOnly ? <Badge variant="secondary">只读</Badge> : dirty ? <Badge variant="outline">未保存</Badge> : null}
-          <Button variant="outline" size="sm" onClick={openPrint}><Printer className="size-4" />打印 / PDF</Button>
+          {project ? (
+            <Button variant="outline" size="sm" disabled={saving || syncing} onClick={() => switchToPointMap()}>
+              <MapPinned className="size-4" />去改点位图
+            </Button>
+          ) : null}
+          <Button variant="outline" size="sm" onClick={() => openPrint(false)}><Printer className="size-4" />打印预览</Button>
+          <Button variant="outline" size="sm" onClick={() => openPrint(true)}><FileDown className="size-4" />导出 PDF</Button>
           {readOnly ? null : (
             <Button size="sm" disabled={saving} onClick={() => save()}>
               {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}保存
@@ -239,10 +398,86 @@ export function QuoteEditor({
       ) : null}
 
       <Card className="gap-0 py-0">
-        <CardHeader className="flex flex-row items-center justify-between border-b py-4">
-          <CardTitle className="text-base">产品明细</CardTitle>
+        <CardHeader className="flex flex-wrap items-center justify-between gap-2 border-b py-4">
+          <div className="flex items-center gap-3">
+            <CardTitle className="text-base">产品明细</CardTitle>
+            {floorGroups.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex rounded-lg bg-muted p-0.5" role="tablist" aria-label="明细视图">
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="ghost"
+                    role="tab"
+                    aria-selected={viewMode === 'floors'}
+                    className={cn('h-7 rounded-md px-2.5 text-xs', viewMode === 'floors' && 'bg-background shadow-sm')}
+                    onClick={() => setViewMode('floors')}
+                  >
+                    <Layers className="size-3.5" />按楼层房间（{floorGroups.length} 层 / {floorGroups.reduce((s, f) => s + f.rooms.length, 0)} 间）
+                  </Button>
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="ghost"
+                    role="tab"
+                    aria-selected={viewMode === 'summary'}
+                    className={cn('h-7 rounded-md px-2.5 text-xs', viewMode === 'summary' && 'bg-background shadow-sm')}
+                    onClick={() => setViewMode('summary')}
+                  >
+                    整单汇总
+                  </Button>
+                </div>
+                {viewMode === 'floors' ? (
+                  <div className="flex rounded-lg bg-muted p-0.5" role="radiogroup" aria-label="点位图显示">
+                    {(
+                      [
+                        ['symbol', '点位图：设备图标'],
+                        ['product', '点位图：产品图'],
+                        ['hide', '收起点位图'],
+                      ] as const
+                    ).map(([v, label]) => (
+                      <Button
+                        key={v}
+                        type="button"
+                        size="xs"
+                        variant="ghost"
+                        role="radio"
+                        aria-checked={planMode === v}
+                        className={cn('h-7 rounded-md px-2 text-xs', planMode === v && 'bg-background shadow-sm')}
+                        onClick={() => setPlanMode(v)}
+                      >
+                        {label}
+                      </Button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
           {readOnly ? null : (
-            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+            <div className="flex items-center gap-2">
+              {project ? (
+                <div className="flex items-center">
+                  <Button variant="outline" size="sm" disabled={syncing || saving} className="rounded-r-none border-r-0" onClick={() => void syncFromPointMap(currentScope)}>
+                    {syncing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}从点位图同步
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" disabled={syncing || saving} className="rounded-l-none px-1.5" aria-label="选择同步范围">
+                        <ChevronDown className="size-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {POINT_SCOPES.map((s) => (
+                        <DropdownMenuItem key={s.value} onSelect={() => void syncFromPointMap(s.value)}>
+                          <span className={cn('flex-1', s.value === currentScope && 'font-semibold')}>按「{s.fullLabel}」同步</span>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              ) : null}
+              <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm"><Plus className="size-4" />添加产品</Button>
               </PopoverTrigger>
@@ -275,12 +510,140 @@ export function QuoteEditor({
                   </CommandList>
                 </Command>
               </PopoverContent>
-            </Popover>
+              </Popover>
+            </div>
           )}
         </CardHeader>
         <CardContent className="p-0">
           {quote.items.length === 0 ? (
             <p className="px-6 py-10 text-center text-sm text-muted-foreground">还没有产品。可以在点位图里放置设备后重新生成，或点击「添加产品」。</p>
+          ) : viewMode === 'floors' && floorGroups.length > 0 ? (
+            <div className="divide-y">
+              {floorGroups.map((floor) => (
+                <div key={floor.sheetId} className="space-y-3 p-4 md:p-6">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <div className="flex flex-wrap items-baseline gap-2">
+                      <h3 className="text-base font-semibold">{floor.floorName}</h3>
+                      <span className="text-xs text-muted-foreground">{floor.sheetName} · {floor.rooms.length} 个区域 · {floor.pointCount} 个点位</span>
+                      {project ? (
+                        <Button type="button" variant="link" size="xs" className="h-auto p-0 text-xs" onClick={() => switchToPointMap({ sheet: floor.sheetId })}>
+                          <MapPinned className="size-3" />去点位图看本层
+                        </Button>
+                      ) : null}
+                    </div>
+                    <div className="text-sm font-semibold tabular-nums">楼层小计 {yuan(floor.subtotal)}</div>
+                  </div>
+                  {planMode !== 'hide' && floor.sheetUrl ? (
+                    <div className="overflow-hidden rounded-xl border bg-white">
+                      <PlanFigure
+                        sheetUrl={floor.sheetUrl}
+                        points={floor.planPoints}
+                        areas={floor.planAreas}
+                        mode={planMode}
+                        className="w-full"
+                      />
+                    </div>
+                  ) : null}
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {floor.rooms.map((room) => (
+                      <div key={room.id} className="flex flex-col rounded-xl border bg-background p-3.5">
+                        <div className="mb-2.5 flex items-baseline justify-between border-b pb-2">
+                          <div className="flex flex-wrap items-baseline gap-1.5">
+                            <span className="text-sm font-semibold">{room.name}</span>
+                            <span className="text-xs text-muted-foreground">{room.typeLabel} · {room.pointCount} 个点位</span>
+                            {project && room.typeLabel !== '未分区' ? (
+                              <Button type="button" variant="link" size="xs" className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground" onClick={() => switchToPointMap({ area: room.name })}>
+                                定位房间
+                              </Button>
+                            ) : null}
+                          </div>
+                          <span className="text-sm font-semibold tabular-nums">{yuan(room.subtotal)}</span>
+                        </div>
+                        <div className="divide-y">
+                          {room.lines.map((line) => {
+                            const originPrice = catalogPriceOf(line.productId)
+                            const priceChanged = originPrice !== undefined && Math.abs(originPrice - line.price) > 0.001
+                            return (
+                              <div key={`${room.id}-${line.deviceType}-${line.productId}`} className="flex items-center gap-2.5 py-2 first:pt-0 last:pb-0">
+                                <ProductThumb src={line.image} alt={line.name} className="size-10" />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <PointMarker type={line.deviceType} className="size-4" />
+                                    <span className="truncate text-sm font-medium">{line.name}</span>
+                                  </div>
+                                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                                    <span>{line.typeName}</span>
+                                    {line.sku ? <span>· {line.sku}</span> : null}
+                                    {line.codes.length ? (
+                                      <span className="inline-flex flex-wrap items-center gap-1 font-mono text-[11px]">
+                                        （
+                                        {line.codes.map((code, idx) => (
+                                          <span key={code}>
+                                            {project ? (
+                                              <button
+                                                type="button"
+                                                title={`在点位图中定位并选中 ${code}`}
+                                                className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+                                                onClick={() => switchToPointMap({ point: code })}
+                                              >
+                                                {code}
+                                              </button>
+                                            ) : (
+                                              code
+                                            )}
+                                            {idx < line.codes.length - 1 ? '、' : ''}
+                                          </span>
+                                        ))}
+                                        ）
+                                      </span>
+                                    ) : null}
+                                    {!readOnly && line.lineKey ? (
+                                      <Button variant="link" size="xs" className="h-auto p-0 text-xs" onClick={() => setSwapKey(line.lineKey)}>
+                                        <ArrowLeftRight className="size-3" />更换型号
+                                      </Button>
+                                    ) : null}
+                                  </div>
+                                </div>
+                                <div className="shrink-0 text-right text-xs tabular-nums">
+                                  <div className="text-sm font-semibold">{yuan(line.subtotal)}</div>
+                                  <div className="mt-1 flex items-center justify-end gap-1 text-muted-foreground">
+                                    <span>¥</span>
+                                    <EditableNumber
+                                      value={line.price}
+                                      disabled={readOnly || !line.lineKey}
+                                      label={`${room.name} ${line.name} 单价`}
+                                      className="h-6 w-20 px-1.5 text-xs"
+                                      onChange={(n) => line.lineKey && updateLine(line.lineKey, { price: n })}
+                                    />
+                                    <span>× {line.quantity}{line.unit || '个'}</span>
+                                  </div>
+                                  {priceChanged && line.lineKey ? (
+                                    <div className="mt-0.5 flex items-center justify-end gap-1 text-[11px] text-warning">
+                                      <span>原价 {yuan(originPrice)}</span>
+                                      {!readOnly ? (
+                                        <Button
+                                          type="button"
+                                          variant="link"
+                                          size="xs"
+                                          className="h-auto p-0 text-[11px]"
+                                          onClick={() => updateLine(line.lineKey!, { price: originPrice })}
+                                        >
+                                          <RotateCcw className="size-2.5" />恢复
+                                        </Button>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <Table>
               <TableHeader>
@@ -326,8 +689,26 @@ export function QuoteEditor({
                         {unitCost(l) === undefined ? '—' : yuan(unitCost(l))}
                       </TableCell>
                     ) : null}
-                    <TableCell key={`p-${l.rev ?? 0}`} className="text-right">{numInput(l.price, (n) => updateLine(l.key, { price: n }), `${l.name} 单价`, 'ml-auto w-28')}</TableCell>
-                    <TableCell key={`q-${l.rev ?? 0}`} className="text-right">{numInput(l.quantity, (n) => updateLine(l.key, { quantity: n }), `${l.name} 数量`, 'ml-auto w-20')}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex flex-col items-end gap-0.5">
+                        {numInput(l.price, (n) => updateLine(l.key, { price: n }), `${l.name} 单价`, 'ml-auto w-28')}
+                        {(() => {
+                          const originPrice = catalogPriceOf(l.product)
+                          if (originPrice === undefined || Math.abs(originPrice - l.price) <= 0.001) return null
+                          return (
+                            <span className="flex items-center gap-1 text-[11px] text-warning tabular-nums">
+                              原价 {yuan(originPrice)}
+                              {!readOnly ? (
+                                <Button type="button" variant="link" size="xs" className="h-auto p-0 text-[11px]" onClick={() => updateLine(l.key, { price: originPrice })}>
+                                  <RotateCcw className="size-2.5" />恢复
+                                </Button>
+                              ) : null}
+                            </span>
+                          )
+                        })()}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">{numInput(l.quantity, (n) => updateLine(l.key, { quantity: n }), `${l.name} 数量`, 'ml-auto w-20')}</TableCell>
                     <TableCell className="text-right font-medium tabular-nums">{yuan(l.price * l.quantity)}</TableCell>
                     {readOnly ? null : (
                       <TableCell className="pr-4">
