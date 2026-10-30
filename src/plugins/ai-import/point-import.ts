@@ -13,10 +13,10 @@
  * }
  * 只给一张图纸时可以省略 sheets，直接写 { "points": [...] }，导入到当前图纸。
  */
-import { AREA_TYPES, inferAreaType, isAreaType, type AreaType } from './area-types'
-import { categoryOf, DEVICE_TYPES, deviceTypeOf, inferDeviceType, isDeviceType } from './device-types'
-import { buildAreaElements, buildPointElements, nextPointCode, type AreaInfo, type PointInfo, type SceneEl, type SheetInfo } from './point-scene'
-import { SHEET } from './sheet-spec'
+import { AREA_TYPES, inferAreaType, isAreaType, type AreaType } from '@/lib/area-types'
+import { categoryOf, DEVICE_TYPES, deviceTypeOf, inferDeviceType, isDeviceType } from '@/lib/device-types'
+import { buildAreaElements, buildPointElements, nextPointCode, type AreaInfo, type PointInfo, type SceneEl, type SheetInfo } from '@/lib/point-scene'
+import { SHEET } from '@/lib/sheet-spec'
 
 export const IMPORT_FORMAT = 'fmkj-points'
 

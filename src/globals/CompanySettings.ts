@@ -44,5 +44,36 @@ export const CompanySettings: GlobalConfig = {
     { name: 'quoteNotes', label: '新报价默认备注', type: 'textarea', maxLength: 2000 },
     { name: 'contractTerms', label: '合同默认条款', type: 'textarea', maxLength: 5000, defaultValue: DEFAULT_CONTRACT_TERMS },
     { name: 'printProductImages', label: '打印报价单时显示产品图片', type: 'checkbox', defaultValue: true },
+    {
+      // 各类文档的默认风格和版式：{ quote: { style, layout }, plans: …, contract: …, checklist: … }，在「设置」页修改
+      name: 'documentDefaults',
+      label: '文档默认模板',
+      type: 'json',
+      jsonSchema: {
+        uri: 'a://fmkj/document-defaults.json',
+        fileMatch: ['a://fmkj/document-defaults.json'],
+        schema: {
+          type: 'object',
+          additionalProperties: {
+            type: 'object',
+            properties: { style: { type: 'string', maxLength: 40 }, layout: { type: 'string', maxLength: 40 } },
+            additionalProperties: false,
+          },
+        },
+      },
+      admin: { description: '在系统「设置 → 文档模板」里修改' },
+    },
+    {
+      // 已关闭的插件 ID 列表；新安装的插件默认开启
+      name: 'disabledPlugins',
+      label: '已关闭的插件',
+      type: 'json',
+      jsonSchema: {
+        uri: 'a://fmkj/disabled-plugins.json',
+        fileMatch: ['a://fmkj/disabled-plugins.json'],
+        schema: { type: 'array', maxItems: 50, items: { type: 'string', minLength: 1, maxLength: 40 } },
+      },
+      admin: { description: '在系统「设置 → 插件」里修改' },
+    },
   ],
 }

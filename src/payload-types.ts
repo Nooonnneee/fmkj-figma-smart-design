@@ -91,6 +91,9 @@ export interface Config {
     media: Media;
     folders: Folder;
     tags: Tag;
+    'ai-conversations': AiConversation;
+    'ai-messages': AiMessage;
+    'ai-credit-ledger': AiCreditLedger;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -110,6 +113,9 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     folders: FoldersSelect<false> | FoldersSelect<true>;
     tags: TagsSelect<false> | TagsSelect<true>;
+    'ai-conversations': AiConversationsSelect<false> | AiConversationsSelect<true>;
+    'ai-messages': AiMessagesSelect<false> | AiMessagesSelect<true>;
+    'ai-credit-ledger': AiCreditLedgerSelect<false> | AiCreditLedgerSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -224,6 +230,10 @@ export interface User {
    * 停用后无法登录，已有项目保留
    */
   status: 'active' | 'disabled';
+  /**
+   * 在「积分流水」里新建一条记录来发放积分
+   */
+  aiCredits?: number | null;
   createdBy?:
     | ({
         relationTo: 'admins';
@@ -723,6 +733,117 @@ export interface Contract {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ai-conversations".
+ */
+export interface AiConversation {
+  id: string;
+  title: string;
+  owner: string | User;
+  project?: (string | null) | Project;
+  model?: string | null;
+  createdBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ai-messages".
+ */
+export interface AiMessage {
+  id: string;
+  conversation: string | AiConversation;
+  owner: string | User;
+  role: 'user' | 'assistant';
+  content: string;
+  model?: string | null;
+  cost?: number | null;
+  toolCalls?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  createdBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * 给成员发放积分：新建一条流水，填写成员和正数积分。
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ai-credit-ledger".
+ */
+export interface AiCreditLedger {
+  id: string;
+  user: string | User;
+  /**
+   * 正数为发放，负数为扣减
+   */
+  delta: number;
+  balanceAfter?: number | null;
+  reason?: string | null;
+  model?: string | null;
+  message?: (string | null) | AiMessage;
+  createdBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -788,6 +909,18 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'tags';
         value: string | Tag;
+      } | null)
+    | ({
+        relationTo: 'ai-conversations';
+        value: string | AiConversation;
+      } | null)
+    | ({
+        relationTo: 'ai-messages';
+        value: string | AiMessage;
+      } | null)
+    | ({
+        relationTo: 'ai-credit-ledger';
+        value: string | AiCreditLedger;
       } | null);
   globalSlug?: string | null;
   user:
@@ -896,6 +1029,7 @@ export interface UsersSelect<T extends boolean = true> {
   name?: T;
   phone?: T;
   status?: T;
+  aiCredits?: T;
   createdBy?: T;
   updatedBy?: T;
   updatedAt?: T;
@@ -1124,6 +1258,53 @@ export interface TagsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ai-conversations_select".
+ */
+export interface AiConversationsSelect<T extends boolean = true> {
+  title?: T;
+  owner?: T;
+  project?: T;
+  model?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ai-messages_select".
+ */
+export interface AiMessagesSelect<T extends boolean = true> {
+  conversation?: T;
+  owner?: T;
+  role?: T;
+  content?: T;
+  model?: T;
+  cost?: T;
+  toolCalls?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ai-credit-ledger_select".
+ */
+export interface AiCreditLedgerSelect<T extends boolean = true> {
+  user?: T;
+  delta?: T;
+  balanceAfter?: T;
+  reason?: T;
+  model?: T;
+  message?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv_select".
  */
 export interface PayloadKvSelect<T extends boolean = true> {
@@ -1198,6 +1379,16 @@ export interface CompanySetting {
   quoteNotes?: string | null;
   contractTerms?: string | null;
   printProductImages?: boolean | null;
+  documentDefaults?: {
+    [k: string]: {
+      style?: string;
+      layout?: string;
+    };
+  };
+  /**
+   * @maxItems 50
+   */
+  disabledPlugins?: string[];
   createdBy?:
     | ({
         relationTo: 'admins';
@@ -1235,6 +1426,8 @@ export interface CompanySettingsSelect<T extends boolean = true> {
   quoteNotes?: T;
   contractTerms?: T;
   printProductImages?: T;
+  documentDefaults?: T;
+  disabledPlugins?: T;
   createdBy?: T;
   updatedBy?: T;
   updatedAt?: T;
@@ -1279,7 +1472,10 @@ export interface CollectionQueryWidget {
       | 'categories'
       | 'media'
       | 'folders'
-      | 'tags';
+      | 'tags'
+      | 'ai-conversations'
+      | 'ai-messages'
+      | 'ai-credit-ledger';
     where?:
       | {
           [k: string]: unknown;
@@ -1314,6 +1510,9 @@ export interface ActivityWidget {
           | 'media'
           | 'folders'
           | 'tags'
+          | 'ai-conversations'
+          | 'ai-messages'
+          | 'ai-credit-ledger'
         )[]
       | null;
   };

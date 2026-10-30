@@ -53,5 +53,15 @@ export const Users: CollectionConfig = {
       admin: { description: '停用后无法登录，已有项目保留' },
       access: { update: fieldCmsAdminOnly },
     },
+    {
+      // 只能通过「积分流水」变动（发放 / 扣减时由服务端写回），任何人都不能直接改
+      name: 'aiCredits',
+      label: 'AI 积分',
+      type: 'number',
+      defaultValue: 0,
+      min: 0,
+      admin: { readOnly: true, position: 'sidebar', description: '在「积分流水」里新建一条记录来发放积分' },
+      access: { update: () => false, create: () => false },
+    },
   ],
 }

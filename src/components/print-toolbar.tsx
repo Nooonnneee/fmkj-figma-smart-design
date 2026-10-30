@@ -13,7 +13,18 @@ import { cn } from '@/lib/utils'
 type Option = { value: string; label: string; href: string }
 
 /** 打印页顶部工具条：切换模板 / 选项、直接导出 PDF、导出图片、浏览器打印。 */
-export function PrintToolbar({ back, groups, exportName }: { back: { href: string; label: string }; groups: { label: string; value: string; options: Option[] }[]; exportName: string }) {
+export function PrintToolbar({
+  back,
+  groups,
+  exportName,
+  wide = false,
+}: {
+  back: { href: string; label: string }
+  groups: { label: string; value: string; options: Option[] }[]
+  exportName: string
+  /** 页面比 A4 宽（例如按 1440px 设计稿排版的方案）时，工具条跟着加宽 */
+  wide?: boolean
+}) {
   const [busy, setBusy] = useState<'pdf' | 'img' | null>(null)
   const searchParams = useSearchParams()
   const autoTriggered = useRef(false)
@@ -68,7 +79,7 @@ export function PrintToolbar({ back, groups, exportName }: { back: { href: strin
   }
   return (
     <div className="sticky top-0 z-20 border-b bg-background/95 print:hidden">
-      <div className="mx-auto flex max-w-[297mm] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2">
+      <div className={cn('mx-auto flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2', wide ? 'max-w-[1440px]' : 'max-w-[297mm]')}>
         <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
           <Link href={back.href}><ChevronLeft className="size-4" />{back.label}</Link>
         </Button>

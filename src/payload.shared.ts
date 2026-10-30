@@ -4,6 +4,9 @@ import { mcpPlugin } from '@payloadcms/plugin-mcp'
 import { en as adminLanguage } from '@payloadcms/translations/languages/en'
 import { fileURLToPath } from 'url'
 import { Admins } from './collections/Admins'
+import { AiConversations } from './collections/AiConversations'
+import { AiCreditLedger } from './collections/AiCreditLedger'
+import { AiMessages } from './collections/AiMessages'
 import { Brands } from './collections/Brands'
 import { Categories } from './collections/Categories'
 import { Contracts } from './collections/Contracts'
@@ -15,7 +18,7 @@ import { Quotes } from './collections/Quotes'
 import { Tags } from './collections/Tags'
 import { Users } from './collections/Users'
 import { CompanySettings } from './globals/CompanySettings'
-import { dwgConverterPlugin } from './plugins/dwg-converter'
+import { PLUGINS } from './plugins'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -44,7 +47,7 @@ export const sharedConfig = {
     fallbackLanguage: 'en',
     supportedLanguages: { 'en': adminLanguage },
   },
-  collections: [Admins, Users, Projects, Quotes, Contracts, Products, Brands, Categories, Media, Folders, Tags],
+  collections: [Admins, Users, Projects, Quotes, Contracts, Products, Brands, Categories, Media, Folders, Tags, AiConversations, AiMessages, AiCreditLedger],
   globals: [CompanySettings],
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
@@ -56,7 +59,7 @@ export const sharedConfig = {
   },
   plugins: [
     mcpPlugin({}),
-    // DWG 转户型图：配置 DWG_CONVERTER_URL 后启用，删掉这一行即卸载
-    dwgConverterPlugin({ endpoint: process.env.DWG_CONVERTER_URL, token: process.env.DWG_CONVERTER_TOKEN }),
+    // 应用插件的 Payload 扩展（例如 DWG 转户型图），在 src/plugins/index.ts 登记
+    ...PLUGINS.flatMap((p) => (p.payload ? [p.payload] : [])),
   ],
 } satisfies Partial<Config>

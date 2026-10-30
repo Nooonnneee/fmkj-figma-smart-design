@@ -1,5 +1,6 @@
 import { appAuth } from '@/lib/app-auth'
-import { autoSelectProducts, isSelectionTier } from '@/lib/auto-select'
+import { autoSelectProducts, isSelectionTier } from '@/plugins/smart-select/auto-select'
+import { getPluginFlags } from '@/plugins/state'
 import { getCatalog } from '@/lib/cached-data'
 import { isDeviceType } from '@/lib/device-types'
 import { getPayloadClient } from '@/lib/payload'
@@ -16,6 +17,7 @@ const fail = (status: number, error: string) => Response.json({ ok: false, error
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await appAuth.getCurrentUser()
   if (!user) return fail(401, '登录已过期，请重新登录')
+  if (!(await getPluginFlags())['smart-select']) return fail(404, '「智能选型」插件已关闭')
   const body = (await request.json().catch(() => null)) as { tier?: unknown; overwrite?: unknown; scope?: unknown } | null
   if (!body || !isSelectionTier(body.tier)) return fail(400, '请选择档次')
   const scope = isPointScope(body.scope) ? body.scope : 'all'

@@ -4,6 +4,58 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* 文档模板「栖序雅致」使用的字体（来自 Figma 设计，按需加载：只有用到这些字体的页面才会下载） */
+@font-face {
+  font-family: "Inter:Light";
+  src: url("https://static.figma.com/font/Inter_1") format("woff2");
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter:Regular";
+  src: url("https://static.figma.com/font/Inter_1") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans SC:Bold";
+  src: url("https://static.figma.com/font/NotoSansSC-VF_2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans SC:Medium";
+  src: url("https://static.figma.com/font/NotoSansSC-VF_2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans SC:Regular";
+  src: url("https://static.figma.com/font/NotoSansSC-VF_2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+/* 文档风格「东方雅韵」的衬线体、「科技」的等宽数字（同样按需加载） */
+@font-face {
+  font-family: "Noto Serif SC";
+  src: url("https://static.figma.com/font/NotoSerifSC-VF_3") format("woff2");
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("https://static.figma.com/font/JetBrainsMono_wght__1") format("woff2");
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+}
+
 @theme inline {
   --font-sans: var(--font-sans);
   --font-heading: var(--font-sans);
@@ -236,4 +288,45 @@
     size: A4;
     margin: 14mm;
   }
+}
+
+/*
+ * 文档模板（报价单、合同、点位图、交底清单、方案）的风格变量。
+ * 每份文档的根节点按所选风格设置 --doc-*（见 src/documents/theme.ts），这里映射成 Tailwind 颜色和工具类：
+ * bg-doc-paper、text-doc-muted、border-doc-rule、bg-doc-head、doc-display、doc-numeral …
+ */
+@theme inline {
+  --color-doc-paper: var(--doc-paper);
+  --color-doc-ink: var(--doc-ink);
+  --color-doc-muted: var(--doc-muted);
+  --color-doc-accent: var(--doc-accent);
+  --color-doc-soft: var(--doc-soft);
+  --color-doc-soft-to: var(--doc-soft-to);
+  --color-doc-rule: var(--doc-rule);
+  --color-doc-head: var(--doc-head-bg);
+  --color-doc-head-fg: var(--doc-head-fg);
+  --color-doc-stripe: var(--doc-stripe);
+  --radius-doc: var(--doc-radius);
+}
+
+@utility doc-display {
+  font-family: var(--doc-font-display);
+  font-weight: var(--doc-w-display);
+}
+@utility doc-strong {
+  font-family: var(--doc-font-strong);
+  font-weight: var(--doc-w-strong);
+}
+@utility doc-body {
+  font-family: var(--doc-font-body);
+  font-weight: 400;
+}
+@utility doc-numeral {
+  font-family: var(--doc-font-numeral);
+  font-weight: var(--doc-w-numeral);
+  font-variant-numeric: tabular-nums;
+}
+@utility doc-latin {
+  font-family: var(--doc-font-latin);
+  font-weight: 400;
 }

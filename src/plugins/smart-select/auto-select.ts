@@ -6,7 +6,7 @@
  * 3. 档次：在候选里按售价取分位（经济 20%、标准 50%、高端 85%）。
  * 4. 品牌统一：同一类别里尽量用同一个品牌（价格相差不超过 40% 时换成主品牌）。
  */
-import { categoryOfType } from './device-types'
+import { categoryOfType } from '@/lib/device-types'
 
 export const SELECTION_TIERS = [
   { value: 'economy', label: '经济', percentile: 0.2 },

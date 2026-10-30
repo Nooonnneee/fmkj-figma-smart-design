@@ -12,6 +12,8 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 
+import { DocumentTemplateSettings, type DocKindOption, type DocStyleOption } from './document-plugin-settings'
+
 type Values = {
   name: string
   slogan: string
@@ -82,7 +84,13 @@ function ImageField({ name, label, url, hint }: { name: 'logo' | 'qrCode'; label
   )
 }
 
-export function CompanyForm({ initial }: { initial: Values }) {
+export function CompanyForm({
+  initial,
+  documents,
+}: {
+  initial: Values
+  documents: { kinds: DocKindOption[]; styles: DocStyleOption[]; defaults: Record<string, { style?: string; layout?: string }> }
+}) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<{ message: string; field?: string } | null>(null)
@@ -170,7 +178,8 @@ export function CompanyForm({ initial }: { initial: Values }) {
           </div>
         </CardContent>
       </Card>
-      <div className="flex justify-end">
+      <DocumentTemplateSettings kinds={documents.kinds} styles={documents.styles} defaults={documents.defaults} />
+      <div className="sticky bottom-0 -mx-1 flex justify-end bg-background/95 px-1 py-3">
         <Button type="submit" disabled={saving}>
           {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}保存
         </Button>

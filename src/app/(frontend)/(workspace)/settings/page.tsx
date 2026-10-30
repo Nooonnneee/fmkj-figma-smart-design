@@ -1,10 +1,13 @@
 import { redirect } from 'next/navigation'
 
+import { allStyles, availableStyles, DOC_KIND_LIST, DOC_KINDS } from '@/documents/registry'
 import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
+import { getCompanyInfo } from '@/lib/cached-data'
 import { DEFAULT_CONTRACT_TERMS } from '@/lib/contracts'
 import { getPayloadClient } from '@/lib/payload'
 import type { Media } from '@/payload-types'
+import { getPluginFlags } from '@/plugins/state'
 
 import { CompanyForm } from './company-form'
 
@@ -14,14 +17,15 @@ export default async function SettingsPage() {
   const user = await appAuth.getCurrentUser()
   if (!user) redirect('/login')
   const payload = await getPayloadClient()
-  const settings = await payload.findGlobal({ slug: 'company-settings', depth: 1, user, overrideAccess: false })
+  const [settings, company, flags] = await Promise.all([payload.findGlobal({ slug: 'company-settings', depth: 1, user, overrideAccess: false }), getCompanyInfo(), getPluginFlags()])
+  const enabledStyles = new Set(availableStyles(flags).map((s) => s.id))
   const img = (m: unknown) => (m && typeof m === 'object' ? ((m as Media).url ?? null) : null)
 
   return (
     <section className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight">设置</h1>
-        <p className="text-sm text-muted-foreground">报价单、合同上的抬头和联系方式，以及新报价、新合同的默认内容</p>
+        <p className="text-sm text-muted-foreground">抬头和联系方式、新报价和合同的默认内容，以及各类打印文档的默认模板</p>
       </header>
       <CompanyForm
         initial={{
@@ -36,6 +40,11 @@ export default async function SettingsPage() {
           printProductImages: settings.printProductImages !== false,
           logoUrl: img(settings.logo),
           qrCodeUrl: img(settings.qrCode),
+        }}
+        documents={{
+          kinds: DOC_KIND_LIST.map((kind) => ({ kind, label: DOC_KINDS[kind].label, layouts: DOC_KINDS[kind].layouts.map((l) => ({ value: l.value, label: l.label })) })),
+          styles: allStyles().map((s) => ({ id: s.id, name: s.name, description: s.description, swatch: [s.colors.paper, s.colors.accent, s.colors.headBg], enabled: enabledStyles.has(s.id) })),
+          defaults: company.documentDefaults,
         }}
       />
     </section>

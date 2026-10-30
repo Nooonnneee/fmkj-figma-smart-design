@@ -3,8 +3,32 @@
 import { useState } from "react"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { ChevronsUpDown, FolderKanban, LogOut, PackageSearch, Settings } from "lucide-react"
+import {
+  Blocks,
+  Bot,
+  Cable,
+  ChevronsUpDown,
+  ClipboardList,
+  FileUp,
+  FolderKanban,
+  KeyRound,
+  LayoutGrid,
+  LogOut,
+  MessageSquareText,
+  PackageCheck,
+  PackageSearch,
+  Palette,
+  Presentation,
+  ScanSearch,
+  Settings,
+  Sparkles,
+  Wand2,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react"
 
+import type { AiProjectContext } from "@/components/ai/ai-elements"
+import { AiSidebarDock } from "@/components/ai/ai-sidebar-dock"
 import { GuardedLink } from "@/components/guarded-link"
 import { LinkPending } from "@/components/link-pending"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -21,28 +45,76 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarSeparator,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { APP_TAGLINE, brandInitials } from "@/lib/brand"
+import { cn } from "@/lib/utils"
+import type { PluginId } from "@/plugins/types"
 
 export type SidebarUser = { name: string; email: string }
 export type SidebarBrand = { name: string; logo: string | null }
+export type SidebarPlugin = {
+  id: PluginId
+  name: string
+  description: string
+  status: "ready" | "coming-soon"
+  enabled: boolean
+  where: string
+  provides: string[]
+}
 
-const nav = [
+const baseNav = [
   { icon: FolderKanban, label: "项目", url: "/projects" },
   { icon: PackageSearch, label: "产品库", url: "/products" },
+  { icon: Blocks, label: "插件", url: "/plugins" },
   { icon: Settings, label: "设置", url: "/settings" },
 ] as const
 
+const PLUGIN_ICONS: Record<PluginId, LucideIcon> = {
+  "ai-copilot": Bot,
+  "doc-styles": Palette,
+  proposal: Presentation,
+  "room-insights": Sparkles,
+  "smart-select": Wand2,
+  "ai-import": ScanSearch,
+  "dwg-import": FileUp,
+  "site-survey": ClipboardList,
+  "wiring-schedule": Cable,
+  procurement: PackageCheck,
+  "scene-handover": KeyRound,
+  "after-sales": Wrench,
+}
+
 const initials = (name: string) => name.trim().slice(0, 1).toUpperCase() || "我"
 
-export function AppSidebar({ user, brand }: { user: SidebarUser; brand: SidebarBrand }) {
+export function AppSidebar({
+  user,
+  brand,
+  plugins,
+  projects,
+  ai,
+}: {
+  user: SidebarUser
+  brand: SidebarBrand
+  plugins: SidebarPlugin[]
+  projects: AiProjectContext[]
+  ai: { credits: number; configured: boolean }
+}) {
   const pathname = usePathname()
+  const { state, setOpen } = useSidebar()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [mode, setMode] = useState<"nav" | "chat">("nav")
+
+  const aiCopilotEnabled = plugins.some((p) => p.id === "ai-copilot" && p.status === "ready" && p.enabled)
+  const effectiveMode = aiCopilotEnabled && state === "expanded" ? mode : "nav"
 
   async function handleLogout() {
     if (isLoggingOut) return
@@ -55,7 +127,14 @@ export function AppSidebar({ user, brand }: { user: SidebarUser; brand: SidebarB
   }
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar
+      collapsible="icon"
+      style={
+        effectiveMode === "chat"
+          ? ({ "--sidebar-width": "24rem" } as React.CSSProperties)
+          : undefined
+      }
+    >
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -77,25 +156,129 @@ export function AppSidebar({ user, brand }: { user: SidebarUser; brand: SidebarB
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-      </SidebarHeader>
 
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarMenu>
-            {nav.map((item) => (
-              <SidebarMenuItem key={item.url}>
-                <SidebarMenuButton asChild isActive={pathname.startsWith(item.url)} tooltip={item.label}>
-                  <GuardedLink href={item.url}>
-                    <item.icon />
-                    <span>{item.label}</span>
-                    <LinkPending className="ml-auto size-3.5" />
-                  </GuardedLink>
+        {/* Figma Make 式侧边栏模式切换：导航 | AI 对话（仅在启用「AI 对话侧栏（高级）」插件时显示） */}
+        {aiCopilotEnabled ? (
+          <>
+            <div className="grid grid-cols-2 gap-1 rounded-xl border border-sidebar-border bg-muted/50 p-0.5 group-data-[collapsible=icon]:hidden">
+              <button
+                type="button"
+                onClick={() => setMode("nav")}
+                className={cn(
+                  "inline-flex h-7 items-center justify-center gap-1.5 rounded-lg text-xs font-medium transition-colors",
+                  effectiveMode === "nav"
+                    ? "bg-background text-foreground shadow-2xs"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <LayoutGrid className="size-3.5" />
+                <span>导航</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("chat")}
+                className={cn(
+                  "inline-flex h-7 items-center justify-center gap-1.5 rounded-lg text-xs font-medium transition-colors",
+                  effectiveMode === "chat"
+                    ? "bg-background text-foreground shadow-2xs"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <MessageSquareText className="size-3.5" />
+                <span>AI 对话</span>
+              </button>
+            </div>
+
+            {/* 折叠为图标模式时，提供一键展开到 AI 对话侧栏的按钮 */}
+            <SidebarMenu className="hidden group-data-[collapsible=icon]:flex">
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="展开 AI 对话侧栏"
+                  onClick={() => {
+                    setOpen(true)
+                    setMode("chat")
+                  }}
+                >
+                  <MessageSquareText />
+                  <span>AI 对话</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarGroup>
-      </SidebarContent>
+            </SidebarMenu>
+          </>
+        ) : null}
+      </SidebarHeader>
+
+      {effectiveMode === "chat" ? (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <AiSidebarDock plugins={plugins.filter((p) => p.id !== "ai-copilot")} projects={projects} credits={ai.credits} configured={ai.configured} />
+        </div>
+      ) : (
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarMenu>
+              {baseNav.map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={item.url === "/plugins" ? pathname === "/plugins" : pathname.startsWith(item.url)}
+                    tooltip={item.label}
+                  >
+                    <GuardedLink href={item.url}>
+                      <item.icon />
+                      <span>{item.label}</span>
+                      <LinkPending className="ml-auto size-3.5" />
+                    </GuardedLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+              {aiCopilotEnabled ? (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={pathname.startsWith("/ai")} tooltip="AI 对话工作台">
+                    <GuardedLink href="/ai">
+                      <Bot />
+                      <span>AI 对话</span>
+                      <LinkPending className="ml-auto size-3.5" />
+                    </GuardedLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ) : null}
+            </SidebarMenu>
+          </SidebarGroup>
+
+          <SidebarSeparator />
+
+          <SidebarGroup>
+            <SidebarGroupLabel>插件</SidebarGroupLabel>
+            <SidebarMenu>
+              {plugins.map((p) => {
+                const Icon = PLUGIN_ICONS[p.id] ?? Blocks
+                const pending = p.status === "coming-soon"
+                const stateText = pending ? "待开发" : p.enabled ? "已开启" : "已关闭"
+                const href = `/plugins/${p.id}`
+                return (
+                  <SidebarMenuItem key={p.id}>
+                    <SidebarMenuButton
+                      asChild
+                      size="sm"
+                      isActive={pathname === href}
+                      tooltip={`${p.name}（${stateText}）`}
+                      className="pr-14"
+                    >
+                      <GuardedLink href={href} className={cn(pending && "text-muted-foreground")}>
+                        <Icon />
+                        <span>{p.name}</span>
+                      </GuardedLink>
+                    </SidebarMenuButton>
+                    <SidebarMenuBadge className={cn("text-[11px] font-normal", pending || !p.enabled ? "text-muted-foreground" : "text-success")}>
+                      {stateText}
+                    </SidebarMenuBadge>
+                  </SidebarMenuItem>
+                )
+              })}
+            </SidebarMenu>
+          </SidebarGroup>
+        </SidebarContent>
+      )}
 
       <SidebarFooter>
         <SidebarMenu>

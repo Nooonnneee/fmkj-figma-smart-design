@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
-import { AlertTriangle, ArrowLeftRight, Check, Eye, FileText, ChevronDown, Download, FilePlus2, FileUp, ImagePlus, Layers, Loader2, MapPinned, Maximize2, Minus, Plus, ReceiptText, Save, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeftRight, Check, Eye, FileText, ChevronDown, Download, ListChecks, Printer, FilePlus2, FileUp, ImagePlus, Layers, Loader2, MapPinned, Maximize2, Minus, Plus, ReceiptText, Save, X } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
 
@@ -20,11 +20,9 @@ import { useSidebar } from '@/components/ui/sidebar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { analyzeAreas } from '@/lib/area-analysis'
 import { areaTypeLabel } from '@/lib/area-types'
-import type { SelectionTier } from '@/lib/auto-select'
 import { categoryOfType, DEVICE_GROUPS, DEVICE_TYPE_ORDER, deviceTypeLabel, deviceTypeOf } from '@/lib/device-types'
 import { registerLeaveGuard } from '@/lib/leave-guard'
 import { resolvePoint, summarizePoints, type ProjectDefaults } from '@/lib/point-map-items'
-import { exportPoints, parsePointImport, planToElements, recognitionPrompt } from '@/lib/point-import'
 import { markerBinaryFile } from '@/lib/point-marker-data'
 import { isMarkerFileId, markerFileId } from '@/lib/point-markers'
 import { inferScopeFromTitle, inPointScope, POINT_SCOPES, pointScopeLabel, type PointScope } from '@/lib/point-scopes'
@@ -50,7 +48,12 @@ import { SHEET } from '@/lib/sheet-spec'
 import { cn } from '@/lib/utils'
 
 import { createQuoteFromProject, syncQuoteFromPointMap } from '../quotes/actions'
-import { AiPanel, AreasPanel, DRAG_TYPE, PlacePanel, SelectedArea, SelectedPoint, SmartSelect, TypeDefaultRow, yuan, type ImportOutcome, type PointProduct } from './editor-panels'
+import { AiPanel, type ImportOutcome } from '@/plugins/ai-import/ai-panel'
+import { exportPoints, parsePointImport, planToElements, recognitionPrompt } from '@/plugins/ai-import/point-import'
+import type { SelectionTier } from '@/plugins/smart-select/auto-select'
+import { SmartSelect } from '@/plugins/smart-select/smart-select-panel'
+
+import { AreasPanel, DRAG_TYPE, PlacePanel, SelectedArea, SelectedPoint, TypeDefaultRow, yuan, type PointProduct } from './editor-panels'
 import { SheetCropper } from './sheet-cropper'
 
 export type { PointProduct } from './editor-panels'
@@ -82,6 +85,8 @@ function download(name: string, blob: Blob) {
 }
 
 type ProjectQuoteSummary = { id: string; title: string; status: string; total: number }
+/** 点位图里由插件提供的功能是否可用（服务端按「设置 → 插件」计算后传入）。 */
+export type PointMapPlugins = { aiImport: boolean; smartSelect: boolean; dwg: boolean; roomInsights: boolean; proposal: boolean }
 type InitialFocus = { quoteId: string | null; sheet: string | null; area: string | null; point: string | null; scope: PointScope | null }
 
 export function PointMapEditor({
@@ -96,7 +101,7 @@ export function PointMapEditor({
   quotes = [],
   initialFocus,
   readOnly,
-  dwgEnabled = false,
+  plugins,
 }: {
   projectId: string
   projectName: string
@@ -109,8 +114,9 @@ export function PointMapEditor({
   quotes?: ProjectQuoteSummary[]
   initialFocus?: InitialFocus
   readOnly: boolean
-  dwgEnabled?: boolean
+  plugins: PointMapPlugins
 }) {
+  const dwgEnabled = plugins.dwg
   const router = useRouter()
   const { resolvedTheme } = useTheme()
   const sidebar = useSidebar()
@@ -897,10 +903,14 @@ export function PointMapEditor({
     [syncingQuote, saving, dirty, save, activeQuote, readOnly, router, scope],
   )
 
-  const switchToProposal = useCallback(async () => {
-    if (dirty && !(await save())) return
-    router.push(`/print/projects/${projectId}/proposal?scope=${scope}`)
-  }, [dirty, save, router, projectId, scope])
+  /** 打开打印文档（点位图、交底清单、方案）：有未保存的修改先保存 */
+  const openDocument = useCallback(
+    async (path: 'plans' | 'checklist' | 'proposal') => {
+      if (dirty && !readOnly && !(await save())) return
+      router.push(`/print/projects/${projectId}/${path}?scope=${scope}`)
+    },
+    [dirty, readOnly, save, router, projectId, scope],
+  )
 
   /* ---------------- 显示范围 ---------------- */
 
@@ -942,7 +952,8 @@ export function PointMapEditor({
   const summary = useMemo(() => summarizePoints(scopedPoints.map((p) => ({ deviceType: p.deviceType, productId: p.productId })), productById, defaults), [scopedPoints, productById, defaults])
   const total = useMemo(() => [...summary.products.entries()].reduce((s, [id, r]) => s + (productById.get(id)?.price ?? 0) * r.count, 0), [summary, productById])
   const typesInUse = DEVICE_TYPE_ORDER.filter((t) => summary.byType.has(t))
-  const analysis = useMemo(() => analyzeAreas(snap.areas, scopedPoints), [snap.areas, scopedPoints])
+  // 房间智能分析插件关闭时不计算配置完整度和建议
+  const analysis = useMemo(() => (plugins.roomInsights ? analyzeAreas(snap.areas, scopedPoints) : new Map()), [plugins.roomInsights, snap.areas, scopedPoints])
   const unassigned = scopedPoints.filter((p) => !p.areaId).length
   const filteredGroups = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -1006,7 +1017,33 @@ export function PointMapEditor({
             </>
           )}
           <Button variant="outline" size="sm" disabled={!api || !snap.sheets.length} onClick={() => void exportSheetPng()}><Download className="size-4" />导出图纸</Button>
-          <Button variant="outline" size="sm" disabled={!api || saving || !scopedPoints.length} onClick={() => void switchToProposal()}><FileText className="size-4" />方案预览</Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" disabled={!api || saving}>
+                <Printer className="size-4" />打印<ChevronDown className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem disabled={!snap.sheets.length} onSelect={() => void openDocument('plans')}>
+                <MapPinned className="size-4" />
+                <span className="flex-1">点位图</span>
+                <span className="text-xs text-muted-foreground">{scope === 'all' ? '全部' : POINT_SCOPES.find((x) => x.value === scope)?.label}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={!scopedPoints.length} onSelect={() => void openDocument('checklist')}>
+                <ListChecks className="size-4" />
+                <span className="flex-1">点位交底清单</span>
+              </DropdownMenuItem>
+              {plugins.proposal ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem disabled={!scopedPoints.length} onSelect={() => void openDocument('proposal')}>
+                    <FileText className="size-4" />
+                    <span className="flex-1">方案演示</span>
+                  </DropdownMenuItem>
+                </>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
           {readOnly ? (
             activeQuote ? (
               <Button variant="outline" size="sm" onClick={() => void switchToQuote()}><ReceiptText className="size-4" />查看报价</Button>
@@ -1150,7 +1187,7 @@ export function PointMapEditor({
                   </div>
                   {scope !== 'all' ? (
                     <Button asChild size="xs" variant="outline" className="h-7">
-                      <Link href={`/print/projects/${projectId}/proposal?template=construction&scope=${scope}`}><FileText className="size-3.5" />出{scope === 'switch' ? '开关' : scope === 'no-light' ? '不含灯具' : '灯光开关'}布局图</Link>
+                      <Link href={`/print/projects/${projectId}/plans?scope=${scope}`}><FileText className="size-3.5" />出{scope === 'switch' ? '开关' : scope === 'no-light' ? '不含灯具' : '灯光开关'}布局图</Link>
                     </Button>
                   ) : null}
               </div>
@@ -1203,7 +1240,7 @@ export function PointMapEditor({
             <TabsList className={cn('mx-4 mt-3 grid w-auto', readOnly ? 'grid-cols-2' : 'grid-cols-4')}>
               {readOnly ? null : <TabsTrigger value="place" className="text-xs">放置</TabsTrigger>}
               <TabsTrigger value="areas" className="text-xs">区域</TabsTrigger>
-              {readOnly ? null : <TabsTrigger value="ai" className="text-xs">AI 识别</TabsTrigger>}
+              {readOnly || !plugins.aiImport ? null : <TabsTrigger value="ai" className="text-xs">AI 识别</TabsTrigger>}
               <TabsTrigger value="summary" className="text-xs">
                 选型
                 {summary.pendingTotal ? <Badge variant="warning" className="ml-0.5 h-4 px-1 text-[10px] tabular-nums">{summary.pendingTotal}</Badge> : null}
@@ -1220,7 +1257,7 @@ export function PointMapEditor({
               <AreasPanel sheets={snap.sheets} areas={snap.areas} analysis={analysis} unassigned={unassigned} selectedAreaId={selectedAreaId} onAdd={(t) => void addArea(t)} onFocus={focusArea} readOnly={readOnly} />
             </TabsContent>
 
-            {readOnly ? null : (
+            {readOnly || !plugins.aiImport ? null : (
               <TabsContent value="ai" className="flex min-h-0 flex-col">
                 <AiPanel sheet={activeSheet} onCopyPrompt={() => void copyPrompt()} onImport={runImport} onExport={exportJson} readOnly={readOnly} />
               </TabsContent>
@@ -1229,7 +1266,7 @@ export function PointMapEditor({
             <TabsContent value="summary" className="flex min-h-0 flex-col">
               <ScrollArea className="min-h-0 flex-1">
                 <div className="space-y-2 p-4">
-                  {readOnly ? null : <SmartSelect platform={platform} busy={selecting} disabled={!scopedPoints.length || saving} onRun={(tier, overwrite) => void autoSelect(tier, overwrite)} />}
+                  {readOnly || !plugins.smartSelect ? null : <SmartSelect platform={platform} busy={selecting} disabled={!scopedPoints.length || saving} onRun={(tier, overwrite) => void autoSelect(tier, overwrite)} />}
                   <div className="flex items-baseline justify-between pt-2">
                     <h2 className="text-sm font-semibold">设备统计{scope !== 'all' ? ` · ${pointScopeLabel(scope)}` : ''}</h2>
                     <span className="text-xs text-muted-foreground tabular-nums">共 {scopedPoints.length} 个点位</span>

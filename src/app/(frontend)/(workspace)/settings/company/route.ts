@@ -1,11 +1,13 @@
+import { allStyles, DOC_KIND_LIST, DOC_KINDS } from '@/documents/registry'
 import { appAuth } from '@/lib/app-auth'
 import { getPayloadClient } from '@/lib/payload'
+import { PLUGINS } from '@/plugins'
 
 const MAX_IMAGE = 3 * 1024 * 1024
 const TEXT_FIELDS = { name: 60, slogan: 80, phone: 30, email: 80, address: 200, qrCaption: 40, quoteNotes: 2000, contractTerms: 5000 } as const
 const fail = (status: number, error: string, field?: string) => Response.json({ ok: false, error, field }, { status })
 
-/** 保存抬头与默认内容（所有成员都可以修改）。图片上传到 Media，再关联到全局设置。 */
+/** 保存抬头、默认内容、文档模板和插件开关（所有成员都可以修改）。图片上传到 Media，再关联到全局设置。 */
 export async function POST(request: Request) {
   const user = await appAuth.getCurrentUser()
   if (!user) return fail(401, '登录已过期，请重新登录')
@@ -49,9 +51,29 @@ export async function POST(request: Request) {
     }
   }
 
+  // 文档模板默认值：只接受已登记的风格和各文档自己的版式；表单里没有这部分时不改动已保存的值
+  const knownStyles = new Set(allStyles().map((s) => s.id))
+  const hasDocFields = DOC_KIND_LIST.some((kind) => form.has(`doc-${kind}-style`) || form.has(`doc-${kind}-layout`))
+  const documentDefaults = hasDocFields
+    ? Object.fromEntries(
+        DOC_KIND_LIST.map((kind) => {
+          const style = String(form.get(`doc-${kind}-style`) ?? '')
+          const layout = String(form.get(`doc-${kind}-layout`) ?? '')
+          return [kind, { ...(knownStyles.has(style) ? { style } : {}), ...(DOC_KINDS[kind].layouts.some((l) => l.value === layout) ? { layout } : {}) }]
+        }),
+      )
+    : undefined
+  // 插件开关：没勾选的记为关闭（新安装的插件默认开启）
+  const disabledPlugins = form.get('plugins-present') === '1' ? PLUGINS.filter((p) => form.get(`plugin-${p.id}`) !== 'on').map((p) => p.id) : undefined
+
   try {
     const printProductImages = form.get('printProductImages') === 'on'
-    await payload.updateGlobal({ slug: 'company-settings', data: { ...data, ...images, printProductImages } as never, user, overrideAccess: false })
+    await payload.updateGlobal({
+      slug: 'company-settings',
+      data: { ...data, ...images, printProductImages, ...(documentDefaults ? { documentDefaults } : {}), ...(disabledPlugins ? { disabledPlugins } : {}) } as never,
+      user,
+      overrideAccess: false,
+    })
     return Response.json({ ok: true })
   } catch (error) {
     const status = (error as { status?: number })?.status

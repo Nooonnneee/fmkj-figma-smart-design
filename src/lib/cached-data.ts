@@ -127,12 +127,27 @@ export type CompanyInfo = {
   quoteNotes: string | null
   contractTerms: string | null
   printProductImages: boolean
+  /** 各类文档的默认风格和版式 */
+  documentDefaults: Record<string, { style?: string; layout?: string }>
+  /** 已关闭的插件 */
+  disabledPlugins: string[]
   logo: { url: string; alt: string; width: number | null; height: number | null } | null
   qrCode: { url: string; alt: string } | null
 }
 
+function parseDocumentDefaults(value: unknown): CompanyInfo['documentDefaults'] {
+  const out: CompanyInfo['documentDefaults'] = {}
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return out
+  for (const [kind, v] of Object.entries(value as Record<string, unknown>)) {
+    if (!v || typeof v !== 'object') continue
+    const { style, layout } = v as { style?: unknown; layout?: unknown }
+    out[kind] = { style: typeof style === 'string' ? style : undefined, layout: typeof layout === 'string' ? layout : undefined }
+  }
+  return out
+}
+
 export const getCompanyInfo = memoize(
-  'company-settings-v3',
+  'company-settings-v4',
   [CACHE_TAGS.company],
   TTL,
   async (): Promise<CompanyInfo> => {
@@ -150,6 +165,8 @@ export const getCompanyInfo = memoize(
       quoteNotes: s.quoteNotes ?? null,
       contractTerms: s.contractTerms ?? null,
       printProductImages: s.printProductImages !== false,
+      documentDefaults: parseDocumentDefaults(s.documentDefaults),
+      disabledPlugins: Array.isArray(s.disabledPlugins) ? s.disabledPlugins.filter((v): v is string => typeof v === 'string') : [],
       logo: logo?.url ? { url: logo.url, alt: logo.alt || s.name, width: logo.width ?? null, height: logo.height ?? null } : null,
       qrCode: qr?.url ? { url: qr.url, alt: qr.alt || '二维码' } : null,
     }

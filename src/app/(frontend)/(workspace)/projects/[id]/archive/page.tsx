@@ -3,7 +3,8 @@ import { Check, Circle, FileText, Printer } from 'lucide-react'
 
 import { relId } from '@/lib/access'
 import { contractStatusLabel, fmtLongDate, paymentAmounts } from '@/lib/contracts'
-import { PROPOSAL_TEMPLATES } from '@/lib/proposal'
+import { PROPOSAL_TEMPLATES } from '@/plugins/proposal/templates'
+import { getPluginFlags } from '@/plugins/state'
 import { quoteStatusLabel, yuan } from '@/lib/quotes'
 import { cn } from '@/lib/utils'
 
@@ -13,7 +14,7 @@ import { ArchiveButton } from './archive-button'
 /** 归档：交付前核对资料是否齐全，打印留档，然后归档（项目转为只读）。 */
 export default async function ProjectArchivePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const [{ project, archived }, { quotes, contract }] = await Promise.all([getProject(id), getProjectDeals(id)])
+  const [{ project, archived }, { quotes, contract }, flags] = await Promise.all([getProject(id), getProjectDeals(id), getPluginFlags()])
   const pid = String(project.id)
   const points = project.pointCount ?? 0
   const finalQuote = quotes.find((q) => String(q.id) === relId(contract?.quote)) ?? quotes.find((q) => q.status === 'accepted') ?? quotes[0] ?? null
@@ -75,14 +76,18 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
       <section aria-labelledby="docs-title" className="rounded-xl bg-card shadow-sm ring-1 ring-foreground/5 dark:ring-foreground/10">
         <div className="border-b px-5 py-3.5">
           <h3 id="docs-title" className="text-base font-semibold">打印留档</h3>
-          <p className="text-sm text-muted-foreground">都可以打印或导出 PDF、图片。</p>
+          <p className="text-sm text-muted-foreground">都可以打印或导出 PDF、图片；版式和风格在打印页顶部切换，默认值在「设置 → 文档模板」。</p>
         </div>
         <div className="divide-y">
-          {PROPOSAL_TEMPLATES.map((t) => (
-            <DocLink key={t.value} href={points ? `/print/projects/${pid}/proposal?template=${t.value}` : null} title={`方案 · ${t.label}`} note={t.description} />
-          ))}
+          <DocLink href={points ? `/print/projects/${pid}/plans` : null} title="点位图" note={points ? '每张图纸一页，附设备图例和统计' : '还没有布置点位'} />
+          <DocLink href={points ? `/print/projects/${pid}/checklist` : null} title="点位交底清单" note={points ? `${points} 个点位，给安装团队逐点核对` : '还没有布置点位'} />
           <DocLink href={finalQuote ? `/print/quotes/${finalQuote.id}` : null} title="报价单" note={finalQuote ? finalQuote.title : '还没有报价'} />
           <DocLink href={contract ? `/print/contracts/${contract.id}` : null} title="合同" note={contract ? `${contract.number}（含报价明细附件）` : '还没有合同'} />
+          {flags.proposal
+            ? PROPOSAL_TEMPLATES.map((t) => (
+                <DocLink key={t.value} href={points ? `/print/projects/${pid}/proposal?template=${t.value}` : null} title={`方案 · ${t.label}`} note={t.description} />
+              ))
+            : null}
         </div>
       </section>
 

@@ -5,6 +5,7 @@ import { parseDefaults } from '@/lib/point-map-items'
 import { isPointScope, type PointScope } from '@/lib/point-scopes'
 import { normalizeScene, type StoredScene } from '@/lib/point-scene'
 import { getDwgSettings } from '@/plugins/dwg-converter'
+import { getPluginFlags } from '@/plugins/state'
 
 import { getProject, getProjectDeals } from '../project-data'
 import { PointMapEditor, type PointProduct } from './point-map-editor'
@@ -20,12 +21,13 @@ export default async function PointMapPage({
   const sp = await searchParams
   const { user, payload, project, archived } = await getProject(id)
   // 点位图、报价列表、产品库并行读取
-  const [scene, deals, catalog] = await Promise.all([
+  const [scene, deals, catalog, flags] = await Promise.all([
     payload
       .findByID({ collection: 'projects', id: project.id, depth: 0, user, overrideAccess: false, select: { pointMap: true, defaultProducts: true } })
       .catch(() => null),
     getProjectDeals(id),
     getCatalog(),
+    getPluginFlags(),
   ])
   if (!scene) notFound()
 
@@ -65,7 +67,13 @@ export default async function PointMapPage({
         scope: isPointScope(sp.scope) ? (sp.scope as PointScope) : null,
       }}
       readOnly={archived}
-      dwgEnabled={Boolean(getDwgSettings(payload.config))}
+      plugins={{
+        aiImport: flags['ai-import'],
+        smartSelect: flags['smart-select'],
+        dwg: flags['dwg-import'] && Boolean(getDwgSettings(payload.config)),
+        roomInsights: flags['room-insights'],
+        proposal: flags.proposal,
+      }}
     />
   )
 }

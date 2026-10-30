@@ -1,4 +1,5 @@
 import { appAuth } from '@/lib/app-auth'
+import { getPluginFlags } from '@/plugins/state'
 import { getPayloadClient } from '@/lib/payload'
 import { convertDwg, DwgConvertError, getDwgSettings } from '@/plugins/dwg-converter'
 
@@ -8,6 +9,7 @@ const fail = (status: number, error: string) => Response.json({ ok: false, error
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await appAuth.getCurrentUser()
   if (!user) return fail(401, '登录已过期，请重新登录')
+  if (!(await getPluginFlags())['dwg-import']) return fail(404, '「DWG 导入」插件已关闭')
 
   const payload = await getPayloadClient()
   const settings = getDwgSettings(payload.config)
