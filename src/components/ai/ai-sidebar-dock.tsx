@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { AlertCircle, ChevronDown, Loader2, Maximize2, MoreHorizontal, SquarePen, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -34,7 +34,7 @@ const toChat = (m: StoredMessage): AiChatMessage => ({
 /** 侧边栏 AI 对话：真实调用服务端 /ai/chat（流式），会话和积分存在 Payload。 */
 export function AiSidebarDock({
   plugins,
-  projects,
+  projects: initialProjects,
   credits: initialCredits,
   configured,
 }: {
@@ -44,10 +44,17 @@ export function AiSidebarDock({
   configured: boolean
 }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const [projectList, setProjectList] = useState<AiProjectContext[]>(initialProjects)
+
+  useEffect(() => {
+    setProjectList(initialProjects)
+  }, [initialProjects])
+
   const routeProjectId = useMemo(() => {
     const id = pathname.match(/^\/projects\/([^/]+)/)?.[1]
-    return id && projects.some((p) => p.id === id) ? id : null
-  }, [pathname, projects])
+    return id && projectList.some((p) => p.id === id) ? id : null
+  }, [pathname, projectList])
 
   const [modelId, setModelId] = useState(AI_MODELS[0].id)
   const [connected, setConnected] = useState<string[]>(() => plugins.filter((p) => p.status === 'ready' && p.enabled).map((p) => p.id))
@@ -69,7 +76,7 @@ export function AiSidebarDock({
   }, [routeProjectId])
 
   const model = AI_MODELS.find((m) => m.id === modelId) ?? AI_MODELS[0]
-  const project = projects.find((p) => p.id === projectId) ?? null
+  const project = projectList.find((p) => p.id === projectId) ?? null
   const activeTitle = conversations.find((c) => c.id === activeId)?.title ?? '新对话'
 
   const loadConversations = useCallback(async () => {
@@ -175,13 +182,32 @@ export function AiSidebarDock({
               setConversations((prev) => [{ id: cid, title: text.slice(0, 30) }, ...prev.filter((c) => c.id !== cid)])
             }
           } else if (ev.type === 'tool') {
-            patchReply((m) => ({ ...m, toolCalls: [...(m.toolCalls ?? []), { pluginId: String(ev.pluginId), pluginName: String(ev.pluginName), action: '', summary: String(ev.summary ?? ''), details: [], href: ev.href as string | undefined }] }))
+            patchReply((m) => ({
+              ...m,
+              toolCalls: [
+                ...(m.toolCalls ?? []),
+                {
+                  pluginId: String(ev.pluginId),
+                  pluginName: String(ev.pluginName),
+                  action: '',
+                  summary: String(ev.summary ?? ''),
+                  details: [],
+                  href: ev.href as string | undefined,
+                  hrefLabel: ev.hrefLabel as string | undefined,
+                },
+              ],
+            }))
+          } else if (ev.type === 'project' && ev.project && typeof ev.project === 'object') {
+            const p = ev.project as AiProjectContext
+            setProjectList((prev) => [p, ...prev.filter((x) => x.id !== p.id)])
+            setProjectId(p.id)
           } else if (ev.type === 'delta') {
             setThinking(false)
             patchReply((m) => ({ ...m, content: m.content + String(ev.text) }))
           } else if (ev.type === 'done') {
             patchReply((m) => ({ ...m, id: String(ev.messageId), cost: Number(ev.cost) }))
             if (typeof ev.balance === 'number') setCredits(ev.balance)
+            if (ev.mutated) router.refresh()
           } else if (ev.type === 'error') {
             throw new Error(String(ev.error))
           }
@@ -309,7 +335,7 @@ export function AiSidebarDock({
           plugins={plugins}
           connectedPluginIds={connected}
           onTogglePlugin={(id) => setConnected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}
-          projects={projects}
+          projects={projectList}
           selectedProjectId={projectId}
           onSelectProject={setProjectId}
           templates={DEFAULT_AI_TEMPLATES.map((t) => ({ id: t.id, name: t.name }))}

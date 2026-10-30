@@ -39,7 +39,7 @@ export function AiMessageBubble({ message, onRegenerate }: { message: AiChatMess
       {message.toolCalls?.map((c, i) => (
         <div key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Blocks className="size-3" />
-          <span>已使用 {c.pluginName}</span>
+          <span>{c.summary ? `${c.pluginName}：${c.summary}` : `已使用 ${c.pluginName}`}</span>
           {c.href ? (
             <Link href={c.href} className="underline-offset-4 hover:text-foreground hover:underline">
               {c.hrefLabel ?? '查看'}

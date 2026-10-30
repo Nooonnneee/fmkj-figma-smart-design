@@ -74,12 +74,21 @@ export async function POST(request: Request) {
     async start(controller) {
       const send = (o: Record<string, unknown>) => controller.enqueue(encoder.encode(`${JSON.stringify(o)}\n`))
       send({ type: 'meta', conversationId })
-      const toolLog: { pluginId: string; pluginName: string; summary: string; href?: string }[] = []
+      const toolLog: { pluginId: string; pluginName: string; summary: string; href?: string; hrefLabel?: string }[] = []
+      const ctx = {
+        user,
+        projectId,
+        project,
+        mutated: false,
+        onProjectChange(proj: { id: string; name: string; customerName: string | null; platform: string | null; pointCount: number }) {
+          send({ type: 'project', project: proj })
+        },
+      }
       try {
         let content = ''
         if (tools.length) {
-          // 支持多步连续调用工具（最多 4 轮，例如：先搜索/应用智能选型 → 再生成报价单）
-          for (let step = 0; step < 4; step++) {
+          // 支持多步连续调用工具（最多 6 轮，例如：新建项目 → 布置房间与点位 → 智能选型 → 生成报价单 → 生成合同）
+          for (let step = 0; step < 6; step++) {
             const turn = await complete(model.id, messages, tools.map((t) => t.definition))
             if (!turn.tool_calls?.length) {
               if (turn.content) {
@@ -90,9 +99,15 @@ export async function POST(request: Request) {
             }
             messages.push({ role: 'assistant', content: turn.content ?? null, tool_calls: turn.tool_calls })
             for (const call of turn.tool_calls) {
-              const r = await runTool(tools, call, { user, projectId, project })
+              const r = await runTool(tools, call, ctx)
               if (r.tool) {
-                const entry = { pluginId: r.tool.pluginId ?? 'core', pluginName: r.tool.pluginName, summary: r.summary ?? '', href: r.href }
+                const entry = {
+                  pluginId: r.tool.pluginId ?? 'core',
+                  pluginName: r.tool.pluginName,
+                  summary: r.summary ?? '',
+                  href: r.href,
+                  hrefLabel: r.hrefLabel,
+                }
                 toolLog.push(entry)
                 send({ type: 'tool', ...entry })
               }
@@ -123,8 +138,16 @@ export async function POST(request: Request) {
         } catch (error) {
           console.error('[ai] credit deduction failed', error)
         }
-        await payload.update({ collection: 'ai-conversations', id: conversationId!, data: { model: model.id }, overrideAccess: true, depth: 0 }).catch(() => null)
-        send({ type: 'done', messageId: String(reply.id), cost: model.cost, balance })
+        await payload
+          .update({
+            collection: 'ai-conversations',
+            id: conversationId!,
+            data: { model: model.id, ...(ctx.projectId ? { project: ctx.projectId } : {}) },
+            overrideAccess: true,
+            depth: 0,
+          })
+          .catch(() => null)
+        send({ type: 'done', messageId: String(reply.id), cost: model.cost, balance, mutated: ctx.mutated })
       } catch (error) {
         send({ type: 'error', error: error instanceof AiError ? error.message : 'AI 服务出错，请稍后重试' })
         if (!(error instanceof AiError)) console.error('[ai] chat failed', error)
