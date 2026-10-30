@@ -14,7 +14,7 @@ import path from 'node:path'
 
 import { getPayload } from 'payload'
 
-const ORDER = ['media', 'brands', 'categories', 'tags', 'folders', 'users', 'products', 'projects', 'quotes'] as const
+const ORDER = ['media', 'brands', 'categories', 'tags', 'folders', 'users', 'products', 'projects', 'quotes', 'contracts'] as const
 // 上传相关字段由文件本身生成，导入时不带。
 const UPLOAD_FIELDS = new Set(['url', 'filename', 'mimeType', 'filesize', 'width', 'height', 'sizes', 'focalX', 'focalY'])
 // 登录相关字段一律不迁移：Figma 的密码密文格式与自托管 Payload 不兼容，员工需用 set-password.ts 重设密码。

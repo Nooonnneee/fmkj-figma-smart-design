@@ -1,40 +1,35 @@
 import type { Access, CollectionConfig } from 'payload'
 
 import { CACHE_TAGS, expireOnChange, expireOnDelete } from '@/lib/cache-tags'
-import { fieldCmsAdminOrStaffAdmin, hasStaffRole, isActiveStaff, isCmsAdmin, STAFF_ROLES } from '@/lib/access'
+import { fieldCmsAdminOnly, isCmsAdmin, isMember } from '@/lib/access'
 
-/** CMS 管理员与员工管理员可看全部账号；其他员工只能看自己。 */
-const readUsers: Access = ({ req }) => {
-  if (isCmsAdmin(req) || hasStaffRole(req, ['admin'])) return true
-  if (isActiveStaff(req) && req.user) return { id: { equals: req.user.id } }
-  return false
-}
-
+/** 成员可以看到团队里的所有成员（负责人下拉、项目列表要显示姓名），只能修改自己的资料。 */
 const updateUsers: Access = ({ req }) => {
-  if (isCmsAdmin(req) || hasStaffRole(req, ['admin'])) return true
-  if (isActiveStaff(req) && req.user) return { id: { equals: req.user.id } }
+  if (isCmsAdmin(req)) return true
+  if (isMember(req) && req.user) return { id: { equals: req.user.id } }
   return false
 }
 
 /**
- * 员工账号（系统登录用）。与 Payload 后台的 admins 账号完全分开：
- * 员工不能登录 /admin，账号由管理员创建，不开放自助注册。
+ * 成员账号（系统登录用）。与 Payload 后台的 admins 账号完全分开：
+ * 成员不能登录 /admin；账号由后台创建，不开放自助注册。
+ * 系统只有一种成员角色，所有成员权限相同。
  */
 export const Users: CollectionConfig = {
   slug: 'users',
-  labels: { singular: '员工账号', plural: '员工账号' },
+  labels: { singular: '成员', plural: '成员' },
   admin: {
     useAsTitle: 'name',
-    defaultColumns: ['name', 'email', 'role', 'status'],
-    group: '账号与权限',
+    defaultColumns: ['name', 'email', 'phone', 'status'],
+    group: '账号',
   },
   auth: {
     tokenExpiration: 60 * 60 * 24 * 7,
   },
   access: {
     admin: () => false,
-    create: ({ req }) => isCmsAdmin(req) || hasStaffRole(req, ['admin']),
-    read: readUsers,
+    create: ({ req }) => isCmsAdmin(req),
+    read: ({ req }) => isCmsAdmin(req) || isMember(req),
     update: updateUsers,
     delete: ({ req }) => isCmsAdmin(req),
   },
@@ -44,22 +39,7 @@ export const Users: CollectionConfig = {
   },
   fields: [
     { name: 'name', label: '姓名', type: 'text', required: true },
-    { name: 'phone', label: '手机号', type: 'text' },
-    {
-      name: 'role',
-      label: '角色',
-      type: 'select',
-      required: true,
-      defaultValue: 'sales',
-      options: [
-        { label: '管理员', value: 'admin' },
-        { label: '经理', value: 'manager' },
-        { label: '设计师', value: 'designer' },
-        { label: '销售', value: 'sales' },
-        { label: '只读', value: 'viewer' },
-      ] satisfies { label: string; value: (typeof STAFF_ROLES)[number] }[],
-      access: { update: fieldCmsAdminOrStaffAdmin },
-    },
+    { name: 'phone', label: '手机号', type: 'text', admin: { description: '会作为联系人显示在报价单上' } },
     {
       name: 'status',
       label: '状态',
@@ -70,7 +50,8 @@ export const Users: CollectionConfig = {
         { label: '启用', value: 'active' },
         { label: '停用', value: 'disabled' },
       ],
-      access: { update: fieldCmsAdminOrStaffAdmin },
+      admin: { description: '停用后无法登录，已有项目保留' },
+      access: { update: fieldCmsAdminOnly },
     },
   ],
 }

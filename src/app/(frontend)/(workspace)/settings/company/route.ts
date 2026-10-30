@@ -2,14 +2,13 @@ import { appAuth } from '@/lib/app-auth'
 import { getPayloadClient } from '@/lib/payload'
 
 const MAX_IMAGE = 3 * 1024 * 1024
-const TEXT_FIELDS = { name: 60, slogan: 80, phone: 30, email: 80, address: 200, qrCaption: 40, quoteNotes: 2000 } as const
+const TEXT_FIELDS = { name: 60, slogan: 80, phone: 30, email: 80, address: 200, qrCaption: 40, quoteNotes: 2000, contractTerms: 5000 } as const
 const fail = (status: number, error: string, field?: string) => Response.json({ ok: false, error, field }, { status })
 
-/** 保存公司信息（仅员工管理员）。图片上传到 Media，再关联到全局设置。 */
+/** 保存抬头与默认内容（所有成员都可以修改）。图片上传到 Media，再关联到全局设置。 */
 export async function POST(request: Request) {
   const user = await appAuth.getCurrentUser()
   if (!user) return fail(401, '登录已过期，请重新登录')
-  if (user.role !== 'admin') return fail(403, '只有管理员可以修改公司信息')
 
   let form: FormData
   try {
@@ -24,7 +23,7 @@ export async function POST(request: Request) {
     if (value.length > max) return fail(400, `内容过长（最多 ${max} 字）`, key)
     data[key] = value || null
   }
-  if (!data.name) return fail(400, '请填写公司名称', 'name')
+  if (!data.name) return fail(400, '请填写名称', 'name')
 
   const payload = await getPayloadClient()
   const images: Record<string, string | null> = {}
@@ -40,7 +39,7 @@ export async function POST(request: Request) {
         data: { alt: `${data.name} ${key === 'logo' ? 'Logo' : '二维码'}` },
         file: { data: Buffer.from(await file.arrayBuffer()), mimetype: file.type, name: file.name, size: file.size },
         user,
-        // Media 默认只允许 CMS 管理员上传；此处已在上方校验员工管理员身份，且只写入受限类型和大小的图片。
+        // Media 默认只允许 CMS 管理员上传；此处已校验成员登录，且只写入受限类型和大小的图片。
         overrideAccess: true,
       })
       images[key] = String(media.id)
@@ -56,7 +55,7 @@ export async function POST(request: Request) {
     return Response.json({ ok: true })
   } catch (error) {
     const status = (error as { status?: number })?.status
-    if (status === 403) return fail(403, '没有权限修改公司信息')
+    if (status === 403) return fail(403, '没有权限修改设置')
     console.error('[settings] save failed', error)
     return fail(500, '保存失败，请稍后重试')
   }

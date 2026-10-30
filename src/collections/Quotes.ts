@@ -1,11 +1,23 @@
-import type { CollectionConfig } from 'payload'
+import { APIError, type CollectionConfig, type PayloadRequest } from 'payload'
 
-import { cmsAdminOrActiveStaff, cmsAdminOrManager, hasStaffRole, isCmsAdmin } from '@/lib/access'
+import { cmsAdminOrMember, isMember, relId } from '@/lib/access'
 import { DEVICE_TYPE_OPTIONS } from '@/lib/device-types'
+import { assertProjectEditable } from '@/lib/project-guards'
 import { QUOTE_STATUSES, quoteTotals } from '@/lib/quotes'
 
-const canEdit = ({ req }: { req: Parameters<typeof isCmsAdmin>[0] }) =>
-  isCmsAdmin(req) || hasStaffRole(req, ['admin', 'manager', 'designer', 'sales'])
+/** 报价被合同引用时的限制：已签订合同的报价不能再改；被任何合同引用的报价不能删除。 */
+async function contractUsing(req: PayloadRequest, quoteId: string, signedOnly: boolean) {
+  const found = await req.payload.find({
+    collection: 'contracts',
+    where: signedOnly ? { and: [{ quote: { equals: quoteId } }, { status: { equals: 'signed' } }] } : { quote: { equals: quoteId } },
+    limit: 1,
+    depth: 0,
+    req,
+    overrideAccess: true,
+    select: { number: true },
+  })
+  return found.docs[0] ?? null
+}
 
 export const Quotes: CollectionConfig = {
   slug: 'quotes',
@@ -17,13 +29,22 @@ export const Quotes: CollectionConfig = {
   },
   defaultSort: '-updatedAt',
   access: {
-    read: cmsAdminOrActiveStaff,
-    create: canEdit,
-    update: canEdit,
-    delete: cmsAdminOrManager,
+    read: cmsAdminOrMember,
+    create: cmsAdminOrMember,
+    update: cmsAdminOrMember,
+    delete: cmsAdminOrMember,
   },
   hooks: {
     beforeChange: [
+      // 已归档项目的报价只读；已用于已签订合同的报价锁定，避免合同附件和报价对不上
+      async ({ data, operation, originalDoc, req }) => {
+        if (!isMember(req)) return data
+        await assertProjectEditable(req, relId(data.project ?? originalDoc?.project))
+        if (operation === 'update' && originalDoc?.id && (await contractUsing(req, String(originalDoc.id), true))) {
+          throw new APIError('这份报价已用于已签订的合同，撤销签订后才能修改', 403)
+        }
+        return data
+      },
       // 金额始终由服务端按明细重新计算，不信任客户端提交的合计。
       ({ data, originalDoc }) => {
         const items = data.items ?? originalDoc?.items ?? []
@@ -34,6 +55,14 @@ export const Quotes: CollectionConfig = {
         data.feeTotal = totals.feeTotal
         data.total = totals.total
         return data
+      },
+    ],
+    beforeDelete: [
+      async ({ id, req }) => {
+        if (!isMember(req)) return
+        const quote = await req.payload.findByID({ collection: 'quotes', id, depth: 0, req, overrideAccess: true, select: { project: true } }).catch(() => null)
+        await assertProjectEditable(req, relId(quote?.project))
+        if (await contractUsing(req, String(id), false)) throw new APIError('这份报价已用于合同，不能删除', 403)
       },
     ],
   },

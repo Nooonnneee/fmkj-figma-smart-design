@@ -1,18 +1,13 @@
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 
-import { appAuth } from '@/lib/app-auth'
-import { getPayloadClient } from '@/lib/payload'
 import { getCatalog } from '@/lib/cached-data'
 import { parseDefaults } from '@/lib/point-map-items'
 import { isPointScope, type PointScope } from '@/lib/point-scopes'
 import { normalizeScene, type StoredScene } from '@/lib/point-scene'
 import { getDwgSettings } from '@/plugins/dwg-converter'
-import type { Quote } from '@/payload-types'
 
-import { canEditProjects } from '../../data'
+import { getProject, getProjectDeals } from '../project-data'
 import { PointMapEditor, type PointProduct } from './point-map-editor'
-
-export const metadata = { title: '点位图 · FMKJ 项目管理' }
 
 export default async function PointMapPage({
   params,
@@ -23,33 +18,19 @@ export default async function PointMapPage({
 }) {
   const { id } = await params
   const sp = await searchParams
-  const user = await appAuth.getCurrentUser()
-  if (!user) redirect('/login')
-  const payload = await getPayloadClient()
-  const project = await payload
-    .findByID({ collection: 'projects', id, depth: 0, user, overrideAccess: false, select: { name: true, platform: true, pointMap: true, defaultProducts: true } })
-    .catch(() => null)
-  if (!project) notFound()
-
-  const quotesResult = await payload.find({
-    collection: 'quotes',
-    where: { project: { equals: project.id } },
-    sort: '-updatedAt',
-    limit: 20,
-    depth: 0,
-    user,
-    overrideAccess: false,
-    select: { title: true, status: true, total: true, updatedAt: true },
-  })
-  const quotes = (quotesResult.docs as Quote[]).map((q) => ({
-    id: String(q.id),
-    title: q.title,
-    status: q.status,
-    total: q.total ?? 0,
-  }))
+  const { user, payload, project, archived } = await getProject(id)
+  // 点位图、报价列表、产品库并行读取
+  const [scene, deals, catalog] = await Promise.all([
+    payload
+      .findByID({ collection: 'projects', id: project.id, depth: 0, user, overrideAccess: false, select: { pointMap: true, defaultProducts: true } })
+      .catch(() => null),
+    getProjectDeals(id),
+    getCatalog(),
+  ])
+  if (!scene) notFound()
 
   // 下架产品也下发，保证旧点位仍能显示名称；选择列表只列在售产品。
-  const products: PointProduct[] = (await getCatalog()).map((p) => ({
+  const products: PointProduct[] = catalog.map((p) => ({
     id: p.id,
     name: p.name,
     sku: p.sku,
@@ -63,20 +44,19 @@ export default async function PointMapPage({
   }))
 
   // 打开时整理场景：旧点位换成新版图标、旧户型图补上图纸信息
-  const { warnings, repaired, ...scene } = normalizeScene(project.pointMap as Partial<StoredScene> | null)
-  const readOnly = !canEditProjects(user?.role)
+  const { warnings, repaired, ...initialScene } = normalizeScene(scene.pointMap as Partial<StoredScene> | null)
 
   return (
     <PointMapEditor
       projectId={String(project.id)}
       projectName={project.name}
       platform={project.platform ?? null}
-      initialScene={scene}
+      initialScene={initialScene}
       warnings={warnings}
-      needsSave={repaired > 0 && !readOnly}
+      needsSave={repaired > 0 && !archived}
       products={products}
-      initialDefaults={parseDefaults(project.defaultProducts)}
-      quotes={quotes}
+      initialDefaults={parseDefaults(scene.defaultProducts)}
+      quotes={deals.quotes.map((q) => ({ id: String(q.id), title: q.title, status: q.status, total: q.total ?? 0 }))}
       initialFocus={{
         quoteId: typeof sp.quoteId === 'string' ? sp.quoteId : null,
         sheet: typeof sp.sheet === 'string' ? sp.sheet : null,
@@ -84,7 +64,7 @@ export default async function PointMapPage({
         point: typeof sp.point === 'string' ? sp.point : null,
         scope: isPointScope(sp.scope) ? (sp.scope as PointScope) : null,
       }}
-      readOnly={readOnly}
+      readOnly={archived}
       dwgEnabled={Boolean(getDwgSettings(payload.config))}
     />
   )

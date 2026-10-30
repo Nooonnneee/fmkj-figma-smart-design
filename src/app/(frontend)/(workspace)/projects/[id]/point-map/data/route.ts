@@ -1,8 +1,7 @@
 import { appAuth } from '@/lib/app-auth'
+import { readableError } from '@/lib/project-guards'
 import { getPayloadClient } from '@/lib/payload'
 import { compactScene, type SceneEl, type SceneFile } from '@/lib/point-scene'
-
-import { canEditProjects } from '../../../data'
 
 /**
  * 点位图只存元素和图片地址（图纸图片在媒体库里），一般几十 KB。
@@ -17,7 +16,6 @@ const fail = (status: number, error: string) => Response.json({ ok: false, error
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await appAuth.getCurrentUser()
   if (!user) return fail(401, '登录已过期，请重新登录')
-  if (!canEditProjects(user.role)) return fail(403, '只读账号不能修改点位图')
 
   const raw = await request.text()
   if (raw.length > 4 * 1024 * 1024) return fail(413, '点位图数据过大，请删除不需要的元素后重试')
@@ -61,7 +59,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   } catch (error) {
     const status = (error as { status?: number })?.status
     if (status === 404) return fail(404, '项目不存在或已被删除')
-    if (status === 403) return fail(403, '没有权限修改该项目')
+    if (status === 403) return fail(403, readableError(error, '没有权限修改该项目'))
     console.error('[point-map] save failed', error)
     return fail(500, '保存失败，请稍后重试')
   }

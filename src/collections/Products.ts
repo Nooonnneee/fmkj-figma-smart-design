@@ -3,7 +3,7 @@ import type { CollectionConfig } from 'payload'
 import { CACHE_TAGS, expireOnChange, expireOnDelete } from '@/lib/cache-tags'
 import { categoryOfType, DEVICE_TYPE_OPTIONS, isDeviceType } from '@/lib/device-types'
 
-import { cmsAdminOrActiveStaff, cmsAdminOrManager, fieldCmsAdminOrManager } from '@/lib/access'
+import { cmsAdminOnly, cmsAdminOrMember } from '@/lib/access'
 
 export const PRODUCT_PLATFORMS = ['Apple Home', '米家', '华为', '涂鸦', 'Matter', 'KNX', '通用'] as const
 
@@ -16,11 +16,12 @@ export const Products: CollectionConfig = {
     group: '产品库',
   },
   defaultSort: 'name',
+  // 产品库由后台（/admin）维护，所有成员都可以查看（包括成本）。
   access: {
-    read: cmsAdminOrActiveStaff,
-    create: cmsAdminOrManager,
-    update: cmsAdminOrManager,
-    delete: cmsAdminOrManager,
+    read: cmsAdminOrMember,
+    create: cmsAdminOnly,
+    update: cmsAdminOnly,
+    delete: cmsAdminOnly,
   },
   hooks: {
     beforeValidate: [
@@ -90,8 +91,6 @@ export const Products: CollectionConfig = {
           label: '成本（元）',
           type: 'number',
           min: 0,
-          // 成本只给管理员和经理看
-          access: { read: fieldCmsAdminOrManager },
         },
         { name: 'unit', label: '单位', type: 'text', required: true, defaultValue: '个' },
         { name: 'stock', label: '库存', type: 'number', min: 0, defaultValue: 0 },

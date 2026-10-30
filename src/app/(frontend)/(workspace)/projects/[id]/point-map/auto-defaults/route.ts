@@ -7,8 +7,6 @@ import { parseDefaults } from '@/lib/point-map-items'
 import { analyzeScene, type StoredScene } from '@/lib/point-scene'
 import { inPointScope, isPointScope } from '@/lib/point-scopes'
 
-import { canEditProjects } from '../../../data'
-
 const fail = (status: number, error: string) => Response.json({ ok: false, error }, { status })
 
 /**
@@ -18,7 +16,6 @@ const fail = (status: number, error: string) => Response.json({ ok: false, error
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await appAuth.getCurrentUser()
   if (!user) return fail(401, '登录已过期，请重新登录')
-  if (!canEditProjects(user.role)) return fail(403, '只读账号不能修改默认型号')
   const body = (await request.json().catch(() => null)) as { tier?: unknown; overwrite?: unknown; scope?: unknown } | null
   if (!body || !isSelectionTier(body.tier)) return fail(400, '请选择档次')
   const scope = isPointScope(body.scope) ? body.scope : 'all'

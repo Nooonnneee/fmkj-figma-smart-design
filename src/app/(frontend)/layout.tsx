@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import Script from "next/script"
 import { ThemeProvider } from "@/components/theme-provider"
+import { APP_DESCRIPTION, APP_NAME, APP_TAGLINE } from "@/lib/brand"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { BodyCustomCode, renderHeadCustomCode } from "@/lib/make-custom-code"
@@ -14,11 +15,10 @@ import "./styles.css"
 
 const fontSans = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" })
 
-const defaultTitle = "FMKJ 项目管理"
+const defaultTitle = `${APP_NAME} ${APP_TAGLINE}`
 const title = makeSiteSettings.title ?? defaultTitle
 const description =
-  makeSiteSettings.description ??
-  "项目流程、产品库、方案报价与团队协作后台"
+  makeSiteSettings.description ?? APP_DESCRIPTION
 const favicon = makeSiteSettings.icons?.icon
 const socialImage = makeSiteSettings.openGraph?.image
 const googleAnalyticsId = sanitizeHtmlAttribute(

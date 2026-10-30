@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Image from 'next/image'
 import { Check, ImageIcon, Search } from 'lucide-react'
 
 import { BrandLogo } from '@/components/brand-logo'
@@ -155,8 +156,7 @@ export function SwapProductDialog({
                         >
                           <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
                             {p.image ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={p.image} alt="" className="size-full object-cover" />
+                              <Image src={p.image} alt="" width={48} height={48} className="size-full bg-white object-contain" />
                             ) : (
                               <ImageIcon className="size-5 text-muted-foreground/50" />
                             )}

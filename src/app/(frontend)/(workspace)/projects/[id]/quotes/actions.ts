@@ -1,8 +1,7 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { ValidationError } from 'payload'
+import { APIError, ValidationError } from 'payload'
 
 import { appAuth } from '@/lib/app-auth'
 import { getPayloadClient } from '@/lib/payload'
@@ -14,28 +13,42 @@ import { inferScopeFromTitle, inPointScope, isPointScope, POINT_SCOPES, type Poi
 import { setProjectDefault } from '@/lib/project-defaults'
 import type { Media, User } from '@/payload-types'
 
-const EDIT_ROLES = ['admin', 'manager', 'designer', 'sales']
-
-async function requireEditor(): Promise<{ user: User; error?: undefined } | { error: string; user?: undefined }> {
+async function requireMember(): Promise<{ user: User; error?: undefined } | { error: string; user?: undefined }> {
   const user = await appAuth.getCurrentUser()
   if (!user) return { error: '登录已过期，请重新登录' }
-  if (!EDIT_ROLES.includes(user.role ?? '')) return { error: '只读账号不能修改报价' }
   return { user }
 }
+
+/** 把保存失败的原因转成可以直接显示给用户的文字（归档、合同锁定等规则来自集合 hook）。 */
+function failureMessage(error: unknown, fallback: string) {
+  if (error instanceof ValidationError) return '有字段未通过校验，请检查后重试'
+  if (error instanceof APIError && error.status < 500) return error.message
+  const code = (error as { status?: number })?.status
+  if (code === 403) return '没有权限修改该报价'
+  if (code === 404) return '报价不存在或已被删除'
+  console.error('[quotes]', fallback, error)
+  return fallback
+}
+
+const quoteHref = (projectId: string, quoteId: string, pending?: number) =>
+  `/projects/${projectId}/quotes/${quoteId}${pending ? `?pending=${pending}` : ''}`
 
 /**
  * 从项目点位图生成草稿报价：点位指定产品 > 项目默认型号；都没有的点位记为待选型，不计入报价。
  * 单价取产品库当前售价，同时快照设备类型和产品图片。
  */
 export async function createQuoteFromProject(form: FormData) {
-  const auth = await requireEditor()
+  const auth = await requireMember()
   if (!auth.user) redirect('/login')
   const { user } = auth
   const projectId = String(form.get('projectId') ?? '')
   const rawScope = form.get('scope')
   const scope: PointScope = isPointScope(rawScope) ? rawScope : 'all'
   const payload = await getPayloadClient()
-  const project = await payload.findByID({ collection: 'projects', id: projectId, depth: 0, user, overrideAccess: false })
+  const project = await payload
+    .findByID({ collection: 'projects', id: projectId, depth: 0, user, overrideAccess: false, select: { name: true, pointMap: true, defaultProducts: true } })
+    .catch(() => null)
+  if (!project) redirect('/projects')
 
   const elements = ((project.pointMap as { elements?: unknown[] } | null)?.elements ?? []) as { isDeleted?: boolean; customData?: PointCustomData }[]
   const allPoints = elements.filter((el) => !el?.isDeleted && isPointData(el?.customData)).map((el) => el.customData!)
@@ -62,15 +75,21 @@ export async function createQuoteFromProject(form: FormData) {
   const company = await getCompanyInfo()
   const existing = await payload.count({ collection: 'quotes', where: { project: { equals: project.id } }, user, overrideAccess: false })
   const scopeSuffix = scope === 'all' ? '' : `（${POINT_SCOPES.find((s) => s.value === scope)!.label}）`
-  const quote = await payload.create({
-    collection: 'quotes',
-    data: { title: `${project.name} 报价${scopeSuffix}${existing.totalDocs ? ` ${existing.totalDocs + 1}` : ''}`, project: project.id, status: 'draft', items, fees: [], discount: 0, notes: company.quoteNotes ?? null },
-    user,
-    overrideAccess: false,
-    depth: 0,
-  })
-  revalidatePath(`/projects/${project.id}`)
-  redirect(summary.pendingTotal ? `/quotes/${quote.id}?pending=${summary.pendingTotal}` : `/quotes/${quote.id}`)
+  let quoteId: string
+  try {
+    const quote = await payload.create({
+      collection: 'quotes',
+      data: { title: `报价 ${existing.totalDocs + 1}${scopeSuffix}`, project: project.id, status: 'draft', items, fees: [], discount: 0, notes: company.quoteNotes ?? null },
+      user,
+      overrideAccess: false,
+      depth: 0,
+      select: { title: true },
+    })
+    quoteId = String(quote.id)
+  } catch (error) {
+    redirect(`/projects/${projectId}/quotes?error=${encodeURIComponent(failureMessage(error, '生成报价失败，请稍后重试'))}`)
+  }
+  redirect(quoteHref(projectId, quoteId, summary.pendingTotal))
 }
 
 /**
@@ -82,7 +101,7 @@ export async function syncQuoteFromPointMap(
   quoteId: string,
   explicitScope?: PointScope,
 ): Promise<{ ok: true; quoteId: string; pending: number; total: number; scope: PointScope } | { ok: false; error: string }> {
-  const auth = await requireEditor()
+  const auth = await requireMember()
   if (!auth.user) return { ok: false, error: auth.error }
   const { user } = auth
   const payload = await getPayloadClient()
@@ -153,7 +172,7 @@ export async function syncQuoteFromPointMap(
     }
   })
 
-  const baseTitle = (quote.title ?? `${project.name} 报价`).replace(/（(全部|不含灯具|仅开关|开关\+灯光)）/g, '')
+  const baseTitle = (quote.title ?? '报价').replace(/（(全部|不含灯具|仅开关|开关\+灯光)）/g, '')
   const scopeSuffix = scope === 'all' ? '' : `（${POINT_SCOPES.find((s) => s.value === scope)!.label}）`
   const nextTitle = `${baseTitle}${scopeSuffix}`
 
@@ -165,19 +184,17 @@ export async function syncQuoteFromPointMap(
       user,
       overrideAccess: false,
       depth: 0,
+      select: { total: true },
     })
-    revalidatePath(`/quotes/${quoteId}`)
-    revalidatePath(`/projects/${projectId}`)
     return { ok: true, quoteId, pending: summary.pendingTotal, total: updated.total ?? 0, scope }
   } catch (error) {
-    console.error('[quotes] sync failed', error)
-    return { ok: false, error: '同步失败，请稍后重试' }
+    return { ok: false, error: failureMessage(error, '同步失败，请稍后重试') }
   }
 }
 
 /** 在报价里换型号时，可同时把新型号设为项目默认型号。 */
 export async function setQuoteProjectDefault(projectId: string, deviceType: string, productId: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const auth = await requireEditor()
+  const auth = await requireMember()
   if (!auth.user) return { ok: false, error: auth.error }
   const result = await setProjectDefault(auth.user, projectId, deviceType, productId)
   return result.ok ? { ok: true } : { ok: false, error: result.error }
@@ -198,7 +215,7 @@ const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slic
 
 /** 保存报价：逐项校验白名单字段，合计由集合 hook 在服务端重新计算。 */
 export async function saveQuote(id: string, input: QuoteInput): Promise<SaveQuoteResult> {
-  const auth = await requireEditor()
+  const auth = await requireMember()
   if (!auth.user) return { ok: false, error: auth.error }
   const { user } = auth
 
@@ -274,16 +291,24 @@ export async function saveQuote(id: string, input: QuoteInput): Promise<SaveQuot
       user,
       overrideAccess: false,
       depth: 0,
+      select: { total: true },
     })
-    revalidatePath('/quotes')
-    revalidatePath(`/quotes/${id}`)
     return { ok: true, total: doc.total ?? 0 }
   } catch (error) {
-    if (error instanceof ValidationError) return { ok: false, error: '有字段未通过校验，请检查后重试' }
-    const code = (error as { status?: number })?.status
-    if (code === 403) return { ok: false, error: '没有权限修改该报价' }
-    if (code === 404) return { ok: false, error: '报价不存在或已被删除' }
-    console.error('[quotes] save failed', error)
-    return { ok: false, error: '保存失败，请稍后重试' }
+    return { ok: false, error: failureMessage(error, '保存失败，请稍后重试') }
   }
 }
+
+/** 删除报价（已用于合同的报价、已归档项目的报价由集合 hook 拒绝）。 */
+export async function deleteQuote(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const auth = await requireMember()
+  if (!auth.user) return { ok: false, error: auth.error }
+  try {
+    const payload = await getPayloadClient()
+    await payload.delete({ collection: 'quotes', id, user: auth.user, overrideAccess: false, depth: 0, select: { title: true } })
+    return { ok: true }
+  } catch (error) {
+    return { ok: false, error: failureMessage(error, '删除失败，请稍后重试') }
+  }
+}
+

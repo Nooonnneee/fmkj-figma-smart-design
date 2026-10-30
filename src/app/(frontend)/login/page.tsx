@@ -2,10 +2,11 @@ import { ShieldCheck } from 'lucide-react'
 import { redirect } from 'next/navigation'
 
 import { appAuth } from '@/lib/app-auth'
+import { APP_DESCRIPTION, APP_NAME, APP_TAGLINE, pageTitle } from '@/lib/brand'
 
 import { LoginForm } from './login-form'
 
-export const metadata = { title: '登录 · FMKJ 项目管理' }
+export const metadata = { title: pageTitle('登录') }
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ from?: string }> }) {
   if (await appAuth.getCurrentUser()) redirect('/projects')
@@ -20,13 +21,13 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             <ShieldCheck className="size-5" />
           </div>
           <div>
-            <p className="leading-none font-semibold">FMKJ</p>
-            <p className="mt-1 text-xs text-muted-foreground">项目运营后台</p>
+            <p className="leading-none font-semibold">{APP_NAME}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{APP_TAGLINE}</p>
           </div>
         </div>
         <div className="max-w-xl space-y-5">
-          <p className="text-3xl font-semibold tracking-normal">项目、产品、报价和交付记录统一管理</p>
-          <p className="text-base leading-7 text-muted-foreground">登录后可以查看项目流程、产品库、方案报价、附件和团队权限。</p>
+          <p className="text-3xl font-semibold tracking-normal">在户型图上布好点位，几分钟出报价和合同</p>
+          <p className="text-base leading-7 text-muted-foreground">{APP_DESCRIPTION}</p>
         </div>
       </div>
       <div className="flex min-h-screen items-center justify-center px-4 py-10 sm:px-6">
@@ -36,7 +37,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
               <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                 <ShieldCheck className="size-5" />
               </div>
-              <span className="text-lg font-semibold">FMKJ</span>
+              <span className="text-lg font-semibold">{APP_NAME}</span>
             </div>
           </div>
           <LoginForm redirectTo={redirectTo} />

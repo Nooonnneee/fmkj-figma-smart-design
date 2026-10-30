@@ -60,6 +60,15 @@ function collectAtomicBlocks(root: HTMLElement, scale: number): { top: number; b
   return blocks.sort((a, b) => a.top - b.top)
 }
 
+/** 强制从新的一页开始的位置（例如合同的附件），标记为 data-pdf-break-before */
+function collectBreaks(root: HTMLElement, scale: number): number[] {
+  const rootRect = root.getBoundingClientRect()
+  return [...root.querySelectorAll<HTMLElement>('[data-pdf-break-before]')]
+    .map((el) => Math.floor((el.getBoundingClientRect().top - rootRect.top) * scale) - Math.round(4 * scale))
+    .filter((n) => n > 0)
+    .sort((a, b) => a - b)
+}
+
 /** 把纵向长画布按 A4 比例切成多页 A4 画布（按 DOM 块边界切页，不劈开卡片、点位图或表格行） */
 function slicePortraitCanvas(source: HTMLCanvasElement, domEl: HTMLElement, scale: number): PageJpeg[] {
   const W_PT = 595.28
@@ -69,6 +78,7 @@ function slicePortraitCanvas(source: HTMLCanvasElement, domEl: HTMLElement, scal
   const contentH = fullPageH - padY * 2
   const srcCtx = source.getContext('2d', { willReadFrequently: true })!
   const blocks = collectAtomicBlocks(domEl, scale)
+  const breaks = collectBreaks(domEl, scale)
 
   const pages: PageJpeg[] = []
   let y = 0
@@ -76,7 +86,10 @@ function slicePortraitCanvas(source: HTMLCanvasElement, domEl: HTMLElement, scal
     const isFirst = y === 0
     const maxSlice = isFirst ? fullPageH - padY : contentH
     let nextY = y + maxSlice
-    if (nextY >= source.height - 16) {
+    const forced = breaks.find((b) => b > y + 8 && b <= Math.min(nextY, source.height))
+    if (forced !== undefined) {
+      nextY = forced
+    } else if (nextY >= source.height - 16) {
       nextY = source.height
     } else {
       const minCut = y + Math.floor(maxSlice * 0.35)

@@ -28,7 +28,7 @@ const QUOTE_TEMPLATES = [
 ] as const
 type QuoteTemplate = (typeof QUOTE_TEMPLATES)[number]['value']
 
-export const metadata = { title: '报价单' }
+export const metadata = { title: '报价单', robots: { index: false, follow: false } }
 
 /** 给客户的报价单：独立于系统外框，A4 打印 / 另存为 PDF。 */
 export default async function PrintQuotePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ template?: string; markers?: string; plans?: string }> }) {
@@ -84,8 +84,8 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
   return (
     <div className="min-h-screen bg-muted/40 pb-8 print:bg-white print:pb-0">
       <PrintToolbar
-        back={{ href: `/quotes/${id}`, label: '返回报价' }}
-        exportName={`${quote.title}-${QUOTE_TEMPLATES.find((x) => x.value === t)!.label}`}
+        back={{ href: project ? `/projects/${project.id}/quotes/${id}` : '/projects', label: '返回报价' }}
+        exportName={`${project ? `${project.name}-` : ''}${quote.title}-${QUOTE_TEMPLATES.find((x) => x.value === t)!.label}`}
         groups={[
           { label: '模板', value: t, options: QUOTE_TEMPLATES.map((x) => ({ value: x.value, label: x.label, href: `${base}?template=${x.value}&markers=${markers}` })) },
           ...(floors.some((f) => Boolean(f.sheetUrl))
@@ -121,9 +121,9 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
         </header>
 
         <section className="grid grid-cols-2 gap-x-8 gap-y-1 py-5 text-[12px]">
-          <div><span className="text-neutral-500">客户：</span>{project?.customerName ?? '—'}</div>
+          <div><span className="text-neutral-500">客户：</span>{project?.customerName || '—'}</div>
           <div><span className="text-neutral-500">项目：</span>{project?.name ?? quote.title}</div>
-          <div><span className="text-neutral-500">电话：</span>{project?.customerPhone ?? '—'}</div>
+          <div><span className="text-neutral-500">电话：</span>{project?.customerPhone || '—'}</div>
           <div><span className="text-neutral-500">地址：</span>{[project?.community, project?.address].filter(Boolean).join(' ') || '—'}</div>
           {owner ? <div><span className="text-neutral-500">联系人：</span>{owner.name}{owner.phone ? ` ${owner.phone}` : ''}</div> : null}
         </section>

@@ -2,15 +2,12 @@ import { appAuth } from '@/lib/app-auth'
 import { getPayloadClient } from '@/lib/payload'
 import { convertDwg, DwgConvertError, getDwgSettings } from '@/plugins/dwg-converter'
 
-import { canEditProjects } from '../../../data'
-
 const fail = (status: number, error: string) => Response.json({ ok: false, error }, { status })
 
 /** 上传 DWG → 外部服务转换为 PNG → 存入 Media，返回图片地址供点位图作为户型底图。 */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await appAuth.getCurrentUser()
   if (!user) return fail(401, '登录已过期，请重新登录')
-  if (!canEditProjects(user.role)) return fail(403, '只读账号不能导入户型图')
 
   const payload = await getPayloadClient()
   const settings = getDwgSettings(payload.config)

@@ -44,7 +44,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
     <div className="space-y-6">
       <div className="space-y-2 text-center lg:text-left">
         <h1 className="text-2xl font-semibold tracking-tight">登录您的账号</h1>
-        <p className="text-sm text-muted-foreground">输入邮箱和密码进入项目运营后台</p>
+        <p className="text-sm text-muted-foreground">输入邮箱和密码继续</p>
       </div>
       <form className="space-y-4" onSubmit={submit} noValidate>
         {error ? (
@@ -94,7 +94,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
           {loading ? '登录中' : '登录'}
         </Button>
       </form>
-      <p className="text-center text-sm text-muted-foreground">没有账号？请让管理员开通账号</p>
+      <p className="text-center text-sm text-muted-foreground">没有账号？请联系团队负责人开通</p>
     </div>
   )
 }

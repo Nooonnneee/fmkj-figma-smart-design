@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
-import { AlertTriangle, ArrowLeftRight, Check, Eye, FileText, ChevronDown, ChevronLeft, Download, FilePlus2, FileUp, ImagePlus, Layers, Loader2, MapPinned, Maximize2, Minus, Plus, ReceiptText, Save, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeftRight, Check, Eye, FileText, ChevronDown, Download, FilePlus2, FileUp, ImagePlus, Layers, Loader2, MapPinned, Maximize2, Minus, Plus, ReceiptText, Save, X } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
 
@@ -16,13 +16,13 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Separator } from '@/components/ui/separator'
 import { useSidebar } from '@/components/ui/sidebar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { analyzeAreas } from '@/lib/area-analysis'
 import { areaTypeLabel } from '@/lib/area-types'
 import type { SelectionTier } from '@/lib/auto-select'
 import { categoryOfType, DEVICE_GROUPS, DEVICE_TYPE_ORDER, deviceTypeLabel, deviceTypeOf } from '@/lib/device-types'
+import { registerLeaveGuard } from '@/lib/leave-guard'
 import { resolvePoint, summarizePoints, type ProjectDefaults } from '@/lib/point-map-items'
 import { exportPoints, parsePointImport, planToElements, recognitionPrompt } from '@/lib/point-import'
 import { markerBinaryFile } from '@/lib/point-marker-data'
@@ -49,7 +49,7 @@ import {
 import { SHEET } from '@/lib/sheet-spec'
 import { cn } from '@/lib/utils'
 
-import { createQuoteFromProject, syncQuoteFromPointMap } from '../../../quotes/actions'
+import { createQuoteFromProject, syncQuoteFromPointMap } from '../quotes/actions'
 import { AiPanel, AreasPanel, DRAG_TYPE, PlacePanel, SelectedArea, SelectedPoint, SmartSelect, TypeDefaultRow, yuan, type ImportOutcome, type PointProduct } from './editor-panels'
 import { SheetCropper } from './sheet-cropper'
 
@@ -521,6 +521,14 @@ export function PointMapEditor({
     }
   }, [api, projectId, saving, uploadImage])
 
+  // 切换项目板块或侧边栏导航时，先自动保存点位图
+  const saveRef = useRef(save)
+  saveRef.current = save
+  useEffect(() => {
+    if (!dirty || readOnly) return
+    return registerLeaveGuard(async () => (await saveRef.current()) || window.confirm('点位图保存失败，仍要离开吗？未保存的修改会丢失。'))
+  }, [dirty, readOnly])
+
   useEffect(() => {
     if (readOnly) return
     const onKey = (e: KeyboardEvent) => {
@@ -871,7 +879,7 @@ export function PointMapEditor({
         return
       }
       if (readOnly) {
-        router.push(`/quotes/${qid}`)
+        router.push(`/projects/${projectId}/quotes/${qid}`)
         return
       }
       setSyncingQuote(true)
@@ -881,7 +889,7 @@ export function PointMapEditor({
           toast.error(res.error)
           return
         }
-        router.push(res.pending ? `/quotes/${qid}?pending=${res.pending}` : `/quotes/${qid}`)
+        router.push(`/projects/${projectId}/quotes/${qid}${res.pending ? `?pending=${res.pending}` : ''}`)
       } finally {
         setSyncingQuote(false)
       }
@@ -951,7 +959,7 @@ export function PointMapEditor({
   const missingSheets = snap.sheets.filter((s) => s.missing).length
 
   return (
-    <div className="full-bleed-page -m-4 flex h-[calc(100svh-4rem)] flex-col md:-m-8">
+    <div className="full-bleed-page -mx-4 -mt-6 -mb-5 flex h-[calc(100svh-5.5rem)] flex-col md:-mx-8 md:-mb-7 md:h-[calc(100svh-3rem)]">
       <form ref={quoteForm} action={createQuoteFromProject} className="hidden">
         <input type="hidden" name="projectId" value={projectId} />
         <input type="hidden" name="scope" value={scope} />
@@ -979,66 +987,14 @@ export function PointMapEditor({
         }}
       />
 
-      <div className="flex flex-wrap items-center gap-2 border-b px-4 py-2">
-        <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
-          <Link href={`/projects/${projectId}`}><ChevronLeft className="size-4" />返回项目</Link>
-        </Button>
-        <Separator orientation="vertical" className="h-5" />
-        <h1 className="max-w-48 truncate text-sm font-semibold">{projectName}</h1>
-        {/* 点位图 ⇄ 报价单 ⇄ 方案预览 无缝切换栏 */}
-        <div className="flex items-center rounded-lg bg-muted p-0.5" role="navigation" aria-label="工作台视图切换">
-          <Button type="button" size="xs" variant="ghost" className="h-7 rounded-md bg-background px-2.5 text-xs font-medium shadow-sm">
-            <MapPinned className="size-3.5" />点位图
-            <span className="text-[11px] font-normal text-muted-foreground tabular-nums">{scopedPoints.length}</span>
-          </Button>
-          <div className="flex items-center">
-            <Button
-              type="button"
-              size="xs"
-              variant="ghost"
-              disabled={!api || saving || syncingQuote || (!activeQuote && !scopedPoints.length)}
-              className="h-7 rounded-md px-2.5 text-xs"
-              onClick={() => void switchToQuote()}
-            >
-              {syncingQuote ? <Loader2 className="size-3.5 animate-spin" /> : <ReceiptText className="size-3.5" />}
-              报价单
-              {activeQuote ? <span className="text-[11px] text-muted-foreground tabular-nums">{yuan(activeQuote.total)}</span> : null}
-            </Button>
-            {quotes.length > 0 && !readOnly ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button type="button" variant="ghost" size="icon-xs" className="h-7 w-5" aria-label="选择或新建报价单">
-                    <ChevronDown className="size-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  {quotes.map((q) => (
-                    <DropdownMenuItem key={q.id} onSelect={() => void switchToQuote(q.id)}>
-                      <span className="flex-1 truncate">{q.title}</span>
-                      <span className="ml-3 text-xs text-muted-foreground tabular-nums">{yuan(q.total)}</span>
-                    </DropdownMenuItem>
-                  ))}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem disabled={!scopedPoints.length} onSelect={() => void createNewQuote()}>
-                    <FilePlus2 className="size-4" />新建另一份报价单（{POINT_SCOPES.find((s) => s.value === scope)?.label}）
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : null}
-          </div>
-          <Button
-            type="button"
-            size="xs"
-            variant="ghost"
-            disabled={!api || saving || !scopedPoints.length}
-            className="h-7 rounded-md px-2.5 text-xs"
-            onClick={() => void switchToProposal()}
-          >
-            <FileText className="size-3.5" />方案预览
-          </Button>
-        </div>
+      <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2 md:px-4">
+        <span className="flex items-center gap-1.5 text-sm font-medium">
+          <MapPinned className="size-4 text-muted-foreground" />
+          点位图
+          <span className="text-xs font-normal text-muted-foreground tabular-nums">{scopedPoints.length} 个点位</span>
+        </span>
         {readOnly ? <Badge variant="secondary">只读</Badge> : dirty ? <Badge variant="outline">未保存</Badge> : null}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           {readOnly ? null : (
             <>
               <Button variant="outline" size="sm" disabled={!api || !!cropFile} onClick={() => fileInput.current?.click()}><ImagePlus className="size-4" />添加图纸</Button>
@@ -1049,17 +1005,52 @@ export function PointMapEditor({
               ) : null}
             </>
           )}
-          <Button variant="outline" size="sm" disabled={!api || !snap.sheets.length} onClick={() => void exportSheetPng()}><Download className="size-4" />导出当前图纸</Button>
-          {readOnly ? null : (
+          <Button variant="outline" size="sm" disabled={!api || !snap.sheets.length} onClick={() => void exportSheetPng()}><Download className="size-4" />导出图纸</Button>
+          <Button variant="outline" size="sm" disabled={!api || saving || !scopedPoints.length} onClick={() => void switchToProposal()}><FileText className="size-4" />方案预览</Button>
+          {readOnly ? (
+            activeQuote ? (
+              <Button variant="outline" size="sm" onClick={() => void switchToQuote()}><ReceiptText className="size-4" />查看报价</Button>
+            ) : null
+          ) : (
             <>
-              <Button variant="outline" size="sm" disabled={!api || saving || syncingQuote || !scopedPoints.length} onClick={() => void switchToQuote()}>
-                {syncingQuote ? <Loader2 className="size-4 animate-spin" /> : activeQuote ? <ArrowLeftRight className="size-4" /> : <FilePlus2 className="size-4" />}
-                {activeQuote
-                  ? `同步到报价单${scope === 'all' ? '' : `（${POINT_SCOPES.find((s) => s.value === scope)?.label}）`}`
-                  : scope === 'all'
-                    ? '生成报价'
-                    : `生成报价（${POINT_SCOPES.find((s) => s.value === scope)?.label}）`}
-              </Button>
+              <div className="flex items-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={quotes.length ? 'rounded-r-none border-r-0' : undefined}
+                  disabled={!api || saving || syncingQuote || !scopedPoints.length}
+                  onClick={() => void switchToQuote()}
+                  title={activeQuote ? `把点位同步到「${activeQuote.title}」并打开` : undefined}
+                >
+                  {syncingQuote ? <Loader2 className="size-4 animate-spin" /> : activeQuote ? <ArrowLeftRight className="size-4" /> : <FilePlus2 className="size-4" />}
+                  {activeQuote
+                    ? `同步到报价${scope === 'all' ? '' : `（${POINT_SCOPES.find((s) => s.value === scope)?.label}）`}`
+                    : scope === 'all'
+                      ? '生成报价'
+                      : `生成报价（${POINT_SCOPES.find((s) => s.value === scope)?.label}）`}
+                </Button>
+                {quotes.length ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="rounded-l-none px-1.5" disabled={!api || saving || syncingQuote} aria-label="选择要同步的报价，或新建报价">
+                        <ChevronDown className="size-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {quotes.map((q) => (
+                        <DropdownMenuItem key={q.id} disabled={!scopedPoints.length} onSelect={() => void switchToQuote(q.id)}>
+                          <span className={cn('flex-1 truncate', q.id === activeQuote?.id && 'font-semibold')}>同步到「{q.title}」</span>
+                          <span className="ml-3 text-xs text-muted-foreground tabular-nums">{yuan(q.total)}</span>
+                        </DropdownMenuItem>
+                      ))}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem disabled={!scopedPoints.length} onSelect={() => void createNewQuote()}>
+                        <FilePlus2 className="size-4" />新建一份报价（{POINT_SCOPES.find((s) => s.value === scope)?.label}）
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
+              </div>
               <Button size="sm" disabled={!api || saving} onClick={() => void save()}>
                 {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}保存
               </Button>

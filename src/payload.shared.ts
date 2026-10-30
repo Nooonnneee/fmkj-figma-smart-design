@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url'
 import { Admins } from './collections/Admins'
 import { Brands } from './collections/Brands'
 import { Categories } from './collections/Categories'
+import { Contracts } from './collections/Contracts'
 import { Media } from './collections/Media'
 import { Folders } from './collections/Folders'
 import { Products } from './collections/Products'
@@ -43,7 +44,7 @@ export const sharedConfig = {
     fallbackLanguage: 'en',
     supportedLanguages: { 'en': adminLanguage },
   },
-  collections: [Admins, Users, Projects, Quotes, Products, Brands, Categories, Media, Folders, Tags],
+  collections: [Admins, Users, Projects, Quotes, Contracts, Products, Brands, Categories, Media, Folders, Tags],
   globals: [CompanySettings],
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),

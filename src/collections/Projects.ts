@@ -1,44 +1,73 @@
-import type { CollectionConfig } from 'payload'
+import { APIError, type CollectionConfig } from 'payload'
 
-import { cmsAdminOrActiveStaff, cmsAdminOrManager, hasStaffRole, isCmsAdmin } from '@/lib/access'
-import { PROJECT_PLATFORMS, PROJECT_RISKS, PROJECT_STAGES, PROJECT_STATUSES, PROJECT_WAITING_ON } from '@/lib/projects'
+import { cmsAdminOrMember, isMember, relId } from '@/lib/access'
+import { countScenePoints } from '@/lib/point-count'
+import { ARCHIVED_MESSAGE } from '@/lib/project-guards'
+import { autoProjectName, PROJECT_PLATFORMS, PROJECT_STATUSES } from '@/lib/projects'
 
 const opts = (list: readonly { value: string; label: string }[]) => list.map(({ value, label }) => ({ value, label }))
 
-/** 只读角色不能新建或修改项目。 */
-const canEditProjects = ({ req }: { req: Parameters<typeof isCmsAdmin>[0] }) =>
-  isCmsAdmin(req) || hasStaffRole(req, ['admin', 'manager', 'designer', 'sales'])
+/** 成员在已归档项目上可以改的字段：只有状态（恢复项目）。 */
+const EDITABLE_WHEN_ARCHIVED = new Set(['status', 'archivedAt', 'pointCount', 'updatedAt', 'createdAt', 'id'])
+const sameValue = (a: unknown, b: unknown) => {
+  const norm = (v: unknown) => (v && typeof v === 'object' && 'id' in (v as object) && !Array.isArray(v) ? relId(v) : (v ?? null))
+  return JSON.stringify(norm(a)) === JSON.stringify(norm(b))
+}
 
 export const Projects: CollectionConfig = {
   slug: 'projects',
   labels: { singular: '项目', plural: '项目' },
   admin: {
     useAsTitle: 'name',
-    defaultColumns: ['name', 'customerName', 'stage', 'owner', 'updatedAt'],
+    defaultColumns: ['name', 'customerName', 'status', 'pointCount', 'updatedAt'],
     group: '项目',
   },
   defaultSort: '-updatedAt',
   access: {
-    read: cmsAdminOrActiveStaff,
-    create: canEditProjects,
-    update: canEditProjects,
-    delete: cmsAdminOrManager,
+    read: cmsAdminOrMember,
+    create: cmsAdminOrMember,
+    update: cmsAdminOrMember,
+    delete: cmsAdminOrMember,
   },
   hooks: {
+    beforeValidate: [
+      // 项目名称留空时按「小区 + 房号」或客户姓名自动生成
+      ({ data }) => {
+        if (data && !String(data.name ?? '').trim()) data.name = autoProjectName(data)
+        return data
+      },
+    ],
     beforeChange: [
-      // 新建时未指定负责人，默认由当前员工负责（服务端设置，不信任客户端）。
-      ({ data, operation, req }) => {
+      ({ data, operation, originalDoc, req }) => {
+        // 已归档的项目只读：成员只能把它恢复为进行中（Payload 会用原值补齐未提交的字段，所以逐个比较值）
+        if (operation === 'update' && originalDoc?.status === 'archived' && data.status === 'archived' && isMember(req)) {
+          const changed = Object.keys(data).filter((k) => !EDITABLE_WHEN_ARCHIVED.has(k) && !sameValue(data[k], originalDoc[k]))
+          if (changed.length) throw new APIError(ARCHIVED_MESSAGE, 403)
+        }
+        // 新建时未指定负责人，默认由当前成员负责（服务端设置，不信任客户端）
         if (operation === 'create' && !data.owner && req.user?.collection === 'users') data.owner = req.user.id
+        // 点位数由点位图自动统计，项目列表和进度不用再读取整张点位图
+        data.pointCount = countScenePoints(data.pointMap)
+        // 归档时间跟随状态
+        if (data.status === 'archived' && originalDoc?.status !== 'archived') data.archivedAt = new Date().toISOString()
+        if (data.status !== 'archived') data.archivedAt = null
         return data
       },
     ],
   },
   fields: [
-    { name: 'name', label: '项目名称', type: 'text', required: true, maxLength: 120 },
+    {
+      name: 'name',
+      label: '项目名称',
+      type: 'text',
+      required: true,
+      maxLength: 120,
+      admin: { description: '留空时按「小区 + 房号」或客户姓名自动生成' },
+    },
     {
       type: 'row',
       fields: [
-        { name: 'customerName', label: '客户姓名', type: 'text', required: true, maxLength: 60 },
+        { name: 'customerName', label: '客户姓名', type: 'text', maxLength: 60 },
         { name: 'customerPhone', label: '客户电话', type: 'text', maxLength: 30 },
       ],
     },
@@ -46,46 +75,38 @@ export const Projects: CollectionConfig = {
       type: 'row',
       fields: [
         { name: 'community', label: '小区 / 楼盘', type: 'text', maxLength: 80 },
-        { name: 'address', label: '详细地址', type: 'text', maxLength: 200 },
+        { name: 'address', label: '房号 / 详细地址', type: 'text', maxLength: 200 },
       ],
     },
     {
       type: 'row',
       fields: [
-        { name: 'stage', label: '阶段', type: 'select', required: true, defaultValue: 'new', options: opts(PROJECT_STAGES), index: true },
-        { name: 'status', label: '状态', type: 'select', required: true, defaultValue: 'active', options: opts(PROJECT_STATUSES), index: true },
-      ],
-    },
-    {
-      type: 'row',
-      fields: [
-        { name: 'owner', label: '负责人', type: 'relationship', relationTo: 'users' },
         { name: 'platform', label: '主平台', type: 'select', options: PROJECT_PLATFORMS.map((p) => ({ value: p, label: p })) },
         { name: 'budget', label: '预算（元）', type: 'number', min: 0 },
+        { name: 'owner', label: '负责人', type: 'relationship', relationTo: 'users' },
       ],
     },
     {
-      type: 'collapsible',
-      label: '风险与下一步',
-      // 页面流程已简化，不再使用这些字段；保留已有数据，仅在后台隐藏。
-      admin: { condition: () => false },
-      fields: [
-        {
-          type: 'row',
-          fields: [
-            { name: 'riskLevel', label: '风险', type: 'select', defaultValue: 'normal', options: opts(PROJECT_RISKS) },
-            { name: 'waitingOn', label: '等待对象', type: 'select', defaultValue: 'none', options: opts(PROJECT_WAITING_ON) },
-          ],
-        },
-        { name: 'riskNote', label: '风险说明', type: 'textarea', maxLength: 500 },
-        {
-          type: 'row',
-          fields: [
-            { name: 'nextAction', label: '下一步', type: 'text', maxLength: 200 },
-            { name: 'nextActionDueAt', label: '下一步截止', type: 'date', admin: { date: { pickerAppearance: 'dayOnly' } } },
-          ],
-        },
-      ],
+      name: 'status',
+      label: '状态',
+      type: 'select',
+      required: true,
+      defaultValue: 'active',
+      options: opts(PROJECT_STATUSES),
+      index: true,
+      admin: { position: 'sidebar' },
+    },
+    {
+      name: 'archivedAt',
+      label: '归档时间',
+      type: 'date',
+      admin: { position: 'sidebar', readOnly: true, condition: (data) => data?.status === 'archived' },
+    },
+    {
+      name: 'pointCount',
+      label: '点位数',
+      type: 'number',
+      admin: { position: 'sidebar', readOnly: true, description: '保存点位图时自动统计' },
     },
     { name: 'notes', label: '备注', type: 'textarea', maxLength: 2000 },
     {

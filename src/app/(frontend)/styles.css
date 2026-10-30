@@ -208,8 +208,9 @@
   transform: translateY(0);
 }
 
-/* 画布类页面（点位图）铺满内容区，不受页面最大宽度限制 */
-[data-slot="sidebar-inset"] > main:has(> .full-bleed-page) {
+/* 画布类页面（点位图）和项目详情铺满内容区，不受页面最大宽度限制（项目各板块自己控制内容宽度） */
+[data-slot="sidebar-inset"] > main:has(> .full-bleed-page),
+[data-slot="sidebar-inset"] > main:has(> .project-header) {
   max-width: none;
 }
 

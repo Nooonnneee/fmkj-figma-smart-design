@@ -1,3 +1,5 @@
-import { DetailSkeleton } from '@/components/page-skeletons'
+import { ProjectTabSkeleton } from '@/components/page-skeletons'
 
-export default DetailSkeleton
+export default function Loading() {
+  return <ProjectTabSkeleton />
+}

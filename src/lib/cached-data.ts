@@ -6,7 +6,7 @@ import type { Brand, Category, Media, Product } from '@/payload-types'
 /**
  * 很少变动的共享数据，缓存在服务端进程内，写入时由集合 hook 立即清除。
  * 这里使用 overrideAccess 读取完整数据：调用方页面已在工作区布局中校验员工登录，
- * 成本等敏感字段由调用方按角色决定是否展示或下发。
+ * 只在登录后的页面和接口里使用。
  */
 
 /** 兜底过期时间：即使有绕过 hook 的修改，最多 60 秒后也会生效。 */
@@ -97,7 +97,7 @@ export const getBrands = memoize(
   },
 )
 
-/** 负责人下拉：启用员工的 id 和姓名。 */
+/** 负责人下拉：启用成员的 id 和姓名。 */
 export const getOwnerOptions = memoize(
   'staff-owner-options-v1',
   [CACHE_TAGS.staff],
@@ -125,13 +125,14 @@ export type CompanyInfo = {
   address: string | null
   qrCaption: string | null
   quoteNotes: string | null
+  contractTerms: string | null
   printProductImages: boolean
   logo: { url: string; alt: string; width: number | null; height: number | null } | null
   qrCode: { url: string; alt: string } | null
 }
 
 export const getCompanyInfo = memoize(
-  'company-settings-v2',
+  'company-settings-v3',
   [CACHE_TAGS.company],
   TTL,
   async (): Promise<CompanyInfo> => {
@@ -147,6 +148,7 @@ export const getCompanyInfo = memoize(
       address: s.address ?? null,
       qrCaption: s.qrCaption ?? null,
       quoteNotes: s.quoteNotes ?? null,
+      contractTerms: s.contractTerms ?? null,
       printProductImages: s.printProductImages !== false,
       logo: logo?.url ? { url: logo.url, alt: logo.alt || s.name, width: logo.width ?? null, height: logo.height ?? null } : null,
       qrCode: qr?.url ? { url: qr.url, alt: qr.alt || '二维码' } : null,

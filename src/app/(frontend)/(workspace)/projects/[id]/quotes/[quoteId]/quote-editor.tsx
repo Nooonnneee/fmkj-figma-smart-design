@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
-import Link from 'next/link'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, ArrowLeftRight, ChevronDown, ChevronLeft, FileDown, FileText, ImageIcon, Layers, Loader2, MapPinned, Plus, Printer, ReceiptText, RefreshCw, RotateCcw, Save, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowLeftRight, ArrowRight, ChevronDown, ChevronLeft, FileDown, FileSignature, ImageIcon, Layers, Loader2, Lock, MapPinned, Plus, Printer, RefreshCw, RotateCcw, Save, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { DeviceSymbol } from '@/components/device-symbol'
+import { GuardedLink } from '@/components/guarded-link'
 import { PlanFigure } from '@/components/plan-figure'
 import { PointMarker } from '@/components/point-marker'
 import { ProductThumb } from '@/components/product-thumb'
@@ -21,13 +22,16 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
+import { contractStatusLabel } from '@/lib/contracts'
 import { DEVICE_TYPE_ORDER, deviceTypeLabel } from '@/lib/device-types'
+import { registerLeaveGuard } from '@/lib/leave-guard'
 import { inferScopeFromTitle, POINT_SCOPES, type PointScope } from '@/lib/point-scopes'
 import type { StoredScene } from '@/lib/point-scene'
 import { buildQuoteFloorGroups } from '@/lib/quote-areas'
 import { QUOTE_STATUSES, quoteTotals, yuan } from '@/lib/quotes'
 import { cn } from '@/lib/utils'
 
+import { createContract } from '../../contract/actions'
 import { saveQuote, setQuoteProjectDefault, syncQuoteFromPointMap } from '../actions'
 import { SwapProductDialog, type SwapScope } from './swap-product-dialog'
 
@@ -114,17 +118,23 @@ export function QuoteEditor({
   products,
   costs,
   readOnly,
+  lockReason = null,
+  contract = null,
   pendingPoints = 0,
 }: {
   quote: QuoteState
-  project: { id: string; name: string; customerName: string } | null
+  project: { id: string; name: string; customerName: string }
   projectQuotes?: { id: string; title: string; total: number }[]
   projectScene?: Partial<StoredScene> | null
   projectDefaults?: unknown
   products: ProductOption[]
-  /** 仅管理员 / 经理会收到成本；为 null 时不显示成本与毛利。 */
+  /** 产品成本（内部参考，不会打印）；为 null 时不显示成本与毛利。 */
   costs: Record<string, number> | null
   readOnly: boolean
+  /** 只读原因：项目已归档，或报价已用于已签订的合同 */
+  lockReason?: string | null
+  /** 项目的合同（每个项目一份）以及是否依据这份报价 */
+  contract?: { number: string; status: string; usesThisQuote: boolean } | null
   /** 从点位图生成时未能确定型号的点位数 */
   pendingPoints?: number
 }) {
@@ -215,22 +225,51 @@ export function QuoteEditor({
     return () => window.removeEventListener('beforeunload', warn)
   }, [dirty])
 
+  const persist = async () => {
+    const result = await saveQuote(quote.id, {
+      title: quote.title,
+      status: quote.status,
+      discount: quote.discount,
+      notes: quote.notes,
+      items: quote.items.map((l) => ({ id: l.id, product: l.product, name: l.name, sku: l.sku, unit: l.unit, price: l.price, quantity: l.quantity })),
+      fees: quote.fees.map(({ key: _k, ...f }) => f),
+    })
+    if (!result.ok) {
+      toast.error(result.error)
+      return false
+    }
+    setDirty(false)
+    toast.success('报价已保存')
+    router.refresh()
+    return true
+  }
   const save = (then?: () => void) =>
     startSaving(async () => {
-      const result = await saveQuote(quote.id, {
-        title: quote.title,
-        status: quote.status,
-        discount: quote.discount,
-        notes: quote.notes,
-        items: quote.items.map((l) => ({ id: l.id, product: l.product, name: l.name, sku: l.sku, unit: l.unit, price: l.price, quantity: l.quantity })),
-        fees: quote.fees.map(({ key: _k, ...f }) => f),
-      })
-      if (!result.ok) return void toast.error(result.error)
-      setDirty(false)
-      toast.success('报价已保存')
-      router.refresh()
-      then?.()
+      if (await persist()) then?.()
     })
+
+  // 切换项目板块或侧边栏导航时，先自动保存未保存的修改
+  const persistRef = useRef(persist)
+  persistRef.current = persist
+  useEffect(() => {
+    if (!dirty || readOnly) return
+    return registerLeaveGuard(async () => (await persistRef.current()) || window.confirm('报价保存失败，仍要离开吗？未保存的修改会丢失。'))
+  }, [dirty, readOnly])
+
+  const [creatingContract, setCreatingContract] = useState(false)
+  const generateContract = async () => {
+    if (creatingContract) return
+    if (dirty && !readOnly && !(await persist())) return
+    setCreatingContract(true)
+    try {
+      const result = await createContract(project.id, quote.id)
+      if (!result.ok) return void toast.error(result.error)
+      toast.success('已生成合同，请核对内容后打印')
+      router.push(`/projects/${project.id}/contract`)
+    } finally {
+      setCreatingContract(false)
+    }
+  }
 
   const openPrint = (autoPdf = false) => {
     const url = autoPdf ? `/print/quotes/${quote.id}?auto=pdf` : `/print/quotes/${quote.id}`
@@ -241,20 +280,11 @@ export function QuoteEditor({
 
   /** 无缝跳回点位图（如有未保存的临时改价或换型号，先自动保存再跳转；支持直接定位到指定楼层、房间或点位代号） */
   const switchToPointMap = (opts?: { sheet?: string; area?: string; point?: string }) => {
-    if (!project) return
     const params = new URLSearchParams({ quoteId: quote.id, scope: currentScope })
     if (opts?.sheet) params.set('sheet', opts.sheet)
     if (opts?.area) params.set('area', opts.area)
     if (opts?.point) params.set('point', opts.point)
     const url = `/projects/${project.id}/point-map?${params.toString()}`
-    const go = () => router.push(url)
-    if (dirty && !readOnly) save(go)
-    else go()
-  }
-
-  const switchToProposal = () => {
-    if (!project) return
-    const url = `/print/projects/${project.id}/proposal?scope=${currentScope}`
     const go = () => router.push(url)
     if (dirty && !readOnly) save(go)
     else go()
@@ -297,66 +327,41 @@ export function QuoteEditor({
         onConfirm={applySwap}
       />
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-0 items-center gap-1">
           <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
-            <Link href={project ? `/projects/${project.id}` : '/quotes'}><ChevronLeft className="size-4" />{project ? '返回项目' : '报价列表'}</Link>
+            <GuardedLink href={`/projects/${project.id}/quotes`}><ChevronLeft className="size-4" />全部报价</GuardedLink>
           </Button>
-          {project ? (
-            <div className="flex items-center rounded-lg bg-muted p-0.5" role="navigation" aria-label="工作台视图切换">
-              <Button
-                type="button"
-                size="xs"
-                variant="ghost"
-                disabled={saving || syncing}
-                className="h-7 rounded-md px-2.5 text-xs"
-                onClick={() => switchToPointMap()}
-              >
-                <MapPinned className="size-3.5" />点位图
-              </Button>
-              <div className="flex items-center">
-                <Button type="button" size="xs" variant="ghost" className="h-7 rounded-md bg-background px-2.5 text-xs font-medium shadow-sm">
-                  <ReceiptText className="size-3.5" />报价单
-                  <span className="text-[11px] font-normal text-muted-foreground tabular-nums">{yuan(totals.total)}</span>
+          {projectQuotes.length > 1 ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" aria-label="切换到项目里的其他报价">
+                  切换<ChevronDown className="size-3.5" />
                 </Button>
-                {projectQuotes.length > 1 ? (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button type="button" variant="ghost" size="icon-xs" className="h-7 w-5" aria-label="切换其他报价单">
-                        <ChevronDown className="size-3" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      {projectQuotes.map((q) => (
-                        <DropdownMenuItem
-                          key={q.id}
-                          onSelect={() => {
-                            if (q.id === quote.id) return
-                            const go = () => router.push(`/quotes/${q.id}`)
-                            if (dirty && !readOnly) save(go)
-                            else go()
-                          }}
-                        >
-                          <span className={cn('flex-1 truncate', q.id === quote.id && 'font-semibold')}>{q.title}</span>
-                          <span className="ml-3 text-xs text-muted-foreground tabular-nums">{yuan(q.total)}</span>
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                ) : null}
-              </div>
-              <Button type="button" size="xs" variant="ghost" disabled={saving || syncing} className="h-7 rounded-md px-2.5 text-xs" onClick={switchToProposal}>
-                <FileText className="size-3.5" />方案预览
-              </Button>
-            </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {projectQuotes.map((q) => (
+                  <DropdownMenuItem
+                    key={q.id}
+                    onSelect={() => {
+                      if (q.id === quote.id) return
+                      const go = () => router.push(`/projects/${project.id}/quotes/${q.id}`)
+                      if (dirty && !readOnly) save(go)
+                      else go()
+                    }}
+                  >
+                    <span className={cn('flex-1 truncate', q.id === quote.id && 'font-semibold')}>{q.title}</span>
+                    <span className="ml-3 text-xs text-muted-foreground tabular-nums">{yuan(q.total)}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : null}
         </div>
-        <div className="flex items-center gap-2">
-          {readOnly ? <Badge variant="secondary">只读</Badge> : dirty ? <Badge variant="outline">未保存</Badge> : null}
-          {project ? (
-            <Button variant="outline" size="sm" disabled={saving || syncing} onClick={() => switchToPointMap()}>
-              <MapPinned className="size-4" />去改点位图
-            </Button>
-          ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {readOnly ? <Badge variant="secondary"><Lock className="size-3" />只读</Badge> : dirty ? <Badge variant="outline">未保存</Badge> : null}
+          <Button variant="outline" size="sm" disabled={saving || syncing} onClick={() => switchToPointMap()}>
+            <MapPinned className="size-4" />调整点位
+          </Button>
           <Button variant="outline" size="sm" onClick={() => openPrint(false)}><Printer className="size-4" />打印预览</Button>
           <Button variant="outline" size="sm" onClick={() => openPrint(true)}><FileDown className="size-4" />导出 PDF</Button>
           {readOnly ? null : (
@@ -367,11 +372,18 @@ export function QuoteEditor({
         </div>
       </div>
 
+      {lockReason ? (
+        <div role="status" className="flex items-start gap-2 rounded-lg border bg-muted/50 px-4 py-3 text-sm">
+          <Lock className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+          <span>{lockReason}</span>
+        </div>
+      ) : null}
+
       <header className="grid gap-4 md:grid-cols-[1fr_12rem]">
         <div className="grid gap-2">
           <Label htmlFor="title">报价名称</Label>
           <Input id="title" value={quote.title} disabled={readOnly} onChange={(e) => update({ title: e.target.value })} className="text-base font-semibold" />
-          {project ? <p className="text-xs text-muted-foreground">{project.name} · 客户 {project.customerName}</p> : null}
+          <p className="text-xs text-muted-foreground">{[project.name, project.customerName && `客户 ${project.customerName}`].filter(Boolean).join(' · ')}</p>
         </div>
         <div className="grid gap-2">
           <Label htmlFor="status">状态</Label>
@@ -384,6 +396,23 @@ export function QuoteEditor({
         </div>
       </header>
 
+      {contract?.usesThisQuote ? (
+        <p className="-mt-2 text-sm text-muted-foreground">
+          已用于合同 {contract.number}（{contractStatusLabel(contract.status)}）
+          <GuardedLink href={`/projects/${project.id}/contract`} className="ml-2 font-medium text-foreground underline-offset-4 hover:underline">查看合同</GuardedLink>
+        </p>
+      ) : !contract && !readOnly && quote.status === 'accepted' ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/40 px-4 py-3">
+          <div className="text-sm">
+            <div className="font-medium">客户已确认这份报价</div>
+            <div className="text-muted-foreground">下一步：用它生成合同，金额、客户信息和付款方式会自动带入。</div>
+          </div>
+          <Button size="sm" disabled={creatingContract || saving} onClick={() => void generateContract()}>
+            {creatingContract ? <Loader2 className="size-4 animate-spin" /> : <FileSignature className="size-4" />}生成合同<ArrowRight className="size-4" />
+          </Button>
+        </div>
+      ) : null}
+
       {pendingPoints ? (
         <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
@@ -391,7 +420,7 @@ export function QuoteEditor({
             <div className="font-medium">点位图中有 {pendingPoints} 个点位待选型，未计入本报价</div>
             <div className="text-muted-foreground">
               可回到点位图给这些点位指定产品，或在「统计与默认型号」里设置项目默认型号后重新生成；也可以直接在下方「添加产品」。
-              {project ? <Link className="ml-1 underline underline-offset-2" href={`/projects/${project.id}/point-map`}>打开点位图</Link> : null}
+              <button type="button" className="ml-1 underline underline-offset-2" onClick={() => switchToPointMap()}>打开点位图</button>
             </div>
           </div>
         </div>
@@ -492,8 +521,7 @@ export function QuoteEditor({
                           <CommandItem key={p.id} value={`${p.name} ${p.sku} ${p.brand?.name ?? ''} ${deviceTypeLabel(p.deviceType)}`} onSelect={() => addProduct(p)}>
                             <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
                               {p.image ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={p.image} alt="" className="size-full object-cover" />
+                                <Image src={p.image} alt="" width={32} height={32} className="size-full bg-white object-contain" />
                               ) : (
                                 <span className="size-5"><DeviceSymbol type={p.deviceType} /></span>
                               )}
@@ -663,8 +691,7 @@ export function QuoteEditor({
                       <div className="flex items-center gap-3">
                         <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted">
                           {l.image ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={l.image} alt="" className="size-full object-cover" />
+                            <Image src={l.image} alt="" width={44} height={44} className="size-full bg-white object-contain" />
                           ) : l.deviceType ? (
                             <span className="size-6"><DeviceSymbol type={l.deviceType} /></span>
                           ) : (
@@ -773,7 +800,7 @@ export function QuoteEditor({
             </div>
             {margin ? (
               <div className="mt-3 space-y-1.5 rounded-lg bg-muted/60 p-3">
-                <div className="text-xs font-medium text-muted-foreground">内部参考 · 仅管理员和经理可见，不会打印</div>
+                <div className="text-xs font-medium text-muted-foreground">内部参考，不会打印</div>
                 <div className="flex justify-between"><span className="text-muted-foreground">产品成本</span><span className="tabular-nums">{yuan(margin.cost)}</span></div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">毛利</span>

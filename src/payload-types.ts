@@ -84,6 +84,7 @@ export interface Config {
     users: User;
     projects: Project;
     quotes: Quote;
+    contracts: Contract;
     products: Product;
     brands: Brand;
     categories: Category;
@@ -102,6 +103,7 @@ export interface Config {
     users: UsersSelect<false> | UsersSelect<true>;
     projects: ProjectsSelect<false> | ProjectsSelect<true>;
     quotes: QuotesSelect<false> | QuotesSelect<true>;
+    contracts: ContractsSelect<false> | ContractsSelect<true>;
     products: ProductsSelect<false> | ProductsSelect<true>;
     brands: BrandsSelect<false> | BrandsSelect<true>;
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
@@ -214,8 +216,13 @@ export interface Admin {
 export interface User {
   id: string;
   name: string;
+  /**
+   * 会作为联系人显示在报价单上
+   */
   phone?: string | null;
-  role: 'admin' | 'manager' | 'designer' | 'sales' | 'viewer';
+  /**
+   * 停用后无法登录，已有项目保留
+   */
   status: 'active' | 'disabled';
   createdBy?:
     | ({
@@ -261,21 +268,23 @@ export interface User {
  */
 export interface Project {
   id: string;
+  /**
+   * 留空时按「小区 + 房号」或客户姓名自动生成
+   */
   name: string;
-  customerName: string;
+  customerName?: string | null;
   customerPhone?: string | null;
   community?: string | null;
   address?: string | null;
-  stage: 'new' | 'measure' | 'proposal' | 'contract' | 'install' | 'acceptance' | 'aftercare';
-  status: 'active' | 'paused' | 'canceled' | 'archived';
-  owner?: (string | null) | User;
   platform?: ('米家' | 'Aqara Home' | 'Apple Home' | '华为鸿蒙智家' | 'KNX' | 'Control4' | '网络/弱电' | '待定') | null;
   budget?: number | null;
-  riskLevel?: ('normal' | 'watch' | 'blocked') | null;
-  waitingOn?: ('none' | 'customer' | 'internal' | 'vendor') | null;
-  riskNote?: string | null;
-  nextAction?: string | null;
-  nextActionDueAt?: string | null;
+  owner?: (string | null) | User;
+  status: 'active' | 'archived';
+  archivedAt?: string | null;
+  /**
+   * 保存点位图时自动统计
+   */
+  pointCount?: number | null;
   notes?: string | null;
   pointMap?:
     | {
@@ -664,6 +673,56 @@ export interface Category {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "contracts".
+ */
+export interface Contract {
+  id: string;
+  /**
+   * 留空自动生成
+   */
+  number: string;
+  status: 'draft' | 'signed';
+  signedAt?: string | null;
+  project: string | Project;
+  quote: string | Quote;
+  amount: number;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  address?: string | null;
+  durationDays?: number | null;
+  warrantyMonths?: number | null;
+  payments?:
+    | {
+        name: string;
+        percent: number;
+        received?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
+  terms?: string | null;
+  createdBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -701,6 +760,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'quotes';
         value: string | Quote;
+      } | null)
+    | ({
+        relationTo: 'contracts';
+        value: string | Contract;
       } | null)
     | ({
         relationTo: 'products';
@@ -832,7 +895,6 @@ export interface AdminsSelect<T extends boolean = true> {
 export interface UsersSelect<T extends boolean = true> {
   name?: T;
   phone?: T;
-  role?: T;
   status?: T;
   createdBy?: T;
   updatedBy?: T;
@@ -864,16 +926,12 @@ export interface ProjectsSelect<T extends boolean = true> {
   customerPhone?: T;
   community?: T;
   address?: T;
-  stage?: T;
-  status?: T;
-  owner?: T;
   platform?: T;
   budget?: T;
-  riskLevel?: T;
-  waitingOn?: T;
-  riskNote?: T;
-  nextAction?: T;
-  nextActionDueAt?: T;
+  owner?: T;
+  status?: T;
+  archivedAt?: T;
+  pointCount?: T;
   notes?: T;
   pointMap?: T;
   defaultProducts?: T;
@@ -915,6 +973,36 @@ export interface QuotesSelect<T extends boolean = true> {
   productTotal?: T;
   feeTotal?: T;
   total?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "contracts_select".
+ */
+export interface ContractsSelect<T extends boolean = true> {
+  number?: T;
+  status?: T;
+  signedAt?: T;
+  project?: T;
+  quote?: T;
+  amount?: T;
+  customerName?: T;
+  customerPhone?: T;
+  address?: T;
+  durationDays?: T;
+  warrantyMonths?: T;
+  payments?:
+    | T
+    | {
+        name?: T;
+        percent?: T;
+        received?: T;
+        id?: T;
+      };
+  terms?: T;
   createdBy?: T;
   updatedBy?: T;
   updatedAt?: T;
@@ -1096,6 +1184,9 @@ export interface PayloadLlmInstructionsSelect<T extends boolean = true> {
  */
 export interface CompanySetting {
   id: string;
+  /**
+   * 公司、工作室或个人名称，显示在报价单和合同上
+   */
   name: string;
   slogan?: string | null;
   phone?: string | null;
@@ -1105,6 +1196,7 @@ export interface CompanySetting {
   qrCode?: (string | null) | Media;
   qrCaption?: string | null;
   quoteNotes?: string | null;
+  contractTerms?: string | null;
   printProductImages?: boolean | null;
   createdBy?:
     | ({
@@ -1141,6 +1233,7 @@ export interface CompanySettingsSelect<T extends boolean = true> {
   qrCode?: T;
   qrCaption?: T;
   quoteNotes?: T;
+  contractTerms?: T;
   printProductImages?: T;
   createdBy?: T;
   updatedBy?: T;
@@ -1176,7 +1269,17 @@ export interface CollectionQueryWidget {
   data?: {
     title?: string | null;
     relatedCollection:
-      'admins' | 'users' | 'projects' | 'quotes' | 'products' | 'brands' | 'categories' | 'media' | 'folders' | 'tags';
+      | 'admins'
+      | 'users'
+      | 'projects'
+      | 'quotes'
+      | 'contracts'
+      | 'products'
+      | 'brands'
+      | 'categories'
+      | 'media'
+      | 'folders'
+      | 'tags';
     where?:
       | {
           [k: string]: unknown;
@@ -1204,6 +1307,7 @@ export interface ActivityWidget {
           | 'users'
           | 'projects'
           | 'quotes'
+          | 'contracts'
           | 'products'
           | 'brands'
           | 'categories'

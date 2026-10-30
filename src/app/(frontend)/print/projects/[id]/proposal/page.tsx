@@ -385,7 +385,7 @@ export default async function ProposalPage({ params, searchParams }: { params: P
     <div className="min-h-screen bg-neutral-200/70 print:bg-white">
       <style>{'@media print { @page { size: A4 landscape; margin: 0; } }'}</style>
       <PrintToolbar
-        back={{ href: `/projects/${id}`, label: '返回项目' }}
+        back={{ href: `/projects/${id}/point-map`, label: '返回点位' }}
         exportName={`${d.project.name}-${tpl.label}${scope === 'all' ? '' : '-' + POINT_SCOPES.find((x) => x.value === scope)!.label}`}
         groups={[
           { label: '模板', value: t, options: PROPOSAL_TEMPLATES.map((x) => ({ value: x.value, label: x.label, href: `${base}?template=${x.value}&scope=${scope}` })) },

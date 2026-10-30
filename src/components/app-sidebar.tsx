@@ -1,13 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { Building2, ChevronsUpDown, FileText, FolderKanban, LogOut, PackageSearch } from "lucide-react"
+import { ChevronsUpDown, FolderKanban, LogOut, PackageSearch, Settings } from "lucide-react"
 
+import { GuardedLink } from "@/components/guarded-link"
 import { LinkPending } from "@/components/link-pending"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,26 +21,26 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
+import { APP_TAGLINE, brandInitials } from "@/lib/brand"
 
-export type SidebarUser = { name: string; email: string; roleLabel: string; isAdmin: boolean }
+export type SidebarUser = { name: string; email: string }
+export type SidebarBrand = { name: string; logo: string | null }
 
-const nav: { icon: typeof PackageSearch; label: string; url: string; soon?: boolean }[] = [
+const nav = [
   { icon: FolderKanban, label: "项目", url: "/projects" },
   { icon: PackageSearch, label: "产品库", url: "/products" },
-  { icon: FileText, label: "报价", url: "/quotes" },
-]
+  { icon: Settings, label: "设置", url: "/settings" },
+] as const
 
-const initials = (name: string) => name.trim().slice(0, 1).toUpperCase() || "用"
+const initials = (name: string) => name.trim().slice(0, 1).toUpperCase() || "我"
 
-export function AppSidebar({ user }: { user: SidebarUser }) {
+export function AppSidebar({ user, brand }: { user: SidebarUser; brand: SidebarBrand }) {
   const pathname = usePathname()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
 
@@ -60,16 +60,20 @@ export function AppSidebar({ user }: { user: SidebarUser }) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild className="group-data-[collapsible=icon]:px-1.5">
-              <Link href="/projects">
-                {/* 品牌字标：用公司缩写代替模板自带的 ⌘ 占位图标 */}
-                <div className="flex size-8 items-center justify-center rounded-lg bg-sidebar-primary text-[11px] font-bold tracking-tight text-sidebar-primary-foreground">
-                  FM
+              <GuardedLink href="/projects">
+                {/* 字标：设置里上传了 Logo 就用 Logo，否则用名称缩写 */}
+                <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-sidebar-primary text-[11px] font-bold tracking-tight text-sidebar-primary-foreground">
+                  {brand.logo ? (
+                    <Image src={brand.logo} alt="" width={32} height={32} className="size-full bg-white object-contain p-0.5" />
+                  ) : (
+                    brandInitials(brand.name)
+                  )}
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">FMKJ</span>
-                  <span className="truncate text-xs text-muted-foreground">项目运营后台</span>
+                  <span className="truncate font-semibold">{brand.name}</span>
+                  <span className="truncate text-xs text-muted-foreground">{APP_TAGLINE}</span>
                 </div>
-              </Link>
+              </GuardedLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -77,48 +81,20 @@ export function AppSidebar({ user }: { user: SidebarUser }) {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>常用</SidebarGroupLabel>
           <SidebarMenu>
             {nav.map((item) => (
-              <SidebarMenuItem key={item.label}>
-                {item.soon ? (
-                  <>
-                    <SidebarMenuButton disabled tooltip={`${item.label}（即将上线）`}>
-                      <item.icon />
-                      <span>{item.label}</span>
-                    </SidebarMenuButton>
-                    <SidebarMenuBadge>
-                      <Badge variant="outline" className="text-[10px]">即将上线</Badge>
-                    </SidebarMenuBadge>
-                  </>
-                ) : (
-                  <SidebarMenuButton asChild isActive={pathname.startsWith(item.url)} tooltip={item.label}>
-                    <Link href={item.url}>
-                      <item.icon />
-                      <span>{item.label}</span>
-                      <LinkPending className="ml-auto size-3.5" />
-                    </Link>
-                  </SidebarMenuButton>
-                )}
+              <SidebarMenuItem key={item.url}>
+                <SidebarMenuButton asChild isActive={pathname.startsWith(item.url)} tooltip={item.label}>
+                  <GuardedLink href={item.url}>
+                    <item.icon />
+                    <span>{item.label}</span>
+                    <LinkPending className="ml-auto size-3.5" />
+                  </GuardedLink>
+                </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
         </SidebarGroup>
-        {user.isAdmin ? (
-          <SidebarGroup>
-            <SidebarGroupLabel>设置</SidebarGroupLabel>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname.startsWith("/settings")} tooltip="公司信息">
-                  <Link href="/settings">
-                    <Building2 />
-                    <span>公司信息</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
-        ) : null}
       </SidebarContent>
 
       <SidebarFooter>
@@ -135,7 +111,7 @@ export function AppSidebar({ user }: { user: SidebarUser }) {
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-semibold">{user.name}</span>
-                    <span className="truncate text-xs text-muted-foreground">{user.roleLabel}</span>
+                    <span className="truncate text-xs text-muted-foreground">{user.email}</span>
                   </div>
                   <ChevronsUpDown className="ml-auto size-4" />
                 </SidebarMenuButton>
@@ -147,14 +123,9 @@ export function AppSidebar({ user }: { user: SidebarUser }) {
                 sideOffset={4}
               >
                 <DropdownMenuLabel className="p-0 font-normal">
-                  <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                    <Avatar className="size-8 rounded-lg">
-                      <AvatarFallback className="rounded-lg">{initials(user.name)}</AvatarFallback>
-                    </Avatar>
-                    <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold">{user.name}</span>
-                      <span className="truncate text-xs text-muted-foreground">{user.email}</span>
-                    </div>
+                  <div className="grid px-1 py-1.5 text-left text-sm leading-tight">
+                    <span className="truncate font-semibold">{user.name}</span>
+                    <span className="truncate text-xs text-muted-foreground">{user.email}</span>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />

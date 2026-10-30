@@ -1,29 +1,29 @@
 'use client'
 
-import { useActionState, useEffect } from 'react'
+import { useActionState, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, Loader2, Save } from 'lucide-react'
+import { AlertCircle, Loader2, Plus, Save } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { PROJECT_PLATFORMS, PROJECT_STAGES, PROJECT_STATUSES } from '@/lib/projects'
+import { registerLeaveGuard } from '@/lib/leave-guard'
+import { autoProjectName, PROJECT_PLATFORMS } from '@/lib/projects'
+import { cn } from '@/lib/utils'
 
 import { saveProject, type ProjectFormState } from './actions'
 
 export type ProjectFormValues = {
   id?: string
   name?: string
-  customerName?: string
+  customerName?: string | null
   customerPhone?: string | null
   community?: string | null
   address?: string | null
-  stage?: string
-  status?: string
   owner?: string | null
   platform?: string | null
   budget?: number | null
@@ -32,31 +32,52 @@ export type ProjectFormValues = {
 
 type Option = { value: string; label: string }
 
+/**
+ * 项目信息表单（新建和编辑共用）。所有字段都可以留空：
+ * 项目名称按小区 + 房号或客户姓名自动生成，主平台默认沿用上一个项目，负责人默认是自己。
+ */
 export function ProjectForm({
   initial = {},
   owners,
   readOnly = false,
+  onCancelHref,
 }: {
   initial?: ProjectFormValues
-  owners: Option[]
+  owners?: Option[]
   readOnly?: boolean
+  onCancelHref?: string
 }) {
   const router = useRouter()
   const [state, action, pending] = useActionState<ProjectFormState, FormData>(saveProject, null)
+  const [dirty, setDirty] = useState(false)
+  const [nameSource, setNameSource] = useState({ customerName: initial.customerName ?? '', community: initial.community ?? '', address: initial.address ?? '' })
   const errors = state && !state.ok ? (state.fieldErrors ?? {}) : {}
   const isNew = !initial.id
+  const suggestedName = autoProjectName(nameSource)
 
   useEffect(() => {
     if (!state?.ok) return
+    setDirty(false)
     if (isNew) router.push(`/projects/${state.id}`)
     else {
-      toast.success('项目已保存')
+      toast.success('项目信息已保存')
       router.refresh()
     }
   }, [state, isNew, router])
 
+  useEffect(() => {
+    if (!dirty || readOnly || isNew) return
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault()
+    window.addEventListener('beforeunload', warn)
+    const release = registerLeaveGuard(() => window.confirm('项目信息还没有保存，确定离开吗？'))
+    return () => {
+      window.removeEventListener('beforeunload', warn)
+      release()
+    }
+  }, [dirty, readOnly, isNew])
+
   const text = (name: keyof ProjectFormValues, label: string, props: React.ComponentProps<typeof Input> = {}) => (
-    <div className="grid gap-2">
+    <div className="grid content-start gap-2">
       <Label htmlFor={name}>{label}</Label>
       <Input
         id={name}
@@ -65,15 +86,19 @@ export function ProjectForm({
         aria-invalid={errors[name] ? true : undefined}
         disabled={readOnly}
         {...props}
+        onChange={(e) => {
+          if (name === 'customerName' || name === 'community' || name === 'address') setNameSource((s) => ({ ...s, [name]: e.target.value }))
+          props.onChange?.(e)
+        }}
       />
       {errors[name] ? <p className="text-xs text-destructive-strong">{errors[name]}</p> : null}
     </div>
   )
 
   const select = (name: keyof ProjectFormValues, label: string, options: readonly Option[], fallback: string, allowNone = false) => (
-    <div className="grid gap-2">
+    <div className="grid content-start gap-2">
       <Label htmlFor={name}>{label}</Label>
-      <Select name={name} defaultValue={(initial[name] as string | null | undefined) || fallback} disabled={readOnly}>
+      <Select name={name} defaultValue={(initial[name] as string | null | undefined) || fallback} disabled={readOnly} onValueChange={() => setDirty(true)}>
         <SelectTrigger id={name} className="w-full" aria-invalid={errors[name] ? true : undefined}>
           <SelectValue />
         </SelectTrigger>
@@ -89,7 +114,7 @@ export function ProjectForm({
   )
 
   return (
-    <form action={action} className="flex flex-col gap-4">
+    <form action={action} onChange={() => setDirty(true)} className="flex flex-col gap-4">
       {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
       {state && !state.ok ? (
         <div role="alert" className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive-strong">
@@ -98,45 +123,51 @@ export function ProjectForm({
         </div>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>基本信息</CardTitle>
-                  </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="md:col-span-2">{text('name', '项目名称', { placeholder: '例如：万科城 3-1201 全屋智能', required: true })}</div>
-          {text('customerName', '客户姓名', { required: true })}
-          {text('customerPhone', '客户电话', { inputMode: 'tel' })}
-          {text('community', '小区 / 楼盘')}
-          {text('address', '详细地址')}
-          {select('owner', '负责人', owners, '__none', true)}
-          {select('platform', '主平台', PROJECT_PLATFORMS.map((p) => ({ value: p, label: p })), '__none', true)}
-          {text('budget', '预算（元）', { type: 'number', min: 0, step: 100, inputMode: 'numeric' })}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>进度</CardTitle>
+      <Card className="gap-0">
+        <CardHeader className="pb-5">
+          <CardTitle className="text-base">{isNew ? '客户和地址' : '项目信息'}</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          {select('stage', '阶段', PROJECT_STAGES, 'new')}
-          {select('status', '状态', PROJECT_STATUSES, 'active')}
+        <CardContent className="grid gap-x-4 gap-y-5 md:grid-cols-2">
+          {text('customerName', '客户姓名', { placeholder: '例如：王女士', autoFocus: isNew, autoComplete: 'off' })}
+          {text('customerPhone', '客户电话', { inputMode: 'tel', autoComplete: 'off' })}
+          {text('community', '小区 / 楼盘', { placeholder: '例如：万科城' })}
+          {text('address', '房号 / 详细地址', { placeholder: '例如：3-1201' })}
+          {select('platform', '主平台', PROJECT_PLATFORMS.map((p) => ({ value: p, label: p })), initial.platform || PROJECT_PLATFORMS[0])}
+          {text('budget', '预算（元）', { type: 'number', min: 0, step: 1000, inputMode: 'numeric', placeholder: '可不填' })}
+          {owners && !isNew ? select('owner', '负责人', owners, '__none', true) : null}
+          <div className={cn('grid content-start gap-2', owners && !isNew ? '' : 'md:col-span-2')}>
+            <Label htmlFor="name">项目名称</Label>
+            <Input
+              id="name"
+              name="name"
+              defaultValue={initial.name ?? ''}
+              placeholder={suggestedName}
+              maxLength={120}
+              aria-invalid={errors.name ? true : undefined}
+              aria-describedby="name-hint"
+              disabled={readOnly}
+            />
+            <p id="name-hint" className="text-xs text-muted-foreground">留空时按小区、房号或客户姓名自动命名</p>
+          </div>
           <div className="grid gap-2 md:col-span-2">
             <Label htmlFor="notes">备注</Label>
-            <Textarea id="notes" name="notes" rows={3} defaultValue={initial.notes ?? ''} disabled={readOnly} />
+            <Textarea id="notes" name="notes" rows={2} maxLength={2000} defaultValue={initial.notes ?? ''} disabled={readOnly} placeholder="户型、装修进度、客户偏好等" />
           </div>
         </CardContent>
+        {readOnly ? null : (
+          <CardFooter className="mt-6 justify-end gap-2 border-t">
+            {isNew ? (
+              <Button type="button" variant="outline" onClick={() => router.push(onCancelHref ?? '/projects')}>取消</Button>
+            ) : dirty ? (
+              <span className="mr-auto text-xs text-muted-foreground">有未保存的修改</span>
+            ) : null}
+            <Button type="submit" disabled={pending || (!isNew && !dirty)}>
+              {pending ? <Loader2 className="size-4 animate-spin" /> : isNew ? <Plus className="size-4" /> : <Save className="size-4" />}
+              {isNew ? '创建项目' : '保存'}
+            </Button>
+          </CardFooter>
+        )}
       </Card>
-
-      {readOnly ? null : (
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => router.push('/projects')}>取消</Button>
-          <Button type="submit" disabled={pending}>
-            {pending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-            {isNew ? '创建项目' : '保存修改'}
-          </Button>
-        </div>
-      )}
     </form>
   )
 }

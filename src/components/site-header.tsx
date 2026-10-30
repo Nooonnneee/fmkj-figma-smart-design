@@ -1,6 +1,7 @@
 "use client"
 
 import { Monitor, Moon, Sun } from "lucide-react"
+import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 
 import { Button } from "@/components/ui/button"
@@ -14,7 +15,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
+/** 项目详情（/projects/[id]/…）有自己的顶栏（板块切换），这里不再重复显示。 */
+export const isProjectDetailPath = (pathname: string) => /^\/projects\/(?!new(?:\/|$))[^/]+/.test(pathname)
+
 export function SiteHeader() {
+  const pathname = usePathname()
+  if (isProjectDetailPath(pathname)) return null
   return (
     // 顶栏只承载侧边栏开关和主题切换，压到 48px，把首屏高度还给内容。
     <header className="sticky top-0 z-50 h-12 shrink-0 border-b bg-background">
@@ -28,7 +34,7 @@ export function SiteHeader() {
   )
 }
 
-function ThemeMenu() {
+export function ThemeMenu() {
   const { setTheme, theme } = useTheme()
 
   return (

@@ -2,6 +2,7 @@ import { getCatalog } from '@/lib/cached-data'
 import { isDeviceType } from '@/lib/device-types'
 import { getPayloadClient } from '@/lib/payload'
 import { parseDefaults, type ProjectDefaults } from '@/lib/point-map-items'
+import { readableError } from '@/lib/project-guards'
 import type { User } from '@/payload-types'
 
 export type SetDefaultResult = { ok: true; defaults: ProjectDefaults } | { ok: false; error: string; status: number }
@@ -32,7 +33,7 @@ export async function setProjectDefault(user: User, projectId: string, deviceTyp
     await payload.update({ collection: 'projects', id: projectId, data: { defaultProducts: data }, user, overrideAccess: false, depth: 0, select: { updatedAt: true } })
     return { ok: true, defaults }
   } catch (error) {
-    if ((error as { status?: number })?.status === 403) return { ok: false, error: '没有权限修改该项目', status: 403 }
+    if ((error as { status?: number })?.status === 403) return { ok: false, error: readableError(error, '没有权限修改该项目'), status: 403 }
     console.error('[project-defaults] save failed', error)
     return { ok: false, error: '保存失败，请稍后重试', status: 500 }
   }

@@ -15,7 +15,7 @@ import config from '@payload-config'
 import { getPayload } from 'payload'
 
 // 导入顺序即依赖顺序：被引用的集合排在前面。
-export const COLLECTIONS = ['media', 'brands', 'categories', 'tags', 'folders', 'users', 'products', 'projects', 'quotes'] as const
+export const COLLECTIONS = ['media', 'brands', 'categories', 'tags', 'folders', 'users', 'products', 'projects', 'quotes', 'contracts'] as const
 
 // Figma 平台附加的字段，自建服务器的表结构里没有，导出时去掉。
 const PLATFORM_FIELDS = new Set(['createdBy', 'updatedBy', '_h_folders', '_h_tags', 'prefix', '_objectKey', 'original', 'thumbnailURL', 'sessions',

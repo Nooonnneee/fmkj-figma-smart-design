@@ -2,7 +2,7 @@ import type { CollectionConfig } from 'payload'
 
 import { CACHE_TAGS, expireOnChange, expireOnDelete } from '@/lib/cache-tags'
 
-import { cmsAdminOrActiveStaff } from '@/lib/access'
+import { cmsAdminOrMember } from '@/lib/access'
 
 export const Categories: CollectionConfig = {
   slug: 'categories',
@@ -15,7 +15,7 @@ export const Categories: CollectionConfig = {
   },
   defaultSort: 'sortOrder',
   access: {
-    read: cmsAdminOrActiveStaff,
+    read: cmsAdminOrMember,
     // 与 src/lib/device-types.ts 的类别一一对应，锁定为只读。
     create: () => false,
     update: () => false,

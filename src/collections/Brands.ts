@@ -2,17 +2,17 @@ import type { CollectionConfig } from 'payload'
 
 import { CACHE_TAGS, expireOnChange, expireOnDelete } from '@/lib/cache-tags'
 
-import { cmsAdminOrActiveStaff, cmsAdminOrManager } from '@/lib/access'
+import { cmsAdminOnly, cmsAdminOrMember } from '@/lib/access'
 
 export const Brands: CollectionConfig = {
   slug: 'brands',
   labels: { singular: '品牌', plural: '品牌' },
   admin: { useAsTitle: 'name', defaultColumns: ['name', 'slug'], group: '产品库' },
   access: {
-    read: cmsAdminOrActiveStaff,
-    create: cmsAdminOrManager,
-    update: cmsAdminOrManager,
-    delete: cmsAdminOrManager,
+    read: cmsAdminOrMember,
+    create: cmsAdminOnly,
+    update: cmsAdminOnly,
+    delete: cmsAdminOnly,
   },
   hooks: {
     afterChange: [expireOnChange(CACHE_TAGS.catalog)],

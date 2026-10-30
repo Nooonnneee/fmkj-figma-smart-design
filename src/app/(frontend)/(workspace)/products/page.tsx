@@ -1,4 +1,5 @@
 import Form from 'next/form'
+import Image from 'next/image'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Check, ChevronDown, ChevronLeft, ChevronRight, ImageIcon, PackageSearch, Search, SlidersHorizontal, X } from 'lucide-react'
@@ -13,11 +14,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PRODUCT_PLATFORMS } from '@/collections/Products'
 import { appAuth } from '@/lib/app-auth'
+import { pageTitle } from '@/lib/brand'
 import { getBrands, getCatalog } from '@/lib/cached-data'
 import { categoryOf, DEVICE_GROUPS, deviceTypeLabel, deviceTypeOf } from '@/lib/device-types'
 import { cn } from '@/lib/utils'
 
-export const metadata = { title: '产品库 · FMKJ 项目管理' }
+export const metadata = { title: pageTitle('产品库') }
 
 const yuan = (value: number | null | undefined) =>
   typeof value === 'number' ? `¥${value.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}` : '—'
@@ -61,7 +63,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   const min = toNumber(f.min)
   const max = toNumber(f.max)
   const [catalog, brands] = await Promise.all([getCatalog(), getBrands()])
-  const showCost = user?.role === 'admin' || user?.role === 'manager'
 
   // 状态之外的条件先算一遍，用于给各筛选项计数
   const byStatus = catalog.filter((p) => (f.status === 'all' ? true : f.status === 'inactive' ? p.status === 'inactive' : p.status === 'active'))
@@ -161,8 +162,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight">产品库</h1>
           <p className="text-sm text-muted-foreground">
-            共 <span className="font-medium text-foreground tabular-nums">{products.length}</span> 个产品
-            {showCost ? ' · 成本仅管理员与经理可见' : ''}
+            共 <span className="font-medium text-foreground tabular-nums">{products.length}</span> 个产品，在后台（/admin）维护
           </p>
         </div>
         <Form action="/products" className="flex flex-wrap items-center gap-2">
@@ -280,7 +280,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed px-6 py-16 text-center">
               <PackageSearch className="size-8 text-muted-foreground" />
               <p className="font-medium">没有找到符合条件的产品</p>
-              <p className="text-sm text-muted-foreground">换个关键词或筛选条件试试；管理员可在后台添加产品。</p>
+              <p className="text-sm text-muted-foreground">换个关键词或筛选条件试试；新产品在后台（/admin）添加。</p>
               <Button asChild variant="outline" size="sm" className="mt-2">
                 <Link href="/products">清除筛选</Link>
               </Button>
@@ -295,8 +295,15 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                   <li key={p.id} className="group flex flex-col overflow-hidden rounded-xl border bg-card transition-all hover:-translate-y-0.5 hover:shadow-md">
                     <div className="relative flex aspect-square w-full items-center justify-center bg-white p-5">
                       {p.image?.url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={p.image.url} alt={p.image.alt ?? p.name} className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105" loading="lazy" />
+                        <span className="relative block size-full">
+                          <Image
+                            src={p.image.url}
+                            alt={p.image.alt ?? p.name}
+                            fill
+                            sizes="(min-width: 1536px) 18vw, (min-width: 1280px) 22vw, (min-width: 768px) 30vw, 45vw"
+                            className="object-contain transition-transform duration-300 group-hover:scale-105"
+                          />
+                        </span>
                       ) : (
                         <ImageIcon className="size-8 text-muted-foreground/40" aria-hidden="true" />
                       )}
@@ -318,7 +325,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                         <div className="leading-tight">
                           <span className="text-base font-semibold tabular-nums">{yuan(p.price)}</span>
                           <span className="ml-0.5 text-xs text-muted-foreground">/{p.unit}</span>
-                          {showCost ? <p className="text-[11px] text-muted-foreground tabular-nums">成本 {yuan(p.cost)}</p> : null}
+                          <p className="text-[11px] text-muted-foreground tabular-nums">成本 {yuan(p.cost)}</p>
                         </div>
                         {p.stock !== null ? <span className="text-[11px] text-muted-foreground tabular-nums">{p.stock > 0 ? `库存 ${p.stock}` : '无库存'}</span> : null}
                       </div>
