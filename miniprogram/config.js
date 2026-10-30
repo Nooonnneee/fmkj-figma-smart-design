@@ -5,7 +5,7 @@
  * 域名需要完成 ICP 备案（建议用自建服务器的域名，见 docs/wechat-miniprogram.md）。
  */
 module.exports = {
-  BASE_URL: 'https://fmkj.example.com',
+  BASE_URL: 'https://fmkj.top',
   API_PREFIX: '/mp/v1',
   VERSION: '1.0.0',
 }
