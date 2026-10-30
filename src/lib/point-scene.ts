@@ -85,6 +85,11 @@ export function sceneSheets(elements: readonly SceneEl[], files: Record<string, 
 }
 
 const contains = (r: { x: number; y: number; width: number; height: number }, x: number, y: number) => x >= r.x && x <= r.x + r.width && y >= r.y && y <= r.y + r.height
+const rectDistSq = (r: { x: number; y: number; width: number; height: number }, x: number, y: number) => {
+  const dx = x < r.x ? r.x - x : x > r.x + r.width ? x - (r.x + r.width) : 0
+  const dy = y < r.y ? r.y - y : y > r.y + r.height ? y - (r.y + r.height) : 0
+  return dx * dx + dy * dy
+}
 
 export function sceneAreas(elements: readonly SceneEl[], sheets: SheetInfo[]): AreaInfo[] {
   return live(elements)
@@ -115,7 +120,14 @@ export function scenePoints(elements: readonly SceneEl[], sheets: SheetInfo[], a
       const cy = e.y + e.height / 2
       const sheet = sheets.find((s) => contains(s, cx, cy)) ?? null
       // 落在多个区域里时取面积最小的（例如套间里的卫生间）
-      const area = areas.filter((a) => contains(a, cx, cy)).sort((a, b) => a.width * a.height - b.width * b.height)[0] ?? null
+      let area = areas.filter((a) => contains(a, cx, cy)).sort((a, b) => a.width * a.height - b.width * b.height)[0] ?? null
+      // 贴墙放置的点位（如开关、插座、路由）中心点可能偏移区域边框几个像素，自动归入同图纸内距离 16px 以内的最近区域
+      if (!area) {
+        const candidates = areas
+          .filter((a) => (!sheet || a.sheetId === sheet.id) && rectDistSq(a, cx, cy) <= 16 * 16)
+          .sort((a, b) => rectDistSq(a, cx, cy) - rectDistSq(b, cx, cy) || a.width * a.height - b.width * b.height)
+        area = candidates[0] ?? null
+      }
       const productId = typeof e.customData?.productId === 'string' && e.customData.productId ? (e.customData.productId as string) : null
       return {
         id: e.id,

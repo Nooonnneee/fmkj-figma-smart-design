@@ -13,7 +13,13 @@ import { getPluginFlags } from '@/plugins/state'
 export const metadata = { title: '智能家居方案', robots: { index: false, follow: false } }
 
 /** 方案演示（插件）：横版多页方案，可打印、导出 PDF 或图片。 */
-export default async function ProposalPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ template?: string; markers?: string; scope?: string }> }) {
+export default async function ProposalPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ template?: string; markers?: string; scope?: string; quoteId?: string }>
+}) {
   const { id } = await params
   const sp = await searchParams
   const user = await appAuth.getCurrentUser()
@@ -21,7 +27,7 @@ export default async function ProposalPage({ params, searchParams }: { params: P
   const flags = await getPluginFlags()
   if (!flags.proposal) notFound()
   const scope = isPointScope(sp.scope) ? sp.scope : 'all'
-  const d = await loadProjectDocs(id, user, scope)
+  const d = await loadProjectDocs(id, user, scope, sp.quoteId ?? null)
   if (!d) notFound()
   const t: ProposalTemplate = isProposalTemplate(sp.template) ? sp.template : 'qixu'
   const tpl = PROPOSAL_TEMPLATES.find((x) => x.value === t)!
@@ -29,8 +35,17 @@ export default async function ProposalPage({ params, searchParams }: { params: P
   const date = new Date().toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: 'long', day: 'numeric' })
   const pages = t === 'qixu' ? qixuDeckPages(d, markers, flags['room-insights']) : classicDeckPages(d, t, markers, flags['room-insights'], date).map((render, i) => <div key={i}>{render(i + 1)}</div>)
   const base = `/print/projects/${id}/proposal`
-  const href = (patch: { template?: string; markers?: string; scope?: string }) =>
-    `${base}?${new URLSearchParams({ template: patch.template ?? t, markers: patch.markers ?? markers, scope: patch.scope ?? scope }).toString()}`
+  const activeQuoteId = d.quote ? String(d.quote.id) : ''
+  const href = (patch: { template?: string; markers?: string; scope?: string; quoteId?: string }) => {
+    const q = new URLSearchParams({
+      template: patch.template ?? t,
+      markers: patch.markers ?? markers,
+      scope: patch.scope ?? scope,
+    })
+    const nextQuoteId = patch.quoteId !== undefined ? patch.quoteId : (patch.scope && patch.scope !== scope ? '' : activeQuoteId)
+    if (nextQuoteId) q.set('quoteId', nextQuoteId)
+    return `${base}?${q.toString()}`
+  }
 
   return (
     <div className="min-h-screen bg-neutral-200/70 print:bg-white">
@@ -40,8 +55,34 @@ export default async function ProposalPage({ params, searchParams }: { params: P
         exportName={`${d.project.name}-${tpl.label}${scope === 'all' ? '' : '-' + POINT_SCOPES.find((x) => x.value === scope)!.label}`}
         wide={t === 'qixu'}
         groups={[
+          ...(d.projectList.length > 1
+            ? [
+                {
+                  label: '项目',
+                  value: id,
+                  options: d.projectList.slice(0, 5).map((p) => ({
+                    value: p.id,
+                    label: `${p.name}（${p.pointCount}点）`,
+                    href: `/print/projects/${p.id}/proposal?template=${t}&scope=${scope}`,
+                  })),
+                },
+              ]
+            : []),
           { label: '模板', value: t, options: PROPOSAL_TEMPLATES.map((x) => ({ value: x.value, label: x.label, href: `${base}?template=${x.value}&scope=${scope}` })) },
           { label: '范围', value: scope, options: POINT_SCOPES.map((x) => ({ value: x.value, label: x.label, href: href({ scope: x.value }) })) },
+          ...(d.quotes.length > 1
+            ? [
+                {
+                  label: '报价版本',
+                  value: activeQuoteId,
+                  options: d.quotes.slice(0, 4).map((q) => ({
+                    value: q.id,
+                    label: `${q.title.replace(d.project.name, '').trim() || '报价'} ¥${q.total.toLocaleString('zh-CN')}`,
+                    href: href({ quoteId: q.id, scope: q.scope }),
+                  })),
+                },
+              ]
+            : []),
           { label: '点位', value: markers, options: [{ value: 'symbol', label: '设备图标', href: href({ markers: 'symbol' }) }, { value: 'product', label: '产品图', href: href({ markers: 'product' }) }] },
         ]}
       />

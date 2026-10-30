@@ -1,23 +1,19 @@
 'use client'
 
-import { useState } from 'react'
-import { AlertTriangle, CheckCircle2, ClipboardCopy, Download, FileJson, Hand, Loader2, MousePointerClick, Plus, Search, Sparkles, Trash2, Upload } from 'lucide-react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { AlertTriangle, Copy, Hand, Layers, Maximize2, MousePointerClick, Plus, Search, Trash2 } from 'lucide-react'
 
 import { BrandLogo } from '@/components/brand-logo'
 import { PointMarker } from '@/components/point-marker'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import { LEVEL_LABEL, type AreaAnalysis } from '@/lib/area-analysis'
 import { AREA_TYPES, areaTypeLabel } from '@/lib/area-types'
-import { DEVICE_GROUPS, deviceTypeLabel, deviceTypeOf, type DeviceCategory, type DeviceType } from '@/lib/device-types'
-import type { ProjectDefaults, ResolvedPoint } from '@/lib/point-map-items'
+import { categoryOfType, DEVICE_GROUPS, DEVICE_TYPES, deviceTypeLabel, deviceTypeOf, type DeviceCategory, type DeviceType } from '@/lib/device-types'
 import type { AreaInfo, SheetInfo } from '@/lib/point-scene'
 import { cn } from '@/lib/utils'
 
@@ -75,11 +71,11 @@ export function PlacePanel({
         {armed ? (
           <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
             <PointMarker type={armed} className="size-5" />
-            <span className="min-w-0 flex-1">在图纸上点击放置「{deviceTypeOf(armed)?.name}」，可连续放置</span>
+            <span className="min-w-0 flex-1">在图纸上点击放置「{deviceTypeOf(armed)?.name}」（右键空白处或 Esc 结束）</span>
             <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => onArm(null)}>Esc 结束</Button>
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">选中设备后在图纸上点击放置（可连续放置），也可以直接拖到图纸上；产品稍后统一选型。</p>
+          <p className="text-xs text-muted-foreground">选中设备后在图纸上点击放置（可连续放置），也可以直接拖到图纸上；产品型号在报价台统一配置。</p>
         )}
         <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -265,48 +261,32 @@ export function SelectedArea({ area, analysis, onChange, onDelete, readOnly }: {
   )
 }
 
-/* ------------------------------ 统计与默认型号 ------------------------------ */
+/* ------------------------------ 点位统计 ------------------------------ */
 
 export function TypeDefaultRow({
   type,
   count,
-  pending,
-  options,
-  value,
-  saving,
   readOnly,
-  onChange,
+  onArm,
 }: {
   type: string
   count: number
-  pending: number
-  options: PointProduct[]
-  value: string | null
-  saving: boolean
   readOnly: boolean
-  onChange: (productId: string | null) => void
+  onArm?: (deviceType: string) => void
 }) {
   return (
-    <div className="rounded-lg border p-2.5">
+    <div className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2">
       <div className="flex items-center gap-2">
         <PointMarker type={type} className="size-6" />
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{deviceTypeLabel(type)}</span>
-        <span className="text-sm text-muted-foreground tabular-nums">× {count}</span>
       </div>
-      <div className="mt-2 grid gap-1">
-        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-          <span>项目默认型号</span>
-          {saving ? <Loader2 className="size-3 animate-spin" /> : null}
-        </div>
-        <Select value={value ?? NONE_VALUE} disabled={readOnly || saving} onValueChange={(v) => onChange(v === NONE_VALUE ? null : v)}>
-          <SelectTrigger size="sm" className="w-full max-w-full min-w-0 overflow-hidden"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE_VALUE}>未设置</SelectItem>
-            {options.map((p) => <SelectItem key={p.id} value={p.id}><ProductLine product={p} /></SelectItem>)}
-          </SelectContent>
-        </Select>
-        {options.length === 0 ? <p className="text-[11px] text-muted-foreground">产品库暂无此类在售产品</p> : null}
-        {pending ? <p className="flex items-center gap-1 text-[11px] text-warning"><AlertTriangle className="size-3" />{pending} 个点位待选型</p> : null}
+      <div className="flex shrink-0 items-center gap-2">
+        <span className="text-sm text-muted-foreground tabular-nums">× {count}</span>
+        {!readOnly && onArm ? (
+          <Button type="button" variant="ghost" size="xs" className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground" onClick={() => onArm(type)}>
+            <Plus className="size-3" />继续放
+          </Button>
+        ) : null}
       </div>
     </div>
   )
@@ -316,50 +296,48 @@ export function TypeDefaultRow({
 
 export function SelectedPoint({
   code,
-  resolved,
-  own,
-  options,
-  defaults,
-  productById,
+  deviceType,
   areaName,
   readOnly,
   onChangeType,
-  onChange,
+  onDuplicate,
   onDelete,
 }: {
   code: string
-  resolved: ResolvedPoint
-  own: PointProduct | undefined
-  options: PointProduct[]
-  defaults: ProjectDefaults
-  productById: Map<string, PointProduct>
+  deviceType: string
   areaName: string | null
   readOnly: boolean
   onChangeType: (deviceType: string) => void
-  onChange: (productId: string | null) => void
+  onDuplicate?: () => void
   onDelete: () => void
 }) {
-  const def = defaults[resolved.deviceType] ? productById.get(defaults[resolved.deviceType]) : undefined
   return (
     <div className="space-y-3 border-b bg-muted/40 p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Hand className="size-3.5" />选中的点位</div>
         {readOnly ? null : (
-          <Button variant="ghost" size="xs" className="-mr-1.5 h-6 px-2 text-xs text-muted-foreground hover:text-destructive" onClick={onDelete}>
-            <Trash2 className="size-3.5" />删除
-          </Button>
+          <div className="-mr-1.5 flex items-center gap-1">
+            {onDuplicate ? (
+              <Button variant="ghost" size="xs" className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground" onClick={onDuplicate}>
+                <Copy className="size-3.5" />复制
+              </Button>
+            ) : null}
+            <Button variant="ghost" size="xs" className="h-6 px-2 text-xs text-muted-foreground hover:text-destructive" onClick={onDelete}>
+              <Trash2 className="size-3.5" />删除
+            </Button>
+          </div>
         )}
       </div>
       <div className="flex items-center gap-3">
-        <PointMarker type={resolved.deviceType} className="size-9" />
+        <PointMarker type={deviceType} className="size-9" />
         <div className="min-w-0">
-          <div className="font-semibold">{code} · {deviceTypeOf(resolved.deviceType)?.name ?? '其他设备'}</div>
-          <div className="text-xs text-muted-foreground">{deviceTypeLabel(resolved.deviceType)}{areaName ? ` · ${areaName}` : ''}</div>
+          <div className="font-semibold">{code} · {deviceTypeOf(deviceType)?.name ?? '其他设备'}</div>
+          <div className="text-xs text-muted-foreground">{deviceTypeLabel(deviceType)}{areaName ? ` · ${areaName}` : ''}</div>
         </div>
       </div>
       <div className="grid gap-1.5">
         <div className="text-xs font-medium text-muted-foreground">设备类型</div>
-        <Select value={resolved.deviceType} disabled={readOnly} onValueChange={onChangeType}>
+        <Select value={deviceType} disabled={readOnly} onValueChange={onChangeType}>
           <SelectTrigger className="w-full max-w-full min-w-0 overflow-hidden bg-background"><SelectValue /></SelectTrigger>
           <SelectContent>
             {DEVICE_GROUPS.map(({ category, types }) => (
@@ -381,23 +359,265 @@ export function SelectedPoint({
           </SelectContent>
         </Select>
       </div>
-      <div className="grid gap-1.5">
-        <div className="text-xs font-medium text-muted-foreground">产品</div>
-        <Select value={own ? own.id : DEFAULT_VALUE} disabled={readOnly} onValueChange={(v) => onChange(v === DEFAULT_VALUE ? null : v)}>
-          <SelectTrigger className="w-full max-w-full min-w-0 overflow-hidden bg-background"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={DEFAULT_VALUE}>{def ? `使用项目默认型号（${def.name}）` : '使用项目默认型号（未设置）'}</SelectItem>
-            {own && own.status !== 'active' ? <SelectItem value={own.id}><ProductLine product={own} hint="已下架" /></SelectItem> : null}
-            {options.map((p) => <SelectItem key={p.id} value={p.id}><ProductLine product={p} /></SelectItem>)}
-          </SelectContent>
-        </Select>
-        {resolved.source === 'pending' ? (
-          <p className="flex items-center gap-1 text-xs text-warning"><AlertTriangle className="size-3.5" />待选型：报价时不计入金额</p>
-        ) : own && own.status !== 'active' ? (
-          <p className="text-xs text-warning">指定的产品已下架，报价将使用项目默认型号</p>
+    </div>
+  )
+}
+
+/* ------------------------------ 画布紧凑右键菜单 ------------------------------ */
+
+export type CanvasContextMenuTarget =
+  | {
+      kind: 'point'
+      pointId: string
+      code: string
+      deviceType: string
+      areaName: string | null
+      x: number
+      y: number
+      wrapW: number
+      wrapH: number
+    }
+  | {
+      kind: 'area'
+      areaId: string
+      name: string
+      areaType: string
+      x: number
+      y: number
+      wrapW: number
+      wrapH: number
+    }
+  | {
+      kind: 'canvas'
+      sceneX: number
+      sceneY: number
+      x: number
+      y: number
+      wrapW: number
+      wrapH: number
+    }
+
+export function PointMapContextMenu({
+  target,
+  onClose,
+  onChangePointType,
+  onDuplicatePoint,
+  onArmType,
+  onDeletePoint,
+  onChangeAreaType,
+  onDeleteArea,
+  onAddAreaAt,
+  onFitSheet,
+}: {
+  target: CanvasContextMenuTarget
+  onClose: () => void
+  onChangePointType: (pointId: string, deviceType: string) => void
+  onDuplicatePoint: (pointId: string) => void
+  onArmType: (deviceType: string) => void
+  onDeletePoint: (pointId: string) => void
+  onChangeAreaType: (areaId: string, areaType: string) => void
+  onDeleteArea: (areaId: string) => void
+  onAddAreaAt: (sceneX: number, sceneY: number) => void
+  onFitSheet: () => void
+}) {
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ left: number; top: number }>({ left: target.x, top: target.y })
+
+  // 自动避让底部显示范围栏（预留 64px）与画布四边，靠近下方时向上展开
+  useLayoutEffect(() => {
+    const el = menuRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const margin = 10
+    const bottomSafe = Math.max(120, target.wrapH - 64)
+    let left = target.x + 4
+    let top = target.y + 4
+    if (left + rect.width > target.wrapW - margin) {
+      left = Math.max(margin, target.wrapW - rect.width - margin)
+    }
+    if (top + rect.height > bottomSafe) {
+      const flipped = target.y - rect.height - 6
+      top = flipped >= margin ? flipped : Math.max(margin, bottomSafe - rect.height)
+    }
+    setPos({ left, top })
+  }, [target])
+
+  useEffect(() => {
+    const onPointerDown = (e: PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose()
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('pointerdown', onPointerDown, true)
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown, true)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [onClose])
+
+  const itemClass =
+    'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-accent hover:text-accent-foreground'
+
+  if (target.kind === 'point') {
+    const cat = categoryOfType(target.deviceType)
+    const siblings = DEVICE_TYPES.filter((t) => t.category === cat?.slug && t.value !== target.deviceType)
+    return (
+      <div
+        ref={menuRef}
+        role="menu"
+        style={{ left: pos.left, top: pos.top }}
+        onContextMenu={(e) => e.preventDefault()}
+        className="absolute z-30 w-56 rounded-xl border bg-popover p-1.5 text-popover-foreground shadow-lg"
+      >
+        <div className="flex items-center gap-2 border-b px-2 py-1.5">
+          <PointMarker type={target.deviceType} className="size-5 shrink-0" />
+          <span className="truncate text-xs font-semibold">
+            {target.code} · {deviceTypeOf(target.deviceType)?.name ?? '设备'}
+          </span>
+          {target.areaName ? <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">{target.areaName}</span> : null}
+        </div>
+
+        {siblings.length > 0 ? (
+          <div className="border-b px-2 py-1.5">
+            <div className="mb-1 text-[10px] text-muted-foreground">快速切换同组类型</div>
+            <div className="flex flex-wrap gap-1">
+              {siblings.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => {
+                    onChangePointType(target.pointId, t.value)
+                    onClose()
+                  }}
+                  className="inline-flex items-center gap-1 rounded-md border bg-background px-1.5 py-0.5 text-[11px] transition-colors hover:border-primary hover:bg-primary/5"
+                >
+                  <PointMarker type={t.value} className="size-3.5" />
+                  <span>{t.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         ) : null}
-        {options.length === 0 ? <p className="text-xs text-muted-foreground">产品库里还没有这个设备类型的在售产品</p> : null}
+
+        <div className="py-1">
+          <button
+            type="button"
+            className={itemClass}
+            onClick={() => {
+              onDuplicatePoint(target.pointId)
+              onClose()
+            }}
+          >
+            <Copy className="size-3.5 text-muted-foreground" />
+            <span>复制点位</span>
+          </button>
+          <button
+            type="button"
+            className={itemClass}
+            onClick={() => {
+              onArmType(target.deviceType)
+              onClose()
+            }}
+          >
+            <Plus className="size-3.5 text-muted-foreground" />
+            <span>以此类型继续放置</span>
+          </button>
+          <button
+            type="button"
+            className={cn(itemClass, 'text-destructive hover:bg-destructive/10 hover:text-destructive')}
+            onClick={() => {
+              onDeletePoint(target.pointId)
+              onClose()
+            }}
+          >
+            <Trash2 className="size-3.5" />
+            <span>删除点位</span>
+          </button>
+        </div>
       </div>
+    )
+  }
+
+  if (target.kind === 'area') {
+    return (
+      <div
+        ref={menuRef}
+        role="menu"
+        style={{ left: pos.left, top: pos.top }}
+        onContextMenu={(e) => e.preventDefault()}
+        className="absolute z-30 w-52 rounded-xl border bg-popover p-1.5 text-popover-foreground shadow-lg"
+      >
+        <div className="border-b px-2 py-1.5 text-xs font-semibold">区域 · {target.name}</div>
+        <div className="border-b px-2 py-1.5">
+          <div className="mb-1 text-[10px] text-muted-foreground">切换房间类型</div>
+          <div className="flex flex-wrap gap-1">
+            {AREA_TYPES.map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => {
+                  onChangeAreaType(target.areaId, t.value)
+                  onClose()
+                }}
+                className={cn(
+                  'rounded-md border bg-background px-1.5 py-0.5 text-[11px] transition-colors hover:border-primary hover:bg-primary/5',
+                  t.value === target.areaType && 'border-primary bg-primary/10 font-medium',
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="pt-1">
+          <button
+            type="button"
+            className={cn(itemClass, 'text-destructive hover:bg-destructive/10 hover:text-destructive')}
+            onClick={() => {
+              onDeleteArea(target.areaId)
+              onClose()
+            }}
+          >
+            <Trash2 className="size-3.5" />
+            <span>删除区域（保留点位）</span>
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      ref={menuRef}
+      role="menu"
+      style={{ left: pos.left, top: pos.top }}
+      onContextMenu={(e) => e.preventDefault()}
+      className="absolute z-30 w-48 rounded-xl border bg-popover p-1.5 text-popover-foreground shadow-lg"
+    >
+      <button
+        type="button"
+        className={itemClass}
+        onClick={() => {
+          onAddAreaAt(target.sceneX, target.sceneY)
+          onClose()
+        }}
+      >
+        <Layers className="size-3.5 text-muted-foreground" />
+        <span>在此处添加房间区域</span>
+      </button>
+      <button
+        type="button"
+        className={itemClass}
+        onClick={() => {
+          onFitSheet()
+          onClose()
+        }}
+      >
+        <Maximize2 className="size-3.5 text-muted-foreground" />
+        <span>图纸铺满画布（100%）</span>
+      </button>
     </div>
   )
 }

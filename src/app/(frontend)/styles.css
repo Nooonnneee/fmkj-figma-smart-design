@@ -274,7 +274,8 @@
 
 /* 点位图画布：缩放由页面上的「图纸铺满 = 100%」控件负责，隐藏 Excalidraw 自带的缩放和素材库 */
 .point-map-canvas .excalidraw .zoom-actions,
-.point-map-canvas .excalidraw .default-sidebar-trigger {
+.point-map-canvas .excalidraw .default-sidebar-trigger,
+.point-map-canvas .excalidraw .context-menu {
   display: none !important;
 }
 

@@ -1,0 +1,99 @@
+<view wx:if="{{!loading}}" class="page page-pad-bottom">
+  <view wx:if="{{lockReason}}" class="notice">
+    <image class="icon-sm" src="/assets/icons/lock-muted.svg" />
+    <text>{{lockReason}}</text>
+  </view>
+
+  <view class="card {{lockReason ? 'mt-24' : ''}}">
+    <input class="title-input" value="{{title}}" disabled="{{readOnly}}" placeholder="报价名称" placeholder-class="placeholder" bindinput="onTitle" />
+    <view class="small muted mt-8" bindtap="openProject">{{project ? project.name : '未关联项目'}}{{contract && contract.usesThisQuote ? ' · 已用于合同 ' + contract.number : ''}}</view>
+    <view class="seg mt-24">
+      <view wx:for="{{statuses}}" wx:key="value" class="seg-item {{status === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="onStatus">{{item.label}}</view>
+    </view>
+  </view>
+
+  <view class="card total-card">
+    <view class="row between small muted"><text>产品小计</text><text class="num">{{totals.product}}</text></view>
+    <view class="row between small muted mt-8"><text>附加费用</text><text class="num">{{totals.fee}}</text></view>
+    <view class="row between small muted mt-8"><text>优惠</text><text class="num">-{{totals.discount}}</text></view>
+    <view class="divider" />
+    <view class="row between"><text class="title">合计</text><text class="big-num">{{totals.total}}</text></view>
+    <view wx:if="{{dirty}}" class="small muted mt-8 text-right">有未保存的修改</view>
+  </view>
+
+  <view wx:if="{{canContract}}" class="card row between gap-16">
+    <view class="grow">
+      <view class="title">客户已确认这份报价</view>
+      <view class="small muted mt-8">用它生成合同，金额、客户信息和付款方式会自动带入</view>
+    </view>
+    <button class="btn btn-primary btn-sm" hover-class="btn-hover" bindtap="createContract">生成合同</button>
+  </view>
+
+  <view class="section-title">
+    <text class="title">产品明细 · {{items.length}} 项</text>
+    <view wx:if="{{!readOnly}}" class="row gap-8 small" hover-class="btn-hover" bindtap="addProduct"><image class="icon-sm" src="/assets/icons/plus.svg" />添加产品</view>
+  </view>
+  <view class="card card-flush">
+    <view wx:for="{{items}}" wx:key="key" class="line">
+      <view class="row gap-16">
+        <image class="thumb-sm" src="{{item.imageUrl}}" mode="aspectFit" />
+        <view class="grow">
+          <view class="clamp-2">{{item.name}}</view>
+          <view class="row gap-8 small muted mt-8">
+            <view class="dot" style="background: {{item.type.color}}" />
+            <text class="truncate">{{item.type.name}}{{item.sku ? ' · ' + item.sku : ''}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="row between mt-16">
+        <view class="row gap-8">
+          <text class="small muted">单价</text>
+          <input class="mini-input" type="digit" value="{{item.priceText}}" disabled="{{readOnly}}" data-index="{{index}}" bindinput="onPrice" />
+        </view>
+        <view class="row gap-8">
+          <view class="step-btn" data-index="{{index}}" data-delta="-1" bindtap="onStep"><image class="icon-sm" src="/assets/icons/minus.svg" /></view>
+          <input class="mini-input qty" type="number" value="{{item.qtyText}}" disabled="{{readOnly}}" data-index="{{index}}" bindinput="onQty" />
+          <view class="step-btn" data-index="{{index}}" data-delta="1" bindtap="onStep"><image class="icon-sm" src="/assets/icons/plus.svg" /></view>
+          <text class="small muted">{{item.unit}}</text>
+        </view>
+      </view>
+      <view class="row between mt-16">
+        <view wx:if="{{!readOnly}}" class="row gap-24 small">
+          <view class="row gap-8" hover-class="btn-hover" data-index="{{index}}" bindtap="swapProduct"><image class="icon-sm" src="/assets/icons/refresh.svg" />换型号</view>
+          <view class="row gap-8 danger-text" hover-class="btn-hover" data-index="{{index}}" bindtap="removeItem"><image class="icon-sm" src="/assets/icons/trash.svg" />删除</view>
+        </view>
+        <view wx:else />
+        <text class="num">{{item.subtotalText}}</text>
+      </view>
+    </view>
+    <view wx:if="{{!items.length}}" class="empty small">还没有产品，可以从点位图同步或手动添加</view>
+  </view>
+
+  <view class="section-title">
+    <text class="title">附加费用</text>
+    <view wx:if="{{!readOnly}}" class="row gap-8 small" hover-class="btn-hover" bindtap="addFee"><image class="icon-sm" src="/assets/icons/plus.svg" />添加费用</view>
+  </view>
+  <view class="card">
+    <view wx:for="{{fees}}" wx:key="key" class="row gap-16 fee">
+      <input class="input grow" value="{{item.name}}" disabled="{{readOnly}}" placeholder="费用名称" placeholder-class="placeholder" data-index="{{index}}" data-key="name" bindinput="onFee" />
+      <input class="input fee-amount" type="digit" value="{{item.amountText}}" disabled="{{readOnly}}" placeholder="金额" placeholder-class="placeholder" data-index="{{index}}" data-key="amount" bindinput="onFee" />
+      <image wx:if="{{!readOnly}}" class="icon" src="/assets/icons/x-muted.svg" data-index="{{index}}" bindtap="removeFee" />
+    </view>
+    <view wx:if="{{!fees.length}}" class="small muted">没有附加费用（安装调试、布线、辅材等）</view>
+    <view class="field mt-16">
+      <view class="field-label">优惠金额</view>
+      <input class="input" type="digit" value="{{discountText}}" disabled="{{readOnly}}" placeholder="0" placeholder-class="placeholder" bindinput="onDiscount" />
+    </view>
+    <view class="field">
+      <view class="field-label">备注（打印在报价单上）</view>
+      <textarea class="textarea" value="{{notes}}" disabled="{{readOnly}}" maxlength="2000" auto-height placeholder="报价说明、有效期等" placeholder-class="placeholder" bindinput="onNotes" />
+    </view>
+  </view>
+
+  <view class="bottom-bar">
+    <button class="btn btn-outline" hover-class="btn-hover" bindtap="more"><image class="icon-sm" src="/assets/icons/layers.svg" />更多</button>
+    <button class="btn btn-outline" hover-class="btn-hover" bindtap="print"><image class="icon-sm" src="/assets/icons/printer.svg" />打印</button>
+    <button wx:if="{{!readOnly}}" class="btn btn-primary" hover-class="btn-hover" loading="{{saving}}" disabled="{{saving}}" bindtap="save">保存</button>
+  </view>
+</view>
+<view wx:else class="empty">加载中…</view>

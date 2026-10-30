@@ -4,8 +4,6 @@
 #   docker compose up -d         # 启动（首次启动自动建表）
 #
 # 国内服务器拉不到 Docker Hub 时，在 .env 里设置 NODE_IMAGE 为镜像加速地址。
-# 镜像内钉 pnpm 10（与 package.json engines / packageManager 一致），避免 corepack
-# 默认拉到 pnpm 12 触发 MINIMUM_RELEASE_AGE / IGNORED_BUILDS。
 ARG NODE_IMAGE=node:24-bookworm-slim
 
 FROM ${NODE_IMAGE} AS deps

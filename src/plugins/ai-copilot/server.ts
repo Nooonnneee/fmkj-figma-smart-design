@@ -16,7 +16,7 @@ import {
 import { DEVICE_TYPE_ORDER, deviceTypeOf, isDeviceType } from '@/lib/device-types'
 import { getPayloadClient } from '@/lib/payload'
 import { countScenePoints } from '@/lib/point-count'
-import { isPointData, parseDefaults, pointDeviceType, summarizePoints, type PointCustomData } from '@/lib/point-map-items'
+import { fillDefaultProducts, isPointData, parseDefaults, pointDeviceType, summarizePoints, type PointCustomData } from '@/lib/point-map-items'
 import {
   analyzeScene,
   buildAreaElements,
@@ -31,7 +31,7 @@ import { inPointScope } from '@/lib/point-scopes'
 import { loadProjectDocs } from '@/lib/project-docs'
 import { DEFAULT_PLATFORM, isProjectPlatform, PROJECT_PLATFORMS } from '@/lib/projects'
 import { QUOTE_STATUSES, type QuoteStatus } from '@/lib/quotes'
-import { resolveDeviceType } from '@/plugins/ai-import/point-import'
+import { parsePointImport, planToElements, resolveDeviceType } from '@/plugins/ai-import/point-import'
 import { autoSelectProducts, isSelectionTier, SELECTION_TIERS } from '@/plugins/smart-select/auto-select'
 import type { PluginFlags } from '@/plugins/state'
 import type { Project, User } from '@/payload-types'
@@ -39,6 +39,15 @@ import type { Project, User } from '@/payload-types'
 import { AI_MODELS } from './templates'
 
 const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'
+
+/** 过滤 DeepSeek 偶发在纯文本模式输出的内部 DSML 协议标签 */
+export function stripDsml(text: string | null | undefined): string {
+  if (!text) return ''
+  return text
+    .replace(/<[｜|]+DSML[｜|]+[\s\S]*$/g, '')
+    .replace(/<\/?[｜|]*DSML[^>]*>/g, '')
+    .trim()
+}
 
 const parseQuoteStatus = (v: unknown): QuoteStatus | null => {
   if (v === 'confirmed') return 'accepted'
@@ -103,7 +112,11 @@ async function post(body: Record<string, unknown>, timeoutMs: number) {
 export async function complete(model: string, messages: LlmMessage[], tools?: unknown[]) {
   const res = await post({ model, messages, ...(tools?.length ? { tools } : {}), stream: false }, 60_000)
   const json = (await res.json()) as { choices?: { message?: { content?: string | null; tool_calls?: LlmToolCall[] } }[] }
-  return json.choices?.[0]?.message ?? { content: '' }
+  const msg = json.choices?.[0]?.message ?? { content: '' }
+  if (typeof msg.content === 'string') {
+    msg.content = stripDsml(msg.content)
+  }
+  return msg
 }
 
 /** 流式调用：逐段回调正文和思考过程，返回完整正文。 */
@@ -154,7 +167,8 @@ export function systemPrompt(project: Awaited<ReturnType<typeof loadProjectDocs>
     '平台主流程：项目信息 → 点位图 → 报价 → 合同 → 归档。',
     '你拥有完整的系统操作工具，可以直接替用户完成：',
     '1. 查询/创建/修改项目与归档状态（list_projects, create_project, update_project）；',
-    '2. 在项目点位图上直接创建房间区域并布置智能设备点位（setup_rooms_and_points）；',
+    '2. 将用户拖入上传的户型图添加为项目点位图图纸并写入真实识别到的点位（add_floor_sheet），或将拖入的 fmkj-points JSON 导入点位图（import_points_json）；',
+    '【重要规则】：当用户上传了户型图图片时，严禁调用 setup_rooms_and_points 生成网格默认点位！点位图打开时绝不能有未识别的默认点位——只有图像真实识别出点位（通过 add_floor_sheet 的 detectedPoints）或用户提供了点位 JSON（import_points_json）时才生成点位图标；若未识别出点位，保持点位图为空（0 点位），绝不虚构默认点位。',
     '3. 检索 728 款产品库、按平台与档次一键选型或指定某类设备的默认产品（search_products, smart_select, set_project_defaults）；',
     '4. 进行房间点位完整度审查（room_insights）；',
     '5. 从点位图直接生成报价单草稿、修改报价单优惠/附加费/状态（get_project_details, create_or_update_quote）；',
@@ -413,13 +427,200 @@ const TOOLS: AiTool[] = [
   },
   {
     pluginId: null,
+    pluginName: '添加户型图纸',
+    definition: {
+      type: 'function',
+      function: {
+        name: 'add_floor_sheet',
+        description:
+          '将用户在对话框中拖入或上传的户型图图片（带有 url 和 mediaId）添加到当前关联项目的点位图中作为标准楼层图纸。如果上传附件中带有真实识别出的点位（detectedPoints），会一并在图纸对应坐标上生成点位图标；若没有识别出点位，则只添加干净的户型图纸，不生成任何默认点位。',
+        parameters: {
+          type: 'object',
+          properties: {
+            url: { type: 'string', description: '上传后返回的图片 URL（如 /api/media/file/...）' },
+            mediaId: { type: 'string', description: '上传后返回的 mediaId' },
+            sheetName: { type: 'string', description: '图纸名称（如 一层平面图、二层开关布置图）' },
+            detectedPoints: {
+              type: 'array',
+              description: '上传户型图时自动识别出的真实点位坐标列表（若无识别点位则不传，不要编造坐标）',
+              items: {
+                type: 'object',
+                properties: {
+                  type: { type: 'string', description: '设备类型代号（如 switch-2, switch-3, downlight, ceiling-light）' },
+                  x: { type: 'number', description: '0-1 水平比例坐标' },
+                  y: { type: 'number', description: '0-1 垂直比例坐标' },
+                },
+                required: ['type', 'x', 'y'],
+              },
+            },
+          },
+          required: ['url'],
+        },
+      },
+    },
+    async run(args, ctx) {
+      if (!ctx.projectId) return { result: { error: '没有关联项目，请先新建或关联项目' }, summary: '未关联项目' }
+      const url = typeof args.url === 'string' ? args.url.trim() : ''
+      if (!url) return { result: { error: '缺少图片 url' }, summary: '缺少图片地址' }
+      const mediaId = typeof args.mediaId === 'string' && args.mediaId.trim() ? args.mediaId.trim() : null
+      const name = typeof args.sheetName === 'string' && args.sheetName.trim() ? args.sheetName.trim().slice(0, 40) : '一层平面图'
+
+      const payload = await getPayloadClient()
+      const project = await payload
+        .findByID({ collection: 'projects', id: ctx.projectId, depth: 0, user: ctx.user, overrideAccess: false, select: { status: true, pointMap: true } })
+        .catch(() => null)
+      if (!project) return { result: { error: '项目不存在或无权限' }, summary: '项目不可用' }
+      if (project.status === 'archived') return { result: { error: '项目已归档，无法修改点位图' }, summary: '项目已归档' }
+
+      const norm = normalizeScene(project.pointMap as Partial<StoredScene> | null)
+      let elements = [...norm.elements]
+      const files = { ...norm.files }
+      const fileId = mediaId ? `sheet-${mediaId}` : `sheet-${Date.now().toString(36)}`
+      files[fileId] = { id: fileId, dataURL: url, mimeType: 'image/png' }
+
+      let analyzed = analyzeScene({ elements, files })
+      // 只有一张空白示意图、且上面还没有任何点位和区域时直接替换；否则追加为新图纸，不丢失已有点位
+      if (analyzed.sheets.length === 1 && analyzed.sheets[0].fileId === 'blank-sheet' && analyzed.points.length === 0 && analyzed.areas.length === 0) {
+        elements = [...buildSheetElements({ index: 0, name, fileId, mediaId }), ...elements.filter((e) => e.customData?.kind !== 'sheet' && e.customData?.kind !== 'sheet-title')]
+      } else {
+        elements.push(...buildSheetElements({ index: analyzed.sheets.length, name, fileId, mediaId }))
+      }
+
+      analyzed = analyzeScene({ elements, files })
+      const targetSheet = analyzed.sheets[analyzed.sheets.length - 1]
+      const rawPts = Array.isArray(args.detectedPoints) ? (args.detectedPoints as Record<string, unknown>[]) : []
+      let recognizedCount = 0
+      if (targetSheet && rawPts.length > 0) {
+        const usedCodes = new Set(analyzed.points.map((p) => p.code).filter(Boolean))
+        for (const p of rawPts) {
+          const rx = typeof p.x === 'number' ? p.x : Number(p.x)
+          const ry = typeof p.y === 'number' ? p.y : Number(p.y)
+          if (!Number.isFinite(rx) || !Number.isFinite(ry) || rx < 0 || rx > 1 || ry < 0 || ry > 1) continue
+          const dt = resolveDeviceType(p.type) ?? (isDeviceType(p.type) ? String(p.type) : 'switch-2')
+          const code = nextPointCode(dt, usedCodes)
+          usedCodes.add(code)
+          elements.push(
+            ...buildPointElements({
+              deviceType: dt,
+              cx: targetSheet.x + rx * targetSheet.width,
+              cy: targetSheet.y + ry * targetSheet.height,
+              code,
+            }),
+          )
+          recognizedCount++
+        }
+      }
+
+      const compacted = compactScene(elements, files, norm.appState)
+      await payload.update({
+        collection: 'projects',
+        id: ctx.projectId,
+        data: { pointMap: compacted as never },
+        user: ctx.user,
+        overrideAccess: false,
+        depth: 0,
+      })
+      ctx.mutated = true
+      await refreshContextProject(ctx, ctx.projectId)
+      return {
+        result: {
+          sheetName: name,
+          url,
+          recognizedPoints: recognizedCount,
+          totalSheets: ctx.project?.sheets.length ?? 1,
+          note: recognizedCount
+            ? `已在图纸上按识别位置生成 ${recognizedCount} 个点位图标`
+            : '图纸已添加（未检测到标准 CAD 点位符号，按规则保持 0 默认点位，可在画布手动放置或导入识别 JSON）',
+        },
+        summary: recognizedCount
+          ? `已添加图纸「${name}」并识别生成 ${recognizedCount} 个点位`
+          : `已添加户型图「${name}」（无默认点位）`,
+        href: `/projects/${ctx.projectId}/point-map`,
+        hrefLabel: '查看点位图',
+      }
+    },
+  },
+  {
+    pluginId: null,
+    pluginName: '导入点位JSON',
+    definition: {
+      type: 'function',
+      function: {
+        name: 'import_points_json',
+        description:
+          '将用户拖入上传或粘贴的 fmkj-points 格式点位识别 JSON（含 sheets / areas / points）直接导入到当前关联项目的点位图中。',
+        parameters: {
+          type: 'object',
+          properties: {
+            jsonText: { type: 'string', description: '完整的点位 JSON 字符串' },
+          },
+          required: ['jsonText'],
+        },
+      },
+    },
+    async run(args, ctx) {
+      if (!ctx.projectId) return { result: { error: '没有关联项目，请先新建或关联项目' }, summary: '未关联项目' }
+      const jsonText = typeof args.jsonText === 'string' ? args.jsonText.trim() : ''
+      if (!jsonText) return { result: { error: '缺少 jsonText 内容' }, summary: '缺少 JSON 内容' }
+
+      const payload = await getPayloadClient()
+      const project = await payload
+        .findByID({ collection: 'projects', id: ctx.projectId, depth: 0, user: ctx.user, overrideAccess: false, select: { status: true, pointMap: true } })
+        .catch(() => null)
+      if (!project) return { result: { error: '项目不存在或无权限' }, summary: '项目不可用' }
+      if (project.status === 'archived') return { result: { error: '项目已归档，无法修改点位图' }, summary: '项目已归档' }
+
+      const norm = normalizeScene(project.pointMap as Partial<StoredScene> | null)
+      const elements = [...norm.elements]
+      const files = { ...norm.files }
+      let analyzed = analyzeScene({ elements, files })
+      if (!analyzed.sheets.length) {
+        const blankFileId = 'blank-sheet'
+        files[blankFileId] = { id: blankFileId, dataURL: '/blank-sheet.svg', mimeType: 'image/svg+xml' }
+        elements.push(...buildSheetElements({ index: 0, name: '一层平面图', fileId: blankFileId }))
+        analyzed = analyzeScene({ elements, files })
+      }
+
+      const parsed = parsePointImport(jsonText, analyzed.sheets)
+      if (!parsed.ok) return { result: { error: parsed.error }, summary: `导入失败：${parsed.error}` }
+
+      const usedCodes = new Set(analyzed.points.map((p) => p.code).filter(Boolean))
+      const built = planToElements(parsed.plan, usedCodes)
+      elements.push(...built.areas, ...built.points)
+
+      const compacted = compactScene(elements, files, norm.appState)
+      await payload.update({
+        collection: 'projects',
+        id: ctx.projectId,
+        data: { pointMap: compacted as never },
+        user: ctx.user,
+        overrideAccess: false,
+        depth: 0,
+      })
+      ctx.mutated = true
+      await refreshContextProject(ctx, ctx.projectId)
+      return {
+        result: {
+          addedAreas: parsed.plan.areaCount,
+          addedPoints: parsed.plan.pointCount,
+          warnings: parsed.plan.warnings,
+          totalPoints: ctx.project?.points.length ?? parsed.plan.pointCount,
+        },
+        summary: `已导入 ${parsed.plan.areaCount} 个区域、${parsed.plan.pointCount} 个点位`,
+        href: `/projects/${ctx.projectId}/point-map`,
+        hrefLabel: '查看点位图',
+      }
+    },
+  },
+  {
+    pluginId: null,
     pluginName: '点位图房间与布点',
     definition: {
       type: 'function',
       function: {
         name: 'setup_rooms_and_points',
         description:
-          '在当前项目的点位图上自动创建或补充房间区域（如玄关、客厅、餐厅、厨房、主卧、次卧、卫生间、阳台）并布置智能设备点位。如果项目尚未上传户型图，会自动创建一张标准图纸并排布好房间框和点位符号。',
+          '仅用于【没有上传户型图】的纯文字需求项目，在空白示意图上创建房间框和设备点位。如果项目已经上传了真实户型图（非空白图），严禁调用此工具生成网格默认点位！',
         parameters: {
           type: 'object',
           properties: {
@@ -473,6 +674,21 @@ const TOOLS: AiTool[] = [
       const norm = normalizeScene(project.pointMap as Partial<StoredScene> | null)
       let elements = [...norm.elements]
       const files = { ...norm.files }
+      const existingSheets = analyzeScene({ elements, files }).sheets
+      const hasRealFloorPlan = existingSheets.some((s) => s.fileId && s.fileId !== 'blank-sheet')
+      if (hasRealFloorPlan) {
+        return {
+          result: {
+            skipped: true,
+            reason:
+              '当前项目已包含真实上传的户型图。按系统规则，点位图打开时不生成网格默认点位，只有真实识别到的点位（add_floor_sheet 的 detectedPoints 或 import_points_json）才会生成图标。',
+          },
+          summary: '已保持真实户型图干净（不生成网格默认点位）',
+          href: `/projects/${ctx.projectId}/point-map`,
+          hrefLabel: '打开点位图',
+        }
+      }
+
       const sheetName = typeof args.sheetName === 'string' && args.sheetName.trim() ? args.sheetName.trim().slice(0, 40) : '一层平面图'
       const replace = args.mode === 'replace'
 
@@ -838,7 +1054,7 @@ const TOOLS: AiTool[] = [
 
       // 新建报价单
       const project = await payload
-        .findByID({ collection: 'projects', id: ctx.projectId, depth: 0, user: ctx.user, overrideAccess: false, select: { name: true, status: true, pointMap: true, defaultProducts: true } })
+        .findByID({ collection: 'projects', id: ctx.projectId, depth: 0, user: ctx.user, overrideAccess: false, select: { name: true, status: true, platform: true, pointMap: true, defaultProducts: true } })
         .catch(() => null)
       if (!project) return { result: { error: '项目不存在或无权限' }, summary: '项目不可用' }
       if (project.status === 'archived') return { result: { error: '项目已归档，不能新建报价' }, summary: '项目已归档' }
@@ -848,7 +1064,7 @@ const TOOLS: AiTool[] = [
       const catalog = await getCatalog()
       const byId = new Map(catalog.map((p) => [p.id, p]))
       const points = allPoints.filter((cd) => inPointScope(pointDeviceType(cd, byId), 'all'))
-      const summary = summarizePoints(points, byId, parseDefaults(project.defaultProducts))
+      const summary = summarizePoints(points, byId, fillDefaultProducts(parseDefaults(project.defaultProducts), catalog, project.platform))
       const items = [...summary.products.entries()]
         .map(([id, row]) => ({ p: byId.get(id)!, row }))
         .sort((a, b) => DEVICE_TYPE_ORDER.indexOf(a.p.deviceType ?? a.row.deviceType) - DEVICE_TYPE_ORDER.indexOf(b.p.deviceType ?? b.row.deviceType))

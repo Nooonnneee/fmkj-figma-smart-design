@@ -49,13 +49,19 @@ function groupPoints(d: ProjectDocsData, layout: string): Group[] {
 }
 
 /** 点位交底清单：给安装团队的逐点清单（代号、设备、型号、位置），带安装 / 调试勾选、验收要点和三方签字。 */
-export default async function ChecklistPrintPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ style?: string; layout?: string; scope?: string }> }) {
+export default async function ChecklistPrintPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ style?: string; layout?: string; scope?: string; quoteId?: string }>
+}) {
   const { id } = await params
   const sp = await searchParams
   const user = await appAuth.getCurrentUser()
   if (!user) redirect(`/login?from=/print/projects/${id}/checklist`)
   const scope = isPointScope(sp.scope) ? sp.scope : 'all'
-  const [d, setup] = await Promise.all([loadProjectDocs(id, user, scope), resolveDocSetup('checklist', sp)])
+  const [d, setup] = await Promise.all([loadProjectDocs(id, user, scope, sp.quoteId ?? null), resolveDocSetup('checklist', sp)])
   if (!d) notFound()
   const { style, layout, company } = setup
   const t = docTable(style)
@@ -81,7 +87,23 @@ export default async function ChecklistPrintPage({ params, searchParams }: { par
       <PrintToolbar
         back={{ href: `/projects/${id}/point-map`, label: '返回点位' }}
         exportName={`${d.project.name}-${title}`}
-        groups={[...docToolbarGroups(setup, href), { label: '范围', value: scope, options: POINT_SCOPES.map((s) => ({ value: s.value, label: s.label, href: href({ scope: s.value }) })) }]}
+        groups={[
+          ...(d.projectList.length > 1
+            ? [
+                {
+                  label: '项目',
+                  value: id,
+                  options: d.projectList.slice(0, 5).map((p) => ({
+                    value: p.id,
+                    label: `${p.name}（${p.pointCount}点）`,
+                    href: `/print/projects/${p.id}/checklist?style=${style.id}&layout=${layout}&scope=${scope}`,
+                  })),
+                },
+              ]
+            : []),
+          ...docToolbarGroups(setup, href),
+          { label: '范围', value: scope, options: POINT_SCOPES.map((s) => ({ value: s.value, label: s.label, href: href({ scope: s.value }) })) },
+        ]}
       />
       <DocRoot style={style}>
         <DocArticle>

@@ -1,0 +1,49 @@
+<view class="page page-pad-bottom">
+  <view class="card">
+    <view class="field">
+      <view class="field-label">项目名称</view>
+      <input class="input" placeholder="留空时按「小区 + 房号」自动生成" placeholder-class="placeholder" value="{{form.name}}" data-key="name" bindinput="onInput" />
+    </view>
+    <view class="field">
+      <view class="field-label">客户姓名</view>
+      <input class="input" placeholder="例如：张先生" placeholder-class="placeholder" value="{{form.customerName}}" data-key="customerName" bindinput="onInput" />
+    </view>
+    <view class="field">
+      <view class="field-label">客户电话</view>
+      <input class="input" type="number" placeholder="手机号" placeholder-class="placeholder" value="{{form.customerPhone}}" data-key="customerPhone" bindinput="onInput" />
+    </view>
+    <view class="field">
+      <view class="field-label">小区 / 楼盘</view>
+      <input class="input" placeholder="例如：万科城" placeholder-class="placeholder" value="{{form.community}}" data-key="community" bindinput="onInput" />
+    </view>
+    <view class="field">
+      <view class="field-label">房号 / 详细地址</view>
+      <input class="input" placeholder="例如：3-1201" placeholder-class="placeholder" value="{{form.address}}" data-key="address" bindinput="onInput" />
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="field">
+      <view class="field-label">主平台</view>
+      <picker range="{{platforms}}" value="{{platformIndex}}" bindchange="onPlatform">
+        <view class="input row between">
+          <text>{{form.platform || '请选择'}}</text>
+          <image class="icon-sm" src="/assets/icons/chevron-down-muted.svg" />
+        </view>
+      </picker>
+    </view>
+    <view class="field">
+      <view class="field-label">预算（元）</view>
+      <input class="input" type="digit" placeholder="可选" placeholder-class="placeholder" value="{{form.budget}}" data-key="budget" bindinput="onInput" />
+      <view wx:if="{{errors.budget}}" class="field-error">{{errors.budget}}</view>
+    </view>
+    <view class="field">
+      <view class="field-label">备注</view>
+      <textarea class="textarea" placeholder="户型、面积、客户需求等" placeholder-class="placeholder" value="{{form.notes}}" data-key="notes" bindinput="onInput" maxlength="2000" auto-height />
+    </view>
+  </view>
+
+  <view class="bottom-bar">
+    <button class="btn btn-primary" hover-class="btn-hover" loading="{{saving}}" disabled="{{saving}}" bindtap="save">{{id ? '保存' : '创建项目'}}</button>
+  </view>
+</view>

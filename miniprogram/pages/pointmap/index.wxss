@@ -1,0 +1,29 @@
+.pm { min-height: 100vh; }
+.toolbar { display: flex; align-items: center; gap: 16rpx; padding: 20rpx 28rpx; background: var(--paper); border-bottom: 1rpx solid var(--rule); }
+.sheet-tabs { flex: 1; min-width: 0; white-space: nowrap; display: flex; }
+.sheet-tabs .chip { margin-right: 12rpx; }
+.mode-banner { display: flex; align-items: center; gap: 16rpx; padding: 16rpx 28rpx; background: var(--ink-primary); color: #ffffff; font-size: 26rpx; }
+.mode-banner .btn-primary { background: #ffffff; color: var(--ink-primary); }
+.mode-icon { width: 40rpx; height: 40rpx; }
+.canvas-wrap { position: relative; padding: 24rpx 28rpx 0; }
+.canvas { width: 100%; background: #ffffff; border: 1rpx solid var(--rule); border-radius: 20rpx; }
+.sheet { position: relative; background: #ffffff; }
+.sheet-img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0.9; }
+.area { position: absolute; border: 1px dashed #64748b; background: rgba(15, 23, 42, 0.025); }
+.area-name { position: absolute; left: 3px; top: 1px; font-size: 9px; font-weight: 600; color: #475569; }
+.marker { position: absolute; width: 0; height: 0; }
+.marker-icon { position: absolute; border-radius: 6px; }
+.marker.sel .marker-icon { box-shadow: 0 0 0 3px rgba(23, 23, 23, 0.85); }
+.marker.pending { opacity: 0.55; }
+.marker-label { position: absolute; left: 0; transform: translateX(-50%); white-space: nowrap; font-size: 9px; font-weight: 700; text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 3px #fff; }
+.sheet-empty { margin: 0; background: var(--paper); border: 1rpx dashed var(--rule); border-radius: 20rpx; }
+.zoom { position: absolute; right: 44rpx; bottom: 16rpx; display: flex; gap: 8rpx; }
+.zoom-btn { height: 60rpx; min-width: 60rpx; padding: 0 12rpx; border-radius: 14rpx; background: rgba(255, 255, 255, 0.95); border: 1rpx solid var(--rule); display: flex; align-items: center; justify-content: center; }
+.zoom-btn.on { background: var(--ink-primary); color: #ffffff; border-color: var(--ink-primary); }
+.panel { padding: 28rpx; }
+.legend-icon { width: 52rpx; height: 52rpx; flex-shrink: 0; }
+.type-scroll { max-height: 62vh; }
+.type-group { margin-bottom: 28rpx; }
+.type-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12rpx; margin-top: 16rpx; }
+.type-cell { display: flex; flex-direction: column; align-items: center; gap: 8rpx; padding: 18rpx 0 14rpx; border-radius: 18rpx; border: 1rpx solid var(--rule); }
+.type-icon { width: 56rpx; height: 56rpx; }

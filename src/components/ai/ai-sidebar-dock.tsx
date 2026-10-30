@@ -3,10 +3,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { AlertCircle, ChevronDown, Loader2, Maximize2, MoreHorizontal, SquarePen, Trash2 } from 'lucide-react'
+import { AlertCircle, ChevronDown, Loader2, Maximize2, MoreHorizontal, SquarePen, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { AiMessageBubble, AiPromptComposer, type AiChatMessage, type AiConnectablePlugin, type AiProjectContext, type AiToolCall } from '@/components/ai/ai-elements'
+import {
+  AiMessageBubble,
+  AiPromptComposer,
+  type AiAttachment,
+  type AiChatMessage,
+  type AiConnectablePlugin,
+  type AiProjectContext,
+  type AiToolCall,
+} from '@/components/ai/ai-elements'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -67,6 +75,8 @@ export function AiSidebarDock({
   const [streaming, setStreaming] = useState(false)
   const [thinking, setThinking] = useState(false)
   const [input, setInput] = useState('')
+  const [attachments, setAttachments] = useState<AiAttachment[]>([])
+  const [dockDragging, setDockDragging] = useState(false)
   const scroller = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -121,6 +131,114 @@ export function AiSidebarDock({
     if (streaming) return
     setActiveId(null)
     setMessages([])
+    setAttachments([])
+  }
+
+  async function handleAddFiles(fileList: FileList | File[]) {
+    const files = Array.from(fileList)
+    if (!files.length) return
+
+    for (const file of files) {
+      const id = `att-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+      const lower = file.name.toLowerCase()
+      const isImage = file.type.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(lower)
+      const isJson = file.type === 'application/json' || /\.(json|excalidraw)$/i.test(lower)
+      const isText = file.type.startsWith('text/') || /\.(csv|txt|md|tsv)$/i.test(lower)
+
+      if (!isImage && !isJson && !isText) {
+        toast.error(`暂不支持「${file.name}」，请拖入 PNG/JPG 户型图、JSON 点位文件或 CSV/TXT 清单`)
+        continue
+      }
+
+      if (isImage) {
+        const previewUrl = URL.createObjectURL(file)
+        setAttachments((prev) => [
+          ...prev,
+          { id, name: file.name, kind: 'image', size: file.size, status: 'uploading', url: previewUrl, summary: '上传中…' },
+        ])
+        try {
+          const form = new FormData()
+          form.append('file', file)
+          const res = await fetch('/ai/upload', { method: 'POST', body: form })
+          const data = (await res.json().catch(() => ({}))) as {
+            ok?: boolean
+            url?: string
+            mediaId?: string
+            name?: string
+            detectedPointCount?: number
+            detectedPoints?: { type: string; x: number; y: number }[]
+            error?: string
+          }
+          if (!res.ok || !data.ok || !data.url) {
+            throw new Error(data.error ?? '上传失败')
+          }
+          const ptCount = data.detectedPointCount ?? 0
+          setAttachments((prev) =>
+            prev.map((a) =>
+              a.id === id
+                ? {
+                    ...a,
+                    status: 'ready',
+                    url: data.url,
+                    mediaId: data.mediaId,
+                    detectedPoints: data.detectedPoints ?? [],
+                    summary: ptCount > 0 ? `已识别 ${ptCount} 个点位` : '图纸就绪（无默认点位）',
+                  }
+                : a,
+            ),
+          )
+        } catch (err) {
+          const msg = (err as Error).message || '上传失败'
+          toast.error(`${file.name}：${msg}`)
+          setAttachments((prev) => prev.filter((a) => a.id !== id))
+        }
+        continue
+      }
+
+      // 读取 JSON 或文本文件
+      try {
+        const rawText = await file.text()
+        const trimmed = rawText.trim()
+        if (!trimmed) {
+          toast.error(`${file.name} 内容为空`)
+          continue
+        }
+        let summary = `${Math.max(1, Math.round(file.size / 1024))} KB`
+        if (isJson) {
+          try {
+            const parsed = JSON.parse(trimmed) as Record<string, unknown>
+            const sheets = Array.isArray(parsed.sheets) ? (parsed.sheets as Record<string, unknown>[]) : null
+            if (sheets) {
+              const pts = sheets.reduce((s, sh) => s + (Array.isArray(sh.points) ? sh.points.length : 0), 0)
+              const ars = sheets.reduce((s, sh) => s + (Array.isArray(sh.areas) ? sh.areas.length : 0), 0)
+              summary = `${sheets.length}图 · ${ars}区域 · ${pts}点位`
+            } else if (Array.isArray(parsed.points)) {
+              summary = `${parsed.points.length} 个点位`
+            }
+          } catch {
+            // 非标准点位 JSON 仍作为普通 JSON 文本传入
+          }
+        } else {
+          const linesCount = trimmed.split(/\r?\n/).filter(Boolean).length
+          summary = `${linesCount} 行`
+        }
+
+        setAttachments((prev) => [
+          ...prev,
+          {
+            id,
+            name: file.name,
+            kind: isJson ? 'json' : 'text',
+            size: file.size,
+            status: 'ready',
+            textContent: trimmed.slice(0, 24000),
+            summary,
+          },
+        ])
+      } catch {
+        toast.error(`读取文件 ${file.name} 失败`)
+      }
+    }
   }
 
   function pickTemplate(id: string) {
@@ -132,19 +250,55 @@ export function AiSidebarDock({
   }
 
   async function send(raw: string) {
+    const readyAtts = attachments.filter((a) => a.status === 'ready')
     const text = raw.trim()
-    if (!text || streaming) return
+    if ((!text && readyAtts.length === 0) || streaming) return
     if (!configured) return toast.error('还没有配置 AI 密钥')
     if (credits < model.cost) return toast.error(`积分不足（剩余 ${credits}，需要 ${model.cost}），请联系管理员发放`)
+
+    // 如果用户只拖入了附件没有输入文字，自动补一句默认说明
+    const displayPrompt =
+      text ||
+      (readyAtts.every((a) => a.kind === 'image')
+        ? `请将上传的户型图（${readyAtts.map((a) => a.name).join('、')}）添加到当前项目的点位图中。`
+        : readyAtts.some((a) => a.kind === 'json')
+          ? `请解析并导入上传的点位文件（${readyAtts.map((a) => a.name).join('、')}）到当前项目点位图中。`
+          : `请根据上传的文件（${readyAtts.map((a) => a.name).join('、')}）处理项目配置。`)
+
+    let fullPayloadMessage = displayPrompt
+    if (readyAtts.length > 0) {
+      const blocks = readyAtts.map((att) => {
+        if (att.kind === 'image') {
+          const sheetTitle = att.name.replace(/\.[^.]+$/, '')
+          const pts = att.detectedPoints ?? []
+          if (pts.length > 0) {
+            return `- [图片] ${att.name} (已自动适配为标准图纸, mediaId: ${att.mediaId ?? ''}, URL: ${att.url ?? ''}, 建议图纸名: ${sheetTitle}, 图像自动识别到 ${pts.length} 个真实点位) —— 请调用 add_floor_sheet 工具并传入 detectedPoints: ${JSON.stringify(pts)}`
+          }
+          return `- [图片] ${att.name} (已自动适配为标准图纸, mediaId: ${att.mediaId ?? ''}, URL: ${att.url ?? ''}, 建议图纸名: ${sheetTitle}, 识别点位数: 0) —— 请只调用 add_floor_sheet 工具添加干净图纸（不传 detectedPoints），严禁调用 setup_rooms_and_points 生成任何默认点位！`
+        }
+        if (att.kind === 'json') {
+          return `- [JSON] ${att.name} (${att.summary ?? ''}) —— 可调用 import_points_json 工具直接导入，内容如下：\n\`\`\`json\n${att.textContent}\n\`\`\``
+        }
+        return `- [文本清单] ${att.name} (${att.summary ?? ''})，内容如下：\n\`\`\`text\n${att.textContent}\n\`\`\``
+      })
+      fullPayloadMessage = `${displayPrompt}\n\n【已上传附件】\n${blocks.join('\n\n')}`
+    }
 
     const now = new Date().toISOString()
     const replyId = `pending-${Date.now()}`
     setMessages((prev) => [
       ...prev,
-      { id: `u-${Date.now()}`, role: 'user', content: text, createdAt: now },
+      {
+        id: `u-${Date.now()}`,
+        role: 'user',
+        content: displayPrompt,
+        createdAt: now,
+        attachments: readyAtts.map((a) => ({ id: a.id, name: a.name, kind: a.kind, url: a.url, summary: a.summary })),
+      },
       { id: replyId, role: 'assistant', content: '', createdAt: now, modelName: model.name, toolCalls: [] },
     ])
     setInput('')
+    setAttachments([])
     setStreaming(true)
     setThinking(true)
     const patchReply = (fn: (m: AiChatMessage) => AiChatMessage) => setMessages((prev) => prev.map((m) => (m.id === replyId ? fn(m) : m)))
@@ -152,11 +306,13 @@ export function AiSidebarDock({
 
     const controller = new AbortController()
     abortRef.current = controller
+    let latestProjectId: string | null = projectId
+    let touchedPointMap = false
     try {
       const res = await fetch('/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversationId: activeId, message: text, modelId: model.id, projectId, pluginIds: connected }),
+        body: JSON.stringify({ conversationId: activeId, message: fullPayloadMessage, modelId: model.id, projectId, pluginIds: connected }),
         signal: controller.signal,
       })
       if (!res.ok || !res.body) {
@@ -179,9 +335,11 @@ export function AiSidebarDock({
             const cid = ev.conversationId
             if (!activeId) {
               setActiveId(cid)
-              setConversations((prev) => [{ id: cid, title: text.slice(0, 30) }, ...prev.filter((c) => c.id !== cid)])
+              setConversations((prev) => [{ id: cid, title: displayPrompt.slice(0, 30) }, ...prev.filter((c) => c.id !== cid)])
             }
           } else if (ev.type === 'tool') {
+            const href = typeof ev.href === 'string' ? ev.href : undefined
+            if (href?.includes('/point-map')) touchedPointMap = true
             patchReply((m) => ({
               ...m,
               toolCalls: [
@@ -192,13 +350,14 @@ export function AiSidebarDock({
                   action: '',
                   summary: String(ev.summary ?? ''),
                   details: [],
-                  href: ev.href as string | undefined,
+                  href,
                   hrefLabel: ev.hrefLabel as string | undefined,
                 },
               ],
             }))
           } else if (ev.type === 'project' && ev.project && typeof ev.project === 'object') {
             const p = ev.project as AiProjectContext
+            latestProjectId = p.id
             setProjectList((prev) => [p, ...prev.filter((x) => x.id !== p.id)])
             setProjectId(p.id)
           } else if (ev.type === 'delta') {
@@ -207,7 +366,13 @@ export function AiSidebarDock({
           } else if (ev.type === 'done') {
             patchReply((m) => ({ ...m, id: String(ev.messageId), cost: Number(ev.cost) }))
             if (typeof ev.balance === 'number') setCredits(ev.balance)
-            if (ev.mutated) router.refresh()
+            if (ev.mutated) {
+              if (touchedPointMap && latestProjectId && pathname !== `/projects/${latestProjectId}/point-map`) {
+                router.push(`/projects/${latestProjectId}/point-map`)
+              } else {
+                router.refresh()
+              }
+            }
           } else if (ev.type === 'error') {
             throw new Error(String(ev.error))
           }
@@ -224,7 +389,34 @@ export function AiSidebarDock({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div
+      onDragOver={(e) => {
+        if (!e.dataTransfer?.types?.includes('Files')) return
+        e.preventDefault()
+        setDockDragging(true)
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
+        setDockDragging(false)
+      }}
+      onDrop={(e) => {
+        if (!e.dataTransfer?.files?.length) return
+        e.preventDefault()
+        setDockDragging(false)
+        void handleAddFiles(e.dataTransfer.files)
+      }}
+      className="relative flex min-h-0 flex-1 flex-col"
+    >
+      {dockDragging ? (
+        <div className="pointer-events-none absolute inset-2 z-30 flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-primary bg-background/95 p-6 text-center shadow-sm">
+          <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Upload className="size-5" />
+          </div>
+          <p className="text-sm font-medium text-foreground">释放鼠标上传文件到 AI 对话</p>
+          <p className="text-xs text-muted-foreground">支持户型图（PNG / JPG / WebP）、点位识别 JSON（fmkj-points）、CSV / TXT 需求清单</p>
+        </div>
+      ) : null}
+
       <div className="flex h-11 items-center justify-between gap-1 px-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -340,6 +532,9 @@ export function AiSidebarDock({
           onSelectProject={setProjectId}
           templates={DEFAULT_AI_TEMPLATES.map((t) => ({ id: t.id, name: t.name }))}
           onPickTemplate={pickTemplate}
+          attachments={attachments}
+          onAddFiles={(files) => void handleAddFiles(files)}
+          onRemoveAttachment={(id) => setAttachments((prev) => prev.filter((a) => a.id !== id))}
         />
         <p className="mt-1.5 text-center text-[11px] text-muted-foreground">AI 生成内容仅供参考，请核对后使用</p>
       </div>

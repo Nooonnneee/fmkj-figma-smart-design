@@ -94,6 +94,8 @@ export interface Config {
     'ai-conversations': AiConversation;
     'ai-messages': AiMessage;
     'ai-credit-ledger': AiCreditLedger;
+    'wechat-accounts': WechatAccount;
+    'mp-sessions': MpSession;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -116,6 +118,8 @@ export interface Config {
     'ai-conversations': AiConversationsSelect<false> | AiConversationsSelect<true>;
     'ai-messages': AiMessagesSelect<false> | AiMessagesSelect<true>;
     'ai-credit-ledger': AiCreditLedgerSelect<false> | AiCreditLedgerSelect<true>;
+    'wechat-accounts': WechatAccountsSelect<false> | WechatAccountsSelect<true>;
+    'mp-sessions': MpSessionsSelect<false> | MpSessionsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -843,6 +847,78 @@ export interface AiCreditLedger {
   createdAt: string;
 }
 /**
+ * 成员在微信小程序里绑定的微信账号。删除记录即解除绑定，成员下次需要重新用账号密码绑定。
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "wechat-accounts".
+ */
+export interface WechatAccount {
+  id: string;
+  openid: string;
+  unionid?: string | null;
+  user: string | User;
+  nickname?: string | null;
+  lastLoginAt?: string | null;
+  createdBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * 微信小程序的登录记录。删除某条记录，对应设备会立即退出登录。
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mp-sessions".
+ */
+export interface MpSession {
+  id: string;
+  tokenHash: string;
+  kind: 'session' | 'bind' | 'web-ticket' | 'web';
+  user?: (string | null) | User;
+  openid?: string | null;
+  unionid?: string | null;
+  redirect?: string | null;
+  client?: string | null;
+  expiresAt: string;
+  lastUsedAt?: string | null;
+  createdBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
@@ -921,6 +997,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'ai-credit-ledger';
         value: string | AiCreditLedger;
+      } | null)
+    | ({
+        relationTo: 'wechat-accounts';
+        value: string | WechatAccount;
+      } | null)
+    | ({
+        relationTo: 'mp-sessions';
+        value: string | MpSession;
       } | null);
   globalSlug?: string | null;
   user:
@@ -1305,6 +1389,40 @@ export interface AiCreditLedgerSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "wechat-accounts_select".
+ */
+export interface WechatAccountsSelect<T extends boolean = true> {
+  openid?: T;
+  unionid?: T;
+  user?: T;
+  nickname?: T;
+  lastLoginAt?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "mp-sessions_select".
+ */
+export interface MpSessionsSelect<T extends boolean = true> {
+  tokenHash?: T;
+  kind?: T;
+  user?: T;
+  openid?: T;
+  unionid?: T;
+  redirect?: T;
+  client?: T;
+  expiresAt?: T;
+  lastUsedAt?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv_select".
  */
 export interface PayloadKvSelect<T extends boolean = true> {
@@ -1475,7 +1593,9 @@ export interface CollectionQueryWidget {
       | 'tags'
       | 'ai-conversations'
       | 'ai-messages'
-      | 'ai-credit-ledger';
+      | 'ai-credit-ledger'
+      | 'wechat-accounts'
+      | 'mp-sessions';
     where?:
       | {
           [k: string]: unknown;
@@ -1513,6 +1633,8 @@ export interface ActivityWidget {
           | 'ai-conversations'
           | 'ai-messages'
           | 'ai-credit-ledger'
+          | 'wechat-accounts'
+          | 'mp-sessions'
         )[]
       | null;
   };

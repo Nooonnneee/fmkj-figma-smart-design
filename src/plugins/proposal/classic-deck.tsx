@@ -165,9 +165,9 @@ function Overview({ ctx, no }: { ctx: Ctx; no: number }) {
             <div>
               <h3 className="mb-2 text-[12px] font-semibold">房间配置完整度{d.analysis.score !== null ? <span className="ml-2 font-normal text-neutral-500">平均 {d.analysis.score}%</span> : null}</h3>
               <div className="grid grid-cols-3 gap-1.5">
-                {d.rooms.map((r) => (
+                {d.rooms.slice(0, 12).map((r) => (
                   <div key={r.areaId} className="rounded-md border border-neutral-200 px-2 py-1.5 text-[10px]">
-                    <div className="flex justify-between"><span className="font-medium">{r.name}</span><span className="tabular-nums text-neutral-500">{r.score}%</span></div>
+                    <div className="flex justify-between gap-1"><span className="truncate font-medium">{r.displayName}</span><span className="shrink-0 tabular-nums text-neutral-500">{r.score}%</span></div>
                     <div className="mt-1 h-1 rounded-full bg-neutral-100"><div className={cn('h-full rounded-full', r.score >= 100 ? 'bg-emerald-500' : r.score >= 60 ? 'bg-neutral-700' : 'bg-amber-500')} style={{ width: `${r.score}%` }} /></div>
                   </div>
                 ))}
@@ -223,13 +223,12 @@ function PlanPage({ ctx, no, sheetId }: { ctx: Ctx; no: number; sheetId: string 
 }
 
 function RoomCard({ r, ctx }: { r: Room; ctx: Ctx }) {
-  const { d } = ctx
   const core = r.missing.filter((m) => m.level !== 'optional')
   return (
     <div className="flex min-h-0 flex-col rounded-lg border border-neutral-200 p-[4mm] text-[10px]">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <div className="text-[14px] font-semibold">{r.name}</div>
+          <div className="text-[14px] font-semibold">{r.displayName}</div>
           <div className="text-neutral-500">{r.typeLabel} · {r.total} 个点位{r.sheets.length ? ` · ${r.sheets.join('、')}` : ''}</div>
         </div>
         <div className="text-right">
@@ -237,11 +236,16 @@ function RoomCard({ r, ctx }: { r: Room; ctx: Ctx }) {
           <div className="text-[9px] text-neutral-500">配置完整度</div>
         </div>
       </div>
-      <div className="mt-2 flex flex-wrap gap-1">
-        {r.devices.map((x) => (
-          <span key={x.deviceType} className="inline-flex items-center gap-1 rounded border border-neutral-200 px-1 py-0.5">
-            <PointMarker type={x.deviceType} className="size-3.5" />{deviceTypeOf(x.deviceType)?.name}<span className="text-neutral-500 tabular-nums">×{x.count}</span>
-          </span>
+      <div className="mt-2 divide-y divide-neutral-100 border-y border-neutral-100 py-1">
+        {r.lines.slice(0, 6).map((l) => (
+          <div key={`${l.deviceType}-${l.product?.id ?? 'none'}`} className="flex items-center justify-between gap-1.5 py-0.5">
+            <span className="flex min-w-0 flex-1 items-center gap-1">
+              <PointMarker type={l.deviceType} className="size-3.5 shrink-0" />
+              <span className="shrink-0 font-medium">{l.typeName}</span>
+              <span className="truncate text-neutral-500">{l.product?.name ?? '待选型'}</span>
+            </span>
+            <span className="shrink-0 tabular-nums">×{l.count}</span>
+          </div>
         ))}
       </div>
       {ctx.t === 'construction' ? (

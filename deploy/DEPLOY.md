@@ -138,30 +138,3 @@ docker run --rm -v fmkj_media:/m -v $PWD:/b alpine tar czf /b/media-$(date +%F).
 已在兼容 PostgreSQL 的测试库上验证：生产构建（不依赖数据库）、启动自动建表、全量数据导入（728 产品、745 图片、项目、报价）、管理员和员工设置密码后登录、图片上传和读取。
 
 尚未验证：在真实 Docker 环境中执行 `docker compose build`、阿里云 OSS / 腾讯云 COS 实际上传。首次部署时请留意这两步的日志。
-
-## 9. 构建与本机旁路注记（K5/K6 运维注记）
-
-以下来自 Mac 旁路 `docker compose build/up` 实机冒烟，便于裸 clone 按本文档即可过构建。
-
-### 镜像源（DaoCloud 等）
-
-国内部分镜像加速（如 `docker.m.daocloud.io`）可能对 `node:24` 返回 **401**。优先：
-
-1. 官方 Docker Hub（本机/服务器开 HTTP 代理亦可），或
-2. 在 `.env` 设置可用的 `NODE_IMAGE` / `NPM_REGISTRY`（见 `selfhost.env.example`）。
-
-### 构建内存
-
-建议构建机内存 **≥4–6G**。Docker Desktop 默认约 2G 时 Next 构建可能被 **SIGKILL（OOM）**，请在 Desktop 设置里调高 Memory 后重启 Docker。
-
-### 本机端口旁路
-
-正式默认绑定 **`127.0.0.1:3000:3000`**（见 `docker-compose.yml`）。若本机 `:3000` 已被占用，可临时把 compose 端口改为 `127.0.0.1:13000:3000` 做本地冒烟；**正式机/生产反代仍按 3000**。旁路端口改动不要长期偏离仓库默认。
-
-### 构建期占位密钥（勿烤生产密钥）
-
-`Dockerfile` builder 阶段使用占位 `PAYLOAD_SECRET` / `DATABASE_URI`（满足 `payload generate:importmap` / `next build` 加载自托管配置）。**不要**把生产 `.env` 里的真密钥作为 compose `build.args` 传入（避免写入镜像层）。运行时由 `env_file: .env` 与 compose 中的 `DATABASE_URI`（指向 `db` 服务）注入真值。
-
-### Docker 内 pnpm 版本
-
-镜像内通过 `corepack prepare pnpm@10.28.2` 钉死 pnpm 10（与 `package.json` 的 `engines.pnpm` / `packageManager` 一致）。勿依赖裸 `corepack enable` 拉到的 pnpm 12（会触发 release-age / ignored-builds 等问题）。`package.json` 已配置 `pnpm.onlyBuiltDependencies`，构建期**不必**再设 `dangerouslyAllowAllBuilds` 或永久 `minimum-release-age 0`。

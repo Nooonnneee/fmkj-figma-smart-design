@@ -1,0 +1,38 @@
+<view class="login">
+  <view class="brand">
+    <view class="logo">FM</view>
+    <view class="h1 mt-32">FMKJ 智能设计</view>
+    <view class="muted mt-8">点位图直接出报价 · 与网页版数据实时同步</view>
+  </view>
+
+  <view wx:if="{{serverError}}" class="notice notice-warning mt-48">
+    <image class="icon-sm" src="/assets/icons/alert.svg" />
+    <text>连不上服务器 {{host}}。请检查 config.js 里的地址，以及小程序后台的服务器域名配置。</text>
+  </view>
+
+  <view wx:if="{{mode === 'wechat'}}" class="panel">
+    <button class="btn btn-primary btn-block" hover-class="btn-hover" loading="{{busy}}" disabled="{{busy}}" bindtap="onWechat">微信一键登录</button>
+    <button class="btn btn-outline btn-block mt-16" hover-class="btn-hover" bindtap="toPassword">使用账号密码登录</button>
+    <view class="small muted text-center mt-24">首次使用微信登录需要绑定一次网页版的成员账号</view>
+  </view>
+
+  <view wx:else class="panel">
+    <view class="title">{{mode === 'bind' ? '绑定成员账号' : '账号密码登录'}}</view>
+    <view class="small muted mt-8">{{mode === 'bind' ? '输入网页版的成员账号完成绑定，之后即可微信一键登录。' : '使用网页版的成员账号登录，账号由管理员在后台开通。'}}</view>
+    <view class="mt-32">
+      <view class="field">
+        <view class="field-label">邮箱</view>
+        <input class="input" type="text" placeholder="name@company.com" placeholder-class="placeholder" value="{{email}}" bindinput="onEmail" />
+      </view>
+      <view class="field">
+        <view class="field-label">密码</view>
+        <input class="input" password placeholder="请输入密码" placeholder-class="placeholder" value="{{password}}" bindinput="onPassword" confirm-type="done" bindconfirm="onSubmit" />
+      </view>
+    </view>
+    <button class="btn btn-primary btn-block mt-32" hover-class="btn-hover" loading="{{busy}}" disabled="{{busy}}" bindtap="onSubmit">{{mode === 'bind' ? '绑定并登录' : '登录'}}</button>
+    <button wx:if="{{wechatReady}}" class="btn btn-muted btn-block mt-16" hover-class="btn-hover" bindtap="toWechat">返回微信登录</button>
+    <view wx:else class="small muted text-center mt-24">服务器暂未开通微信登录（未配置小程序 AppID / AppSecret）</view>
+  </view>
+
+  <view class="foot small muted">{{host}} · v{{version}}</view>
+</view>

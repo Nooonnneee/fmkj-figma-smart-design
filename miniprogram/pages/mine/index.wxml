@@ -1,0 +1,59 @@
+<view class="page">
+  <view class="card row gap-24">
+    <view class="avatar">{{initial}}</view>
+    <view class="grow">
+      <view class="h2 truncate">{{me.name}}</view>
+      <view class="small muted mt-8 truncate">{{me.email}}</view>
+      <view class="small muted truncate">{{me.phone || '未填写手机号'}}</view>
+    </view>
+    <view class="icon-btn" hover-class="btn-hover" bindtap="openEdit"><image class="icon" src="/assets/icons/pencil.svg" /></view>
+  </view>
+
+  <view class="stats two mt-24">
+    <view class="stat"><text class="label">AI 积分</text><text class="num">{{me.aiCredits || 0}}</text></view>
+    <view class="stat"><text class="label">微信</text><text class="num">{{me.wechatBound ? '已绑定' : '未绑定'}}</text></view>
+  </view>
+
+  <view class="card card-flush mt-24">
+    <view class="list-item" hover-class="list-item-hover" bindtap="wechat">
+      <image class="icon" src="/assets/icons/link.svg" />
+      <text class="grow">微信绑定</text>
+      <text class="small muted">{{me.wechatBound ? '解除绑定' : '用微信登录时绑定'}}</text>
+    </view>
+    <view class="list-item" hover-class="list-item-hover" bindtap="company">
+      <image class="icon" src="/assets/icons/building.svg" />
+      <text class="grow">公司信息</text>
+      <text class="small muted truncate">{{companyName}}</text>
+    </view>
+    <view class="list-item" hover-class="list-item-hover" bindtap="plugins">
+      <image class="icon" src="/assets/icons/layers.svg" />
+      <text class="grow">已启用插件</text>
+      <text class="small muted">{{pluginCount}} 个</text>
+    </view>
+    <view class="list-item">
+      <image class="icon" src="/assets/icons/file.svg" />
+      <text class="grow">服务器</text>
+      <text class="small muted truncate">{{host}}</text>
+    </view>
+    <view class="list-item">
+      <image class="icon" src="/assets/icons/check.svg" />
+      <text class="grow">版本</text>
+      <text class="small muted">v{{version}}</text>
+    </view>
+  </view>
+  <view class="small muted mt-24">账号、产品库和插件由管理员在网页版后台维护；小程序与网页版使用同一份数据。</view>
+
+  <button class="btn btn-danger btn-block mt-32" hover-class="btn-hover" bindtap="logout"><image class="icon-sm" src="/assets/icons/logout.svg" />退出登录</button>
+
+  <block wx:if="{{editing}}">
+    <view class="mask" bindtap="closeEdit" />
+    <view class="sheet">
+      <view class="sheet-head"><text class="title">修改资料</text><image class="icon" src="/assets/icons/x-muted.svg" bindtap="closeEdit" /></view>
+      <view class="sheet-body">
+        <view class="field"><view class="field-label">姓名</view><input class="input" value="{{form.name}}" data-key="name" bindinput="onInput" /></view>
+        <view class="field"><view class="field-label">手机号（作为联系人显示在报价单上）</view><input class="input" type="number" value="{{form.phone}}" data-key="phone" bindinput="onInput" /></view>
+        <button class="btn btn-primary btn-block mt-24" hover-class="btn-hover" loading="{{saving}}" bindtap="saveProfile">保存</button>
+      </view>
+    </view>
+  </block>
+</view>

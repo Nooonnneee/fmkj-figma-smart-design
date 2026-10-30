@@ -1,0 +1,6 @@
+.radio { width: 40rpx; height: 40rpx; border-radius: 50%; border: 2rpx solid var(--rule); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.radio.on { background: var(--ink-primary); border-color: var(--ink-primary); }
+.pay { padding: 24rpx 28rpx; border-top: 1rpx solid var(--rule); }
+.pay:first-child { border-top: none; }
+.pct { width: 140rpx; flex: none; text-align: right; }
+.terms { margin-top: 12rpx; font-size: 26rpx; line-height: 1.7; }

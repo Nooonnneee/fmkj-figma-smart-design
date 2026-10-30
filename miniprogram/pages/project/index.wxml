@@ -1,0 +1,126 @@
+<view wx:if="{{p}}" class="page page-pad-bottom">
+  <view class="card">
+    <view class="row between gap-16">
+      <view class="h2 grow">{{p.name}}</view>
+      <text class="badge shrink-0">{{p.statusLabel}}</text>
+    </view>
+    <view class="mt-16">
+      <view class="kv">
+        <text class="muted">客户</text>
+        <view class="row gap-16">
+          <text>{{p.customerName || '未填写'}}</text>
+          <view wx:if="{{p.customerPhone}}" class="row gap-8" hover-class="btn-hover" bindtap="call">
+            <image class="icon-sm" src="/assets/icons/phone.svg" />
+            <text class="num">{{p.customerPhone}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="kv"><text class="muted">地址</text><text class="text-right grow">{{p.place || '—'}}</text></view>
+      <view class="kv"><text class="muted">主平台</text><text>{{p.platform || '待定'}}</text></view>
+      <view class="kv"><text class="muted">预算</text><text class="num">{{p.budgetText || '—'}}</text></view>
+      <view class="kv"><text class="muted">负责人</text><text>{{owner ? owner.name : '—'}}</text></view>
+    </view>
+    <view wx:if="{{p.notes}}" class="notice mt-16">{{p.notes}}</view>
+  </view>
+
+  <view class="card">
+    <view class="row between">
+      <text class="title">进度</text>
+      <text class="small muted">{{p.progress.detail}}</text>
+    </view>
+    <view class="steps mt-24">
+      <view wx:for="{{p.steps}}" wx:for-item="done" wx:for-index="i" wx:key="i" class="step {{done ? 'done' : ''}}" />
+    </view>
+    <view class="row between mt-16 small muted">
+      <text wx:for="{{stepLabels}}" wx:key="*this">{{item}}</text>
+    </view>
+    <button wx:if="{{p.progress.next && !archived}}" class="btn btn-primary btn-block mt-24" hover-class="btn-hover" bindtap="nextStep">下一步：{{p.progress.next.label}}</button>
+  </view>
+
+  <view class="section-title"><text class="title">点位与预算</text></view>
+  <view class="card">
+    <view class="mini-stats">
+      <view><text class="label">点位</text><text class="num block">{{summary.points}}</text></view>
+      <view><text class="label">房间</text><text class="num block">{{summary.rooms}}</text></view>
+      <view><text class="label">图纸</text><text class="num block">{{summary.sheets}}</text></view>
+      <view><text class="label">设备预算</text><text class="num block">{{summary.totalText}}</text></view>
+    </view>
+    <view wx:if="{{summary.pending}}" class="notice notice-warning mt-24">
+      <image class="icon-sm" src="/assets/icons/alert.svg" />
+      <text>{{summary.pending}} 个点位待选型，未计入预算</text>
+    </view>
+    <view wx:if="{{summary.categories.length}}" class="row wrap gap-12 mt-24">
+      <view wx:for="{{summary.categories}}" wx:key="slug" class="chip">
+        <view class="dot" style="background: {{item.color}}" />
+        <text>{{item.name}}</text>
+        <text class="num">{{item.count}}</text>
+      </view>
+    </view>
+    <view class="row gap-16 mt-24">
+      <button wx:if="{{!archived}}" class="btn btn-outline grow" hover-class="btn-hover" bindtap="uploadSheet">
+        <image class="icon-sm" src="/assets/icons/image-plus.svg" />上传户型图
+      </button>
+      <button class="btn btn-primary grow" hover-class="btn-hover" bindtap="openPointMap">
+        <image class="icon-sm" src="/assets/icons/map-pin-white.svg" />打开点位图
+      </button>
+    </view>
+  </view>
+
+  <view class="section-title">
+    <text class="title">报价</text>
+    <view wx:if="{{!archived && summary.points}}" class="row gap-8 small" hover-class="btn-hover" bindtap="generateQuote">
+      <image class="icon-sm" src="/assets/icons/plus.svg" />从点位图生成
+    </view>
+  </view>
+  <view class="card card-flush">
+    <view wx:for="{{quotes}}" wx:key="id" class="list-item" hover-class="list-item-hover" data-id="{{item.id}}" bindtap="openQuote">
+      <image class="icon" src="/assets/icons/receipt.svg" />
+      <view class="grow truncate">{{item.title}}</view>
+      <view class="text-right shrink-0">
+        <view class="num">{{item.totalText}}</view>
+        <view class="badge {{item.badge}} mt-8">{{item.statusLabel}}</view>
+      </view>
+    </view>
+    <view wx:if="{{!quotes.length}}" class="empty small">{{summary.points ? '还没有报价，点右上角从点位图生成' : '布置点位后可以自动生成报价'}}</view>
+  </view>
+
+  <view class="section-title"><text class="title">合同</text></view>
+  <view class="card" hover-class="list-item-hover" bindtap="openContract">
+    <block wx:if="{{contract}}">
+      <view class="row between">
+        <text class="num">{{contract.number}}</text>
+        <text class="badge {{contract.badge}}">{{contract.statusLabel}}</text>
+      </view>
+      <view class="row between mt-16">
+        <text class="big-num">{{contract.amountText}}</text>
+        <text class="small muted">收款 {{contract.received}}/{{contract.payments.length}} 期</text>
+      </view>
+    </block>
+    <view wx:else class="row between">
+      <text class="muted">{{quotes.length ? '用一份报价生成合同' : '生成报价后可以生成合同'}}</text>
+      <image class="icon-sm" src="/assets/icons/chevron-right-muted.svg" />
+    </view>
+  </view>
+
+  <view class="section-title"><text class="title">打印与文档</text></view>
+  <view class="card card-flush">
+    <view wx:for="{{documents}}" wx:key="key" class="list-item" hover-class="list-item-hover" data-path="{{item.path}}" data-title="{{item.title}}" bindtap="openDoc">
+      <image class="icon" src="/assets/icons/printer.svg" />
+      <view class="grow">
+        <view>{{item.title}}</view>
+        <view class="small muted truncate">{{item.note}}</view>
+      </view>
+      <image class="icon-sm" src="/assets/icons/chevron-right-muted.svg" />
+    </view>
+  </view>
+
+  <view class="bottom-bar">
+    <button class="btn btn-outline" hover-class="btn-hover" bindtap="toggleArchive">
+      <image class="icon-sm" src="/assets/icons/archive.svg" />{{archived ? '恢复项目' : '归档'}}
+    </button>
+    <button class="btn btn-primary" hover-class="btn-hover" disabled="{{archived}}" bindtap="edit">
+      <image class="icon-sm" src="/assets/icons/pencil-white.svg" />编辑资料
+    </button>
+  </view>
+</view>
+<view wx:elif="{{loading}}" class="empty">加载中…</view>

@@ -1,0 +1,117 @@
+<view class="pm {{readOnly ? '' : 'page-pad-bottom'}}">
+  <view class="toolbar">
+    <scroll-view scroll-x class="sheet-tabs" enable-flex>
+      <view wx:for="{{sheets}}" wx:key="id" class="chip {{sheetIndex === index ? 'active' : ''}}" data-index="{{index}}" bindtap="onSheetTab">
+        {{item.name}} <text class="small">{{item.pointCount}}</text>
+      </view>
+    </scroll-view>
+    <picker range="{{scopes}}" range-key="label" value="{{scopeIndex}}" bindchange="onScope">
+      <view class="chip shrink-0">{{scopes[scopeIndex].label || '全部'}}<image class="icon-sm" src="/assets/icons/chevron-down.svg" /></view>
+    </picker>
+  </view>
+
+  <view wx:if="{{mode !== 'view'}}" class="mode-banner">
+    <block wx:if="{{mode === 'place'}}">
+      <image class="mode-icon" src="{{placeType.icon}}" />
+      <text class="grow">点击图纸放置「{{placeType.name}}」，可连续放置</text>
+    </block>
+    <text wx:else class="grow">点击图纸上的新位置</text>
+    <button class="btn btn-sm btn-primary" bindtap="exitMode">{{mode === 'place' ? '完成' : '取消'}}</button>
+  </view>
+
+  <view class="canvas-wrap">
+    <scroll-view wx:if="{{sheets.length}}" scroll-x scroll-y class="canvas" style="height: {{viewH}}px">
+      <view id="sheet" class="sheet" style="width: {{sheetW}}px; height: {{sheetH}}px" bindtap="onCanvasTap">
+        <image class="sheet-img" src="{{sheetUrl}}" mode="aspectFit" />
+        <view wx:for="{{areasOnSheet}}" wx:key="id" class="area" style="left: {{item.left}}%; top: {{item.top}}%; width: {{item.width}}%; height: {{item.height}}%">
+          <text class="area-name">{{item.name}}</text>
+        </view>
+        <view
+          wx:for="{{pointsOnSheet}}"
+          wx:key="id"
+          class="marker {{item.id === selectedId ? 'sel' : ''}} {{item.pending ? 'pending' : ''}}"
+          style="left: {{item.left}}%; top: {{item.top}}%"
+          data-id="{{item.id}}"
+          catchtap="onMarkerTap"
+        >
+          <image class="marker-icon" src="{{item.icon}}" style="width: {{markerSize}}px; height: {{markerSize}}px; left: -{{markerSize / 2}}px; top: -{{markerSize / 2}}px" />
+          <text wx:if="{{showLabels}}" class="marker-label" style="top: {{markerSize / 2 + 1}}px; color: {{item.color}}">{{item.name}}</text>
+        </view>
+      </view>
+    </scroll-view>
+    <view wx:elif="{{!loading}}" class="empty sheet-empty">
+      <image class="icon-lg" src="/assets/icons/image-plus-muted.svg" />
+      <text>还没有户型图</text>
+      <text class="small">上传后自动裁掉图框和标题栏，放进标准图纸</text>
+      <button wx:if="{{!readOnly}}" class="btn btn-primary btn-sm" bindtap="onUpload">上传户型图</button>
+    </view>
+    <view wx:if="{{sheets.length}}" class="zoom">
+      <view class="zoom-btn" bindtap="zoomOut"><image class="icon-sm" src="/assets/icons/zoom-out.svg" /></view>
+      <view class="zoom-btn" bindtap="zoomFit"><image class="icon-sm" src="/assets/icons/maximize.svg" /></view>
+      <view class="zoom-btn" bindtap="zoomIn"><image class="icon-sm" src="/assets/icons/zoom-in.svg" /></view>
+      <view class="zoom-btn {{showLabels ? 'on' : ''}}" bindtap="toggleLabels"><text class="small">名称</text></view>
+    </view>
+  </view>
+
+  <view class="panel">
+    <view wx:if="{{summary}}" class="row between">
+      <view>
+        <text class="num">{{summary.points}}</text><text class="small muted"> 个点位</text>
+      </view>
+      <view wx:if="{{!readOnly && summary.points}}" class="row gap-8 small" hover-class="btn-hover" bindtap="generateQuote">
+        <image class="icon-sm" src="/assets/icons/receipt.svg" />生成报价
+      </view>
+    </view>
+    <view class="seg mt-24">
+      <view class="seg-item {{tab === 'legend' ? 'active' : ''}}" data-tab="legend" bindtap="onTab">图例 {{legend.length}}</view>
+      <view class="seg-item {{tab === 'rooms' ? 'active' : ''}}" data-tab="rooms" bindtap="onTab">房间 {{rooms.length}}</view>
+    </view>
+
+    <view wx:if="{{tab === 'legend'}}" class="card card-flush mt-24">
+      <view wx:for="{{legend}}" wx:key="value" class="list-item" hover-class="list-item-hover" data-index="{{index}}" bindtap="onLegendTap">
+        <image class="legend-icon" src="{{item.icon}}" />
+        <view class="grow">
+          <view class="row gap-8"><text>{{item.name}}</text></view>
+        </view>
+        <text class="num shrink-0">× {{item.count}}</text>
+      </view>
+      <view wx:if="{{!legend.length}}" class="empty small">还没有点位{{readOnly ? '' : '，点「放置设备」开始布置'}}</view>
+    </view>
+
+    <view wx:else class="card card-flush mt-24">
+      <view wx:for="{{rooms}}" wx:key="id" class="list-item">
+        <view class="grow">
+          <view class="row gap-8"><text>{{item.name}}</text><text class="small muted">{{item.typeLabel}} · {{item.points}} 点</text></view>
+          <view class="small muted clamp-2 mt-8">{{item.linesText || '暂无设备'}}</view>
+        </view>
+      </view>
+      <view wx:if="{{!rooms.length}}" class="empty small">还没有划分房间区域（在网页版点位图里划分）</view>
+    </view>
+  </view>
+
+  <view wx:if="{{!readOnly}}" class="bottom-bar">
+    <button class="btn btn-outline" hover-class="btn-hover" bindtap="onUpload"><image class="icon-sm" src="/assets/icons/image-plus.svg" />户型图</button>
+    <button class="btn btn-primary" hover-class="btn-hover" bindtap="openTypeSheet"><image class="icon-sm" src="/assets/icons/plus-white.svg" />放置设备</button>
+  </view>
+
+  <block wx:if="{{typeSheet}}">
+    <view class="mask" bindtap="closeTypeSheet" />
+    <view class="sheet">
+      <view class="sheet-head">
+        <text class="title">{{typeSheetFor === 'place' ? '选择要放置的设备' : '更换为'}}</text>
+        <image class="icon" src="/assets/icons/x-muted.svg" bindtap="closeTypeSheet" />
+      </view>
+      <scroll-view scroll-y class="sheet-body type-scroll">
+        <view wx:for="{{groups}}" wx:key="slug" wx:for-item="g" class="type-group">
+          <view class="row gap-8 label"><view class="dot" style="background: {{g.color}}" />{{g.name}}</view>
+          <view class="type-grid">
+            <view wx:for="{{g.types}}" wx:key="value" wx:for-item="t" class="type-cell" hover-class="list-item-hover" data-type="{{t}}" bindtap="onPickType">
+              <image class="type-icon" src="{{t.icon}}" />
+              <text class="small">{{t.name}}</text>
+            </view>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+  </block>
+</view>

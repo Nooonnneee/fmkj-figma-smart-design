@@ -16,13 +16,19 @@ export const metadata = { title: '点位图', robots: { index: false, follow: fa
 const pad = (n: number) => String(n).padStart(2, '0')
 
 /** 点位图：每张图纸一页横向 A4（设备图标 / 产品图 / 大图），最后一页按图纸统计设备数量。 */
-export default async function PlansPrintPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ style?: string; layout?: string; scope?: string }> }) {
+export default async function PlansPrintPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ style?: string; layout?: string; scope?: string; quoteId?: string }>
+}) {
   const { id } = await params
   const sp = await searchParams
   const user = await appAuth.getCurrentUser()
   if (!user) redirect(`/login?from=/print/projects/${id}/plans`)
   const scope = isPointScope(sp.scope) ? sp.scope : 'all'
-  const [d, setup] = await Promise.all([loadProjectDocs(id, user, scope), resolveDocSetup('plans', sp)])
+  const [d, setup] = await Promise.all([loadProjectDocs(id, user, scope, sp.quoteId ?? null), resolveDocSetup('plans', sp)])
   if (!d) notFound()
   const { style, layout, company } = setup
   const markers = layout === 'product' ? 'product' : 'symbol'
@@ -45,7 +51,23 @@ export default async function PlansPrintPage({ params, searchParams }: { params:
       <PrintToolbar
         back={{ href: `/projects/${id}/point-map`, label: '返回点位' }}
         exportName={`${d.project.name}-${kind}`}
-        groups={[...docToolbarGroups(setup, href), { label: '范围', value: scope, options: POINT_SCOPES.map((s) => ({ value: s.value, label: s.label, href: href({ scope: s.value }) })) }]}
+        groups={[
+          ...(d.projectList.length > 1
+            ? [
+                {
+                  label: '项目',
+                  value: id,
+                  options: d.projectList.slice(0, 5).map((p) => ({
+                    value: p.id,
+                    label: `${p.name}（${p.pointCount}点）`,
+                    href: `/print/projects/${p.id}/plans?style=${style.id}&layout=${layout}&scope=${scope}`,
+                  })),
+                },
+              ]
+            : []),
+          ...docToolbarGroups(setup, href),
+          { label: '范围', value: scope, options: POINT_SCOPES.map((s) => ({ value: s.value, label: s.label, href: href({ scope: s.value }) })) },
+        ]}
       />
       <DocRoot style={style}>
         <div className="space-y-6 py-6 print:space-y-0 print:py-0">

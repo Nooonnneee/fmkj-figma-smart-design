@@ -50,10 +50,19 @@ import { cn } from '@/lib/utils'
 import { createQuoteFromProject, syncQuoteFromPointMap } from '../quotes/actions'
 import { AiPanel, type ImportOutcome } from '@/plugins/ai-import/ai-panel'
 import { exportPoints, parsePointImport, planToElements, recognitionPrompt } from '@/plugins/ai-import/point-import'
-import type { SelectionTier } from '@/plugins/smart-select/auto-select'
-import { SmartSelect } from '@/plugins/smart-select/smart-select-panel'
 
-import { AreasPanel, DRAG_TYPE, PlacePanel, SelectedArea, SelectedPoint, TypeDefaultRow, yuan, type PointProduct } from './editor-panels'
+import {
+  AreasPanel,
+  DRAG_TYPE,
+  PlacePanel,
+  PointMapContextMenu,
+  SelectedArea,
+  SelectedPoint,
+  TypeDefaultRow,
+  yuan,
+  type CanvasContextMenuTarget,
+  type PointProduct,
+} from './editor-panels'
 import { SheetCropper } from './sheet-cropper'
 
 export type { PointProduct } from './editor-panels'
@@ -131,10 +140,9 @@ export function PointMapEditor({
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null)
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null)
   const [armed, setArmed] = useState<string | null>(null)
+  const [ctxMenu, setCtxMenu] = useState<CanvasContextMenuTarget | null>(null)
   const [cropFile, setCropFile] = useState<File | null>(null)
-  const [defaults, setDefaults] = useState<ProjectDefaults>(initialDefaults)
-  const [savingDefault, setSavingDefault] = useState<string | null>(null)
-  const [selecting, setSelecting] = useState(false)
+  const [defaults] = useState<ProjectDefaults>(initialDefaults)
   const [query, setQuery] = useState('')
   const [dirty, setDirty] = useState(needsSave)
   const [saving, setSaving] = useState(false)
@@ -306,6 +314,28 @@ export function PointMapEditor({
 
   const firstSheetId = useRef<string | null>(snap.sheets[0]?.id ?? null)
   const focusRef = useRef(initialFocus)
+  const prevInitialSceneRef = useRef(initialScene)
+
+  // 当侧边栏 AI 工具更新了服务端点位图并触发 router.refresh() 时，实时同步更新当前打开的 Excalidraw 画布
+  useEffect(() => {
+    if (!api || prevInitialSceneRef.current === initialScene) return
+    prevInitialSceneRef.current = initialScene
+    if (dirty) return
+    void (async () => {
+      const ex = await import('@excalidraw/excalidraw')
+      const restored = ex.restoreElements(initialScene.elements as never, null)
+      const filesMap = Object.values(initialScene.files).map((f) =>
+        isMarkerFileId(f.id) ? markerBinaryFile(f.id.replace(/^mk\d+-/, '')) : f,
+      )
+      if (filesMap.length) api.addFiles(filesMap as never)
+      api.updateScene({ elements: restored as never })
+      const sheets = sceneSheets(initialScene.elements, initialScene.files)
+      if (sheets[0]) {
+        setTimeout(() => fitSheet(sheets[0].id, true), 60)
+      }
+    })()
+  }, [api, initialScene, dirty, fitSheet])
+
   useEffect(() => {
     if (!api || fitted.current) return
     fitted.current = true
@@ -441,6 +471,7 @@ export function PointMapEditor({
       if (e.button !== 0 || !(e.target instanceof HTMLCanvasElement)) return
       e.preventDefault()
       e.stopPropagation()
+      setCtxMenu(null)
       const { x, y } = sceneCoords(e.clientX, e.clientY)
       void placePoint(armed, x, y)
     }
@@ -481,6 +512,107 @@ export function PointMapEditor({
       wrap.removeEventListener('drop', onDrop, true)
     }
   }, [api, readOnly, placePoint, sceneCoords])
+
+  // 画布右键菜单：拦截 Excalidraw 冗长的原生右键菜单，改为针对点位/区域的紧凑快捷菜单，并自动避让底部栏
+  useEffect(() => {
+    const wrap = canvasWrap.current
+    if (!api || !wrap) return
+    const onContextMenu = (e: MouseEvent) => {
+      if (!(e.target instanceof HTMLCanvasElement)) return
+      e.preventDefault()
+      e.stopPropagation()
+      if (readOnly) return
+
+      const rect = wrap.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+      const { x: sx, y: sy } = sceneCoords(e.clientX, e.clientY)
+      const s = api.getAppState() as unknown as AppStateLike
+      const pad = Math.max(8, 10 / (s.zoom?.value || 1))
+      const live = elementsNow().filter((el) => !el.isDeleted && !hidden.current.has(el.id))
+
+      // 1. 优先检测是否右键在点位图标或其代号文字上
+      const hitEl = live
+        .slice()
+        .reverse()
+        .find((el) => {
+          if (!isPointElement(el) && kindOf(el) !== 'label') return false
+          return sx >= el.x - pad && sx <= el.x + el.width + pad && sy >= el.y - pad && sy <= el.y + el.height + pad
+        })
+      const pointEl =
+        hitEl && isPointElement(hitEl)
+          ? hitEl
+          : hitEl?.groupIds?.length
+            ? live.find((el) => isPointElement(el) && el.groupIds?.some((g) => hitEl.groupIds!.includes(g)))
+            : undefined
+
+      if (pointEl) {
+        if (armed) setArmed(null)
+        api.updateScene({ appState: { selectedElementIds: { [pointEl.id]: true } } as never })
+        const sheets = sceneSheets(live, api.getFiles() as never)
+        const areas = sceneAreas(live, sheets)
+        const pts = scenePoints(live, sheets, areas)
+        const info = pts.find((p) => p.id === pointEl.id)
+        const areaName = info?.areaId ? (areas.find((a) => a.id === info.areaId)?.name ?? null) : null
+        setCtxMenu({
+          kind: 'point',
+          pointId: pointEl.id,
+          code: String(pointEl.customData?.pointCode ?? info?.code ?? ''),
+          deviceType: String(pointEl.customData?.deviceType ?? info?.deviceType ?? 'other'),
+          areaName,
+          x,
+          y,
+          wrapW: rect.width,
+          wrapH: rect.height,
+        })
+        return
+      }
+
+      // 2. 连续放置点位模式下右键空白处：直接结束连续放置（同 Esc）
+      if (armed) {
+        setArmed(null)
+        setCtxMenu(null)
+        return
+      }
+
+      // 3. 检测是否右键在区域标签或已选中的区域框上
+      const hitAreaLabel = live
+        .slice()
+        .reverse()
+        .find((el) => kindOf(el) === 'area-label' && sx >= el.x - pad && sx <= el.x + el.width + pad && sy >= el.y - pad && sy <= el.y + el.height + pad)
+      const areaEl = hitAreaLabel?.groupIds?.length
+        ? live.find((el) => kindOf(el) === 'area' && el.groupIds?.some((g) => hitAreaLabel.groupIds!.includes(g)))
+        : live.find((el) => kindOf(el) === 'area' && s.selectedElementIds?.[el.id] && contains(el, sx, sy))
+
+      if (areaEl) {
+        api.updateScene({ appState: { selectedElementIds: { [areaEl.id]: true } } as never })
+        setCtxMenu({
+          kind: 'area',
+          areaId: areaEl.id,
+          name: String(areaEl.customData?.name ?? '区域'),
+          areaType: String(areaEl.customData?.areaType ?? 'living'),
+          x,
+          y,
+          wrapW: rect.width,
+          wrapH: rect.height,
+        })
+        return
+      }
+
+      // 4. 画布空白处快捷菜单
+      setCtxMenu({
+        kind: 'canvas',
+        sceneX: sx,
+        sceneY: sy,
+        x,
+        y,
+        wrapW: rect.width,
+        wrapH: rect.height,
+      })
+    }
+    wrap.addEventListener('contextmenu', onContextMenu, true)
+    return () => wrap.removeEventListener('contextmenu', onContextMenu, true)
+  }, [api, readOnly, armed, elementsNow, sceneCoords])
 
   /* ---------------- 保存 ---------------- */
 
@@ -671,17 +803,25 @@ export function PointMapEditor({
 
   /* ---------------- 区域 ---------------- */
 
+  const addAreaAt = useCallback(
+    async (cx: number, cy: number, areaType = 'living') => {
+      if (!api) return
+      const created = buildAreaElements({ name: areaTypeLabel(areaType), areaType, x: cx - 110, y: cy - 75, width: 220, height: 150 })
+      await insertElements(created, 'aboveSheets', { select: created[0].id })
+      toast.success('已添加区域，拖动边框调整到房间范围')
+    },
+    [api, insertElements],
+  )
+
   const addArea = useCallback(
     async (areaType: string) => {
       if (!api) return
       const s = api.getAppState() as unknown as AppStateLike
       const cx = s.width / 2 / s.zoom.value - s.scrollX
       const cy = s.height / 2 / s.zoom.value - s.scrollY
-      const created = buildAreaElements({ name: areaTypeLabel(areaType), areaType, x: cx - 110, y: cy - 75, width: 220, height: 150 })
-      await insertElements(created, 'aboveSheets', { select: created[0].id })
-      toast.success('已添加区域，拖动边框调整到房间范围')
+      await addAreaAt(cx, cy, areaType)
     },
-    [api, insertElements],
+    [api, addAreaAt],
   )
 
   const updateArea = useCallback(
@@ -764,18 +904,7 @@ export function PointMapEditor({
     download(`${projectName}-点位.json`, new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
   }, [snap, projectName])
 
-  /* ---------------- 选型 ---------------- */
-
-  const updatePointProduct = useCallback(
-    async (pointId: string, productId: string | null) => {
-      await patchElements((el) => {
-        if (el.id !== pointId) return null
-        const { productId: _old, ...rest } = el.customData ?? {}
-        return { customData: productId ? { ...rest, productId } : rest }
-      })
-    },
-    [patchElements],
-  )
+  /* ---------------- 点位编辑 ---------------- */
 
   /** 切换选中点位的设备类型：自动替换画布图标，跨大类时自动更新代号前缀与文字颜色 */
   const updatePointType = useCallback(
@@ -815,6 +944,23 @@ export function PointMapEditor({
     [elementsNow, ensureMarkers, usedCodes, patchElements],
   )
 
+  /** 复制选中点位：在右下方偏移生成同类型新点位，并自动分配新编号 */
+  const duplicatePoint = useCallback(
+    async (pointId: string) => {
+      const target = elementsNow().find((e) => e.id === pointId)
+      if (!target || readOnly) return
+      const deviceType = String(target.customData?.deviceType ?? 'other')
+      ensureMarkers([deviceType])
+      const code = nextPointCode(deviceType, usedCodes())
+      const cx = target.x + target.width / 2 + 28
+      const cy = target.y + target.height / 2 + 16
+      const created = buildPointElements({ deviceType, cx, cy, code })
+      await insertElements(created, 'top', { select: created[0].id })
+      toast.success(`已复制点位 ${code}`)
+    },
+    [elementsNow, readOnly, ensureMarkers, usedCodes, insertElements],
+  )
+
   const deletePoint = useCallback(
     async (pointId: string) => {
       const target = elementsNow().find((e) => e.id === pointId)
@@ -827,46 +973,6 @@ export function PointMapEditor({
       await insertElements([], 'top', { remove })
     },
     [elementsNow, insertElements],
-  )
-
-  const saveDefault = useCallback(
-    async (deviceType: string, productId: string | null) => {
-      setSavingDefault(deviceType)
-      try {
-        const res = await fetch(`/projects/${projectId}/point-map/defaults`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ deviceType, productId }) })
-        const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; defaults?: ProjectDefaults }
-        if (!res.ok || !data.ok || !data.defaults) throw new Error(data.error ?? '保存失败，请稍后重试')
-        setDefaults(data.defaults)
-        toast.success(productId ? `已设为「${deviceTypeLabel(deviceType)}」的默认型号` : '已清除默认型号')
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : '保存失败，请稍后重试')
-      } finally {
-        setSavingDefault(null)
-      }
-    },
-    [projectId],
-  )
-
-  const autoSelect = useCallback(
-    async (tier: SelectionTier, overwrite: boolean) => {
-      // 服务端按已保存的点位图统计设备类型，先保存
-      if (dirty && !(await save())) return
-      setSelecting(true)
-      try {
-        const res = await fetch(`/projects/${projectId}/point-map/auto-defaults`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tier, overwrite, scope }) })
-        const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; defaults?: ProjectDefaults; changed?: unknown[]; missing?: string[] }
-        if (!res.ok || !data.ok || !data.defaults) throw new Error(data.error ?? '选型失败，请稍后重试')
-        setDefaults(data.defaults)
-        const n = data.changed?.length ?? 0
-        const missing = data.missing?.length ? `；${data.missing.map((t) => deviceTypeLabel(t)).join('、')} 产品库里没有在售产品` : ''
-        toast.success(n ? `已为 ${n} 类设备设置默认型号${missing}` : `所有设备类型都已选型${missing}`)
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : '选型失败，请稍后重试')
-      } finally {
-        setSelecting(false)
-      }
-    },
-    [dirty, save, projectId, scope],
   )
 
   const createNewQuote = useCallback(async () => {
@@ -950,7 +1056,6 @@ export function PointMapEditor({
 
   const scopedPoints = useMemo(() => snap.points.filter((p) => inPointScope(p.deviceType, scope)), [snap.points, scope])
   const summary = useMemo(() => summarizePoints(scopedPoints.map((p) => ({ deviceType: p.deviceType, productId: p.productId })), productById, defaults), [scopedPoints, productById, defaults])
-  const total = useMemo(() => [...summary.products.entries()].reduce((s, [id, r]) => s + (productById.get(id)?.price ?? 0) * r.count, 0), [summary, productById])
   const typesInUse = DEVICE_TYPE_ORDER.filter((t) => summary.byType.has(t))
   // 房间智能分析插件关闭时不计算配置完整度和建议
   const analysis = useMemo(() => (plugins.roomInsights ? analyzeAreas(snap.areas, scopedPoints) : new Map()), [plugins.roomInsights, snap.areas, scopedPoints])
@@ -965,7 +1070,6 @@ export function PointMapEditor({
   }, [query, activeByType])
 
   const selectedPoint = selectedPointId ? snap.points.find((p) => p.id === selectedPointId) : undefined
-  const selectedResolved = selectedPoint ? resolvePoint({ deviceType: selectedPoint.deviceType, productId: selectedPoint.productId }, productById, defaults) : null
   const selectedArea = selectedAreaId ? snap.areas.find((a) => a.id === selectedAreaId) : undefined
   const missingSheets = snap.sheets.filter((s) => s.missing).length
 
@@ -1177,6 +1281,20 @@ export function PointMapEditor({
                 tools: { image: !readOnly },
               }}
             />
+            {ctxMenu ? (
+              <PointMapContextMenu
+                target={ctxMenu}
+                onClose={() => setCtxMenu(null)}
+                onChangePointType={(pointId, dt) => void updatePointType(pointId, dt)}
+                onDuplicatePoint={(pointId) => void duplicatePoint(pointId)}
+                onArmType={(dt) => setArmed(dt)}
+                onDeletePoint={(pointId) => void deletePoint(pointId)}
+                onChangeAreaType={(areaId, areaType) => void updateArea(areaId, { areaType, name: areaTypeLabel(areaType) })}
+                onDeleteArea={(areaId) => void deleteArea(areaId)}
+                onAddAreaAt={(sx, sy) => void addAreaAt(sx, sy)}
+                onFitSheet={() => fitSheet(activeSheetId)}
+              />
+            ) : null}
             {snap.points.length ? (
               <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-xl border bg-background/95 p-1 pl-2.5 shadow-sm">
                   <Eye className="size-3.5 text-muted-foreground" />
@@ -1218,18 +1336,14 @@ export function PointMapEditor({
         </div>
 
         <aside className="point-map-aside hidden w-84 shrink-0 flex-col border-l bg-background lg:flex">
-          {selectedPoint && selectedResolved ? (
+          {selectedPoint ? (
             <SelectedPoint
               code={selectedPoint.code}
-              resolved={selectedResolved}
-              own={selectedPoint.productId ? productById.get(selectedPoint.productId) : undefined}
-              options={activeByType.get(selectedResolved.deviceType) ?? []}
-              defaults={defaults}
-              productById={productById}
+              deviceType={selectedPoint.deviceType}
               areaName={snap.areas.find((a) => a.id === selectedPoint.areaId)?.name ?? null}
               readOnly={readOnly}
               onChangeType={(newType) => void updatePointType(selectedPoint.id, newType)}
-              onChange={(productId) => void updatePointProduct(selectedPoint.id, productId)}
+              onDuplicate={() => void duplicatePoint(selectedPoint.id)}
               onDelete={() => void deletePoint(selectedPoint.id)}
             />
           ) : selectedArea ? (
@@ -1242,8 +1356,7 @@ export function PointMapEditor({
               <TabsTrigger value="areas" className="text-xs">区域</TabsTrigger>
               {readOnly || !plugins.aiImport ? null : <TabsTrigger value="ai" className="text-xs">AI 识别</TabsTrigger>}
               <TabsTrigger value="summary" className="text-xs">
-                选型
-                {summary.pendingTotal ? <Badge variant="warning" className="ml-0.5 h-4 px-1 text-[10px] tabular-nums">{summary.pendingTotal}</Badge> : null}
+                统计
               </TabsTrigger>
             </TabsList>
 
@@ -1266,36 +1379,27 @@ export function PointMapEditor({
             <TabsContent value="summary" className="flex min-h-0 flex-col">
               <ScrollArea className="min-h-0 flex-1">
                 <div className="space-y-2 p-4">
-                  {readOnly || !plugins.smartSelect ? null : <SmartSelect platform={platform} busy={selecting} disabled={!scopedPoints.length || saving} onRun={(tier, overwrite) => void autoSelect(tier, overwrite)} />}
-                  <div className="flex items-baseline justify-between pt-2">
+                  <div className="flex items-baseline justify-between">
                     <h2 className="text-sm font-semibold">设备统计{scope !== 'all' ? ` · ${pointScopeLabel(scope)}` : ''}</h2>
                     <span className="text-xs text-muted-foreground tabular-nums">共 {scopedPoints.length} 个点位</span>
                   </div>
                   {typesInUse.length === 0 ? <p className="text-xs text-muted-foreground">还没有放置设备</p> : null}
-                  {typesInUse.map((t) => {
-                    const def = defaults[t]
-                    return (
-                      <TypeDefaultRow
-                        key={t}
-                        type={t}
-                        count={summary.byType.get(t) ?? 0}
-                        pending={summary.pending.get(t) ?? 0}
-                        options={activeByType.get(t) ?? []}
-                        value={def && productById.get(def) ? def : null}
-                        saving={savingDefault === t}
-                        readOnly={readOnly}
-                        onChange={(v) => void saveDefault(t, v)}
-                      />
-                    )
-                  })}
+                  {typesInUse.map((t) => (
+                    <TypeDefaultRow
+                      key={t}
+                      type={t}
+                      count={summary.byType.get(t) ?? 0}
+                      readOnly={readOnly}
+                      onArm={(dt) => {
+                        setArmed(dt)
+                        setTab('place')
+                      }}
+                    />
+                  ))}
                 </div>
               </ScrollArea>
               <div className="space-y-2 border-t p-4 text-sm">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-muted-foreground">设备合计（售价）</span>
-                  <span className="font-semibold tabular-nums">{yuan(total)}</span>
-                </div>
-                {summary.pendingTotal ? <p className="text-xs text-warning">另有 {summary.pendingTotal} 个点位待选型，未计入金额</p> : null}
+                <p className="text-xs text-muted-foreground">布置完成后生成或同步报价，即可在报价台统一配置与更换产品型号。</p>
                 {readOnly ? null : (
                   <Button className="w-full" size="sm" disabled={!api || saving || syncingQuote || !scopedPoints.length} onClick={() => void switchToQuote()}>
                     {syncingQuote ? <Loader2 className="size-4 animate-spin" /> : activeQuote ? <ArrowLeftRight className="size-4" /> : <FilePlus2 className="size-4" />}

@@ -143,6 +143,13 @@ export type AreaAnalysis = {
 /** 区域名称统一（去空格），同名区域视为同一个房间 */
 export const roomKey = (name: string) => name.replace(/\s+/g, '')
 
+/** 从图纸名称提取简短楼层标识（用于区分不同楼层的同名房间，如一层的楼梯与二层的楼梯） */
+export function floorTagFromSheetName(name: string | null | undefined): string {
+  if (!name) return ''
+  const m = /(地下[一二三123]层|负[一二三123]层|[一二三四五六七八九十1-9]+层|[B1-9]F)/i.exec(name)
+  return m ? m[1].toUpperCase() : name.trim()
+}
+
 export function analyzeArea(area: AreaLike, points: PointLike[], siblings: AreaLike[] = [area]): AreaAnalysis {
   const ids = new Set(siblings.map((a) => a.id))
   const mine = points.filter((p) => p.areaId && ids.has(p.areaId))
@@ -181,17 +188,25 @@ export function analyzeArea(area: AreaLike, points: PointLike[], siblings: AreaL
 }
 
 /** 全屋分析：亮点（写进方案概览）和需要注意的问题。 */
-/** 按房间分组：同名区域合并成一个房间，类型取第一个区域的类型 */
-export function groupRooms<T extends AreaLike>(areas: T[]) {
+/**
+ * 按房间分组：同一楼层的同名区域合并成一个房间（例如同一层 L 形主卫的两个框，或同层灯光图与插座图上的客厅），
+ * 不同楼层的同名区域（如一层楼梯、二层楼梯）保持独立。
+ */
+export function groupRooms<T extends AreaLike>(areas: T[], sheetFloorById?: ReadonlyMap<string, string>) {
   const rooms = new Map<string, T[]>()
-  for (const a of areas) rooms.set(roomKey(a.name), [...(rooms.get(roomKey(a.name)) ?? []), a])
+  for (const a of areas) {
+    const floor = a.sheetId ? (sheetFloorById?.get(a.sheetId) ?? a.sheetId) : ''
+    const key = floor ? `${floor}::${roomKey(a.name)}` : roomKey(a.name)
+    rooms.set(key, [...(rooms.get(key) ?? []), a])
+  }
   return [...rooms.values()]
 }
 
 /** 每个区域元素对应的房间分析（编辑器里按区域显示，内容按房间合并计算） */
-export function analyzeAreas(areas: AreaLike[], points: PointLike[]) {
+export function analyzeAreas(areas: AreaLike[], points: PointLike[], sheets?: { id: string; name: string }[]) {
+  const floorMap = sheets ? new Map(sheets.map((s) => [s.id, floorTagFromSheetName(s.name)])) : undefined
   const map = new Map<string, AreaAnalysis>()
-  for (const group of groupRooms(areas)) {
+  for (const group of groupRooms(areas, floorMap)) {
     const r = analyzeArea(group[0], points, group)
     for (const a of group) map.set(a.id, r)
   }
@@ -199,7 +214,8 @@ export function analyzeAreas(areas: AreaLike[], points: PointLike[]) {
 }
 
 export function analyzeProject(areas: AreaLike[], points: PointLike[], sheets: { id: string; name: string }[]) {
-  const results = groupRooms(areas).map((group) => analyzeArea(group[0], points, group))
+  const floorMap = new Map(sheets.map((s) => [s.id, floorTagFromSheetName(s.name)]))
+  const results = groupRooms(areas, floorMap).map((group) => analyzeArea(group[0], points, group))
   const count = (f: (t: string) => boolean) => points.filter((p) => f(p.deviceType)).length
   const lights = count(LIGHT)
   const switches = count(cat('switch'))

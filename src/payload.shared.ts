@@ -12,11 +12,13 @@ import { Categories } from './collections/Categories'
 import { Contracts } from './collections/Contracts'
 import { Media } from './collections/Media'
 import { Folders } from './collections/Folders'
+import { MpSessions } from './collections/MpSessions'
 import { Products } from './collections/Products'
 import { Projects } from './collections/Projects'
 import { Quotes } from './collections/Quotes'
 import { Tags } from './collections/Tags'
 import { Users } from './collections/Users'
+import { WechatAccounts } from './collections/WechatAccounts'
 import { CompanySettings } from './globals/CompanySettings'
 import { PLUGINS } from './plugins'
 
@@ -47,7 +49,24 @@ export const sharedConfig = {
     fallbackLanguage: 'en',
     supportedLanguages: { 'en': adminLanguage },
   },
-  collections: [Admins, Users, Projects, Quotes, Contracts, Products, Brands, Categories, Media, Folders, Tags, AiConversations, AiMessages, AiCreditLedger],
+  collections: [
+    Admins,
+    Users,
+    Projects,
+    Quotes,
+    Contracts,
+    Products,
+    Brands,
+    Categories,
+    Media,
+    Folders,
+    Tags,
+    AiConversations,
+    AiMessages,
+    AiCreditLedger,
+    WechatAccounts,
+    MpSessions,
+  ],
   globals: [CompanySettings],
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),

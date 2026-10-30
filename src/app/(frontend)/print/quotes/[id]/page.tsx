@@ -38,6 +38,20 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
   const { style, company } = setup
   const project = typeof quote.project === 'object' ? (quote.project as Project) : null
   const owner = project && typeof project.owner === 'object' ? (project.owner as User | null) : null
+  const siblingQuotes = project
+    ? (
+        await payload.find({
+          collection: 'quotes',
+          where: { project: { equals: project.id } },
+          sort: '-updatedAt',
+          limit: 6,
+          depth: 0,
+          user,
+          overrideAccess: false,
+          select: { title: true, total: true },
+        })
+      ).docs
+    : []
   const imageOf = (i: { image?: unknown }) => (i.image && typeof i.image === 'object' ? ((i.image as Media).url ?? null) : null)
   const items = quote.items ?? []
   const fees = quote.fees ?? []
@@ -77,6 +91,19 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
         back={{ href: project ? `/projects/${project.id}/quotes/${id}` : '/projects', label: '返回报价' }}
         exportName={`${project ? `${project.name}-` : ''}${quote.title}-${setup.layouts.find((l) => l.value === layout)?.label ?? ''}`}
         groups={[
+          ...(siblingQuotes.length > 1
+            ? [
+                {
+                  label: '版本',
+                  value: String(quote.id),
+                  options: siblingQuotes.slice(0, 4).map((sq) => ({
+                    value: String(sq.id),
+                    label: `${sq.title.replace(project?.name ?? '', '').trim() || '报价'} ¥${(sq.total ?? 0).toLocaleString('zh-CN')}`,
+                    href: `/print/quotes/${sq.id}?layout=${layout}&style=${style.id}&markers=${markers}`,
+                  })),
+                },
+              ]
+            : []),
           ...docToolbarGroups({ ...setup, layout }, (p) => href(p)),
           ...(hasPlans
             ? [

@@ -1,0 +1,37 @@
+<view wx:if="{{p}}" class="page">
+  <view class="card card-flush">
+    <image class="hero" src="{{p.imageUrl}}" mode="aspectFit" />
+    <view class="info">
+      <view class="row gap-8 small muted">
+        <view class="dot" style="background: {{p.type.color}}" />
+        <text>{{p.type.category}} · {{p.type.name}}</text>
+      </view>
+      <view class="h2 mt-16">{{p.name}}</view>
+      <view class="row between mt-24">
+        <view>
+          <text class="big-num">{{p.priceText}}</text>
+          <text class="muted"> /{{p.unit}}</text>
+        </view>
+        <view wx:if="{{p.cost !== null}}" class="small muted">成本 {{p.costText}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="kv"><text class="muted">品牌</text><text>{{p.brand || '—'}}</text></view>
+    <view class="kv"><text class="muted">型号 / SKU</text><text class="num">{{p.sku}}</text></view>
+    <view class="kv"><text class="muted">库存</text><text>{{p.stock === null ? '—' : p.stock}}</text></view>
+    <view class="kv">
+      <text class="muted">支持平台</text>
+      <view class="row wrap gap-8 grow" style="justify-content: flex-end">
+        <text wx:for="{{p.platforms}}" wx:key="*this" class="badge">{{item}}</text>
+        <text wx:if="{{!p.platforms.length}}">—</text>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{p.description}}" class="card">
+    <view class="label">产品说明</view>
+    <view class="mt-16 desc">{{p.description}}</view>
+  </view>
+</view>
