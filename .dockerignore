@@ -6,3 +6,5 @@ deploy/*.env
 media
 *.log
 .tmp-*
+import/
+import-xlsx/
