@@ -46,10 +46,10 @@ export default buildConfig({
     // 允许导入脚本写入原 ID（data-import.ts 依赖这一项）。
     allowIDOnCreate: true,
     migrationDir: path.resolve(dirname, 'migrations'),
-    // 生产容器启动时自动执行尚未运行的迁移（standalone 镜像里没有 payload CLI）。
-    prodMigrations: migrations,
-    // 启动前由 `payload migrate` 建表/升级，运行时不自动改表结构。
-    push: false,
+    // 双边同步开发默认开启自动表结构同步（push: true），新增集合/字段无需手写迁移即可直接启动；
+    // 若正式服需严格走迁移脚本，可在 .env 设置 PAYLOAD_DB_PUSH=false。
+    prodMigrations: process.env.PAYLOAD_DB_PUSH === 'false' ? migrations : undefined,
+    push: process.env.PAYLOAD_DB_PUSH !== 'false',
   }),
   storage: useS3
     ? [

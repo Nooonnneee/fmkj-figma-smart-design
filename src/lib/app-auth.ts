@@ -7,6 +7,19 @@ import type { User } from '@/payload-types'
 const APP_SESSION_COOKIE = 'app-session'
 
 /**
+ * Cookie 策略：
+ * - Figma Make 预览运行在跨站 iframe 中，必须 SameSite=None + Secure + Partitioned；
+ * - 本地开发（http://localhost / 局域网 IP）或自托管服务器使用 SameSite=Lax，仅在 HTTPS 域名下开启 Secure。
+ */
+function sessionCookieOptions() {
+  if (process.env.FIGMA === '1') {
+    return { httpOnly: true, sameSite: 'none' as const, secure: true, partitioned: true, path: '/' }
+  }
+  const isHttps = Boolean(process.env.PUBLIC_URL?.startsWith('https://'))
+  return { httpOnly: true, sameSite: 'lax' as const, secure: isHttps, path: '/' }
+}
+
+/**
  * 员工登录（app-session Cookie），与 Payload 后台的 CMS 登录完全独立。
  * 只读取 app-session，只认 `users` 集合的身份。
  */
@@ -35,13 +48,7 @@ export function createAppAuth(appUserCollection: 'users') {
       if ((result.user as User).status !== 'active') return { ok: false, error: '该账号已停用，请联系管理员' }
 
       ;(await cookies()).set(APP_SESSION_COOKIE, result.token, {
-        httpOnly: true,
-        // 预览运行在 Figma Make 的跨站 iframe 中，lax Cookie 不会被发送，
-        // 需 SameSite=None + Secure；Partitioned 让 Chrome 在禁用第三方 Cookie 时仍保留登录。
-        sameSite: 'none',
-        secure: true,
-        partitioned: true,
-        path: '/',
+        ...sessionCookieOptions(),
         expires: result.exp ? new Date(result.exp * 1000) : undefined,
       })
       return { ok: true }
@@ -51,7 +58,7 @@ export function createAppAuth(appUserCollection: 'users') {
   }
 
   async function logout() {
-    ;(await cookies()).set(APP_SESSION_COOKIE, '', { httpOnly: true, sameSite: 'none', secure: true, partitioned: true, path: '/', maxAge: 0 })
+    ;(await cookies()).set(APP_SESSION_COOKIE, '', { ...sessionCookieOptions(), maxAge: 0 })
   }
 
   return { getCurrentUser, login, logout }

@@ -31,8 +31,8 @@ export const AiCreditLedger: CollectionConfig = {
   },
   hooks: {
     beforeChange: [
-      async ({ data, req, operation }) => {
-        if (operation !== 'create') return data
+      async ({ data, req, operation, context }) => {
+        if (operation !== 'create' || context.importing) return data
         const userId = relId(data.user)
         if (!userId) throw new APIError('请选择成员', 400)
         const delta = Number(data.delta)
@@ -46,8 +46,8 @@ export const AiCreditLedger: CollectionConfig = {
       },
     ],
     afterChange: [
-      async ({ doc, req, operation }) => {
-        if (operation !== 'create') return doc
+      async ({ doc, req, operation, context }) => {
+        if (operation !== 'create' || context.importing) return doc
         await req.payload.update({
           collection: 'users',
           id: relId(doc.user)!,
