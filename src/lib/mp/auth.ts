@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 
 import { relId } from '@/lib/access'
+import { resolveMembership } from '@/lib/membership'
 import { getPayloadClient } from '@/lib/payload'
 import type { User } from '@/payload-types'
 
@@ -177,6 +178,7 @@ export async function bindOpenid(userId: string, openid: string, unionid: string
 export async function presentMe(user: MpUser) {
   const payload = await getPayloadClient()
   const { totalDocs } = await payload.count({ collection: 'wechat-accounts', where: { user: { equals: user.id } }, overrideAccess: true })
+  const membership = resolveMembership(user as never)
   return {
     id: String(user.id),
     name: user.name,
@@ -184,5 +186,9 @@ export async function presentMe(user: MpUser) {
     phone: user.phone ?? null,
     aiCredits: user.aiCredits ?? 0,
     wechatBound: totalDocs > 0,
+    membershipTier: membership.effectiveTier,
+    membershipLabel: membership.label,
+    membershipBadge: membership.badge,
+    membershipExpiresAt: membership.expiresAt,
   }
 }

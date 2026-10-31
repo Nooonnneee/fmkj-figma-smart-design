@@ -16,6 +16,7 @@ import { MpSessions } from './collections/MpSessions'
 import { Products } from './collections/Products'
 import { Projects } from './collections/Projects'
 import { Quotes } from './collections/Quotes'
+import { RedemptionCodes } from './collections/RedemptionCodes'
 import { Tags } from './collections/Tags'
 import { Users } from './collections/Users'
 import { WechatAccounts } from './collections/WechatAccounts'
@@ -64,6 +65,7 @@ export const sharedConfig = {
     AiConversations,
     AiMessages,
     AiCreditLedger,
+    RedemptionCodes,
     WechatAccounts,
     MpSessions,
   ],

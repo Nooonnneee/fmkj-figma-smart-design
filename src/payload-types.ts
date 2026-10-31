@@ -94,6 +94,7 @@ export interface Config {
     'ai-conversations': AiConversation;
     'ai-messages': AiMessage;
     'ai-credit-ledger': AiCreditLedger;
+    'redemption-codes': RedemptionCode;
     'wechat-accounts': WechatAccount;
     'mp-sessions': MpSession;
     'payload-kv': PayloadKv;
@@ -118,6 +119,7 @@ export interface Config {
     'ai-conversations': AiConversationsSelect<false> | AiConversationsSelect<true>;
     'ai-messages': AiMessagesSelect<false> | AiMessagesSelect<true>;
     'ai-credit-ledger': AiCreditLedgerSelect<false> | AiCreditLedgerSelect<true>;
+    'redemption-codes': RedemptionCodesSelect<false> | RedemptionCodesSelect<true>;
     'wechat-accounts': WechatAccountsSelect<false> | WechatAccountsSelect<true>;
     'mp-sessions': MpSessionsSelect<false> | MpSessionsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -234,6 +236,14 @@ export interface User {
    * 停用后无法登录，已有项目保留
    */
   status: 'active' | 'disabled';
+  /**
+   * 可通过「兑换码」激活升级，或由管理员在后台直接调整
+   */
+  membershipTier: 'free' | 'pro' | 'team';
+  /**
+   * 留空表示长期有效；过期后自动恢复为标准体验版
+   */
+  membershipExpiresAt?: string | null;
   /**
    * 在「积分流水」里新建一条记录来发放积分
    */
@@ -905,6 +915,60 @@ export interface AiCreditLedger {
   createdAt: string;
 }
 /**
+ * 新建兑换码发放会员时长或 AI 积分（兑换码留空时自动生成 FMKJ-XXXX-XXXX-XXXX）。
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "redemption-codes".
+ */
+export interface RedemptionCode {
+  id: string;
+  code: string;
+  label?: string | null;
+  grantTier: 'none' | 'pro' | 'team';
+  /**
+   * 如 30（月卡）、365（年卡）；仅充积分时填 0
+   */
+  durationDays: number;
+  credits: number;
+  /**
+   * 默认 1（一码一用）；活动通用码可设为多人可用，每个账号限兑一次
+   */
+  maxUses: number;
+  usedCount?: number | null;
+  status: 'active' | 'disabled';
+  /**
+   * 留空表示长期可兑换
+   */
+  expiresAt?: string | null;
+  redeemedBy?:
+    | {
+        user: string | User;
+        redeemedAt: string;
+        id?: string | null;
+      }[]
+    | null;
+  createdBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * 成员在微信小程序里绑定的微信账号。删除记录即解除绑定，成员下次需要重新用账号密码绑定。
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1057,6 +1121,10 @@ export interface PayloadLockedDocument {
         value: string | AiCreditLedger;
       } | null)
     | ({
+        relationTo: 'redemption-codes';
+        value: string | RedemptionCode;
+      } | null)
+    | ({
         relationTo: 'wechat-accounts';
         value: string | WechatAccount;
       } | null)
@@ -1171,6 +1239,8 @@ export interface UsersSelect<T extends boolean = true> {
   name?: T;
   phone?: T;
   status?: T;
+  membershipTier?: T;
+  membershipExpiresAt?: T;
   aiCredits?: T;
   companyProfile?:
     | T
@@ -1474,6 +1544,32 @@ export interface AiCreditLedgerSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "redemption-codes_select".
+ */
+export interface RedemptionCodesSelect<T extends boolean = true> {
+  code?: T;
+  label?: T;
+  grantTier?: T;
+  durationDays?: T;
+  credits?: T;
+  maxUses?: T;
+  usedCount?: T;
+  status?: T;
+  expiresAt?: T;
+  redeemedBy?:
+    | T
+    | {
+        user?: T;
+        redeemedAt?: T;
+        id?: T;
+      };
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "wechat-accounts_select".
  */
 export interface WechatAccountsSelect<T extends boolean = true> {
@@ -1710,6 +1806,7 @@ export interface CollectionQueryWidget {
       | 'ai-conversations'
       | 'ai-messages'
       | 'ai-credit-ledger'
+      | 'redemption-codes'
       | 'wechat-accounts'
       | 'mp-sessions';
     where?:
@@ -1749,6 +1846,7 @@ export interface ActivityWidget {
           | 'ai-conversations'
           | 'ai-messages'
           | 'ai-credit-ledger'
+          | 'redemption-codes'
           | 'wechat-accounts'
           | 'mp-sessions'
         )[]

@@ -7,6 +7,7 @@ import {
   Blocks,
   Bot,
   ChevronsUpDown,
+  Crown,
   FolderKanban,
   LayoutGrid,
   LogOut,
@@ -20,6 +21,7 @@ import { AiSidebarDock } from "@/components/ai/ai-sidebar-dock"
 import { GuardedLink } from "@/components/guarded-link"
 import { LinkPending } from "@/components/link-pending"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,7 +46,7 @@ import { APP_TAGLINE, brandInitials } from "@/lib/brand"
 import { cn } from "@/lib/utils"
 import type { PluginId } from "@/plugins/types"
 
-export type SidebarUser = { name: string; email: string }
+export type SidebarUser = { name: string; email: string; membershipBadge?: string }
 export type SidebarBrand = { name: string; logo: string | null }
 export type SidebarPlugin = {
   id: PluginId
@@ -60,6 +62,7 @@ const baseNav = [
   { icon: FolderKanban, label: "项目", url: "/projects" },
   { icon: PackageSearch, label: "产品库", url: "/products" },
   { icon: Blocks, label: "插件市场", url: "/plugins" },
+  { icon: Crown, label: "会员与积分", url: "/membership" },
   { icon: Settings, label: "设置", url: "/settings" },
 ] as const
 
@@ -230,7 +233,14 @@ export function AppSidebar({
                         <AvatarFallback className="rounded-lg">{initials(user.name)}</AvatarFallback>
                       </Avatar>
                       <div className="grid flex-1 text-left text-sm leading-tight">
-                        <span className="truncate font-semibold">{user.name}</span>
+                        <span className="flex items-center gap-1.5 truncate font-semibold">
+                          <span className="truncate">{user.name}</span>
+                          {user.membershipBadge ? (
+                            <Badge variant="outline" className="h-4 px-1.5 text-[10px]">
+                              {user.membershipBadge}
+                            </Badge>
+                          ) : null}
+                        </span>
                         <span className="truncate text-xs text-muted-foreground">{user.email}</span>
                       </div>
                       <ChevronsUpDown className="ml-auto size-4" />
@@ -249,6 +259,12 @@ export function AppSidebar({
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <GuardedLink href="/membership">
+                        <Crown />
+                        会员与积分（{ai.credits} 积分）
+                      </GuardedLink>
+                    </DropdownMenuItem>
                     <DropdownMenuItem disabled={isLoggingOut} onSelect={() => void handleLogout()}>
                       <LogOut />
                       {isLoggingOut ? "退出中" : "退出登录"}

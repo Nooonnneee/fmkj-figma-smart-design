@@ -11,10 +11,15 @@
 
   <view class="stats two mt-24">
     <view class="stat"><text class="label">AI 积分</text><text class="num">{{me.aiCredits || 0}}</text></view>
-    <view class="stat"><text class="label">微信</text><text class="num">{{me.wechatBound ? '已绑定' : '未绑定'}}</text></view>
+    <view class="stat" bindtap="openRedeem"><text class="label">会员等级</text><text class="num">{{me.membershipBadge || '体验版'}}</text></view>
   </view>
 
   <view class="card card-flush mt-24">
+    <view class="list-item" hover-class="list-item-hover" bindtap="openRedeem">
+      <image class="icon" src="/assets/icons/sparkles.svg" />
+      <text class="grow">兑换码激活 / 充积分</text>
+      <text class="small muted">{{me.membershipLabel || '输入兑换码'}}</text>
+    </view>
     <view class="list-item" hover-class="list-item-hover" bindtap="scanWebLogin">
       <image class="icon" src="/assets/icons/maximize.svg" />
       <text class="grow">扫码登录电脑端</text>
@@ -63,6 +68,20 @@
         <view class="field"><view class="field-label">姓名</view><input class="input" value="{{form.name}}" data-key="name" bindinput="onInput" /></view>
         <view class="field"><view class="field-label">手机号（作为联系人显示在报价单上）</view><input class="input" type="number" value="{{form.phone}}" data-key="phone" bindinput="onInput" /></view>
         <button class="btn btn-primary btn-block mt-24" hover-class="btn-hover" loading="{{saving}}" bindtap="saveProfile">保存</button>
+      </view>
+    </view>
+  </block>
+
+  <block wx:if="{{redeeming}}">
+    <view class="mask" bindtap="closeRedeem" />
+    <view class="sheet">
+      <view class="sheet-head"><text class="title">使用兑换码</text><image class="icon" src="/assets/icons/x-muted.svg" bindtap="closeRedeem" /></view>
+      <view class="sheet-body">
+        <view class="field">
+          <view class="field-label">兑换码（激活会员时长或充值 AI 积分）</view>
+          <input class="input" placeholder="如 FMKJ-XXXX-XXXX-XXXX" value="{{redeemCode}}" bindinput="onRedeemInput" />
+        </view>
+        <button class="btn btn-primary btn-block mt-24" hover-class="btn-hover" loading="{{saving}}" bindtap="submitRedeem">立即兑换</button>
       </view>
     </view>
   </block>

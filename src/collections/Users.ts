@@ -4,6 +4,7 @@ import { CACHE_TAGS, expireOnChange, expireOnDelete } from '@/lib/cache-tags'
 import { fieldCmsAdminOnly, isCmsAdmin, isMember } from '@/lib/access'
 import { DEFAULT_CONTRACT_TERMS } from '@/lib/contracts'
 import { cloneDemoProjectForUser } from '@/lib/demo-project'
+import { MEMBERSHIP_TIERS } from '@/lib/membership'
 
 /** 成员只能读取和修改自己的账号资料，防止通过 /api/users 遍历其他用户的邮箱与手机号。 */
 const selfOrCmsAdmin: Access = ({ req }) => {
@@ -22,7 +23,7 @@ export const Users: CollectionConfig = {
   labels: { singular: '成员', plural: '成员' },
   admin: {
     useAsTitle: 'name',
-    defaultColumns: ['name', 'email', 'phone', 'status'],
+    defaultColumns: ['name', 'email', 'membershipTier', 'aiCredits', 'status'],
     group: '账号',
   },
   auth: {
@@ -64,11 +65,28 @@ export const Users: CollectionConfig = {
       access: { update: fieldCmsAdminOnly },
     },
     {
+      name: 'membershipTier',
+      label: '会员等级',
+      type: 'select',
+      required: true,
+      defaultValue: 'free',
+      options: MEMBERSHIP_TIERS.map((t) => ({ label: t.label, value: t.value })),
+      admin: { position: 'sidebar', description: '可通过「兑换码」激活升级，或由管理员在后台直接调整' },
+      access: { update: fieldCmsAdminOnly },
+    },
+    {
+      name: 'membershipExpiresAt',
+      label: '会员到期时间',
+      type: 'date',
+      admin: { position: 'sidebar', description: '留空表示长期有效；过期后自动恢复为标准体验版' },
+      access: { update: fieldCmsAdminOnly },
+    },
+    {
       // 只能通过「积分流水」变动（发放 / 扣减时由服务端写回），任何人都不能直接改
       name: 'aiCredits',
       label: 'AI 积分',
       type: 'number',
-      defaultValue: 0,
+      defaultValue: 20,
       min: 0,
       admin: { readOnly: true, position: 'sidebar', description: '在「积分流水」里新建一条记录来发放积分' },
       access: { update: () => false, create: () => false },

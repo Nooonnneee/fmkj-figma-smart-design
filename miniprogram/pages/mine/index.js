@@ -4,7 +4,7 @@ const { getMeta } = require('../../utils/meta')
 const config = require('../../config')
 
 Page({
-  data: { me: {}, initial: '', companyName: '', pluginCount: 0, host: '', version: config.VERSION, editing: false, form: { name: '', phone: '' }, saving: false },
+  data: { me: {}, initial: '', companyName: '', pluginCount: 0, host: '', version: config.VERSION, editing: false, redeeming: false, redeemCode: '', form: { name: '', phone: '' }, saving: false },
 
   onLoad(options) {
     if (options && options.scene) {
@@ -40,6 +40,28 @@ Page({
   },
   closeEdit() {
     this.setData({ editing: false })
+  },
+  openRedeem() {
+    this.setData({ redeeming: true, redeemCode: '' })
+  },
+  closeRedeem() {
+    this.setData({ redeeming: false })
+  },
+  onRedeemInput(e) {
+    this.setData({ redeemCode: (e.detail.value || '').toUpperCase() })
+  },
+  async submitRedeem() {
+    const code = (this.data.redeemCode || '').trim()
+    if (!code) return toast('请输入兑换码')
+    this.setData({ saving: true })
+    try {
+      const res = await api.post('/me/redeem', { code })
+      toast(res.message || '兑换成功')
+      this.setData({ redeeming: false, redeemCode: '' })
+      this.load()
+    } finally {
+      this.setData({ saving: false })
+    }
   },
   onInput(e) {
     this.setData({ ['form.' + e.currentTarget.dataset.key]: e.detail.value })
