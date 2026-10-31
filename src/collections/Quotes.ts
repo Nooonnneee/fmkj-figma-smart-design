@@ -12,7 +12,6 @@ const readQuoteAccess: Access = ({ req }) => {
   const where: Where = {
     or: [
       { 'project.owner': { equals: req.user.id } },
-      { 'project.owner': { exists: false } },
       { 'project.collaborators.user': { equals: req.user.id } },
     ],
   }
