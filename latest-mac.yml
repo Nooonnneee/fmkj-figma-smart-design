@@ -1,0 +1,11 @@
+version: 1.0.0
+files:
+  - url: FanmengSpace-1.0.0-mac-x64.zip
+    sha512: OySf/za7SAtzCiWT22y5H9Tb8kUzsM/u7o8yXpbc4N4lrQV5VlybKhxw81GXF17cp4CklZNHrWlsA1hfLMsilA==
+    size: 123680478
+  - url: FanmengSpace-1.0.0-mac-arm64.zip
+    sha512: lzCw9jZGqJsPPP1hq3nQooW0Z6W6sD1Eqjiof7JuRkU/Ck0nEfqtnri5OCIRu5uLdswTT1Aa7+PIsmAhkj8OHA==
+    size: 117762176
+path: FanmengSpace-1.0.0-mac-x64.zip
+sha512: OySf/za7SAtzCiWT22y5H9Tb8kUzsM/u7o8yXpbc4N4lrQV5VlybKhxw81GXF17cp4CklZNHrWlsA1hfLMsilA==
+releaseDate: '2026-10-31T15:23:35.713Z'
