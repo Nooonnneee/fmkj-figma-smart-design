@@ -1,0 +1,251 @@
+/* 客户端本地页面（离线页、服务器设置）共用样式，配色取自品牌规范 */
+:root {
+  color-scheme: dark;
+  --night: #0b0c1e;
+  --night-2: #1b1847;
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-hover: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.12);
+  --text: #f4f4f8;
+  --muted: #a3a3b8;
+  --indigo: #4f46e5;
+  --violet: #7c3aed;
+  --ok: #6ee7b7;
+  --warn: #fcd34d;
+  --error: #fca5a5;
+  font-family: Inter, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--text);
+  background:
+    radial-gradient(900px 520px at 50% -12%, rgba(79, 70, 229, 0.38), transparent 62%),
+    linear-gradient(180deg, var(--night-2), var(--night) 72%);
+  -webkit-font-smoothing: antialiased;
+}
+
+body.center {
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  user-select: none;
+}
+
+.panel {
+  width: min(440px, 100%);
+  text-align: center;
+}
+
+.logo {
+  width: 88px;
+  height: 88px;
+  filter: drop-shadow(0 14px 32px rgba(79, 70, 229, 0.45));
+}
+
+.logo.small {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  filter: drop-shadow(0 8px 18px rgba(79, 70, 229, 0.4));
+}
+
+h1 {
+  margin: 24px 0 8px;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+p {
+  margin: 0;
+}
+
+.lead {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+button {
+  appearance: none;
+  height: 38px;
+  padding: 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    filter 0.15s ease,
+    transform 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid #a5b4fc;
+  outline-offset: 2px;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+button.primary {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--indigo), var(--violet));
+  box-shadow: 0 8px 24px rgba(79, 70, 229, 0.35);
+}
+
+button.primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--indigo), var(--violet));
+  filter: brightness(1.1);
+}
+
+button.link {
+  padding: 0 4px;
+  border-color: transparent;
+  background: none;
+  color: var(--muted);
+}
+
+button.link:hover:not(:disabled) {
+  background: none;
+  color: var(--text);
+}
+
+.hint {
+  min-height: 20px;
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.meta {
+  margin-top: 24px;
+  color: rgba(163, 163, 184, 0.7);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 服务器设置窗口 */
+body.settings {
+  padding: 28px;
+}
+
+.form-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 56px);
+}
+
+.form-header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.form-header h1 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.form-header p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+form {
+  margin-top: 28px;
+}
+
+label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+input:disabled {
+  opacity: 0.6;
+}
+
+.status {
+  min-height: 20px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.status[data-tone='ok'] {
+  color: var(--ok);
+}
+
+.status[data-tone='warn'] {
+  color: var(--warn);
+}
+
+.status[data-tone='error'] {
+  color: var(--error);
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 18px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.form-panel .meta {
+  margin-top: auto;
+  padding-top: 20px;
+}

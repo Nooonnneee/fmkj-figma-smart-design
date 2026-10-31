@@ -34,8 +34,8 @@ RUN pnpm exec payload generate:importmap && pnpm build
 
 FROM ${NODE_IMAGE} AS runner
 WORKDIR /app
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 MEDIA_DIR=/data/media
-RUN mkdir -p /data/media && chown -R node:node /data
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 MEDIA_DIR=/data/media DESKTOP_RELEASES_DIR=/data/desktop
+RUN mkdir -p /data/media /data/desktop && chown -R node:node /data
 COPY --from=builder --chown=node:node /app/public ./public
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static

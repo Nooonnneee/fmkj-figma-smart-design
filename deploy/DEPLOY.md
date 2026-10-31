@@ -133,6 +133,28 @@ docker run --rm -v fmkj_media:/m -v $PWD:/b alpine tar czf /b/media-$(date +%F).
 
 建议每天定时执行，并把备份复制到服务器以外的地方。卷名前缀取决于项目目录名，可用 `docker volume ls` 确认。
 
+## 9. 桌面客户端（Windows / macOS）
+
+客户端源码在 `desktop/`，打包方法见 `desktop/README.md`。客户端加载的是服务器上的网页工作台，服务器只需要托管安装包和自动更新清单：
+
+1. 安装包放在项目目录下的 `desktop-releases/`（docker-compose 已只读挂载到容器的 `/data/desktop`）：
+
+   ```bash
+   mkdir -p desktop-releases
+   # 在打包的电脑上（desktop/ 目录）执行：先传安装包，最后传更新清单
+   sh scripts/upload.sh 用户@服务器:/项目目录/desktop-releases
+   ```
+
+   需要的文件：Windows 为 `FanmengSpace-Setup-<版本>.exe`、`.exe.blockmap`、`latest.yml`；macOS 为 `FanmengSpace-<版本>-mac-*.dmg`/`.zip`、`latest-mac.yml`。
+
+2. 上传后不用重启：`/download` 页面一分钟内显示新版本；Windows 客户端会自动下载更新，macOS 客户端会提示前往下载页。
+3. 首次启用需要重建一次镜像（新增了下载页和 `/downloads/desktop/*` 路由）：`docker compose build app && docker compose up -d app`。
+4. 安装包也可以放在对象存储 / CDN：在 `.env` 设置 `DESKTOP_RELEASES_URL=https://cdn.example.com/desktop`，本地目录没有的文件会跳转过去。
+
+固定下载地址可以印在宣传物料上：`/downloads/desktop/latest/windows`、`/downloads/desktop/latest/mac-arm64`、`/downloads/desktop/latest/mac-x64`。
+
+客户端默认连接 `https://fmkj.top`（`desktop/app-config.json` 的 `defaultServerUrl`）。正式域名不同时，改这里后重新打包；私有部署的用户也可以在客户端「帮助 → 服务器设置」里填写自己的地址。
+
 ## 已验证 / 未验证
 
 已在兼容 PostgreSQL 的测试库上验证：生产构建（不依赖数据库）、启动自动建表、全量数据导入（728 产品、745 图片、项目、报价）、管理员和员工设置密码后登录、图片上传和读取。

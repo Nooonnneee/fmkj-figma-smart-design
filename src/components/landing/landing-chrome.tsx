@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Download } from 'lucide-react'
 
 import { BrandMark } from '@/components/brand/brand-mark'
 import { Button } from '@/components/ui/button'
@@ -36,6 +36,12 @@ export function LandingNav() {
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-2 md:ml-0">
+          <Button asChild variant="ghost" size="sm" className="hidden text-muted-foreground lg:inline-flex">
+            <Link href="/download">
+              <Download data-icon="inline-start" />
+              下载客户端
+            </Link>
+          </Button>
           <Button asChild variant="ghost" size="sm">
             <Link href="/login">登录</Link>
           </Button>
@@ -60,6 +66,7 @@ export function LandingFooter() {
       links: [
         { label: '登录账号', href: '/login' },
         { label: '进入工作台', href: '/projects' },
+        { label: '下载客户端', href: '/download' },
         { label: '品牌资源', href: '/brand' },
       ],
     },

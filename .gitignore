@@ -25,3 +25,6 @@ logs/
 # 自托管迁移数据（含客户信息，不提交）
 /import/
 /media/
+
+# 桌面客户端安装包（上传到服务器的 desktop-releases 目录，不提交）
+/desktop-releases/
