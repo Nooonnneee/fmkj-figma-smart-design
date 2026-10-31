@@ -124,3 +124,4 @@
   </view>
 </view>
 <view wx:elif="{{loading}}" class="empty">加载中…</view>
+<privacy-popup id="privacy-popup" />

@@ -45,6 +45,11 @@
       <text class="grow">版本</text>
       <text class="small muted">v{{version}}</text>
     </view>
+    <view class="list-item" hover-class="list-item-hover" bindtap="privacy">
+      <image class="icon" src="/assets/icons/lock.svg" />
+      <text class="grow">隐私保护指引</text>
+      <text class="small muted">查看</text>
+    </view>
   </view>
   <view class="small muted mt-24">账号、产品库和插件由管理员在网页版后台维护；小程序与网页版使用同一份数据。</view>
 
@@ -62,3 +67,4 @@
     </view>
   </block>
 </view>
+<privacy-popup id="privacy-popup" />
