@@ -55,7 +55,7 @@ const nextConfig: NextConfig = {
     ]
     return [
       {
-        source: '/(brands|brand|point-markers|point-symbols)/:path*',
+        source: '/(brands|brand|ecosystem|point-markers|point-symbols)/:path*',
         headers: [
           ...securityHeaders,
           {

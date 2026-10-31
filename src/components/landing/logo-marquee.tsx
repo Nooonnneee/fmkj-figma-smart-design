@@ -1,27 +1,44 @@
 import Image from 'next/image'
-import { Bluetooth, Cable, Cpu, Hexagon, House, Layers, Lightbulb, Network, PlugZap, Radio, Smartphone, Sparkles, Waypoints, Wifi, Zap, type LucideIcon } from 'lucide-react'
+import { Cable, Cpu, PlugZap, Zap, type LucideIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
 import { brandSrc, LANDING_BRANDS, type LandingBrand } from './brand-logos'
 
-/** 通信协议与智能生态（文字 + 图标，不使用第三方协议商标图形） */
-const PROTOCOLS: { name: string; icon: LucideIcon }[] = [
-  { name: 'Matter', icon: Hexagon },
-  { name: 'Thread', icon: Waypoints },
-  { name: 'Zigbee 3.0', icon: Radio },
-  { name: 'Wi-Fi 7', icon: Wifi },
-  { name: '蓝牙 Mesh', icon: Bluetooth },
-  { name: 'KNX', icon: Network },
-  { name: 'PLC 电力载波', icon: Zap },
-  { name: 'RS485 / Modbus', icon: Cable },
-  { name: 'DALI 调光', icon: Lightbulb },
-  { name: 'PoE 供电', icon: PlugZap },
-  { name: 'Apple Home', icon: House },
-  { name: '米家', icon: Smartphone },
-  { name: '华为鸿蒙智家', icon: Sparkles },
-  { name: 'Aqara Home', icon: Layers },
+/** 智能平台与通信协议：有官方标识的显示图标（放在浅色小底板上保证深色背景下可见），无标识的用线性图标 */
+type EcoItem = { name: string; logo?: string; w?: number; h?: number; icon?: LucideIcon }
+
+const PLATFORMS: EcoItem[] = [
+  { name: 'Apple Home', logo: 'apple-home.svg', w: 512, h: 512 },
+  { name: '米家', logo: 'mijia.webp', w: 96, h: 96 },
+  { name: '华为鸿蒙智家', logo: 'harmonyos.svg', w: 24, h: 24 },
+  { name: 'Google Home', logo: 'google-home.svg', w: 256, h: 258 },
+  { name: 'Amazon Alexa', logo: 'alexa.svg', w: 24, h: 24 },
+  { name: 'SmartThings', logo: 'smartthings.svg', w: 24, h: 24 },
+  { name: 'Home Assistant', logo: 'home-assistant.svg', w: 24, h: 24 },
+  { name: 'Aqara Home', logo: 'aqara-home.svg', w: 80, h: 48 },
+  { name: '涂鸦智能', logo: 'tuya-smart.svg', w: 60, h: 30 },
+  { name: '天猫精灵', logo: 'tmall-genie.webp', w: 969, h: 96 },
+  { name: '小度', logo: 'xiaodu.svg', w: 48, h: 48 },
   { name: 'Control4', icon: Cpu },
+]
+
+const PROTOCOLS: EcoItem[] = [
+  { name: 'Matter', logo: 'matter.svg', w: 512, h: 110 },
+  { name: 'Thread', logo: 'thread.svg', w: 165, h: 165 },
+  { name: 'Zigbee 3.0', logo: 'zigbee.svg', w: 256, h: 256 },
+  { name: 'Wi-Fi', logo: 'wifi.svg', w: 256, h: 192 },
+  { name: '蓝牙', logo: 'bluetooth.svg', w: 256, h: 348 },
+  { name: '蓝牙 Mesh', logo: 'ble-mesh.svg', w: 360, h: 160 },
+  { name: 'Z-Wave', logo: 'zwave.svg', w: 256, h: 114 },
+  { name: 'KNX', logo: 'knx.svg', w: 114, h: 53 },
+  { name: 'DALI 调光', logo: 'dali.webp', w: 202, h: 96 },
+  { name: 'Modbus', logo: 'modbus.webp', w: 282, h: 96 },
+  { name: 'MQTT', logo: 'mqtt.svg', w: 24, h: 24 },
+  { name: '以太网', logo: 'ethernet.svg', w: 24, h: 24 },
+  { name: 'PLC 电力载波', icon: Zap },
+  { name: 'RS485', icon: Cable },
+  { name: 'PoE 供电', icon: PlugZap },
 ]
 const TONES = ['text-chart-1', 'text-chart-2', 'text-chart-3', 'text-chart-4', 'text-chart-5']
 
@@ -29,7 +46,7 @@ const half = Math.ceil(LANDING_BRANDS.length / 2)
 const ROW_A = LANDING_BRANDS.slice(0, half)
 const ROW_B = LANDING_BRANDS.slice(half)
 
-/** 三行无缝滚动：品牌 → 协议（反向）→ 品牌。悬停暂停，品牌悬停显示原色。 */
+/** 四行无缝滚动：品牌 → 平台 → 协议 → 品牌，方向交替。悬停暂停，品牌悬停显示原色。 */
 export function LogoMarquee() {
   return (
     <section aria-labelledby="ecosystem-title" className="relative py-16 sm:py-20">
@@ -42,10 +59,13 @@ export function LogoMarquee() {
         <MarqueeRow label="兼容品牌（一）" className="[--marquee-duration:80s]">
           {(hidden) => <BrandSet brands={ROW_A} hidden={hidden} />}
         </MarqueeRow>
-        <MarqueeRow label="生态与通信协议" reverse className="[--marquee-duration:70s]">
-          {(hidden) => <ProtocolSet hidden={hidden} />}
+        <MarqueeRow label="智能平台" reverse className="[--marquee-duration:70s]">
+          {(hidden) => <EcoSet items={PLATFORMS} hidden={hidden} />}
         </MarqueeRow>
-        <MarqueeRow label="兼容品牌（二）" className="[--marquee-duration:90s]">
+        <MarqueeRow label="通信协议" className="[--marquee-duration:75s]">
+          {(hidden) => <EcoSet items={PROTOCOLS} hidden={hidden} />}
+        </MarqueeRow>
+        <MarqueeRow label="兼容品牌（二）" reverse className="[--marquee-duration:90s]">
           {(hidden) => <BrandSet brands={ROW_B} hidden={hidden} />}
         </MarqueeRow>
       </div>
@@ -112,21 +132,20 @@ function LogoChip({ brand, hidden, duplicate }: { brand: LandingBrand; hidden: b
   )
 }
 
-function ProtocolSet({ hidden }: { hidden: boolean }) {
-  return [...PROTOCOLS, ...PROTOCOLS].map(({ name, icon: Icon }, i) => {
-    const duplicate = i >= PROTOCOLS.length
-    return (
-      <li
-        key={`${name}-${i}`}
-        aria-hidden={hidden || duplicate || undefined}
-        className={cn(
-          'flex h-12 shrink-0 items-center gap-2 rounded-full border border-border bg-card/40 px-5 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground',
-          duplicate && 'motion-reduce:hidden',
-        )}
-      >
-        <Icon className={cn('size-4', TONES[i % TONES.length])} />
-        {name}
-      </li>
-    )
-  })
+function EcoSet({ items, hidden }: { items: EcoItem[]; hidden: boolean }) {
+  return items.map(({ name, logo, w = 1, h = 1, icon: Icon }, i) => (
+    <li
+      key={name}
+      className="flex h-12 shrink-0 items-center gap-2.5 rounded-full border border-border bg-card/40 py-1.5 pr-5 pl-1.5 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+    >
+      <span className="flex h-full min-w-9 items-center justify-center rounded-full bg-white px-2.5">
+        {logo ? (
+          <Image src={`/ecosystem/${logo}`} alt="" width={w} height={h} unoptimized className={cn('w-auto', w / h > 2.2 ? 'h-3.5 max-w-24' : 'h-5')} />
+        ) : Icon ? (
+          <Icon className={cn('size-4', TONES[i % TONES.length])} />
+        ) : null}
+      </span>
+      <span aria-hidden={hidden || undefined}>{name}</span>
+    </li>
+  ))
 }
