@@ -1,3 +1,4 @@
+import { relId } from '@/lib/access'
 import { allStyles, DOC_KIND_LIST, DOC_KINDS } from '@/documents/registry'
 import { appAuth } from '@/lib/app-auth'
 import { getPayloadClient } from '@/lib/payload'
@@ -7,7 +8,7 @@ const MAX_IMAGE = 3 * 1024 * 1024
 const TEXT_FIELDS = { name: 60, slogan: 80, phone: 30, email: 80, address: 200, qrCaption: 40, quoteNotes: 2000, contractTerms: 5000 } as const
 const fail = (status: number, error: string, field?: string) => Response.json({ ok: false, error, field }, { status })
 
-/** 保存抬头、默认内容、文档模板和插件开关（所有成员都可以修改）。图片上传到 Media，再关联到全局设置。 */
+/** 保存当前登录账号自己的抬头、默认内容、文档模板和插件开关（每个账号独立保存，互不覆盖）。 */
 export async function POST(request: Request) {
   const user = await appAuth.getCurrentUser()
   if (!user) return fail(401, '登录已过期，请重新登录')
@@ -68,17 +69,31 @@ export async function POST(request: Request) {
 
   try {
     const printProductImages = form.get('printProductImages') === 'on'
-    await payload.updateGlobal({
-      slug: 'company-settings',
+    const existingUser = await payload.findByID({
+      collection: 'users',
+      id: user.id,
+      depth: 0,
+      overrideAccess: true,
+      select: { companyProfile: true } as never,
+    })
+    const prevProfile = ((existingUser as unknown as { companyProfile?: Record<string, unknown> | null })?.companyProfile ?? {})
+    const nextProfile: Record<string, unknown> = {
+      ...prevProfile,
+      ...data,
+      logo: Object.prototype.hasOwnProperty.call(images, 'logo') ? images.logo : (relId(prevProfile.logo) || null),
+      qrCode: Object.prototype.hasOwnProperty.call(images, 'qrCode') ? images.qrCode : (relId(prevProfile.qrCode) || null),
+      printProductImages,
+      ...(documentDefaults ? { documentDefaults } : {}),
+      ...(disabledPlugins ? { disabledPlugins } : {}),
+    }
+    await payload.update({
+      collection: 'users',
+      id: user.id,
       data: {
-        ...data,
-        ...images,
-        printProductImages,
-        ...(documentDefaults ? { documentDefaults } : {}),
-        ...(disabledPlugins ? { disabledPlugins } : {}),
+        companyProfile: nextProfile,
       } as never,
-      user,
-      overrideAccess: false,
+      overrideAccess: true,
+      depth: 0,
     })
     return Response.json({ ok: true })
   } catch (error) {

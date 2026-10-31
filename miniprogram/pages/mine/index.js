@@ -71,7 +71,7 @@ Page({
   },
   scanWebLogin() {
     wx.scanCode({
-      onlyFromCamera: false,
+      onlyFromCamera: true,
       success: (r) => {
         const raw = (r && (r.result || r.path)) || ''
         if (!raw) return toast('未识别到二维码内容')
@@ -79,10 +79,23 @@ Page({
       },
     })
   },
-  confirmWebLogin(ticket) {
+  async confirmWebLogin(ticket) {
+    let timeHint = ''
+    try {
+      const info = await api.get('/auth/qr-confirm?ticket=' + encodeURIComponent(ticket))
+      if (info && info.issuedAt) {
+        const d = new Date(info.issuedAt)
+        const hh = String(d.getHours()).padStart(2, '0')
+        const mm = String(d.getMinutes()).padStart(2, '0')
+        const ss = String(d.getSeconds()).padStart(2, '0')
+        timeHint = `\n发起时间：${hh}:${mm}:${ss}`
+      }
+    } catch {
+      return
+    }
     wx.showModal({
       title: '登录电脑端工作台',
-      content: '确认在电脑网页端登录当前账号？',
+      content: '请确认是本人正在电脑浏览器前操作（切勿扫他人发来的二维码截图）。' + timeHint,
       confirmText: '确认登录',
       success: async (r) => {
         if (!r.confirm) return

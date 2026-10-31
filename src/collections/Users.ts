@@ -2,9 +2,11 @@ import type { Access, CollectionConfig } from 'payload'
 
 import { CACHE_TAGS, expireOnChange, expireOnDelete } from '@/lib/cache-tags'
 import { fieldCmsAdminOnly, isCmsAdmin, isMember } from '@/lib/access'
+import { DEFAULT_CONTRACT_TERMS } from '@/lib/contracts'
+import { cloneDemoProjectForUser } from '@/lib/demo-project'
 
-/** 成员可以看到团队里的所有成员（负责人下拉、项目列表要显示姓名），只能修改自己的资料。 */
-const updateUsers: Access = ({ req }) => {
+/** 成员只能读取和修改自己的账号资料，防止通过 /api/users 遍历其他用户的邮箱与手机号。 */
+const selfOrCmsAdmin: Access = ({ req }) => {
   if (isCmsAdmin(req)) return true
   if (isMember(req) && req.user) return { id: { equals: req.user.id } }
   return false
@@ -29,12 +31,20 @@ export const Users: CollectionConfig = {
   access: {
     admin: () => false,
     create: ({ req }) => isCmsAdmin(req),
-    read: ({ req }) => isCmsAdmin(req) || isMember(req),
-    update: updateUsers,
+    read: selfOrCmsAdmin,
+    update: selfOrCmsAdmin,
     delete: ({ req }) => isCmsAdmin(req),
   },
   hooks: {
-    afterChange: [expireOnChange(CACHE_TAGS.staff)],
+    afterChange: [
+      expireOnChange(CACHE_TAGS.staff),
+      ({ doc, operation }) => {
+        if (operation === 'create' && doc?.id) {
+          void cloneDemoProjectForUser(doc.id)
+        }
+        return doc
+      },
+    ],
     afterDelete: [expireOnDelete(CACHE_TAGS.staff)],
   },
   fields: [
@@ -62,6 +72,47 @@ export const Users: CollectionConfig = {
       min: 0,
       admin: { readOnly: true, position: 'sidebar', description: '在「积分流水」里新建一条记录来发放积分' },
       access: { update: () => false, create: () => false },
+    },
+    {
+      name: 'companyProfile',
+      label: '个人抬头与默认设置',
+      type: 'group',
+      admin: {
+        description: '每个账号独立的报价单/合同抬头、联系方式、Logo、二维码与文档默认模板；未填写时回退使用系统默认抬头。',
+      },
+      fields: [
+        { name: 'name', label: '抬头名称', type: 'text', maxLength: 60 },
+        { name: 'slogan', label: '副标题', type: 'text', maxLength: 80 },
+        {
+          type: 'row',
+          fields: [
+            { name: 'phone', label: '联系电话', type: 'text', maxLength: 30 },
+            { name: 'email', label: '邮箱', type: 'text', maxLength: 80 },
+          ],
+        },
+        { name: 'address', label: '地址', type: 'text', maxLength: 200 },
+        {
+          type: 'row',
+          fields: [
+            { name: 'logo', label: 'Logo', type: 'upload', relationTo: 'media' },
+            { name: 'qrCode', label: '二维码', type: 'upload', relationTo: 'media' },
+          ],
+        },
+        { name: 'qrCaption', label: '二维码说明', type: 'text', maxLength: 40 },
+        { name: 'quoteNotes', label: '新报价默认备注', type: 'textarea', maxLength: 2000 },
+        { name: 'contractTerms', label: '合同默认条款', type: 'textarea', maxLength: 5000, defaultValue: DEFAULT_CONTRACT_TERMS },
+        { name: 'printProductImages', label: '打印报价单时显示产品图片', type: 'checkbox', defaultValue: true },
+        {
+          name: 'documentDefaults',
+          label: '文档默认模板',
+          type: 'json',
+        },
+        {
+          name: 'disabledPlugins',
+          label: '已关闭的插件',
+          type: 'json',
+        },
+      ],
     },
   ],
 }

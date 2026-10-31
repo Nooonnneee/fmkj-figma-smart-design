@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     return fail(400, '该插件尚在待开发阶段，暂不可开启')
   }
 
-  const company = await getCompanyInfo()
+  const company = await getCompanyInfo(user.id)
   const disabled = new Set(company.disabledPlugins.filter((id) => isPluginId(id)))
   if (body.enabled) {
     disabled.delete(plugin.id)
@@ -36,11 +36,25 @@ export async function POST(request: Request) {
 
   try {
     const payload = await getPayloadClient()
-    await payload.updateGlobal({
-      slug: 'company-settings',
-      data: { disabledPlugins: [...disabled] } as never,
-      user,
-      overrideAccess: false,
+    const existingUser = await payload.findByID({
+      collection: 'users',
+      id: user.id,
+      depth: 0,
+      overrideAccess: true,
+      select: { companyProfile: true } as never,
+    })
+    const prevProfile = ((existingUser as unknown as { companyProfile?: Record<string, unknown> | null })?.companyProfile ?? {})
+    await payload.update({
+      collection: 'users',
+      id: user.id,
+      data: {
+        companyProfile: {
+          ...prevProfile,
+          disabledPlugins: [...disabled],
+        },
+      } as never,
+      overrideAccess: true,
+      depth: 0,
     })
     return Response.json({ ok: true, enabled: body.enabled })
   } catch (error) {

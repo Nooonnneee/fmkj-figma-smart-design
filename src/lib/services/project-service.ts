@@ -1,6 +1,8 @@
 import { APIError, ValidationError } from 'payload'
 
+import { relId } from '@/lib/access'
 import { getPayloadClient } from '@/lib/payload'
+import { canManageProject, type CollaboratorItem } from '@/lib/project-access'
 import { DEFAULT_PLATFORM, isProjectPlatform } from '@/lib/projects'
 import type { Project, User } from '@/payload-types'
 
@@ -53,14 +55,40 @@ export async function saveProjectInput(user: User, id: string | null, input: Rec
   if (Object.keys(fieldErrors).length) return { ok: false, error: '请检查标记的字段', fieldErrors }
 
   const payload = await getPayloadClient()
+  const ownerProvided = Object.prototype.hasOwnProperty.call(input, 'owner')
+  if (id && ownerProvided) {
+    const existing = await payload
+      .findByID({
+        collection: 'projects',
+        id,
+        depth: 0,
+        user,
+        overrideAccess: false,
+        select: { owner: true, collaborators: true },
+      })
+      .catch(() => null)
+    if (!existing) return { ok: false, error: '项目不存在或已被删除' }
+    const currentOwnerId = relId(existing.owner)
+    if ((owner || '') !== (currentOwnerId || '')) {
+      if (!canManageProject(existing as never, user.id)) {
+        return { ok: false, error: '只有项目创建者（负责人）可以转让负责人' }
+      }
+      if (owner) {
+        const collabs = ((existing as unknown as { collaborators?: CollaboratorItem[] | null }).collaborators ?? [])
+        const allowedIds = new Set<string>([String(user.id), ...(currentOwnerId ? [currentOwnerId] : []), ...collabs.map((c) => relId(c.user)).filter((x): x is string => Boolean(x))])
+        if (!allowedIds.has(owner)) {
+          return { ok: false, error: '请检查标记的字段', fieldErrors: { owner: '只能将负责人转让给已加入该项目的协作者' } }
+        }
+      }
+    }
+  }
   if (owner) {
     const found = await payload.find({
       collection: 'users',
       where: { and: [{ id: { equals: owner } }, { status: { equals: 'active' } }] },
       limit: 1,
       depth: 0,
-      user,
-      overrideAccess: false,
+      overrideAccess: true,
       select: { name: true },
     })
     if (!found.docs.length) return { ok: false, error: '请检查标记的字段', fieldErrors: { owner: '负责人不存在或已停用' } }
@@ -68,7 +96,6 @@ export async function saveProjectInput(user: User, id: string | null, input: Rec
 
   try {
     // 表单里出现 owner 字段（哪怕为空）才修改负责人；小程序只改资料时不带这个字段
-    const ownerProvided = Object.prototype.hasOwnProperty.call(input, 'owner')
     const doc = id
       ? await payload.update({ collection: 'projects', id, data: { ...data, ...(ownerProvided ? { owner: owner || null } : {}) }, user, overrideAccess: false, depth: 0, select: { name: true } })
       : await payload.create({ collection: 'projects', data: { ...data, owner: owner || user.id, status: 'active' }, user, overrideAccess: false, depth: 0, select: { name: true } })

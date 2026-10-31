@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { notFound, redirect } from 'next/navigation'
 
 import { PrintToolbar } from '@/components/print-toolbar'
@@ -24,16 +25,19 @@ export default async function ProposalPage({
   const sp = await searchParams
   const user = await appAuth.getCurrentUser()
   if (!user) redirect(`/login?from=/print/projects/${id}/proposal`)
-  const flags = await getPluginFlags()
-  if (!flags.proposal) notFound()
   const scope = isPointScope(sp.scope) ? sp.scope : 'all'
   const d = await loadProjectDocs(id, user, scope, sp.quoteId ?? null)
   if (!d) notFound()
+  const flags = await getPluginFlags(d.owner?.id ?? user.id)
+  if (!flags.proposal) notFound()
   const t: ProposalTemplate = isProposalTemplate(sp.template) ? sp.template : 'qixu'
   const tpl = PROPOSAL_TEMPLATES.find((x) => x.value === t)!
   const markers = sp.markers === 'product' || sp.markers === 'symbol' ? sp.markers : tpl.markers
   const date = new Date().toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: 'long', day: 'numeric' })
-  const pages = t === 'qixu' ? qixuDeckPages(d, markers, flags['room-insights']) : classicDeckPages(d, t, markers, flags['room-insights'], date).map((render, i) => <div key={i}>{render(i + 1)}</div>)
+  const pages =
+    t === 'qixu'
+      ? qixuDeckPages(d, markers, flags['room-insights'])
+      : classicDeckPages(d, t, markers, flags['room-insights'], date).map((render, i) => <Fragment key={i}>{render(i + 1)}</Fragment>)
   const base = `/print/projects/${id}/proposal`
   const activeQuoteId = d.quote ? String(d.quote.id) : ''
   const href = (patch: { template?: string; markers?: string; scope?: string; quoteId?: string }) => {
@@ -48,7 +52,7 @@ export default async function ProposalPage({
   }
 
   return (
-    <div className="min-h-screen bg-neutral-200/70 print:bg-white">
+    <div className="min-h-screen bg-neutral-200/70 print:min-h-0 print:bg-white">
       <style>{'@media print { @page { size: A4 landscape; margin: 0; } }'}</style>
       <PrintToolbar
         back={{ href: `/projects/${id}/archive`, label: '返回归档' }}

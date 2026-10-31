@@ -31,13 +31,14 @@ export async function createContractFromQuote(user: User, projectId: string, quo
   const payload = await getPayloadClient()
   const [project, quote, company] = await Promise.all([
     payload
-      .findByID({ collection: 'projects', id: projectId, depth: 0, user, overrideAccess: false, select: { customerName: true, customerPhone: true, community: true, address: true } })
+      .findByID({ collection: 'projects', id: projectId, depth: 0, user, overrideAccess: false, select: { owner: true, customerName: true, customerPhone: true, community: true, address: true } })
       .catch(() => null),
     payload.findByID({ collection: 'quotes', id: quoteId, depth: 0, user, overrideAccess: false, select: { project: true, total: true } }).catch(() => null),
-    getCompanyInfo(),
+    getCompanyInfo(user.id),
   ])
   if (!project) return { ok: false, error: '项目不存在或已被删除' }
   if (!quote || relId(quote.project) !== String(project.id)) return { ok: false, error: '请选择这个项目里的报价' }
+  const ownerCompany = relId(project.owner) && relId(project.owner) !== String(user.id) ? await getCompanyInfo(relId(project.owner)) : company
   try {
     const doc = await payload.create({
       collection: 'contracts',
@@ -52,7 +53,7 @@ export async function createContractFromQuote(user: User, projectId: string, quo
         durationDays: DEFAULT_DURATION_DAYS,
         warrantyMonths: DEFAULT_WARRANTY_MONTHS,
         payments: DEFAULT_PAYMENTS.map((p) => ({ name: p.name, percent: p.percent, received: false })),
-        terms: company.contractTerms?.trim() || DEFAULT_CONTRACT_TERMS,
+        terms: ownerCompany.contractTerms?.trim() || DEFAULT_CONTRACT_TERMS,
       } as never,
       user,
       overrideAccess: false,

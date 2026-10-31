@@ -19,7 +19,7 @@ export default async function PluginsPage({
 }) {
   const user = await appAuth.getCurrentUser()
   if (!user) redirect('/login')
-  const [sp, flags] = await Promise.all([searchParams, getPluginFlags()])
+  const [sp, flags] = await Promise.all([searchParams, getPluginFlags(user.id)])
   const tab: Tab = sp.tab === 'ready' || sp.tab === 'coming-soon' ? sp.tab : 'all'
 
   const allItems: PluginViewItem[] = PLUGINS.map((p) => ({

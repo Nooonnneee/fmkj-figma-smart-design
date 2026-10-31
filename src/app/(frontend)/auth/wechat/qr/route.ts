@@ -8,6 +8,27 @@ import { renderQrSvgDataUrl } from '@/lib/qr-svg'
 
 const QR_TTL_MS = 3 * 60 * 1000
 
+const QR_RATE_WINDOW_MS = 60 * 1000
+const QR_RATE_MAX = 20
+const qrRateMap = new Map<string, { count: number; resetAt: number }>()
+
+function checkQrRateLimit(ip: string): boolean {
+  const now = Date.now()
+  if (qrRateMap.size > 500) {
+    for (const [k, v] of qrRateMap) {
+      if (v.resetAt < now) qrRateMap.delete(k)
+    }
+  }
+  const cur = qrRateMap.get(ip)
+  if (!cur || cur.resetAt < now) {
+    qrRateMap.set(ip, { count: 1, resetAt: now + QR_RATE_WINDOW_MS })
+    return true
+  }
+  if (cur.count >= QR_RATE_MAX) return false
+  cur.count += 1
+  return true
+}
+
 /** 尝试调用微信官方 getwxacodeunlimit 生成小程序码；若未配置或小程序尚未发布正式版则返回 null，自动降级为标准 QR 码。 */
 async function tryCreateWxacodeDataUrl(scene: string): Promise<string | null> {
   if (!wechatConfigured()) return null
@@ -23,6 +44,8 @@ async function tryCreateWxacodeDataUrl(scene: string): Promise<string | null> {
     const tokenJson = (await tokenRes.json().catch(() => null)) as { access_token?: string } | null
     if (!tokenJson?.access_token) return null
 
+    const rawEnv = process.env.WECHAT_MP_ENV_VERSION?.trim()
+    const envVersion = rawEnv === 'trial' || rawEnv === 'develop' ? rawEnv : 'release'
     const codeRes = await fetch(
       `https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=${encodeURIComponent(tokenJson.access_token)}`,
       {
@@ -32,6 +55,7 @@ async function tryCreateWxacodeDataUrl(scene: string): Promise<string | null> {
           scene,
           page: 'pages/mine/index',
           check_path: false,
+          env_version: envVersion,
           width: 280,
         }),
         signal: AbortSignal.timeout(6000),
@@ -52,6 +76,14 @@ async function tryCreateWxacodeDataUrl(scene: string): Promise<string | null> {
  * ticket 固定 24 位（满足微信 getwxacodeunlimit scene <= 32 位的限制）。
  */
 export async function POST(request: Request) {
+  const ip =
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip')?.trim() ||
+    'local'
+  if (!checkQrRateLimit(ip)) {
+    return Response.json({ ok: false, error: '生成二维码太频繁，请稍后再试' }, { status: 429 })
+  }
+
   const body = (await request.json().catch(() => ({}))) as { redirectTo?: string }
   const redirectTo =
     typeof body.redirectTo === 'string' && body.redirectTo.startsWith('/') && !body.redirectTo.startsWith('//')
@@ -75,6 +107,14 @@ export async function POST(request: Request) {
     overrideAccess: true,
     depth: 0,
   })
+  void payload
+    .delete({
+      collection: 'mp-sessions',
+      where: { expiresAt: { less_than: new Date().toISOString() } },
+      overrideAccess: true,
+      depth: 0,
+    })
+    .catch(() => null)
 
   const wxacode = await tryCreateWxacodeDataUrl(ticket)
   const qrImage = wxacode ?? renderQrSvgDataUrl(`fmkj-login:${ticket}`)

@@ -12,7 +12,7 @@ export const CompanySettings: GlobalConfig = {
   admin: { group: '设置' },
   access: {
     read: ({ req }) => isCmsAdmin(req) || isMember(req),
-    update: ({ req }) => isCmsAdmin(req) || isMember(req),
+    update: ({ req }) => isCmsAdmin(req),
   },
   hooks: { afterChange: [expireGlobalOnChange(CACHE_TAGS.company)] },
   fields: [

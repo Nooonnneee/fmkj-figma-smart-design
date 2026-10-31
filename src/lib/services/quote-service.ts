@@ -1,5 +1,6 @@
 import { APIError, ValidationError } from 'payload'
 
+import { relId } from '@/lib/access'
 import { getCatalog, getCompanyInfo } from '@/lib/cached-data'
 import { DEVICE_TYPE_ORDER } from '@/lib/device-types'
 import { getPayloadClient } from '@/lib/payload'
@@ -47,7 +48,7 @@ export async function createQuoteForProject(
   const scope: PointScope = isPointScope(rawScope) ? rawScope : 'all'
   const payload = await getPayloadClient()
   const project = await payload
-    .findByID({ collection: 'projects', id: projectId, depth: 0, user, overrideAccess: false, select: { name: true, platform: true, pointMap: true, defaultProducts: true } })
+    .findByID({ collection: 'projects', id: projectId, depth: 0, user, overrideAccess: false, select: { name: true, owner: true, platform: true, pointMap: true, defaultProducts: true } })
     .catch(() => null)
   if (!project) return { ok: false, error: '项目不存在或已被删除', status: 404 }
 
@@ -69,7 +70,7 @@ export async function createQuoteForProject(
       quantity: row.count,
     }))
 
-  const company = await getCompanyInfo()
+  const company = await getCompanyInfo(relId(project.owner) || user.id)
   const existing = await payload.count({ collection: 'quotes', where: { project: { equals: project.id } }, user, overrideAccess: false })
   try {
     const quote = await payload.create({

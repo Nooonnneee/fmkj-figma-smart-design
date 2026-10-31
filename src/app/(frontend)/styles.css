@@ -331,3 +331,209 @@
   font-family: var(--doc-font-latin);
   font-weight: 400;
 }
+
+/*
+ * 首页（营销落地页）的动效与装饰工具类。
+ * 组件里统一用 motion-safe: 启用动画：系统开启「减少动态效果」时页面保持静止，内容完整可见。
+ * 需要错开播放的元素用 [--landing-delay:120ms] 设置延迟（写在动画简写里，不会被简写覆盖）。
+ * 用 @theme inline：动画值直接写进工具类，--landing-delay 才会在各元素上分别解析。
+ */
+@theme inline {
+  --animate-marquee: landing-marquee var(--marquee-duration, 60s) linear infinite;
+  --animate-float: landing-float 7s ease-in-out var(--landing-delay, 0s) infinite;
+  --animate-pop: landing-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-draw: landing-draw 1.6s cubic-bezier(0.65, 0, 0.35, 1) both;
+  --animate-fade: landing-fade 0.8s ease-out both;
+  --animate-rise: landing-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) var(--landing-delay, 0s) both;
+  --animate-scan: landing-scan 6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  --animate-dash: landing-dash 1.2s linear infinite;
+  --animate-aurora: landing-aurora 22s ease-in-out var(--landing-delay, 0s) infinite alternate;
+  --animate-shimmer: landing-shimmer 3.6s ease-in-out var(--landing-delay, 0s) infinite;
+  --animate-gradient-x: landing-gradient-x 8s ease-in-out var(--landing-delay, 0s) infinite;
+  --animate-orbit: landing-orbit 60s linear infinite;
+  --animate-orbit-reverse: landing-orbit 60s linear infinite reverse;
+  --animate-beam: landing-beam 4.5s ease-in-out var(--landing-delay, 0s) infinite;
+  --animate-typing: landing-typing 1.2s ease-in-out infinite;
+  --animate-progress: landing-progress 2.4s cubic-bezier(0.65, 0, 0.35, 1) var(--landing-delay, 0s) both;
+
+  @keyframes landing-marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-100%);
+    }
+  }
+  @keyframes landing-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-0.6rem);
+    }
+  }
+  @keyframes landing-pop {
+    0% {
+      opacity: 0;
+      transform: scale(0.2);
+    }
+    70% {
+      opacity: 1;
+      transform: scale(1.18);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes landing-draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes landing-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes landing-rise {
+    from {
+      opacity: 0;
+      transform: translateY(1.25rem);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes landing-scan {
+    0% {
+      transform: translateY(-100%);
+      opacity: 0;
+    }
+    8% {
+      opacity: 1;
+    }
+    60% {
+      opacity: 1;
+    }
+    70%,
+    100% {
+      transform: translateY(400%);
+      opacity: 0;
+    }
+  }
+  @keyframes landing-dash {
+    to {
+      stroke-dashoffset: -20;
+    }
+  }
+  @keyframes landing-aurora {
+    0% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    50% {
+      transform: translate3d(8%, -6%, 0) scale(1.12);
+    }
+    100% {
+      transform: translate3d(-6%, 8%, 0) scale(0.94);
+    }
+  }
+  @keyframes landing-shimmer {
+    0% {
+      transform: translateX(-150%);
+    }
+    55%,
+    100% {
+      transform: translateX(350%);
+    }
+  }
+  @keyframes landing-gradient-x {
+    0%,
+    100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+  @keyframes landing-orbit {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes landing-beam {
+    0% {
+      left: 0%;
+      opacity: 0;
+    }
+    15% {
+      opacity: 1;
+    }
+    85% {
+      opacity: 1;
+    }
+    100% {
+      left: 100%;
+      opacity: 0;
+    }
+  }
+  @keyframes landing-typing {
+    0%,
+    60%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.35;
+    }
+    30% {
+      transform: translateY(-0.2rem);
+      opacity: 1;
+    }
+  }
+  @keyframes landing-progress {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+}
+
+/* 细网格背景（线条颜色跟随前景色） */
+@utility landing-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in oklch, var(--foreground) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklch, var(--foreground) 7%, transparent) 1px, transparent 1px);
+  background-size: 3.5rem 3.5rem;
+}
+/* 滚动条两端渐隐 */
+@utility landing-mask-x {
+  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+}
+/* 中心清晰、四周渐隐（用于网格背景） */
+@utility landing-mask-radial {
+  mask-image: radial-gradient(ellipse 65% 55% at 50% 35%, #000 25%, transparent 78%);
+}
+/* 配合 pathLength="1" 的描边动画：虚线长度等于整条路径 */
+@utility landing-draw {
+  stroke-dasharray: 1;
+}
+
+/* 首页是深色主题：页面滚动到边界时也保持深色底，并启用锚点平滑滚动 */
+html:has([data-landing]) {
+  background-color: oklch(0.145 0 0);
+  color-scheme: dark;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:has([data-landing]) {
+    scroll-behavior: smooth;
+  }
+}

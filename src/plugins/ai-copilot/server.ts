@@ -1180,7 +1180,7 @@ const TOOLS: AiTool[] = [
         }
       }
 
-      const company = await getCompanyInfo()
+      const company = await getCompanyInfo(ctx.user.id)
       const existing = await payload.count({ collection: 'quotes', where: { project: { equals: ctx.projectId } }, user: ctx.user, overrideAccess: false })
       const title = typeof args.title === 'string' && args.title.trim() ? args.title.trim().slice(0, 60) : `报价 ${existing.totalDocs + 1}`
       const discount = typeof args.discount === 'number' && args.discount >= 0 ? Math.round(args.discount * 100) / 100 : 0
@@ -1253,7 +1253,7 @@ const TOOLS: AiTool[] = [
         payload.findByID({ collection: 'projects', id: ctx.projectId, depth: 0, user: ctx.user, overrideAccess: false }).catch(() => null),
         payload.find({ collection: 'contracts', where: { project: { equals: ctx.projectId } }, limit: 1, depth: 0, user: ctx.user, overrideAccess: false }),
         payload.find({ collection: 'quotes', where: { project: { equals: ctx.projectId } }, sort: '-updatedAt', limit: 5, depth: 0, user: ctx.user, overrideAccess: false }),
-        getCompanyInfo(),
+        getCompanyInfo(ctx.user.id),
       ])
       if (!project) return { result: { error: '项目不存在或无权限' }, summary: '项目不可用' }
 

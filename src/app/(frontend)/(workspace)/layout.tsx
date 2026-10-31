@@ -13,8 +13,9 @@ import { enabledAiModels } from '@/plugins/ai-copilot/templates'
 
 /** 需要成员登录的系统页面。 */
 export default async function WorkspaceLayout({ children }: { children: React.ReactNode }) {
-  const [user, company] = await Promise.all([appAuth.getCurrentUser(), getCompanyInfo()])
+  const user = await appAuth.getCurrentUser()
   if (!user) redirect('/login')
+  const company = await getCompanyInfo(user.id)
 
   const payload = await getPayloadClient()
   const projectsRes = await payload

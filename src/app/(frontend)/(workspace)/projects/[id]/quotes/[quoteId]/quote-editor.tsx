@@ -583,49 +583,50 @@ export function QuoteEditor({
                             const originPrice = catalogPriceOf(line.productId)
                             const priceChanged = originPrice !== undefined && Math.abs(originPrice - line.price) > 0.001
                             return (
-                              <div key={`${room.id}-${line.deviceType}-${line.productId}`} className="flex items-center gap-2.5 py-2 first:pt-0 last:pb-0">
-                                <ProductThumb src={line.image} alt={line.name} className="size-10" />
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-1.5">
-                                    <PointMarker type={line.deviceType} className="size-4" />
-                                    <span className="truncate text-sm font-medium">{line.name}</span>
-                                  </div>
-                                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                                    <span>{line.typeName}</span>
-                                    {line.sku ? <span>· {line.sku}</span> : null}
-                                    {line.codes.length ? (
-                                      <span className="inline-flex flex-wrap items-center gap-1 font-mono text-[11px]">
-                                        （
-                                        {line.codes.map((code, idx) => (
-                                          <span key={code}>
-                                            {project ? (
-                                              <button
-                                                type="button"
-                                                title={`在点位图中定位并选中 ${code}`}
-                                                className="underline decoration-dotted underline-offset-2 hover:text-foreground"
-                                                onClick={() => switchToPointMap({ point: code })}
-                                              >
-                                                {code}
-                                              </button>
-                                            ) : (
-                                              code
-                                            )}
-                                            {idx < line.codes.length - 1 ? '、' : ''}
-                                          </span>
-                                        ))}
-                                        ）
-                                      </span>
-                                    ) : null}
-                                    {!readOnly && line.lineKey ? (
-                                      <Button variant="link" size="xs" className="h-auto p-0 text-xs" onClick={() => setSwapKey(line.lineKey)}>
-                                        <ArrowLeftRight className="size-3" />更换型号
-                                      </Button>
-                                    ) : null}
+                              <div key={`${room.id}-${line.deviceType}-${line.productId}`} className="flex flex-col gap-2 py-2.5 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:gap-2.5">
+                                <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                                  <ProductThumb src={line.image} alt={line.name} className="size-10 shrink-0" />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1.5">
+                                      <PointMarker type={line.deviceType} className="size-4 shrink-0" />
+                                      <span className="truncate text-sm font-medium">{line.name}</span>
+                                    </div>
+                                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                                      <span>{line.typeName}</span>
+                                      {line.sku ? <span>· {line.sku}</span> : null}
+                                      {line.codes.length ? (
+                                        <span className="inline-flex flex-wrap items-center gap-1 font-mono text-[11px]">
+                                          （
+                                          {line.codes.map((code, idx) => (
+                                            <span key={code}>
+                                              {project ? (
+                                                <button
+                                                  type="button"
+                                                  title={`在点位图中定位并选中 ${code}`}
+                                                  className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+                                                  onClick={() => switchToPointMap({ point: code })}
+                                                >
+                                                  {code}
+                                                </button>
+                                              ) : (
+                                                code
+                                              )}
+                                              {idx < line.codes.length - 1 ? '、' : ''}
+                                            </span>
+                                          ))}
+                                          ）
+                                        </span>
+                                      ) : null}
+                                      {!readOnly && line.lineKey ? (
+                                        <Button variant="link" size="xs" className="h-auto p-0 text-xs" onClick={() => setSwapKey(line.lineKey)}>
+                                          <ArrowLeftRight className="size-3" />更换型号
+                                        </Button>
+                                      ) : null}
+                                    </div>
                                   </div>
                                 </div>
-                                <div className="shrink-0 text-right text-xs tabular-nums">
-                                  <div className="text-sm font-semibold">{yuan(line.subtotal)}</div>
-                                  <div className="mt-1 flex items-center justify-end gap-1 text-muted-foreground">
+                                <div className="flex flex-wrap items-center justify-between gap-2 pl-12 text-xs tabular-nums sm:shrink-0 sm:flex-col sm:items-end sm:justify-center sm:gap-0 sm:pl-0 sm:text-right">
+                                  <div className="flex items-center gap-1 text-muted-foreground sm:order-2 sm:mt-1 sm:justify-end">
                                     <span>¥</span>
                                     <EditableNumber
                                       value={line.price}
@@ -636,8 +637,9 @@ export function QuoteEditor({
                                     />
                                     <span>× {line.quantity}{line.unit || '个'}</span>
                                   </div>
+                                  <div className="text-sm font-semibold sm:order-1">{yuan(line.subtotal)}</div>
                                   {priceChanged && line.lineKey ? (
-                                    <div className="mt-0.5 flex items-center justify-end gap-1 text-[11px] text-warning">
+                                    <div className="mt-0.5 flex w-full items-center justify-end gap-1 text-[11px] text-warning sm:order-3 sm:w-auto">
                                       <span>原价 {yuan(originPrice)}</span>
                                       {!readOnly ? (
                                         <Button
@@ -664,52 +666,117 @@ export function QuoteEditor({
               ))}
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="pl-6">产品</TableHead>
-                  {costs ? <TableHead className="text-right">成本</TableHead> : null}
-                  <TableHead className="text-right">单价</TableHead>
-                  <TableHead className="text-right">数量</TableHead>
-                  <TableHead className="text-right">小计</TableHead>
-                  {readOnly ? null : <TableHead className="w-10 pr-4" />}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              {/* 手机窄屏（< md）采用纵向自适应卡片行，确保单价与数量输入框完全在 390px 屏幕内 */}
+              <div className="divide-y md:hidden">
                 {quote.items.map((l) => (
-                  <TableRow key={l.key}>
-                    <TableCell className="pl-6">
-                      <div className="flex items-center gap-3">
-                        <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted">
-                          {l.image ? (
-                            <Image src={l.image} alt="" width={44} height={44} className="size-full bg-white object-contain" />
-                          ) : l.deviceType ? (
-                            <span className="size-6"><DeviceSymbol type={l.deviceType} /></span>
-                          ) : (
-                            <ImageIcon className="size-4 text-muted-foreground/50" />
-                          )}
-                        </span>
-                        <div className="min-w-0">
-                          <div className="font-medium">{l.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {[l.deviceType ? deviceTypeLabel(l.deviceType) : null, l.sku, l.unit && `单位：${l.unit}`].filter(Boolean).join(' · ')}
-                          </div>
+                  <div key={l.key} className="space-y-2.5 px-4 py-3">
+                    <div className="flex items-start gap-2.5">
+                      <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted">
+                        {l.image ? (
+                          <Image src={l.image} alt="" width={40} height={40} className="size-full bg-white object-contain" />
+                        ) : l.deviceType ? (
+                          <span className="size-5"><DeviceSymbol type={l.deviceType} /></span>
+                        ) : (
+                          <ImageIcon className="size-4 text-muted-foreground/50" />
+                        )}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="line-clamp-2 text-sm font-medium leading-snug">{l.name}</div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                          <span>{[l.deviceType ? deviceTypeLabel(l.deviceType) : null, l.sku, l.unit && `单位：${l.unit}`].filter(Boolean).join(' · ')}</span>
                           {!readOnly && l.deviceType ? (
-                            <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setSwapKey(l.key)}>
+                            <Button variant="link" size="xs" className="h-auto p-0 text-xs" onClick={() => setSwapKey(l.key)}>
                               <ArrowLeftRight className="size-3" />更换型号
                             </Button>
                           ) : null}
                         </div>
                       </div>
-                    </TableCell>
-                    {costs ? (
-                      <TableCell className="text-right text-sm text-muted-foreground tabular-nums">
-                        {unitCost(l) === undefined ? '—' : yuan(unitCost(l))}
-                      </TableCell>
-                    ) : null}
-                    <TableCell className="text-right">
-                      <div className="flex flex-col items-end gap-0.5">
-                        {numInput(l.price, (n) => updateLine(l.key, { price: n }), `${l.name} 单价`, 'ml-auto w-28')}
+                      {readOnly ? null : (
+                        <Button variant="ghost" size="icon-sm" className="-mr-1 shrink-0" aria-label={`删除 ${l.name}`} onClick={() => update({ items: quote.items.filter((x) => x.key !== l.key) })}>
+                          <Trash2 className="size-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2 pl-12 text-xs tabular-nums">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-muted-foreground">单价</span>
+                        {numInput(l.price, (n) => updateLine(l.key, { price: n }), `${l.name} 单价`, 'w-24')}
+                        <span className="text-muted-foreground">×</span>
+                        {numInput(l.quantity, (n) => updateLine(l.key, { quantity: n }), `${l.name} 数量`, 'w-16')}
+                      </div>
+                      <div className="ml-auto text-sm font-semibold">{yuan(l.price * l.quantity)}</div>
+                    </div>
+                    {(() => {
+                      const originPrice = catalogPriceOf(l.product)
+                      if (originPrice === undefined || Math.abs(originPrice - l.price) <= 0.001) return null
+                      return (
+                        <div className="flex items-center justify-end gap-1 pl-12 text-[11px] text-warning tabular-nums">
+                          <span>原价 {yuan(originPrice)}</span>
+                          {!readOnly ? (
+                            <Button type="button" variant="link" size="xs" className="h-auto p-0 text-[11px]" onClick={() => updateLine(l.key, { price: originPrice })}>
+                              <RotateCcw className="size-2.5" />恢复
+                            </Button>
+                          ) : null}
+                        </div>
+                      )
+                    })()}
+                  </div>
+                ))}
+                <div className="flex items-center justify-between bg-muted/40 px-4 py-3 text-sm">
+                  <span className="font-medium">产品小计</span>
+                  <span className="font-semibold tabular-nums">{yuan(totals.productTotal)}</span>
+                </div>
+              </div>
+
+              {/* 平板与桌面端（>= md）保持表格布局 */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="pl-6">产品</TableHead>
+                      {costs ? <TableHead className="text-right">成本</TableHead> : null}
+                      <TableHead className="text-right">单价</TableHead>
+                      <TableHead className="text-right">数量</TableHead>
+                      <TableHead className="text-right">小计</TableHead>
+                      {readOnly ? null : <TableHead className="w-10 pr-4" />}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {quote.items.map((l) => (
+                      <TableRow key={l.key}>
+                        <TableCell className="pl-6 whitespace-normal">
+                          <div className="flex items-center gap-3">
+                            <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted">
+                              {l.image ? (
+                                <Image src={l.image} alt="" width={44} height={44} className="size-full bg-white object-contain" />
+                              ) : l.deviceType ? (
+                                <span className="size-6"><DeviceSymbol type={l.deviceType} /></span>
+                              ) : (
+                                <ImageIcon className="size-4 text-muted-foreground/50" />
+                              )}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="font-medium">{l.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {[l.deviceType ? deviceTypeLabel(l.deviceType) : null, l.sku, l.unit && `单位：${l.unit}`].filter(Boolean).join(' · ')}
+                              </div>
+                              {!readOnly && l.deviceType ? (
+                                <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setSwapKey(l.key)}>
+                                  <ArrowLeftRight className="size-3" />更换型号
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                        </TableCell>
+                        {costs ? (
+                          <TableCell className="text-right text-sm text-muted-foreground tabular-nums">
+                            {unitCost(l) === undefined ? '—' : yuan(unitCost(l))}
+                          </TableCell>
+                        ) : null}
+                        <TableCell className="text-right">
+                          <div className="flex flex-col items-end gap-0.5">
+                            {numInput(l.price, (n) => updateLine(l.key, { price: n }), `${l.name} 单价`, 'ml-auto w-28')}
                         {(() => {
                           const originPrice = catalogPriceOf(l.product)
                           if (originPrice === undefined || Math.abs(originPrice - l.price) <= 0.001) return null
@@ -746,6 +813,8 @@ export function QuoteEditor({
                 </TableRow>
               </TableFooter>
             </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { PrintToolbar } from '@/components/print-toolbar'
 import { DocArticle, DocFooter, DocHeader, DocRoot, DocSectionHeading, DocTitle, docTable } from '@/documents/parts'
 import { docToolbarGroups, resolveDocSetup } from '@/documents/registry'
+import { relId } from '@/lib/access'
 import { appAuth } from '@/lib/app-auth'
 import { fmtLongDate, paymentAmounts, rmbUpper } from '@/lib/contracts'
 import { getPayloadClient } from '@/lib/payload'
@@ -21,25 +22,23 @@ export default async function PrintContractPage({ params, searchParams }: { para
   const user = await appAuth.getCurrentUser()
   if (!user) redirect(`/login?from=/print/contracts/${id}`)
   const payload = await getPayloadClient()
-  const [contract, setup] = await Promise.all([
-    payload
-      .findByID({
-        collection: 'contracts',
-        id,
-        depth: 1,
-        user,
-        overrideAccess: false,
-        populate: {
-          projects: { name: true, platform: true },
-          quotes: { title: true, items: true, fees: true, discount: true, productTotal: true, feeTotal: true, total: true },
-        },
-      })
-      .catch(() => null),
-    resolveDocSetup('contract', sp),
-  ])
+  const contract = await payload
+    .findByID({
+      collection: 'contracts',
+      id,
+      depth: 1,
+      user,
+      overrideAccess: false,
+      populate: {
+        projects: { name: true, platform: true, owner: true },
+        quotes: { title: true, items: true, fees: true, discount: true, productTotal: true, feeTotal: true, total: true },
+      },
+    })
+    .catch(() => null)
   if (!contract) notFound()
-  const { style, company, layout } = setup
   const project = typeof contract.project === 'object' ? (contract.project as Project) : null
+  const setup = await resolveDocSetup('contract', sp, (project ? relId(project.owner) : null) || user.id)
+  const { style, company, layout } = setup
   const quote = typeof contract.quote === 'object' ? (contract.quote as Quote) : null
   const amount = contract.amount ?? 0
   const payments = contract.payments ?? []
@@ -217,7 +216,7 @@ export default async function PrintContractPage({ params, searchParams }: { para
               </div>
             </section>
           ) : null}
-          <DocFooter className="mt-10" left={contract.address || project?.name || ''} center={contract.number} right={company.name} />
+          <DocFooter className="mt-6" left={contract.address || project?.name || ''} center={contract.number} right={company.name} />
         </DocArticle>
       </DocRoot>
     </div>

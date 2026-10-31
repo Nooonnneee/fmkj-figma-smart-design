@@ -1,3 +1,4 @@
+import { relId } from '@/lib/access'
 import { CACHE_TAGS } from '@/lib/cache-tags'
 import { memoize } from '@/lib/memo-cache'
 import { getPayloadClient } from '@/lib/payload'
@@ -108,25 +109,40 @@ export const getBrands = memoize(
   },
 )
 
-/** 负责人下拉：启用成员的 id 和姓名。 */
-export const getOwnerOptions = memoize(
-  'staff-owner-options-v1',
-  [CACHE_TAGS.staff],
-  TTL,
-  async () => {
-    const payload = await getPayloadClient()
-    const users = await payload.find({
-      collection: 'users',
-      where: { status: { equals: 'active' } },
-      select: { name: true },
-      sort: 'name',
-      limit: 500,
-      depth: 0,
-      overrideAccess: true,
-    })
-    return users.docs.map((u) => ({ value: String(u.id), label: u.name }))
-  },
-)
+/**
+ * 单个项目的负责人下拉候选：只包含该项目当前负责人与已加入该项目的协作者，
+ * 不再向前端暴露系统内其他无关用户。
+ */
+export async function getProjectOwnerOptions(project: {
+  owner?: unknown
+  collaborators?: Array<{ user?: unknown }> | null
+}): Promise<{ value: string; label: string }[]> {
+  const ids = new Set<string>()
+  const ownerId = relId(project.owner)
+  if (ownerId) ids.add(ownerId)
+  for (const c of project.collaborators ?? []) {
+    const uid = relId(c.user)
+    if (uid) ids.add(uid)
+  }
+  if (ids.size === 0) return []
+  const payload = await getPayloadClient()
+  const users = await payload.find({
+    collection: 'users',
+    where: {
+      and: [{ id: { in: [...ids] } }, { status: { equals: 'active' } }],
+    },
+    select: { name: true },
+    sort: 'name',
+    limit: 100,
+    depth: 0,
+    overrideAccess: true,
+  })
+  const options = users.docs.map((u) => ({ value: String(u.id), label: u.name }))
+  if (ownerId && !options.some((o) => o.value === ownerId)) {
+    options.unshift({ value: ownerId, label: '当前负责人' })
+  }
+  return options
+}
 
 export type CompanyInfo = {
   name: string
@@ -159,7 +175,7 @@ function parseDocumentDefaults(value: unknown): CompanyInfo['documentDefaults'] 
   return out
 }
 
-export const getCompanyInfo = memoize(
+const getBaseCompanyInfo = memoize(
   'company-settings-v6',
   [CACHE_TAGS.company],
   TTL,
@@ -189,3 +205,80 @@ export const getCompanyInfo = memoize(
     }
   },
 )
+
+type RawUserCompanyProfile = {
+  name?: string | null
+  slogan?: string | null
+  phone?: string | null
+  email?: string | null
+  address?: string | null
+  qrCaption?: string | null
+  quoteNotes?: string | null
+  contractTerms?: string | null
+  printProductImages?: boolean | null
+  documentDefaults?: unknown
+  disabledPlugins?: unknown
+  logo?: Media | string | number | null
+  qrCode?: Media | string | number | null
+}
+
+/**
+ * 获取抬头与默认配置：
+ * - 传入 userId 时，优先读取该账号自己保存的 `companyProfile`（每个账号独立抬头）；
+ *   若该账号尚未保存过自己的抬头，则回退到系统全局默认抬头；
+ * - 全局 AI 模型列表（`aiModels`）始终来自系统全局配置。
+ */
+export async function getCompanyInfo(userId?: string | number | null): Promise<CompanyInfo> {
+  const base = await getBaseCompanyInfo()
+  if (!userId) return base
+  const payload = await getPayloadClient()
+  const userDoc = await payload
+    .findByID({
+      collection: 'users',
+      id: String(userId),
+      depth: 1,
+      overrideAccess: true,
+      select: { name: true, phone: true, email: true, companyProfile: true } as never,
+    })
+    .catch(() => null)
+  if (!userDoc) return base
+
+  const p = ((userDoc as unknown as { companyProfile?: RawUserCompanyProfile | null }).companyProfile ?? null)
+  const hasCustomHeader = Boolean(p && typeof p.name === 'string' && p.name.trim())
+  const userDocDefaults = p?.documentDefaults ? parseDocumentDefaults(p.documentDefaults) : {}
+  const mergedDocDefaults = { ...base.documentDefaults, ...userDocDefaults }
+  const disabledPlugins = Array.isArray(p?.disabledPlugins)
+    ? p!.disabledPlugins.filter((v): v is string => typeof v === 'string')
+    : base.disabledPlugins
+
+  if (!hasCustomHeader || !p) {
+    return {
+      ...base,
+      documentDefaults: mergedDocDefaults,
+      disabledPlugins,
+    }
+  }
+
+  const logo = p.logo && typeof p.logo === 'object' ? (p.logo as Media) : null
+  const qr = p.qrCode && typeof p.qrCode === 'object' ? (p.qrCode as Media) : null
+  const logoUrl = resolveMediaUrl(logo)
+  const qrUrl = resolveMediaUrl(qr)
+  const name = p.name!.trim()
+
+  return {
+    name,
+    slogan: p.slogan ?? null,
+    phone: p.phone ?? null,
+    email: p.email ?? null,
+    address: p.address ?? null,
+    qrCaption: p.qrCaption ?? null,
+    quoteNotes: p.quoteNotes ?? null,
+    contractTerms: p.contractTerms ?? base.contractTerms,
+    printProductImages: p.printProductImages !== false,
+    documentDefaults: mergedDocDefaults,
+    disabledPlugins,
+    aiModels: base.aiModels,
+    logo: logo && logoUrl ? { url: logoUrl, alt: logo.alt || name, width: logo.width ?? null, height: logo.height ?? null } : null,
+    qrCode: qr && qrUrl ? { url: qrUrl, alt: qr.alt || '二维码' } : null,
+  }
+}

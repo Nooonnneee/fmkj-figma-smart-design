@@ -69,8 +69,12 @@ export type DocSetup = {
 }
 
 /** 打印页确定风格和版式：网址参数 → 设置里的默认值 → 第一个可用项。 */
-export async function resolveDocSetup(kind: DocKind, params: { style?: string; layout?: string }): Promise<DocSetup> {
-  const [company, flags] = await Promise.all([getCompanyInfo(), getPluginFlags()])
+export async function resolveDocSetup(
+  kind: DocKind,
+  params: { style?: string; layout?: string },
+  userId?: string | number | null,
+): Promise<DocSetup> {
+  const [company, flags] = await Promise.all([getCompanyInfo(userId), getPluginFlags(userId)])
   const styles = availableStyles(flags)
   const layouts = DOC_KINDS[kind].layouts
   const defaults = company.documentDefaults[kind] ?? {}

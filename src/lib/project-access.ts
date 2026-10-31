@@ -48,8 +48,7 @@ export function getProjectRole(
   if (!userId) return null
   const uid = String(userId)
   const ownerId = relId(project.owner)
-  // 旧演示项目未填 owner 时默认视为可管理，避免历史项目无法访问
-  if (!ownerId || ownerId === uid) return 'owner'
+  if (ownerId && ownerId === uid) return 'owner'
   const collab = (project.collaborators ?? []).find((c) => relId(c.user) === uid)
   if (!collab) return null
   return collab.role === 'edit' ? 'edit' : 'read'
@@ -68,6 +67,13 @@ export function canEditProject(
 ): boolean {
   const role = getProjectRole(project, userId)
   return role === 'owner' || role === 'edit'
+}
+
+export function canManageProject(
+  project: Pick<Project, 'owner'> & { collaborators?: CollaboratorItem[] | null },
+  userId: string | number | null | undefined,
+): boolean {
+  return getProjectRole(project, userId) === 'owner'
 }
 
 export function roleLabel(role: ProjectRole): string {

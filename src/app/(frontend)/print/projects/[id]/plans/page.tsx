@@ -28,8 +28,9 @@ export default async function PlansPrintPage({
   const user = await appAuth.getCurrentUser()
   if (!user) redirect(`/login?from=/print/projects/${id}/plans`)
   const scope = isPointScope(sp.scope) ? sp.scope : 'all'
-  const [d, setup] = await Promise.all([loadProjectDocs(id, user, scope, sp.quoteId ?? null), resolveDocSetup('plans', sp)])
+  const d = await loadProjectDocs(id, user, scope, sp.quoteId ?? null)
   if (!d) notFound()
+  const setup = await resolveDocSetup('plans', sp, d.owner?.id ?? user.id)
   const { style, layout, company } = setup
   const markers = layout === 'product' ? 'product' : 'symbol'
   const sheets = d.sheets.filter((s) => scope === 'all' || d.points.some((p) => p.sheetId === s.id))

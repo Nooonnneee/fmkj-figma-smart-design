@@ -8,6 +8,7 @@ import { PrintToolbar } from '@/components/print-toolbar'
 import { ProductThumb } from '@/components/product-thumb'
 import { DocArticle, DocFacts, DocFooter, DocHeader, DocRoot, DocSectionHeading, DocSignatures, DocTitle, docTable } from '@/documents/parts'
 import { docToolbarGroups, resolveDocSetup } from '@/documents/registry'
+import { relId } from '@/lib/access'
 import { appAuth } from '@/lib/app-auth'
 import { getCatalog, resolveMediaUrl } from '@/lib/cached-data'
 import { categoryOfType, DEVICE_CATEGORIES } from '@/lib/device-types'
@@ -29,15 +30,29 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
   const user = await appAuth.getCurrentUser()
   if (!user) redirect(`/login?from=/print/quotes/${id}`)
   const payload = await getPayloadClient()
-  const [quote, catalog, setup] = await Promise.all([
+  const [quote, catalog] = await Promise.all([
     payload.findByID({ collection: 'quotes', id, depth: 2, user, overrideAccess: false }).catch(() => null),
     getCatalog(),
-    resolveDocSetup('quote', { style: sp.style, layout: sp.layout ?? sp.template }),
   ])
   if (!quote) notFound()
-  const { style, company } = setup
   const project = typeof quote.project === 'object' ? (quote.project as Project) : null
-  const owner = project && typeof project.owner === 'object' ? (project.owner as User | null) : null
+  const ownerId = project ? relId(project.owner) : null
+  const setup = await resolveDocSetup('quote', { style: sp.style, layout: sp.layout ?? sp.template }, ownerId || user.id)
+  const { style, company } = setup
+  const owner =
+    project && typeof project.owner === 'object' && project.owner
+      ? (project.owner as User)
+      : ownerId
+        ? ((await payload
+            .findByID({
+              collection: 'users',
+              id: ownerId,
+              depth: 0,
+              overrideAccess: true,
+              select: { name: true, phone: true },
+            })
+            .catch(() => null)) as User | null)
+        : null
   const siblingQuotes = project
     ? (
         await payload.find({
@@ -346,8 +361,10 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
             </section>
           ) : null}
 
-          <DocSignatures className="mt-12" parties={[{ label: '客户确认签字' }, { label: `${company.name} 盖章` }]} />
-          <DocFooter className="mt-10" left={address || project?.name || ''} center={date} right={company.name} />
+          <section data-pdf-block className="mt-8 break-inside-avoid">
+            <DocSignatures parties={[{ label: '客户确认签字' }, { label: `${company.name} 盖章` }]} />
+            <DocFooter className="mt-6" left={address || project?.name || ''} center={date} right={company.name} />
+          </section>
         </DocArticle>
       </DocRoot>
     </div>

@@ -16,7 +16,7 @@ const TTL: Record<MpTokenKind, number> = {
   session: 30 * 24 * HOUR,
   bind: 10 * 60 * 1000,
   'web-ticket': 2 * 60 * 1000,
-  web: 2 * HOUR,
+  web: 7 * 24 * HOUR,
 }
 
 export const hashToken = (token: string) => createHash('sha256').update(token).digest('hex')
@@ -95,13 +95,13 @@ export async function userFromToken(token: string | null | undefined, kind: 'ses
   if (!session) return null
   const user = await loadActiveUser(relId(session.user))
   if (!user) return null
-  if (kind === 'session' && (!session.lastUsedAt || Date.now() - new Date(session.lastUsedAt).getTime() > 24 * HOUR)) {
+  if ((kind === 'session' || kind === 'web') && (!session.lastUsedAt || Date.now() - new Date(session.lastUsedAt).getTime() > 24 * HOUR)) {
     const payload = await getPayloadClient()
     await payload
       .update({
         collection: 'mp-sessions',
         id: session.id,
-        data: { lastUsedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + TTL.session).toISOString() },
+        data: { lastUsedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + TTL[kind]).toISOString() },
         overrideAccess: true,
         depth: 0,
       })

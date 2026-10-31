@@ -2,20 +2,19 @@ import { APIError, type Access, type CollectionConfig, type Where } from 'payloa
 
 import { cmsAdminOrMember, fieldCmsAdminOnly, isCmsAdmin, isMember, relId } from '@/lib/access'
 import { countScenePoints } from '@/lib/point-count'
-import { canEditProject } from '@/lib/project-access'
+import { canEditProject, canManageProject, type CollaboratorItem } from '@/lib/project-access'
 import { ARCHIVED_MESSAGE } from '@/lib/project-guards'
 import { autoProjectName, PROJECT_PLATFORMS, PROJECT_STATUSES } from '@/lib/projects'
 
 const opts = (list: readonly { value: string; label: string }[]) => list.map(({ value, label }) => ({ value, label }))
 
-/** 行级读取控制：成员只能看到自己创建的项目、受邀协作的项目，以及未指定负责人的演示项目。 */
+/** 行级读取控制：成员只能看到自己创建的项目或受邀协作的项目（演示模板项目在用户注册时单独克隆发放）。 */
 export const readProjectAccess: Access = ({ req }) => {
   if (isCmsAdmin(req)) return true
   if (!isMember(req) || !req.user) return false
   const where: Where = {
     or: [
       { owner: { equals: req.user.id } },
-      { owner: { exists: false } },
       { 'collaborators.user': { equals: req.user.id } },
     ],
   }
@@ -27,7 +26,7 @@ const deleteProjectAccess: Access = ({ req }) => {
   if (isCmsAdmin(req)) return true
   if (!isMember(req) || !req.user) return false
   const where: Where = {
-    or: [{ owner: { equals: req.user.id } }, { owner: { exists: false } }],
+    owner: { equals: req.user.id },
   }
   return where
 }
@@ -70,6 +69,26 @@ export const Projects: CollectionConfig = {
           // 允许通过协作链接加入时由服务端 overrideAccess 更新 collaborators，普通成员请求需校验编辑权限
           if (!canEditProject(originalDoc as never, req.user.id)) {
             throw new APIError('你对该项目仅有查看权限，无法修改', 403)
+          }
+          // 只有当前负责人（owner）才能修改或转让负责人字段；协作者不能篡改 owner 夺取项目控制权
+          if (Object.prototype.hasOwnProperty.call(data, 'owner') && !sameValue(data.owner, originalDoc.owner)) {
+            if (!canManageProject(originalDoc as never, req.user.id)) {
+              throw new APIError('只有项目创建者（负责人）可以转让负责人', 403)
+            }
+            const prevOwnerId = relId(originalDoc.owner)
+            const nextOwnerId = relId(data.owner)
+            // 原负责人将项目转让给他人时，自动把原负责人保留为可编辑协作者，避免自己失去访问权
+            if (prevOwnerId && nextOwnerId && prevOwnerId !== nextOwnerId) {
+              const rawCollabs = ((data.collaborators ?? originalDoc.collaborators) as CollaboratorItem[] | undefined) ?? []
+              const filtered = rawCollabs.filter((c) => {
+                const uid = relId(c.user)
+                return Boolean(uid && uid !== nextOwnerId && uid !== prevOwnerId)
+              })
+              data.collaborators = [
+                ...filtered,
+                { user: prevOwnerId, role: 'edit', joinedAt: new Date().toISOString() },
+              ]
+            }
           }
         }
         // 已归档的项目只读：成员只能把它恢复为进行中（Payload 会用原值补齐未提交的字段，所以逐个比较值）
@@ -116,7 +135,20 @@ export const Projects: CollectionConfig = {
       fields: [
         { name: 'platform', label: '主平台', type: 'select', options: PROJECT_PLATFORMS.map((p) => ({ value: p, label: p })) },
         { name: 'budget', label: '预算（元）', type: 'number', min: 0 },
-        { name: 'owner', label: '负责人', type: 'relationship', relationTo: 'users' },
+        {
+          name: 'owner',
+          label: '负责人',
+          type: 'relationship',
+          relationTo: 'users',
+          access: {
+            update: ({ req, doc }) => {
+              if (isCmsAdmin(req)) return true
+              if (!isMember(req) || !req.user) return false
+              if (!doc) return true
+              return canManageProject(doc as never, req.user.id)
+            },
+          },
+        },
       ],
     },
     {
@@ -140,6 +172,19 @@ export const Projects: CollectionConfig = {
       label: '点位数',
       type: 'number',
       admin: { position: 'sidebar', readOnly: true, description: '保存点位图时自动统计' },
+    },
+    {
+      name: 'isDemoTemplate',
+      label: '作为新用户示例模板',
+      type: 'checkbox',
+      defaultValue: false,
+      access: {
+        update: fieldCmsAdminOnly,
+      },
+      admin: {
+        position: 'sidebar',
+        description: '勾选后，每当新建成员账号时会自动复制一份该项目（含点位图与报价单）发给新用户',
+      },
     },
     { name: 'notes', label: '备注', type: 'textarea', maxLength: 2000 },
     {

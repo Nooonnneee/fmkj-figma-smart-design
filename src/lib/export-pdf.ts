@@ -57,6 +57,16 @@ function collectAtomicBlocks(root: HTMLElement, scale: number): { top: number; b
     const bottom = Math.ceil((r.bottom - rootRect.top) * scale) + Math.round(140 * scale)
     blocks.push({ top, bottom })
   }
+  // 文档末尾的 footer 与它上方的签字栏保持在同一页，防止最后一页只剩单独一行页脚
+  const footerEl = root.querySelector<HTMLElement>('footer')
+  if (footerEl) {
+    const fr = footerEl.getBoundingClientRect()
+    if (fr.height > 0) {
+      const fBottom = Math.ceil((fr.bottom - rootRect.top) * scale)
+      const fTop = Math.max(0, Math.floor((fr.top - rootRect.top) * scale) - Math.round(140 * scale))
+      blocks.push({ top: fTop, bottom: fBottom })
+    }
+  }
   return blocks.sort((a, b) => a.top - b.top)
 }
 

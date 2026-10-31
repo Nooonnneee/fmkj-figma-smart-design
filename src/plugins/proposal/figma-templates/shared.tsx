@@ -198,11 +198,15 @@ export function FigmaSlidePage({
   frameName: string
   children: React.ReactNode
 }) {
+  const isLast = no >= total
   return (
     <section
       data-export-page
       data-figma-frame={frameName}
-      className="relative mx-auto flex h-[1018px] w-[1440px] flex-col items-start gap-[24px] overflow-hidden bg-doc-paper px-[56px] pt-[36px] pb-[72px] shadow-sm break-after-page print:shadow-none print:[zoom:0.7795]"
+      className={cn(
+        'relative mx-auto flex h-[1018px] w-[1440px] flex-col items-start gap-[24px] overflow-hidden bg-doc-paper px-[56px] pt-[36px] pb-[72px] shadow-sm print:shadow-none print:[zoom:0.778]',
+        isLast ? 'break-after-auto' : 'break-after-page',
+      )}
     >
       <FigmaHeader d={ctx.d} />
       {children}

@@ -24,7 +24,13 @@ type Ctx = { d: ProposalData; t: Exclude<ProposalTemplate, 'qixu'>; markers: 'sy
 function Page({ ctx, title, no, children, dark = false }: { ctx: Ctx; title?: string; no: number; children: React.ReactNode; dark?: boolean }) {
   const premium = ctx.t === 'premium'
   return (
-    <section data-export-page className={cn('relative mx-auto flex h-[210mm] w-[297mm] flex-col overflow-hidden bg-white px-[14mm] py-[11mm] text-neutral-900 shadow-sm break-after-page print:shadow-none', dark && 'bg-neutral-950 text-white')}>
+    <section
+      data-export-page
+      className={cn(
+        'relative mx-auto flex h-[210mm] w-[297mm] flex-col overflow-hidden bg-white px-[14mm] py-[11mm] text-neutral-900 shadow-sm break-after-page last:break-after-auto print:h-[209mm] print:shadow-none',
+        dark && 'bg-neutral-950 text-white',
+      )}
+    >
       {title ? (
         <header className={cn('mb-[6mm] flex items-end justify-between border-b pb-[3mm]', premium ? 'border-neutral-900' : 'border-neutral-200')}>
           <h2 className={cn('font-semibold tracking-tight', premium ? 'text-[22px]' : 'text-[19px]')}>{title}</h2>

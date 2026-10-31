@@ -5,8 +5,6 @@ import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
 import { getCompanyInfo } from '@/lib/cached-data'
 import { DEFAULT_CONTRACT_TERMS } from '@/lib/contracts'
-import { getPayloadClient } from '@/lib/payload'
-import type { Media } from '@/payload-types'
 import { getPluginFlags } from '@/plugins/state'
 
 import { CompanyForm } from './company-form'
@@ -16,30 +14,28 @@ export const metadata = { title: pageTitle('设置') }
 export default async function SettingsPage() {
   const user = await appAuth.getCurrentUser()
   if (!user) redirect('/login')
-  const payload = await getPayloadClient()
-  const [settings, company, flags] = await Promise.all([payload.findGlobal({ slug: 'company-settings', depth: 1, user, overrideAccess: false }), getCompanyInfo(), getPluginFlags()])
+  const [company, flags] = await Promise.all([getCompanyInfo(user.id), getPluginFlags(user.id)])
   const enabledStyles = new Set(availableStyles(flags).map((s) => s.id))
-  const img = (m: unknown) => (m && typeof m === 'object' ? ((m as Media).url ?? null) : null)
 
   return (
     <section className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight">设置</h1>
-        <p className="text-sm text-muted-foreground">抬头和联系方式、新报价和合同的默认内容，以及各类文档的默认模板</p>
+        <p className="text-sm text-muted-foreground">当前账号专属的报价单/合同抬头、联系方式、默认条款，以及各类文档的默认模板</p>
       </header>
       <CompanyForm
         initial={{
-          name: settings.name ?? '',
-          slogan: settings.slogan ?? '',
-          phone: settings.phone ?? '',
-          email: settings.email ?? '',
-          address: settings.address ?? '',
-          qrCaption: settings.qrCaption ?? '',
-          quoteNotes: settings.quoteNotes ?? '',
-          contractTerms: settings.contractTerms ?? DEFAULT_CONTRACT_TERMS,
-          printProductImages: settings.printProductImages !== false,
-          logoUrl: img(settings.logo),
-          qrCodeUrl: img(settings.qrCode),
+          name: company.name ?? '',
+          slogan: company.slogan ?? '',
+          phone: company.phone ?? '',
+          email: company.email ?? '',
+          address: company.address ?? '',
+          qrCaption: company.qrCaption ?? '',
+          quoteNotes: company.quoteNotes ?? '',
+          contractTerms: company.contractTerms ?? DEFAULT_CONTRACT_TERMS,
+          printProductImages: company.printProductImages !== false,
+          logoUrl: company.logo?.url ?? null,
+          qrCodeUrl: company.qrCode?.url ?? null,
         }}
         documents={{
           kinds: DOC_KIND_LIST.map((kind) => ({ kind, label: DOC_KINDS[kind].label, layouts: DOC_KINDS[kind].layouts.map((l) => ({ value: l.value, label: l.label })) })),

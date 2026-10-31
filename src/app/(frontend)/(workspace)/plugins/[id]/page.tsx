@@ -35,8 +35,8 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
 
   const payload = await getPayloadClient()
   const [flags, company, projectsRes] = await Promise.all([
-    getPluginFlags(),
-    getCompanyInfo(),
+    getPluginFlags(user.id),
+    getCompanyInfo(user.id),
     payload.find({
       collection: 'projects',
       where: { status: { not_equals: 'archived' } },

@@ -61,8 +61,9 @@ export default async function ChecklistPrintPage({
   const user = await appAuth.getCurrentUser()
   if (!user) redirect(`/login?from=/print/projects/${id}/checklist`)
   const scope = isPointScope(sp.scope) ? sp.scope : 'all'
-  const [d, setup] = await Promise.all([loadProjectDocs(id, user, scope, sp.quoteId ?? null), resolveDocSetup('checklist', sp)])
+  const d = await loadProjectDocs(id, user, scope, sp.quoteId ?? null)
   if (!d) notFound()
+  const setup = await resolveDocSetup('checklist', sp, d.owner?.id ?? user.id)
   const { style, layout, company } = setup
   const t = docTable(style)
   const groups = groupPoints(d, layout)
@@ -210,10 +211,9 @@ export default async function ChecklistPrintPage({
                 </p>
               ))}
             </div>
+            <DocSignatures className="mt-7" parties={[{ label: '设计方', name: d.owner?.name }, { label: '施工方' }, { label: '业主（验收）', name: d.project.customerName }]} />
+            <DocFooter className="mt-6" left={address || d.project.name} center={`${docNo}  /  ${date}`} right={company.name} />
           </section>
-
-          <DocSignatures className="mt-12" parties={[{ label: '设计方', name: d.owner?.name }, { label: '施工方' }, { label: '业主（验收）', name: d.project.customerName }]} />
-          <DocFooter className="mt-10" left={address || d.project.name} center={`${docNo}  /  ${date}`} right={company.name} />
         </DocArticle>
       </DocRoot>
     </div>

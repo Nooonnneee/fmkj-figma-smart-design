@@ -15,8 +15,8 @@ import { SELECTION_TIERS } from '@/plugins/smart-select/auto-select'
 import { getPluginFlags } from '@/plugins/state'
 
 /** 字典与配置：设备类别和类型、平台、状态、点位范围、AI 模型和模板、已启用插件、公司抬头。 */
-export const GET = mpRoute(async () => {
-  const [company, flags] = await Promise.all([getCompanyInfo(), getPluginFlags()])
+export const GET = mpRoute(async ({ user }) => {
+  const [company, flags] = await Promise.all([getCompanyInfo(user.id), getPluginFlags(user.id)])
   const activeAiModels = enabledAiModels(company.aiModels)
   return ok({
     categories: DEVICE_CATEGORIES.map((c) => ({ slug: c.slug, name: c.name, code: c.code, color: c.color })),

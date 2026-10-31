@@ -4,6 +4,8 @@
  */
 import { docNumber, type ProjectDocsData } from '@/lib/project-docs'
 
+import { Fragment } from 'react'
+
 import { FigmaCoverPage } from './figma-templates/01-cover'
 import { FigmaOverviewPage } from './figma-templates/02-overview'
 import { FigmaFloorPlanPage } from './figma-templates/03-floor-plan'
@@ -46,5 +48,5 @@ export function qixuDeckPages(d: ProjectDocsData, markers: 'symbol' | 'product',
     ))
   if (d.categories.length) pages.push((no, total) => <FigmaBudgetPage ctx={ctx} no={no} total={total} />)
   pages.push((no, total) => <FigmaServicePage ctx={ctx} no={no} total={total} />)
-  return pages.map((render, i) => <div key={i}>{render(i + 1, pages.length)}</div>)
+  return pages.map((render, i) => <Fragment key={i}>{render(i + 1, pages.length)}</Fragment>)
 }

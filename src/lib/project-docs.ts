@@ -45,12 +45,14 @@ export type FloorSummary = {
 export async function loadProjectDocs(projectId: string, user: User, scope: PointScope = 'all', quoteId?: string | null) {
   const payload = await getPayloadClient()
   const project = (await payload
-    .findByID({ collection: 'projects', id: projectId, depth: 1, user, overrideAccess: false, populate: { users: { name: true, phone: true } } })
+    .findByID({ collection: 'projects', id: projectId, depth: 0, user, overrideAccess: false })
     .catch(() => null)) as Project | null
   if (!project) return null
+  const ownerId = relId(project.owner)
+  const headerUserId = ownerId || String(user.id)
   const [catalog, company, quotesRes, contracts, projectsRes] = await Promise.all([
     getCatalog(),
-    getCompanyInfo(),
+    getCompanyInfo(headerUserId),
     payload.find({
       collection: 'quotes',
       where: { project: { equals: project.id } },
@@ -295,7 +297,17 @@ export async function loadProjectDocs(projectId: string, user: User, scope: Poin
     })
     .filter((f) => f.pointCount > 0 || scope === 'all')
 
-  const owner = project.owner && typeof project.owner === 'object' ? (project.owner as User) : null
+  const owner = ownerId
+    ? ((await payload
+        .findByID({
+          collection: 'users',
+          id: ownerId,
+          depth: 0,
+          overrideAccess: true,
+          select: { name: true, phone: true },
+        })
+        .catch(() => null)) as User | null)
+    : null
   const projectList = (projectsRes.docs as Project[])
     .filter((p) => (p.pointCount ?? 0) > 0 || String(p.id) === String(project.id))
     .map((p) => ({
