@@ -1,8 +1,9 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowRight } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
-import { APP_DESCRIPTION, APP_NAME, APP_TAGLINE, brandInitials } from '@/lib/brand'
+import { APP_DESCRIPTION, APP_NAME, APP_TAGLINE, COMPANY_NAME } from '@/lib/brand'
 
 const NAV = [
   { label: '点位图', href: '#pointmap' },
@@ -11,12 +12,9 @@ const NAV = [
   { label: '更多能力', href: '#features' },
 ]
 
-function BrandMark() {
-  return (
-    <span aria-hidden className="flex size-8 items-center justify-center rounded-lg bg-linear-to-br from-chart-1 to-chart-4 text-xs font-bold tracking-tight text-foreground shadow-lg">
-      {brandInitials(APP_NAME)}
-    </span>
-  )
+/** 横版标识（白色字，深色背景用），文件见 public/brand */
+function BrandLogo({ className }: { className?: string }) {
+  return <Image src="/brand/fmkj-logo-white.svg" alt={APP_NAME} width={436} height={120} unoptimized priority className={className} />
 }
 
 /** 首页顶部导航：毛玻璃吸顶 */
@@ -25,9 +23,8 @@ export function LandingNav() {
     <header className="sticky top-0 z-40 border-b border-border/60 bg-background/70 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
         <Link href="/" aria-label={`${APP_NAME} 首页`} className="flex shrink-0 items-center gap-2.5">
-          <BrandMark />
-          <span className="text-base font-semibold tracking-tight">{APP_NAME}</span>
-          <span className="hidden text-xs text-muted-foreground lg:inline">{APP_TAGLINE}</span>
+          <BrandLogo className="h-8 w-auto" />
+          <span className="hidden border-l border-border pl-2.5 text-xs text-muted-foreground lg:inline">{APP_TAGLINE}</span>
         </Link>
         <nav aria-label="首页导航" className="hidden flex-1 items-center justify-center gap-1 md:flex">
           {NAV.map((item) => (
@@ -61,6 +58,7 @@ export function LandingFooter() {
       links: [
         { label: '登录账号', href: '/login' },
         { label: '进入工作台', href: '/projects' },
+        { label: '品牌资源', href: '/brand' },
       ],
     },
   ]
@@ -68,11 +66,7 @@ export function LandingFooter() {
     <footer className="border-t border-border">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-12 lg:px-8">
         <div className="md:col-span-6">
-          <div className="flex items-center gap-2.5">
-            <BrandMark />
-            <span className="text-base font-semibold tracking-tight">{APP_NAME}</span>
-            <span className="text-xs text-muted-foreground">{APP_TAGLINE}</span>
-          </div>
+          <BrandLogo className="h-10 w-auto" />
           <p className="mt-4 max-w-sm text-sm text-muted-foreground">{APP_DESCRIPTION}</p>
         </div>
         {groups.map((group) => (
@@ -93,7 +87,7 @@ export function LandingFooter() {
       <div className="border-t border-border">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-6 text-xs text-muted-foreground sm:px-6 lg:px-8">
           <p>
-            © {year} {APP_NAME} · {APP_TAGLINE}
+            © {year} {COMPANY_NAME}
           </p>
           <p>文中品牌名称与标识归各自权利人所有</p>
         </div>
