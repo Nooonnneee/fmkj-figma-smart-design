@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 
+import { PageHeader } from '@/components/page-header'
 import { allStyles, availableStyles, DOC_KIND_LIST, DOC_KINDS } from '@/documents/registry'
 import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
@@ -7,6 +8,7 @@ import { getCompanyInfo } from '@/lib/cached-data'
 import { DEFAULT_CONTRACT_TERMS } from '@/lib/contracts'
 import { getPluginFlags } from '@/plugins/state'
 
+import { AppearanceSettings } from './appearance-settings'
 import { CompanyForm } from './company-form'
 
 export const metadata = { title: pageTitle('设置') }
@@ -19,10 +21,8 @@ export default async function SettingsPage() {
 
   return (
     <section className="mx-auto flex w-full max-w-3xl flex-col gap-5">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">设置</h1>
-        <p className="text-sm text-muted-foreground">当前账号专属的报价单/合同抬头、联系方式、默认条款，以及各类文档的默认模板</p>
-      </header>
+      <PageHeader title="设置" description="外观偏好，以及当前账号专属的报价单 / 合同抬头、联系方式、默认条款和文档模板" />
+      <AppearanceSettings />
       <CompanyForm
         initial={{
           name: company.name ?? '',

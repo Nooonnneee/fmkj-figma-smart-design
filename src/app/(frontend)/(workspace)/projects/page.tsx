@@ -1,18 +1,22 @@
 import Form from 'next/form'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { FolderKanban, Plus, Search } from 'lucide-react'
+import { ArrowRight, CircleCheck, FileSignature, FolderKanban, MapPin, Plus, Search, Wallet } from 'lucide-react'
 import type { Where } from 'payload'
 
+import { BrandMark } from '@/components/brand/brand-mark'
 import { FilterTabs } from '@/components/filter-tabs'
+import { PageHeader } from '@/components/page-header'
 import { SearchSubmit } from '@/components/search-submit'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { relId } from '@/lib/access'
 import { appAuth } from '@/lib/app-auth'
-import { pageTitle } from '@/lib/brand'
+import { APP_NAME, pageTitle } from '@/lib/brand'
+import { getCompanyInfo } from '@/lib/cached-data'
 import { getPayloadClient } from '@/lib/payload'
 import { countScenePoints } from '@/lib/point-count'
 import { fmtDate, PROJECT_SECTIONS, projectProgress } from '@/lib/projects'
@@ -22,6 +26,12 @@ import { cn } from '@/lib/utils'
 export const metadata = { title: pageTitle('项目') }
 
 type Amount = { value: number; caption: string }
+
+/** 系统为新成员发放的示例项目，名称带「【示例】」前缀 */
+const DEMO_PREFIX = '【示例】'
+const isDemo = (name: string) => name.startsWith(DEMO_PREFIX)
+
+const compactYuan = (n: number) => `¥${Math.round(n).toLocaleString('zh-CN')}`
 
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ q?: string; view?: string }> }) {
   const user = await appAuth.getCurrentUser()
@@ -126,20 +136,103 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
     return s ? `/projects?${s}` : '/projects'
   }
 
+  // 概览数字：只在「进行中、未搜索」时展示，口径与下方列表一致
+  const overview = !archived && !keyword && projects.length > 0
+  const totals = { amount: 0, points: 0, signed: 0 }
+  if (overview) {
+    for (const p of projects) {
+      const pid = String(p.id)
+      totals.amount += amountOf(pid)?.value ?? 0
+      totals.points += p.pointCount ?? 0
+      if (contractOf.get(pid)?.status === 'signed') totals.signed++
+    }
+  }
+  const stats = [
+    { label: '进行中项目', value: `${activeCount.totalDocs}`, icon: FolderKanban },
+    { label: '项目金额合计', value: compactYuan(totals.amount), icon: Wallet },
+    { label: '已签合同', value: `${totals.signed}`, icon: FileSignature },
+    { label: '点位总数', value: totals.points.toLocaleString('zh-CN'), icon: MapPin },
+  ]
+
+  // 新成员上手引导：还没有自己的项目时显示，建好第一个项目后自动消失
+  const demo = !archived && !keyword ? projects.find((p) => isDemo(p.name)) : undefined
+  const isNewMember = !archived && !keyword && archivedCount.totalDocs === 0 && projects.every((p) => isDemo(p.name))
+  const company = isNewMember ? await getCompanyInfo(user.id) : null
+  const steps = [
+    ...(demo
+      ? [{ title: '看看示例项目', description: '三层别墅的点位、选型和报价，一看就懂', href: `/projects/${demo.id}/point-map`, done: false }]
+      : []),
+    { title: '完善公司资料', description: '名称、Logo、联系方式会印在报价单和合同上', href: '/settings', done: Boolean(company?.isCustom) },
+    { title: '新建第一个项目', description: '填好客户与房屋信息，就能开始布置点位', href: '/projects/new', done: false },
+  ]
+
   return (
-    <section className="flex flex-col gap-5">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">项目</h1>
-          <p className="text-sm text-muted-foreground">
+    <section className="mx-auto flex w-full max-w-6xl flex-col gap-5">
+      <PageHeader
+        title="项目"
+        description={
+          <>
             {archived ? '已归档' : '进行中'} <span className="font-medium text-foreground tabular-nums">{projects.length}</span> 个
-            {keyword ? `，匹配「${keyword}」` : ''}
-          </p>
+            {keyword ? `，匹配「${keyword}」` : '，每个项目按「信息 → 点位 → 报价 → 合同 → 归档」推进'}
+          </>
+        }
+        actions={
+          <Button asChild>
+            <Link href="/projects/new"><Plus className="size-4" />新建项目</Link>
+          </Button>
+        }
+      />
+
+      {isNewMember ? (
+        <Card className="gap-4 px-5 ring-primary/20">
+          <div className="flex items-start gap-3">
+            <BrandMark decorative className="size-9" />
+            <div className="space-y-0.5">
+              <p className="font-semibold">欢迎来到{APP_NAME}，三步开始第一个项目</p>
+              <p className="text-sm text-muted-foreground">先用示例项目熟悉流程；公司资料填好后，报价单和合同会自动带上你的抬头。</p>
+            </div>
+          </div>
+          <ol className={cn('grid gap-2', steps.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2')}>
+            {steps.map((s, i) => (
+              <li key={s.title}>
+                <Link
+                  href={s.href}
+                  className="group flex h-full items-start gap-3 rounded-lg border bg-background p-3 transition-colors hover:border-primary/40 hover:bg-accent/50"
+                >
+                  {s.done ? (
+                    <CircleCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-label="已完成" />
+                  ) : (
+                    <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-primary/40 text-xs font-medium text-primary">
+                      {i + 1}
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className={cn('block text-sm font-medium', s.done && 'text-muted-foreground line-through')}>{s.title}</span>
+                    <span className="block text-xs text-muted-foreground">{s.description}</span>
+                  </span>
+                  <ArrowRight className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </Card>
+      ) : null}
+
+      {overview ? (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {stats.map((s) => (
+            <Card key={s.label} size="sm" className="flex-row items-center gap-3 px-4">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <s.icon className="size-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">{s.label}</p>
+                <p className="truncate text-lg font-semibold tabular-nums">{s.value}</p>
+              </div>
+            </Card>
+          ))}
         </div>
-        <Button asChild>
-          <Link href="/projects/new"><Plus className="size-4" />新建项目</Link>
-        </Button>
-      </header>
+      ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <FilterTabs
@@ -161,7 +254,9 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
 
       {projects.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed px-6 py-16 text-center">
-          <FolderKanban className="size-8 text-muted-foreground" />
+          <span className="mb-1 flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <FolderKanban className="size-6" />
+          </span>
           <p className="font-medium">{keyword ? '没有找到符合条件的项目' : archived ? '还没有归档的项目' : '还没有进行中的项目'}</p>
           <p className="text-sm text-muted-foreground">
             {keyword ? '换个关键词试试。' : archived ? '项目签约交付后，在项目的「归档」里归档。' : '新建项目后，按「信息 → 点位 → 报价 → 合同 → 归档」推进。'}
@@ -190,9 +285,12 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                 return (
                   <TableRow key={pid} className="relative">
                     <TableCell className="max-w-0 pl-4 sm:pl-6">
-                      <Link href={`/projects/${pid}`} className="block truncate font-medium after:absolute after:inset-0 hover:underline">
-                        {p.name}
-                      </Link>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Link href={`/projects/${pid}`} className="truncate font-medium after:absolute after:inset-0 hover:underline">
+                          {isDemo(p.name) ? p.name.slice(DEMO_PREFIX.length) : p.name}
+                        </Link>
+                        {isDemo(p.name) ? <Badge variant="secondary" className="shrink-0">示例</Badge> : null}
+                      </div>
                       <div className="mt-0.5 truncate text-xs text-muted-foreground">
                         {[p.customerName, p.community].filter(Boolean).join(' · ') || '未填写客户'}
                       </div>
@@ -206,7 +304,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                         {/* 五个板块的迷你进度，由数据自动推算 */}
                         <span className="flex w-28 gap-0.5" aria-hidden="true">
                           {PROJECT_SECTIONS.map((s, i) => (
-                            <span key={s.key} className={cn('h-1 flex-1 rounded-full', i <= progress.index ? 'bg-foreground/70' : 'bg-muted')} />
+                            <span key={s.key} className={cn('h-1 flex-1 rounded-full', i <= progress.index ? 'bg-primary' : 'bg-muted')} />
                           ))}
                         </span>
                       </div>

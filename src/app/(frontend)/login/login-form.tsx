@@ -1,12 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Image from 'next/image'
 import { AlertCircle, CheckCircle2, KeyRound, Loader2, LogIn, Mail, QrCode, RefreshCw } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { cn } from '@/lib/utils'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export function LoginForm({ redirectTo }: { redirectTo: string }) {
   const [loginTab, setLoginTab] = useState<'wechat' | 'password'>('wechat')
@@ -104,43 +105,30 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
   return (
     <div className="space-y-6">
       <div className="space-y-2 text-center lg:text-left">
-        <h1 className="text-2xl font-semibold tracking-tight">登录您的账号</h1>
-        <p className="text-sm text-muted-foreground">使用微信小程序扫码登录，或输入邮箱密码继续</p>
+        <h1 className="text-2xl font-semibold tracking-tight">欢迎回来</h1>
+        <p className="text-sm text-muted-foreground">用微信小程序扫码，或输入邮箱和密码登录</p>
       </div>
 
-      <div className="grid grid-cols-2 rounded-lg bg-muted p-0.5 text-xs">
-        <button
-          type="button"
-          onClick={() => {
-            setLoginTab('wechat')
-            setError('')
-          }}
-          className={cn(
-            'inline-flex items-center justify-center gap-1.5 rounded-md py-1.5 font-medium transition-colors',
-            loginTab === 'wechat' ? 'bg-background text-foreground shadow-2xs' : 'text-muted-foreground',
-          )}
-        >
-          <QrCode className="size-3.5" />
-          微信扫码登录
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setLoginTab('password')
-            setError('')
-          }}
-          className={cn(
-            'inline-flex items-center justify-center gap-1.5 rounded-md py-1.5 font-medium transition-colors',
-            loginTab === 'password' ? 'bg-background text-foreground shadow-2xs' : 'text-muted-foreground',
-          )}
-        >
-          <Mail className="size-3.5" />
-          邮箱密码登录
-        </button>
-      </div>
+      <Tabs
+        value={loginTab}
+        onValueChange={(v) => {
+          setLoginTab(v === 'password' ? 'password' : 'wechat')
+          setError('')
+        }}
+        className="gap-6"
+      >
+        <TabsList className="w-full">
+          <TabsTrigger value="wechat">
+            <QrCode className="size-3.5" />
+            微信扫码登录
+          </TabsTrigger>
+          <TabsTrigger value="password">
+            <Mail className="size-3.5" />
+            邮箱密码登录
+          </TabsTrigger>
+        </TabsList>
 
-      {loginTab === 'wechat' ? (
-        <div className="space-y-4">
+        <TabsContent value="wechat" className="space-y-4">
           {error ? (
             <div role="alert" className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive-strong">
               <AlertCircle className="size-4 shrink-0" />
@@ -148,23 +136,23 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
             </div>
           ) : null}
           <div className="flex flex-col items-center gap-3 rounded-xl border bg-muted/20 p-6 text-center">
+            {/* 二维码需要白底才能被稳定识别，深色模式下也保持白底 */}
             <div className="relative flex size-48 items-center justify-center overflow-hidden rounded-xl border bg-white p-2 shadow-2xs">
               {qrStatus === 'loading' ? (
                 <Loader2 className="size-6 animate-spin text-muted-foreground" />
               ) : qrImage ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={qrImage} alt="微信小程序扫码登录" className="size-full object-contain" />
+                <Image src={qrImage} alt="微信小程序扫码登录" width={176} height={176} unoptimized className="size-full object-contain" />
               ) : null}
 
               {qrStatus === 'expired' ? (
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
                   onClick={() => void createQr()}
-                  className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/90 text-xs font-medium backdrop-blur-[2px]"
+                  className="absolute inset-0 h-auto flex-col gap-2 rounded-none bg-background/90 text-xs backdrop-blur-xs hover:bg-background/95"
                 >
                   <RefreshCw className="size-5 text-primary" />
                   <span>二维码已过期，点击刷新</span>
-                </button>
+                </Button>
               ) : qrStatus === 'confirmed' ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/95 text-xs font-medium text-success">
                   <CheckCircle2 className="size-6" />
@@ -180,57 +168,59 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
               </p>
             </div>
           </div>
-        </div>
-      ) : (
-      <form className="space-y-4" onSubmit={submit} noValidate>
-        {error ? (
-          <div role="alert" className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive-strong">
-            <AlertCircle className="size-4 shrink-0" />
-            {error}
-          </div>
-        ) : null}
-        <div className="grid gap-2">
-          <Label htmlFor="email">邮箱</Label>
-          <div className="relative">
-            <Mail className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="email"
-              className="h-10 pl-9"
-              type="email"
-              placeholder="name@example.com"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value)
-                setError('')
-              }}
-            />
-          </div>
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="password">密码</Label>
-          <div className="relative">
-            <KeyRound className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="password"
-              className="h-10 pl-9"
-              type="password"
-              placeholder="输入密码"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value)
-                setError('')
-              }}
-            />
-          </div>
-        </div>
-        <Button type="submit" className="h-10 w-full" disabled={loading}>
-          {loading ? <Loader2 className="size-4 animate-spin" /> : <LogIn className="size-4" />}
-          {loading ? '登录中' : '登录'}
-        </Button>
-      </form>
-      )}
+        </TabsContent>
+
+        <TabsContent value="password">
+          <form className="space-y-4" onSubmit={submit} noValidate>
+            {error ? (
+              <div role="alert" className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive-strong">
+                <AlertCircle className="size-4 shrink-0" />
+                {error}
+              </div>
+            ) : null}
+            <div className="grid gap-2">
+              <Label htmlFor="email">邮箱</Label>
+              <div className="relative">
+                <Mail className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="email"
+                  className="h-10 pl-9"
+                  type="email"
+                  placeholder="name@example.com"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    setError('')
+                  }}
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="password">密码</Label>
+              <div className="relative">
+                <KeyRound className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="password"
+                  className="h-10 pl-9"
+                  type="password"
+                  placeholder="输入密码"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value)
+                    setError('')
+                  }}
+                />
+              </div>
+            </div>
+            <Button type="submit" className="h-10 w-full" disabled={loading}>
+              {loading ? <Loader2 className="size-4 animate-spin" /> : <LogIn className="size-4" />}
+              {loading ? '登录中' : '登录'}
+            </Button>
+          </form>
+        </TabsContent>
+      </Tabs>
       <p className="text-center text-sm text-muted-foreground">没有账号？请联系团队负责人开通</p>
     </div>
   )

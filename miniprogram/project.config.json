@@ -1,5 +1,5 @@
 {
-  "description": "FMKJ 智能家居设计报价 · 微信小程序",
+  "description": "繁梦空间 · 智能家居设计报价 · 微信小程序",
   "packOptions": { "ignore": [{ "type": "file", "value": "README.md" }], "include": [] },
   "miniprogramRoot": "./",
   "compileType": "miniprogram",

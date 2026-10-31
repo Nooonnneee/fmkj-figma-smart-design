@@ -67,7 +67,7 @@ export default async function ProjectInfoPage({ params }: { params: Promise<{ id
                   <span
                     className={cn(
                       'flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold tabular-nums',
-                      step.done ? 'border-primary bg-primary text-primary-foreground' : current ? 'border-foreground text-foreground' : 'text-muted-foreground',
+                      step.done ? 'border-primary bg-primary text-primary-foreground' : current ? 'border-primary text-primary ring-3 ring-primary/15' : 'text-muted-foreground',
                     )}
                   >
                     {step.done ? <Check className="size-3.5" /> : i + 1}

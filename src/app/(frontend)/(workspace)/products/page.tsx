@@ -8,6 +8,7 @@ import { BrandLogo } from '@/components/brand-logo'
 import { DeviceSymbol } from '@/components/device-symbol'
 import { LinkPending } from '@/components/link-pending'
 import { FilterTabs } from '@/components/filter-tabs'
+import { PageHeader } from '@/components/page-header'
 import { SearchSubmit } from '@/components/search-submit'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -157,28 +158,30 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   }
 
   return (
-    <section className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">产品库</h1>
-          <p className="text-sm text-muted-foreground">
-            共 <span className="font-medium text-foreground tabular-nums">{products.length}</span> 个产品，在后台（/admin）维护
-          </p>
-        </div>
-        <Form action="/products" className="flex flex-wrap items-center gap-2">
-          {KEYS.filter((k) => !['q', 'min', 'max', 'page'].includes(k) && f[k]).map((k) => <input key={k} type="hidden" name={k} value={f[k]} />)}
-          <div className="relative w-full sm:w-72">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input name="q" defaultValue={f.q} placeholder="搜索名称、SKU、型号、品牌" aria-label="搜索产品" className="pl-9" />
-          </div>
-          <div className="flex items-center gap-1">
-            <Input name="min" defaultValue={f.min} inputMode="decimal" placeholder="¥ 最低" aria-label="最低价" className="w-20" />
-            <span className="text-muted-foreground">–</span>
-            <Input name="max" defaultValue={f.max} inputMode="decimal" placeholder="¥ 最高" aria-label="最高价" className="w-20" />
-          </div>
-          <SearchSubmit variant="default" />
-        </Form>
-      </header>
+    <section className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+      <PageHeader
+        title="产品库"
+        description={
+          <>
+            共 <span className="font-medium text-foreground tabular-nums">{products.length}</span> 个产品，点位选型和报价都从这里取价，在后台（/admin）维护
+          </>
+        }
+        actions={
+          <Form action="/products" className="flex flex-wrap items-center gap-2">
+            {KEYS.filter((k) => !['q', 'min', 'max', 'page'].includes(k) && f[k]).map((k) => <input key={k} type="hidden" name={k} value={f[k]} />)}
+            <div className="relative w-full sm:w-72">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input name="q" defaultValue={f.q} placeholder="搜索名称、SKU、型号、品牌" aria-label="搜索产品" className="pl-9" />
+            </div>
+            <div className="flex items-center gap-1">
+              <Input name="min" defaultValue={f.min} inputMode="decimal" placeholder="¥ 最低" aria-label="最低价" className="w-20" />
+              <span className="text-muted-foreground">–</span>
+              <Input name="max" defaultValue={f.max} inputMode="decimal" placeholder="¥ 最高" aria-label="最高价" className="w-20" />
+            </div>
+            <SearchSubmit variant="default" />
+          </Form>
+        }
+      />
 
       <div className="grid gap-6 lg:grid-cols-[15rem_1fr]">
         {/* 窄屏下筛选栏默认收起（纯 CSS 开关，无需客户端脚本），避免类别和品牌列表占满首屏 */}
@@ -190,7 +193,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           <span className="flex items-center gap-2"><SlidersHorizontal className="size-4" />筛选{activeCount ? <span className="rounded-full bg-primary px-1.5 text-[11px] text-primary-foreground tabular-nums">{activeCount}</span> : null}</span>
           <ChevronDown className="size-4 text-muted-foreground" />
         </label>
-        <aside className="hidden flex-col gap-5 peer-checked:flex lg:sticky lg:flex lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
+        {/* 吸顶时让出 48px 顶栏 */}
+        <aside className="hidden flex-col gap-5 peer-checked:flex lg:sticky lg:top-16 lg:flex lg:max-h-[calc(100vh-5rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
           {section(
             '类别',
             <>

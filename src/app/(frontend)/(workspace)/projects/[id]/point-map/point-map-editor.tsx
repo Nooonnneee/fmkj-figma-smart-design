@@ -22,8 +22,8 @@ import { areaTypeLabel } from '@/lib/area-types'
 import { categoryOfType, DEVICE_GROUPS, DEVICE_TYPE_ORDER, deviceTypeLabel, deviceTypeOf } from '@/lib/device-types'
 import { registerLeaveGuard } from '@/lib/leave-guard'
 import { resolvePoint, summarizePoints, type ProjectDefaults } from '@/lib/point-map-items'
-import { markerBinaryFile } from '@/lib/point-marker-data'
-import { isMarkerFileId, markerFileId } from '@/lib/point-markers'
+import { canvasFile, markerBinaryFile } from '@/lib/point-marker-data'
+import { markerFileId } from '@/lib/point-markers'
 import { inferScopeFromTitle, inPointScope, POINT_SCOPES, pointScopeLabel, type PointScope } from '@/lib/point-scopes'
 import {
   buildAreaElements,
@@ -176,8 +176,8 @@ export function PointMapEditor({
   const initialData = useMemo(
     () => ({
       elements: initialScene.elements as never,
-      // 标记图标用内嵌 SVG 数据（保存时换回静态地址）
-      files: Object.fromEntries(Object.entries(initialScene.files).map(([id, f]) => [id, isMarkerFileId(id) ? markerBinaryFile(id.replace(/^mk\d+-/, '')) : f])) as never,
+      // 标记图标、空白图纸用内嵌 SVG 数据（保存时换回静态地址）
+      files: Object.fromEntries(Object.entries(initialScene.files).map(([id, f]) => [id, canvasFile(f)])) as never,
       appState: {
         viewBackgroundColor: (initialScene.appState?.viewBackgroundColor as string) ?? '#ffffff',
         currentItemRoughness: 0,
@@ -312,9 +312,7 @@ export function PointMapEditor({
     void (async () => {
       const ex = await import('@excalidraw/excalidraw')
       const restored = ex.restoreElements(initialScene.elements as never, null)
-      const filesMap = Object.values(initialScene.files).map((f) =>
-        isMarkerFileId(f.id) ? markerBinaryFile(f.id.replace(/^mk\d+-/, '')) : f,
-      )
+      const filesMap = Object.values(initialScene.files).map(canvasFile)
       if (filesMap.length) api.addFiles(filesMap as never)
       api.updateScene({ elements: restored as never })
       const sheets = sceneSheets(initialScene.elements, initialScene.files)

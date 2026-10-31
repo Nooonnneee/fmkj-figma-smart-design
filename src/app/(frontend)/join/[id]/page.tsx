@@ -1,11 +1,12 @@
 import Link from 'next/link'
 import { AlertTriangle, Eye, PencilLine, Users } from 'lucide-react'
 
+import { BrandLockup } from '@/components/brand/brand-mark'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { appAuth } from '@/lib/app-auth'
-import { pageTitle } from '@/lib/brand'
+import { APP_NAME, pageTitle } from '@/lib/brand'
 import { getPayloadClient } from '@/lib/payload'
 import { parseShareConfig } from '@/lib/project-access'
 import type { User } from '@/payload-types'
@@ -43,7 +44,10 @@ export default async function JoinProjectPage({
 
   if (!valid || !project || !shareConfig) {
     return (
-      <main className="flex min-h-svh items-center justify-center bg-muted/30 p-4">
+      <main className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted/30 p-4">
+        <Link href="/" aria-label={`${APP_NAME} 首页`}>
+          <BrandLockup />
+        </Link>
         <Card className="w-full max-w-md text-center">
           <CardHeader className="items-center">
             <div className="flex size-11 items-center justify-center rounded-full bg-warning/15 text-warning">
@@ -66,7 +70,10 @@ export default async function JoinProjectPage({
   const canEdit = shareConfig.role === 'edit'
 
   return (
-    <main className="flex min-h-svh items-center justify-center bg-muted/30 p-4">
+    <main className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted/30 p-4">
+      <Link href="/" aria-label={`${APP_NAME} 首页`}>
+        <BrandLockup />
+      </Link>
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-3">
           <div className="flex items-center justify-between">

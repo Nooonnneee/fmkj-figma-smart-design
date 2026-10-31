@@ -36,7 +36,8 @@ export default function HomePage() {
   ]
 
   return (
-    <div data-landing className="dark relative min-h-svh overflow-x-clip bg-background text-foreground">
+    // 首页固定深色 + 品牌「繁梦紫」配色，不随访客选择的外观变化
+    <div data-landing data-accent="fanmeng" className="dark relative min-h-svh overflow-x-clip bg-background text-foreground">
       <noscript>
         <style dangerouslySetInnerHTML={{ __html: NOSCRIPT_CSS }} />
       </noscript>

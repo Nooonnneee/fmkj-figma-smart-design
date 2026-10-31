@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 
 import { FilterTabs } from '@/components/filter-tabs'
+import { PageHeader } from '@/components/page-header'
 import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
 import { PLUGINS } from '@/plugins'
@@ -37,22 +38,20 @@ export default async function PluginsPage({
 
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">插件市场</h1>
-          <p className="text-sm text-muted-foreground">
-            核心主链路（项目信息 → 点位 → 报价 → 合同 → 归档）独立运行；外围功能按插件启用，尚未开发的功能标为「待开发」
-          </p>
-        </div>
-        <FilterTabs
-          label="插件状态筛选"
-          items={[
-            { key: 'all', label: '全部', href: '/plugins', active: tab === 'all', count: allItems.length },
-            { key: 'ready', label: '已开发', href: '/plugins?tab=ready', active: tab === 'ready', count: readyCount },
-            { key: 'coming-soon', label: '待开发', href: '/plugins?tab=coming-soon', active: tab === 'coming-soon', count: comingSoonCount },
-          ]}
-        />
-      </header>
+      <PageHeader
+        title="插件市场"
+        description="核心流程（信息 → 点位 → 报价 → 合同 → 归档）始终可用；外围功能按需启用，标「待开发」的即将上线"
+        actions={
+          <FilterTabs
+            label="插件状态筛选"
+            items={[
+              { key: 'all', label: '全部', href: '/plugins', active: tab === 'all', count: allItems.length },
+              { key: 'ready', label: '已开发', href: '/plugins?tab=ready', active: tab === 'ready', count: readyCount },
+              { key: 'coming-soon', label: '待开发', href: '/plugins?tab=coming-soon', active: tab === 'coming-soon', count: comingSoonCount },
+            ]}
+          />
+        }
+      />
       <PluginList items={shown} selectedId={sp.plugin ?? null} />
     </section>
   )

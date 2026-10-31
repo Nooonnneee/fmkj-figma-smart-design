@@ -42,7 +42,7 @@ export function ProjectHeader({
       <div className="flex flex-wrap items-center md:h-12 md:flex-nowrap">
         <div className="flex h-12 min-w-0 flex-1 items-center gap-2 pl-3 md:flex-none md:pl-4">
           <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
-          <Separator orientation="vertical" className="h-5" />
+          <Separator orientation="vertical" className="data-vertical:h-5 data-vertical:self-center" />
           <GuardedLink href="/projects" className="hidden shrink-0 text-sm text-muted-foreground transition-colors hover:text-foreground sm:inline">
             项目
           </GuardedLink>
@@ -87,7 +87,7 @@ export function ProjectHeader({
                   'relative inline-flex shrink-0 items-center px-3 text-sm transition-colors duration-150',
                   'focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset',
                   isActive
-                    ? 'font-medium text-foreground after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-foreground'
+                    ? 'font-medium text-foreground after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary'
                     : 'text-muted-foreground hover:text-foreground',
                 )}
               >

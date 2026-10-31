@@ -162,6 +162,8 @@ export type CompanyInfo = {
   aiModels: AiModelConfig[]
   logo: { url: string; alt: string; width: number | null; height: number | null } | null
   qrCode: { url: string; alt: string } | null
+  /** 成员是否填写过自己的公司资料（未填写时沿用平台默认抬头） */
+  isCustom?: boolean
 }
 
 function parseDocumentDefaults(value: unknown): CompanyInfo['documentDefaults'] {
@@ -280,5 +282,6 @@ export async function getCompanyInfo(userId?: string | number | null): Promise<C
     aiModels: base.aiModels,
     logo: logo && logoUrl ? { url: logoUrl, alt: logo.alt || name, width: logo.width ?? null, height: logo.height ?? null } : null,
     qrCode: qr && qrUrl ? { url: qrUrl, alt: qr.alt || '二维码' } : null,
+    isCustom: true,
   }
 }

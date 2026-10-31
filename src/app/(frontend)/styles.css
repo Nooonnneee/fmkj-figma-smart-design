@@ -183,6 +183,125 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/*
+ * 主题风格（强调色）：<html data-accent="fanmeng | jade | classic">。
+ * 「经典」沿用上面的中性色；繁梦紫、青碧在浅色 / 深色下分别覆盖主色、侧边栏和中性色的微妙色调。
+ */
+[data-accent="fanmeng"] {
+  --primary: oklch(0.51 0.22 279);
+  --primary-foreground: oklch(0.985 0.005 285);
+  --secondary: oklch(0.965 0.012 285);
+  --secondary-foreground: oklch(0.3 0.09 280);
+  --muted: oklch(0.968 0.007 285);
+  --muted-foreground: oklch(0.5 0.03 282);
+  --accent: oklch(0.955 0.02 285);
+  --accent-foreground: oklch(0.32 0.12 280);
+  --border: oklch(0.915 0.012 285);
+  --input: oklch(0.915 0.012 285);
+  --ring: oklch(0.62 0.17 281);
+  --sidebar: oklch(0.982 0.008 286);
+  --sidebar-foreground: oklch(0.2 0.03 280);
+  --sidebar-primary: oklch(0.51 0.22 279);
+  --sidebar-primary-foreground: oklch(0.985 0.005 285);
+  --sidebar-accent: oklch(0.948 0.024 285);
+  --sidebar-accent-foreground: oklch(0.3 0.12 280);
+  --sidebar-border: oklch(0.915 0.014 285);
+  --sidebar-ring: oklch(0.62 0.17 281);
+}
+.dark[data-accent="fanmeng"] {
+  --background: oklch(0.155 0.02 283);
+  --foreground: oklch(0.975 0.005 285);
+  --card: oklch(0.2 0.026 283);
+  --card-foreground: oklch(0.975 0.005 285);
+  --popover: oklch(0.205 0.026 283);
+  --popover-foreground: oklch(0.975 0.005 285);
+  --primary: oklch(0.72 0.15 282);
+  --primary-foreground: oklch(0.17 0.04 283);
+  --secondary: oklch(0.26 0.03 283);
+  --secondary-foreground: oklch(0.975 0.005 285);
+  --muted: oklch(0.25 0.026 283);
+  --muted-foreground: oklch(0.73 0.03 285);
+  --accent: oklch(0.27 0.04 283);
+  --accent-foreground: oklch(0.975 0.005 285);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.6 0.15 282);
+  --sidebar: oklch(0.18 0.024 283);
+  --sidebar-foreground: oklch(0.975 0.005 285);
+  --sidebar-primary: oklch(0.72 0.15 282);
+  --sidebar-primary-foreground: oklch(0.17 0.04 283);
+  --sidebar-accent: oklch(0.26 0.034 283);
+  --sidebar-accent-foreground: oklch(0.975 0.005 285);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.6 0.15 282);
+}
+[data-accent="jade"] {
+  --primary: oklch(0.5 0.095 182);
+  --primary-foreground: oklch(0.985 0.005 180);
+  --secondary: oklch(0.965 0.01 180);
+  --secondary-foreground: oklch(0.3 0.05 185);
+  --muted: oklch(0.968 0.006 180);
+  --muted-foreground: oklch(0.5 0.02 185);
+  --accent: oklch(0.955 0.018 178);
+  --accent-foreground: oklch(0.32 0.07 182);
+  --border: oklch(0.915 0.01 180);
+  --input: oklch(0.915 0.01 180);
+  --ring: oklch(0.63 0.1 180);
+  --sidebar: oklch(0.982 0.007 175);
+  --sidebar-foreground: oklch(0.2 0.02 190);
+  --sidebar-primary: oklch(0.5 0.095 182);
+  --sidebar-primary-foreground: oklch(0.985 0.005 180);
+  --sidebar-accent: oklch(0.948 0.02 178);
+  --sidebar-accent-foreground: oklch(0.3 0.07 182);
+  --sidebar-border: oklch(0.915 0.012 178);
+  --sidebar-ring: oklch(0.63 0.1 180);
+}
+.dark[data-accent="jade"] {
+  --background: oklch(0.155 0.014 205);
+  --foreground: oklch(0.975 0.004 180);
+  --card: oklch(0.2 0.018 205);
+  --card-foreground: oklch(0.975 0.004 180);
+  --popover: oklch(0.205 0.018 205);
+  --popover-foreground: oklch(0.975 0.004 180);
+  --primary: oklch(0.76 0.11 178);
+  --primary-foreground: oklch(0.18 0.03 195);
+  --secondary: oklch(0.26 0.022 200);
+  --secondary-foreground: oklch(0.975 0.004 180);
+  --muted: oklch(0.25 0.018 202);
+  --muted-foreground: oklch(0.73 0.02 190);
+  --accent: oklch(0.27 0.03 195);
+  --accent-foreground: oklch(0.975 0.004 180);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.62 0.1 180);
+  --sidebar: oklch(0.18 0.017 205);
+  --sidebar-foreground: oklch(0.975 0.004 180);
+  --sidebar-primary: oklch(0.76 0.11 178);
+  --sidebar-primary-foreground: oklch(0.18 0.03 195);
+  --sidebar-accent: oklch(0.26 0.024 200);
+  --sidebar-accent-foreground: oklch(0.975 0.004 180);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.62 0.1 180);
+}
+
+/* 主题风格色块与品牌色（品牌规范页、Logo 底色使用，不随主题变化） */
+@theme {
+  --color-swatch-fanmeng: oklch(0.55 0.22 280);
+  --color-swatch-jade: oklch(0.56 0.11 180);
+  --color-swatch-classic: oklch(0.205 0 0);
+  --color-brand-violet: #8b6dff;
+  --color-brand-indigo: #3f3bdb;
+  --color-brand-gold: #ffc24b;
+  --color-brand-gold-light: #ffdb7e;
+  --color-brand-gold-deep: #ffb536;
+  --color-brand-dusk: #1d1856;
+  --color-brand-night: #0b0a24;
+  --color-brand-ink: #16123a;
+  --color-brand-slate: #5f5a86;
+  --color-brand-lavender: #b7b0ff;
+  --color-brand-mist: #f4f3ff;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -539,9 +658,9 @@
   stroke-dasharray: 1;
 }
 
-/* 首页是深色主题：页面滚动到边界时也保持深色底，并启用锚点平滑滚动 */
+/* 首页是深色主题（繁梦紫）：页面滚动到边界时也保持同色深底，并启用锚点平滑滚动 */
 html:has([data-landing]) {
-  background-color: oklch(0.145 0 0);
+  background-color: oklch(0.155 0.02 283);
   color-scheme: dark;
 }
 @media (prefers-reduced-motion: no-preference) {

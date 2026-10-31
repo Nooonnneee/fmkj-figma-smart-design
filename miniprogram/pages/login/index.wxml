@@ -1,8 +1,8 @@
 <view class="login">
   <view class="brand">
-    <view class="logo">FM</view>
-    <view class="h1 mt-32">FMKJ 智能设计</view>
-    <view class="muted mt-8">点位图直接出报价 · 与网页版数据实时同步</view>
+    <image class="logo" src="/assets/brand/app-icon.png" mode="aspectFit" />
+    <view class="h1 mt-32">繁梦空间</view>
+    <view class="muted mt-8">智能家居设计报价 · 点位图直接出报价，与网页版实时同步</view>
   </view>
 
   <view wx:if="{{serverError}}" class="notice notice-warning mt-48">

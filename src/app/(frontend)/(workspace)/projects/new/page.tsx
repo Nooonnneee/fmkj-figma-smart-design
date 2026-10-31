@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
 
+import { PageHeader } from '@/components/page-header'
 import { Button } from '@/components/ui/button'
 import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
@@ -35,10 +36,7 @@ export default async function NewProjectPage() {
       <Button asChild variant="ghost" size="sm" className="-ml-2 w-fit text-muted-foreground">
         <Link href="/projects"><ChevronLeft className="size-4" />项目</Link>
       </Button>
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">新建项目</h1>
-        <p className="text-sm text-muted-foreground">都可以先空着，之后在项目「信息」里补充。</p>
-      </header>
+      <PageHeader title="新建项目" description="除了名称都可以先空着，之后在项目「信息」里补充；创建后就能上传户型图布置点位。" />
       <ProjectForm initial={{ platform }} />
     </section>
   )

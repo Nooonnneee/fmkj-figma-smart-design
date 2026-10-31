@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Check, Coins, Crown, FolderKanban, Gift, History, Loader2, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 
+import { PageHeader } from '@/components/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -97,10 +98,7 @@ export function MembershipClient({
 
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">会员与积分</h1>
-        <p className="text-sm text-muted-foreground">查看当前账号的会员权益、活跃项目额度、AI 积分余额，或使用兑换码激活升级</p>
-      </header>
+      <PageHeader title="会员与积分" description="查看当前账号的会员权益、活跃项目额度、AI 积分余额，或使用兑换码激活升级" />
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>

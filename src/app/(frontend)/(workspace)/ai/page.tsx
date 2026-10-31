@@ -45,7 +45,9 @@ export default async function AiPage({
   if (!flags['ai-copilot']) {
     return (
       <section className="mx-auto flex w-full max-w-xl flex-col items-center gap-3 rounded-xl border border-dashed px-6 py-14 text-center">
-        <Bot className="size-6 text-muted-foreground" />
+        <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <Bot className="size-6" />
+        </span>
         <div className="space-y-1">
           <h1 className="text-base font-semibold">「AI 对话侧栏（高级）」插件已关闭</h1>
           <p className="text-xs text-muted-foreground">
@@ -80,7 +82,8 @@ export default async function AiPage({
   const activeModels = enabledAiModels(company.aiModels)
 
   return (
-    <div className="mx-auto flex h-[calc(100svh-7.5rem)] w-full max-w-3xl flex-col">
+    // 视口高度减去 48px 顶栏和 main 的上下内边距
+    <div className="mx-auto flex h-[calc(100svh-5.5rem)] w-full max-w-3xl flex-col md:h-[calc(100svh-6.5rem)]">
       <AiSidebarDock plugins={plugins} projects={projects} credits={user.aiCredits ?? 0} configured={aiConfigured(activeModels)} models={activeModels} />
     </div>
   )

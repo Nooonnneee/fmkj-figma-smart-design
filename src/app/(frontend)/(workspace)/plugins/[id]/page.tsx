@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft, Bot, Clock, ExternalLink, FolderKanban, Settings } from 'lucide-react'
 
+import { PageHeader } from '@/components/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -77,13 +78,11 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
         </Button>
       </div>
 
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">{plugin.name}</h1>
-          <p className="text-sm text-muted-foreground">{plugin.description}</p>
-        </div>
-        <PluginDetailToggle id={plugin.id} name={plugin.name} status={plugin.status} initialEnabled={enabled} />
-      </header>
+      <PageHeader
+        title={plugin.name}
+        description={plugin.description}
+        actions={<PluginDetailToggle id={plugin.id} name={plugin.name} status={plugin.status} initialEnabled={enabled} />}
+      />
 
       <Card>
         <CardHeader>

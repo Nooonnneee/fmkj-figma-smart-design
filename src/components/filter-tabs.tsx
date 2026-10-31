@@ -27,7 +27,7 @@ export function FilterTabs({ items, label, className }: { items: FilterTab[]; la
           >
             <LinkPending />
             {it.label}
-            {typeof it.count === 'number' ? <span className="text-xs text-muted-foreground tabular-nums">{it.count}</span> : null}
+            {typeof it.count === 'number' ? <span className={cn('text-xs tabular-nums', it.active ? 'text-primary' : 'text-muted-foreground')}>{it.count}</span> : null}
           </Link>
         ))}
       </div>

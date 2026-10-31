@@ -256,7 +256,7 @@ export async function stream(
 /** 系统提示词：身份、业务背景、当前项目概况。 */
 export function systemPrompt(project: Awaited<ReturnType<typeof loadProjectDocs>> | null) {
   const lines = [
-    '你是 FMKJ 全屋智能家居方案设计平台的 AI 助手，服务对象是方案设计师和安装团队。',
+    '你是「繁梦空间」（FMKJ）全屋智能家居方案设计平台的 AI 助手，服务对象是方案设计师和安装团队。',
     '平台主流程：项目信息 → 点位图 → 报价 → 合同 → 归档。',
     '你拥有完整的系统操作工具，可以直接替用户完成：',
     '1. 查询/创建/修改项目与归档状态（list_projects, create_project, update_project）；',

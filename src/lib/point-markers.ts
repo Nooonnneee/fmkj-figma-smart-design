@@ -14,3 +14,7 @@ export const markerUrl = (type: string) => `/point-markers/${type}.svg?v=${MARKE
 export const markerFileId = (type: string) => `mk${MARKER_VERSION}-${type}`
 
 export const isMarkerFileId = (id: unknown): id is string => typeof id === 'string' && /^mk\d+-/.test(id)
+
+/** 空白图纸（AI 新建或示例项目的占位底图），存储时指向 public/blank-sheet.svg */
+export const BLANK_SHEET_FILE_ID = 'blank-sheet'
+export const BLANK_SHEET_URL = '/blank-sheet.svg'

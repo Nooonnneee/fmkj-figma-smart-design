@@ -1,23 +1,28 @@
 "use client"
 
 import { useState } from "react"
-import Image from "next/image"
 import { usePathname } from "next/navigation"
 import {
   Blocks,
   Bot,
+  ChevronRight,
   ChevronsUpDown,
+  Coins,
   Crown,
   FolderKanban,
   LayoutGrid,
   LogOut,
   MessageSquareText,
   PackageSearch,
+  Palette,
+  Plus,
   Settings,
 } from "lucide-react"
 
 import type { AiModelOption, AiProjectContext } from "@/components/ai/ai-elements"
 import { AiSidebarDock } from "@/components/ai/ai-sidebar-dock"
+import { AppearanceMenuItems } from "@/components/appearance-menu"
+import { BrandMark } from "@/components/brand/brand-mark"
 import { GuardedLink } from "@/components/guarded-link"
 import { LinkPending } from "@/components/link-pending"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -25,9 +30,13 @@ import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -35,6 +44,7 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -42,8 +52,8 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { APP_TAGLINE, brandInitials } from "@/lib/brand"
-import { cn } from "@/lib/utils"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { APP_NAME, APP_TAGLINE } from "@/lib/brand"
 import type { PluginId } from "@/plugins/types"
 
 export type SidebarUser = { name: string; email: string; membershipBadge?: string }
@@ -58,15 +68,36 @@ export type SidebarPlugin = {
   provides: string[]
 }
 
-const baseNav = [
+/** 日常工作：项目 → 产品 → AI */
+const workNav = [
   { icon: FolderKanban, label: "项目", url: "/projects" },
   { icon: PackageSearch, label: "产品库", url: "/products" },
+] as const
+
+/** 扩展与账户：低频入口，放在底部 */
+const moreNav = [
   { icon: Blocks, label: "插件市场", url: "/plugins" },
   { icon: Crown, label: "会员与积分", url: "/membership" },
   { icon: Settings, label: "设置", url: "/settings" },
 ] as const
 
+const RECENT_LIMIT = 5
+
 const initials = (name: string) => name.trim().slice(0, 1).toUpperCase() || "我"
+
+function NavItem({ icon: Icon, label, url, active }: { icon: React.ComponentType; label: string; url: string; active: boolean }) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild isActive={active} tooltip={label}>
+        <GuardedLink href={url}>
+          <Icon />
+          <span>{label}</span>
+          <LinkPending className="ml-auto size-3.5" />
+        </GuardedLink>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  )
+}
 
 export function AppSidebar({
   user,
@@ -88,6 +119,8 @@ export function AppSidebar({
 
   const aiCopilotEnabled = plugins.some((p) => p.id === "ai-copilot" && p.status === "ready" && p.enabled)
   const effectiveMode = aiCopilotEnabled && state === "expanded" ? mode : "nav"
+  const recent = projects.slice(0, RECENT_LIMIT)
+  const isActive = (url: string) => pathname === url || pathname.startsWith(`${url}/`)
 
   async function handleLogout() {
     if (isLoggingOut) return
@@ -108,59 +141,41 @@ export function AppSidebar({
           : undefined
       }
     >
-      <SidebarHeader>
+      <SidebarHeader className="gap-3">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild className="group-data-[collapsible=icon]:px-1.5">
+            <SidebarMenuButton size="lg" asChild tooltip={APP_NAME}>
               <GuardedLink href="/projects">
-                {/* 字标：设置里上传了 Logo 就用 Logo，否则用名称缩写 */}
-                <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-sidebar-primary text-[11px] font-bold tracking-tight text-sidebar-primary-foreground">
-                  {brand.logo ? (
-                    <Image src={brand.logo} alt="" width={32} height={32} className="size-full bg-white object-contain p-0.5" />
-                  ) : (
-                    brandInitials(brand.name)
-                  )}
-                </div>
+                {/* 平台标志；副标题是当前工作区（公司）名称，公司 Logo 仍用于报价单与合同抬头 */}
+                <BrandMark decorative className="size-8" />
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">{brand.name}</span>
-                  <span className="truncate text-xs text-muted-foreground">{APP_TAGLINE}</span>
+                  <span className="truncate font-semibold tracking-wide">{APP_NAME}</span>
+                  <span className="truncate text-xs text-muted-foreground">{brand.name || APP_TAGLINE}</span>
                 </div>
               </GuardedLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
 
-        {/* Figma Make 式侧边栏模式切换：导航 | AI 对话（仅在启用「AI 对话侧栏（高级）」插件时显示） */}
+        {/* 侧边栏模式：导航 | AI 对话（仅在启用「AI 对话侧栏（高级）」插件时显示） */}
         {aiCopilotEnabled ? (
           <>
-            <div className="grid grid-cols-2 gap-1 rounded-xl border border-sidebar-border bg-muted/50 p-0.5 group-data-[collapsible=icon]:hidden">
-              <button
-                type="button"
-                onClick={() => setMode("nav")}
-                className={cn(
-                  "inline-flex h-7 items-center justify-center gap-1.5 rounded-lg text-xs font-medium transition-colors",
-                  effectiveMode === "nav"
-                    ? "bg-background text-foreground shadow-2xs"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <LayoutGrid className="size-3.5" />
-                <span>导航</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("chat")}
-                className={cn(
-                  "inline-flex h-7 items-center justify-center gap-1.5 rounded-lg text-xs font-medium transition-colors",
-                  effectiveMode === "chat"
-                    ? "bg-background text-foreground shadow-2xs"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <MessageSquareText className="size-3.5" />
-                <span>AI 对话</span>
-              </button>
-            </div>
+            <Tabs
+              value={effectiveMode}
+              onValueChange={(v) => setMode(v === "chat" ? "chat" : "nav")}
+              className="group-data-[collapsible=icon]:hidden"
+            >
+              <TabsList className="w-full">
+                <TabsTrigger value="nav" className="text-xs">
+                  <LayoutGrid className="size-3.5" />
+                  导航
+                </TabsTrigger>
+                <TabsTrigger value="chat" className="text-xs">
+                  <MessageSquareText className="size-3.5" />
+                  AI 对话
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
 
             {/* 折叠为图标模式时，提供一键展开到 AI 对话侧栏的按钮 */}
             <SidebarMenu className="hidden group-data-[collapsible=icon]:flex">
@@ -188,55 +203,97 @@ export function AppSidebar({
       ) : (
         <>
           <SidebarContent>
-            <SidebarGroup>
+            {/* 最常用的动作放在最显眼的位置 */}
+            <SidebarGroup className="pb-0">
               <SidebarMenu>
-                {baseNav.map((item) => (
-                  <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={pathname.startsWith(item.url)}
-                      tooltip={item.label}
-                    >
-                      <GuardedLink href={item.url}>
-                        <item.icon />
-                        <span>{item.label}</span>
-                        <LinkPending className="ml-auto size-3.5" />
-                      </GuardedLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    tooltip="新建项目"
+                    className="bg-sidebar-primary font-medium text-sidebar-primary-foreground shadow-xs hover:bg-sidebar-primary/90 hover:text-sidebar-primary-foreground active:bg-sidebar-primary/90 active:text-sidebar-primary-foreground"
+                  >
+                    <GuardedLink href="/projects/new">
+                      <Plus />
+                      <span>新建项目</span>
+                    </GuardedLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+
+            <SidebarGroup>
+              <SidebarGroupLabel>工作台</SidebarGroupLabel>
+              <SidebarMenu>
+                {workNav.map((item) => (
+                  <NavItem key={item.url} {...item} active={isActive(item.url) && pathname !== "/projects/new"} />
                 ))}
-                {aiCopilotEnabled ? (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={pathname.startsWith("/ai")} tooltip="AI 对话工作台">
-                      <GuardedLink href="/ai">
-                        <Bot />
-                        <span>AI 对话</span>
-                        <LinkPending className="ml-auto size-3.5" />
-                      </GuardedLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ) : null}
+                {aiCopilotEnabled ? <NavItem icon={Bot} label="AI 对话" url="/ai" active={isActive("/ai")} /> : null}
+              </SidebarMenu>
+            </SidebarGroup>
+
+            {recent.length > 0 ? (
+              <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+                <SidebarGroupLabel>最近项目</SidebarGroupLabel>
+                <SidebarMenu>
+                  {recent.map((p) => (
+                    <SidebarMenuItem key={p.id}>
+                      <SidebarMenuButton asChild size="sm" isActive={isActive(`/projects/${p.id}`)} className="text-sidebar-foreground/80">
+                        <GuardedLink href={`/projects/${p.id}`}>
+                          <span aria-hidden className="flex size-4 shrink-0 items-center justify-center rounded-sm bg-sidebar-accent text-xs font-semibold text-sidebar-accent-foreground">
+                            {p.name.trim().slice(0, 1) || "项"}
+                          </span>
+                          <span className="truncate">{p.name}</span>
+                        </GuardedLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroup>
+            ) : null}
+
+            <SidebarGroup className="mt-auto">
+              <SidebarGroupLabel>扩展与账户</SidebarGroupLabel>
+              <SidebarMenu>
+                {moreNav.map((item) => (
+                  <NavItem key={item.url} {...item} active={isActive(item.url)} />
+                ))}
               </SidebarMenu>
             </SidebarGroup>
           </SidebarContent>
 
           <SidebarFooter>
+            {/* 积分余额：一眼可见，点击去充值 / 升级 */}
+            <GuardedLink
+              href="/membership"
+              className="group/credits flex items-center gap-3 rounded-lg border border-sidebar-border bg-sidebar-accent/50 px-3 py-2 transition-colors hover:bg-sidebar-accent group-data-[collapsible=icon]:hidden"
+            >
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary/10 text-sidebar-primary">
+                <Coins className="size-4" />
+              </span>
+              <span className="grid min-w-0 flex-1 leading-tight">
+                <span className="truncate text-sm font-medium tabular-nums">{ai.credits.toLocaleString("zh-CN")} 积分</span>
+                <span className="truncate text-xs text-muted-foreground">{user.membershipBadge ?? "体验版"} · 充值或升级</span>
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover/credits:translate-x-0.5" />
+            </GuardedLink>
+
             <SidebarMenu>
               <SidebarMenuItem>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <SidebarMenuButton
                       size="lg"
+                      tooltip={user.name}
                       className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                     >
                       <Avatar className="size-8 rounded-lg">
-                        <AvatarFallback className="rounded-lg">{initials(user.name)}</AvatarFallback>
+                        <AvatarFallback className="rounded-lg bg-sidebar-primary/10 font-medium text-sidebar-primary">{initials(user.name)}</AvatarFallback>
                       </Avatar>
                       <div className="grid flex-1 text-left text-sm leading-tight">
                         <span className="flex items-center gap-1.5 truncate font-semibold">
                           <span className="truncate">{user.name}</span>
                           {user.membershipBadge ? (
-                            <Badge variant="outline" className="h-4 px-1.5 text-[10px]">
+                            <Badge variant="outline" className="h-4 px-1.5 text-xs">
                               {user.membershipBadge}
                             </Badge>
                           ) : null}
@@ -259,12 +316,31 @@ export function AppSidebar({
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <GuardedLink href="/membership">
-                        <Crown />
-                        会员与积分（{ai.credits} 积分）
-                      </GuardedLink>
-                    </DropdownMenuItem>
+                    <DropdownMenuGroup>
+                      <DropdownMenuItem asChild>
+                        <GuardedLink href="/membership">
+                          <Crown />
+                          会员与积分
+                          <span className="ml-auto text-xs text-muted-foreground tabular-nums">{ai.credits}</span>
+                        </GuardedLink>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <GuardedLink href="/settings">
+                          <Settings />
+                          公司与账户设置
+                        </GuardedLink>
+                      </DropdownMenuItem>
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>
+                          <Palette />
+                          外观
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent className="w-44">
+                          <AppearanceMenuItems />
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                    </DropdownMenuGroup>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem disabled={isLoggingOut} onSelect={() => void handleLogout()}>
                       <LogOut />
                       {isLoggingOut ? "退出中" : "退出登录"}

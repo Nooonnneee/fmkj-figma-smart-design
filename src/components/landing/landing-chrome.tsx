@@ -2,14 +2,16 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowRight } from 'lucide-react'
 
+import { BrandMark } from '@/components/brand/brand-mark'
 import { Button } from '@/components/ui/button'
 import { APP_DESCRIPTION, APP_NAME, APP_TAGLINE, COMPANY_NAME } from '@/lib/brand'
 
 const NAV = [
-  { label: '点位图', href: '#pointmap' },
-  { label: '报价单', href: '#quote' },
-  { label: '工作流', href: '#workflow' },
-  { label: '更多能力', href: '#features' },
+  // 带上首页路径，品牌资源页等其他公开页面也能直接跳到首页对应板块
+  { label: '点位图', href: '/#pointmap' },
+  { label: '报价单', href: '/#quote' },
+  { label: '工作流', href: '/#workflow' },
+  { label: '更多能力', href: '/#features' },
 ]
 
 /** 横版标识（白色字，深色背景用），文件见 public/brand */
@@ -61,6 +63,10 @@ export function LandingFooter() {
         { label: '品牌资源', href: '/brand' },
       ],
     },
+    {
+      title: '关于',
+      links: [{ label: '品牌资源', href: '/brand' }],
+    },
   ]
   return (
     <footer className="border-t border-border">
@@ -70,7 +76,7 @@ export function LandingFooter() {
           <p className="mt-4 max-w-sm text-sm text-muted-foreground">{APP_DESCRIPTION}</p>
         </div>
         {groups.map((group) => (
-          <nav key={group.title} aria-label={group.title} className="md:col-span-3">
+          <nav key={group.title} aria-label={group.title} className="md:col-span-2">
             <h3 className="text-sm font-medium">{group.title}</h3>
             <ul className="mt-4 space-y-2.5 text-sm">
               {group.links.map((link) => (

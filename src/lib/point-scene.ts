@@ -13,7 +13,7 @@
  */
 import { areaTypeLabel, inferAreaType, isAreaType, type AreaType } from './area-types'
 import { categoryOfType, deviceTypeOf, isDeviceType } from './device-types'
-import { isMarkerFileId, markerFileId, markerUrl } from './point-markers'
+import { BLANK_SHEET_FILE_ID, BLANK_SHEET_URL, isMarkerFileId, markerFileId, markerUrl } from './point-markers'
 import { MARKER, SHEET, sheetOrigin } from './sheet-spec'
 
 export type SceneEl = {
@@ -380,6 +380,8 @@ export function compactScene(elements: readonly SceneEl[], files: Record<string,
     if (!id || kept[id]) continue
     const type = isPointElement(el) && isDeviceType(el.customData?.deviceType) ? (el.customData!.deviceType as string) : null
     if (isMarkerFileId(id) && type) kept[id] = markerFile(type)
+    // 画布里是内嵌数据，存回静态地址（否则保存时会被当成插入的图片上传到媒体库）
+    else if (id === BLANK_SHEET_FILE_ID && files[id]) kept[id] = { id, dataURL: BLANK_SHEET_URL, mimeType: 'image/svg+xml' }
     else if (files[id]) kept[id] = { id, dataURL: files[id].dataURL, mimeType: files[id].mimeType }
   }
   return { elements: out, appState: { viewBackgroundColor: appState?.viewBackgroundColor ?? '#ffffff' }, files: kept }
