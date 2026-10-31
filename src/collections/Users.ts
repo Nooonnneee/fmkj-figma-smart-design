@@ -38,9 +38,9 @@ export const Users: CollectionConfig = {
   hooks: {
     afterChange: [
       expireOnChange(CACHE_TAGS.staff),
-      ({ doc, operation }) => {
+      async ({ doc, operation }) => {
         if (operation === 'create' && doc?.id) {
-          void cloneDemoProjectForUser(doc.id)
+          await cloneDemoProjectForUser(doc.id)
         }
         return doc
       },
