@@ -55,6 +55,16 @@ const nextConfig: NextConfig = {
     ]
     return [
       {
+        source: '/(brands|brand|point-markers|point-symbols)/:path*',
+        headers: [
+          ...securityHeaders,
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
         source: '/:path*',
         headers: securityHeaders,
       },
@@ -98,6 +108,7 @@ const nextConfig: NextConfig = {
   // Prerender source maps add ~100 MB per static build worker
   enablePrerenderSourceMaps: false,
   experimental: {
+    optimizePackageImports: ['lucide-react', 'radix-ui'],
     // Caps static build workers (~250-380 MB each) to lower `next build` peak memory
     cpus: 2,
     // Payload Admin uses Next Server Actions. In the Make preview proxy, the

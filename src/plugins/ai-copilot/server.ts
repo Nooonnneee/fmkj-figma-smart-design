@@ -365,7 +365,7 @@ const TOOLS: AiTool[] = [
         depth: 0,
         user: ctx.user,
         overrideAccess: false,
-        select: { name: true, customerName: true, customerPhone: true, community: true, address: true, platform: true, budget: true, status: true, pointMap: true },
+        select: { name: true, customerName: true, customerPhone: true, community: true, address: true, platform: true, budget: true, status: true, pointCount: true },
       })
       const list = res.docs
         .filter((p) => (!q ? true : `${p.name} ${p.customerName ?? ''} ${p.community ?? ''} ${p.address ?? ''}`.toLowerCase().includes(q)))
@@ -379,7 +379,7 @@ const TOOLS: AiTool[] = [
           platform: p.platform ?? null,
           budget: p.budget ?? null,
           status: p.status,
-          pointCount: countScenePoints(p.pointMap),
+          pointCount: p.pointCount ?? 0,
         }))
       return {
         result: { count: list.length, projects: list },

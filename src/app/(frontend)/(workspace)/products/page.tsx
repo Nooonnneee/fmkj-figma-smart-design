@@ -69,8 +69,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   const byStatus = catalog.filter((p) => (f.status === 'all' ? true : f.status === 'inactive' ? p.status === 'inactive' : p.status === 'active'))
   const keyword = f.q.toLowerCase()
   const match = (p: (typeof catalog)[number], skip?: 'cat' | 'type' | 'brand' | 'platform') =>
-    (!keyword || `${p.name} ${p.sku} ${p.brand?.name ?? ''} ${p.description ?? ''}`.toLowerCase().includes(keyword)) &&
-    (skip === 'cat' || skip === 'type' || !f.cat || deviceTypeOf(p.deviceType)?.category === f.cat) &&
+    (!keyword || (p.searchText ?? `${p.name} ${p.sku} ${p.brand?.name ?? ''} ${p.description ?? ''}`.toLowerCase()).includes(keyword)) &&
+    (skip === 'cat' || skip === 'type' || !f.cat || (p.categorySlug ?? deviceTypeOf(p.deviceType)?.category) === f.cat) &&
     (skip === 'type' || !f.type || p.deviceType === f.type) &&
     (skip === 'brand' || brandSet.size === 0 || (p.brand && brandSet.has(p.brand.slug))) &&
     (skip === 'platform' || !f.platform || p.platforms.includes(f.platform)) &&
@@ -84,9 +84,30 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
     f.sort === 'price-asc' ? a.price - b.price : f.sort === 'price-desc' ? b.price - a.price : f.sort === 'updated' ? b.updatedAt.localeCompare(a.updatedAt) : a.name.localeCompare(b.name, 'zh-CN'),
   )
 
-  const count = (skip: 'cat' | 'type' | 'brand' | 'platform', test: (p: (typeof catalog)[number]) => boolean) =>
-    byStatus.filter((p) => match(p, skip) && test(p)).length
-  const brandCounts = new Map(brands.map((b) => [b.slug, count('brand', (p) => p.brand?.slug === b.slug)]))
+  // 单次遍历归桶统计各类别、各设备类型、各品牌、各平台的产品数量，避免 70+ 次重复 filter
+  let allCatCount = 0
+  const catCounts = new Map<string, number>()
+  const typeCounts = new Map<string, number>()
+  const brandCounts = new Map<string, number>()
+  const platformCounts = new Map<string, number>()
+  for (const p of byStatus) {
+    if (match(p, 'cat')) {
+      allCatCount++
+      const cs = p.categorySlug ?? deviceTypeOf(p.deviceType)?.category
+      if (cs) catCounts.set(cs, (catCounts.get(cs) ?? 0) + 1)
+    }
+    if (p.deviceType && match(p, 'type')) {
+      typeCounts.set(p.deviceType, (typeCounts.get(p.deviceType) ?? 0) + 1)
+    }
+    if (p.brand?.slug && match(p, 'brand')) {
+      brandCounts.set(p.brand.slug, (brandCounts.get(p.brand.slug) ?? 0) + 1)
+    }
+    if (p.platforms.length && match(p, 'platform')) {
+      for (const pl of p.platforms) {
+        platformCounts.set(pl, (platformCounts.get(pl) ?? 0) + 1)
+      }
+    }
+  }
   const visibleBrands = brands.filter((b) => (brandCounts.get(b.slug) ?? 0) > 0 || brandSet.has(b.slug))
   const activeGroup = DEVICE_GROUPS.find((g) => g.category.slug === f.cat)
 
@@ -198,7 +219,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           {section(
             '类别',
             <>
-              {navItem('全部类别', !f.cat, href({ cat: '', type: '' }), n(count('cat', () => true)))}
+              {navItem('全部类别', !f.cat, href({ cat: '', type: '' }), n(allCatCount))}
               {DEVICE_GROUPS.map(({ category, types }) => {
                 const active = f.cat === category.slug
                 return (
@@ -210,12 +231,12 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                       </>,
                       active,
                       href({ cat: active ? '' : category.slug, type: '' }),
-                      n(count('cat', (p) => deviceTypeOf(p.deviceType)?.category === category.slug)),
+                      n(catCounts.get(category.slug) ?? 0),
                     )}
                     {active ? (
                       <div className="my-0.5 ml-3 flex flex-col gap-0.5 border-l pl-2">
                         {types.map((t) => {
-                          const c = count('type', (p) => p.deviceType === t.value)
+                          const c = typeCounts.get(t.value) ?? 0
                           if (!c && f.type !== t.value) return null
                           return navItem(
                             <>
@@ -259,7 +280,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             <>
               {navItem('全部平台', !f.platform, href({ platform: '' }))}
               {PRODUCT_PLATFORMS.map((pl) => {
-                const c = count('platform', (p) => p.platforms.includes(pl))
+                const c = platformCounts.get(pl) ?? 0
                 return c || f.platform === pl ? navItem(pl, f.platform === pl, href({ platform: f.platform === pl ? '' : pl }), n(c), pl) : null
               })}
             </>,

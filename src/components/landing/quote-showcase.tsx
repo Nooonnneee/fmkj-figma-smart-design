@@ -37,6 +37,7 @@ const DEMO_COMPANY: CompanyInfo = {
 /** 报价单展示：用真实的文档模板部件渲染样张，切换风格即时换装。 */
 export function QuoteShowcase({ styles, layouts }: { styles: DocStyle[]; layouts: DocLayout[] }) {
   const [value, setValue] = useState(() => (styles.some((s) => s.id === 'qixu') ? 'qixu' : (styles[0]?.id ?? '')))
+  const activeStyle = styles.find((s) => s.id === value) ?? styles[0]!
   const features = [
     { icon: LayoutGrid, text: '按楼层、房间分区报价，客户一眼看懂每个空间花了多少' },
     { icon: Palette, text: `${styles.map((s) => s.name).join('、')}，一键换装` },
@@ -90,21 +91,19 @@ export function QuoteShowcase({ styles, layouts }: { styles: DocStyle[]; layouts
         <div className="relative isolate lg:col-span-7">
           <div aria-hidden className="absolute inset-x-10 -top-5 bottom-6 -z-10 rotate-3 rounded-2xl border border-border bg-card/50" />
           <div aria-hidden className="absolute inset-x-5 -top-2.5 bottom-3 -z-10 -rotate-2 rounded-2xl border border-border bg-card/70" />
-          {styles.map((s) => (
-            <TabsContent
-              key={s.id}
-              value={s.id}
-              className="lg:perspective-distant data-[state=active]:animate-in data-[state=active]:duration-500 data-[state=active]:fade-in-0 data-[state=active]:zoom-in-95 motion-reduce:animate-none"
+          <TabsContent
+            key={activeStyle.id}
+            value={activeStyle.id}
+            className="lg:perspective-distant data-[state=active]:animate-in data-[state=active]:duration-500 data-[state=active]:fade-in-0 data-[state=active]:zoom-in-95 motion-reduce:animate-none"
+          >
+            <div
+              role="img"
+              aria-label={`报价单样张（${activeStyle.name}风格）：${DEMO_QUOTE.title}，合计 ${yuan(DEMO_QUOTE_TOTALS.total)}`}
+              className="transition-transform duration-700 ease-out lg:rotate-x-2 lg:-rotate-y-6 lg:hover:rotate-x-0 lg:hover:rotate-y-0 motion-reduce:transform-none"
             >
-              <div
-                role="img"
-                aria-label={`报价单样张（${s.name}风格）：${DEMO_QUOTE.title}，合计 ${yuan(DEMO_QUOTE_TOTALS.total)}`}
-                className="transition-transform duration-700 ease-out lg:rotate-x-2 lg:-rotate-y-6 lg:hover:rotate-x-0 lg:hover:rotate-y-0 motion-reduce:transform-none"
-              >
-                <QuoteSheet style={s} />
-              </div>
-            </TabsContent>
-          ))}
+              <QuoteSheet style={activeStyle} />
+            </div>
+          </TabsContent>
           <div
             aria-hidden
             className="absolute -top-4 -left-2 z-10 hidden items-center gap-2 rounded-xl border border-border bg-card/90 px-3 py-2 text-xs shadow-xl backdrop-blur sm:flex motion-safe:animate-float"

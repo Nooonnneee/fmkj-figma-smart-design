@@ -1,5 +1,6 @@
 import { relId } from '@/lib/access'
 import { CACHE_TAGS } from '@/lib/cache-tags'
+import { deviceTypeOf } from '@/lib/device-types'
 import { memoize } from '@/lib/memo-cache'
 import { getPayloadClient } from '@/lib/payload'
 import type { Brand, Category, Media, Product } from '@/payload-types'
@@ -39,10 +40,13 @@ export type CatalogProduct = {
   brand: { id: string; name: string; slug: string; logo: string | null } | null
   category: { id: string; name: string; slug: string } | null
   image: { id: string; url: string; alt: string } | null
+  /** 预计算的小写检索串与大类 slug，避免列表筛选时重复拼接与转换 */
+  searchText?: string
+  categorySlug?: string | null
 }
 
 export const getCatalog = memoize(
-  'catalog-products-v3',
+  'catalog-products-v4',
   [CACHE_TAGS.catalog],
   TTL,
   async (): Promise<CatalogProduct[]> => {
@@ -53,7 +57,28 @@ export const getCatalog = memoize(
       limit: 1000,
       sort: 'name',
       overrideAccess: true,
-      populate: { brands: { name: true, slug: true, logo: true }, categories: { name: true, slug: true } },
+      select: {
+        name: true,
+        sku: true,
+        price: true,
+        cost: true,
+        unit: true,
+        stock: true,
+        description: true,
+        platforms: true,
+        status: true,
+        deviceType: true,
+        tags: true,
+        updatedAt: true,
+        brand: true,
+        category: true,
+        image: true,
+      },
+      populate: {
+        brands: { name: true, slug: true, logo: true },
+        categories: { name: true, slug: true },
+        media: { url: true, filename: true, alt: true },
+      },
     })
     return (result.docs as Product[]).map((p) => {
       const b = typeof p.brand === 'object' ? (p.brand as Brand | null) : null
@@ -62,6 +87,7 @@ export const getCatalog = memoize(
       const logo = b && typeof b.logo === 'object' ? (b.logo as Media | null) : null
       const imgUrl = resolveMediaUrl(m)
       const logoUrl = resolveMediaUrl(logo)
+      const deviceType = p.deviceType ?? null
       return {
         id: String(p.id),
         name: p.name,
@@ -73,12 +99,14 @@ export const getCatalog = memoize(
         description: p.description ?? null,
         platforms: (p.platforms ?? []) as string[],
         status: p.status ?? 'active',
-        deviceType: p.deviceType ?? null,
+        deviceType,
         tags: (p.tags ?? []) as string[],
         updatedAt: p.updatedAt,
         brand: b ? { id: String(b.id), name: b.name, slug: b.slug, logo: logoUrl } : null,
         category: c ? { id: String(c.id), name: c.name, slug: c.slug } : null,
         image: m && imgUrl ? { id: String(m.id), url: imgUrl, alt: m.alt ?? p.name } : null,
+        searchText: `${p.name} ${p.sku} ${b?.name ?? ''} ${p.description ?? ''}`.toLowerCase(),
+        categorySlug: deviceTypeOf(deviceType)?.category ?? c?.slug ?? null,
       }
     })
   },
@@ -229,59 +257,68 @@ type RawUserCompanyProfile = {
  * - 传入 userId 时，优先读取该账号自己保存的 `companyProfile`（每个账号独立抬头）；
  *   若该账号尚未保存过自己的抬头，则回退到系统全局默认抬头；
  * - 全局 AI 模型列表（`aiModels`）始终来自系统全局配置。
+ * - 结果按 userId 缓存在进程内（当 Users 或 CompanySettings 变更时由 hook 自动清除缓存）。
  */
 export async function getCompanyInfo(userId?: string | number | null): Promise<CompanyInfo> {
-  const base = await getBaseCompanyInfo()
-  if (!userId) return base
-  const payload = await getPayloadClient()
-  const userDoc = await payload
-    .findByID({
-      collection: 'users',
-      id: String(userId),
-      depth: 1,
-      overrideAccess: true,
-      select: { name: true, phone: true, email: true, companyProfile: true } as never,
-    })
-    .catch(() => null)
-  if (!userDoc) return base
+  if (!userId) return getBaseCompanyInfo()
+  const uid = String(userId)
+  return memoize(
+    `company-user-v2:${uid}`,
+    [CACHE_TAGS.company, CACHE_TAGS.staff],
+    TTL,
+    async (): Promise<CompanyInfo> => {
+      const [base, payload] = await Promise.all([getBaseCompanyInfo(), getPayloadClient()])
+      const userDoc = await payload
+        .findByID({
+          collection: 'users',
+          id: uid,
+          depth: 1,
+          overrideAccess: true,
+          select: { name: true, phone: true, email: true, companyProfile: true } as never,
+          populate: { media: { url: true, filename: true, alt: true, width: true, height: true } },
+        })
+        .catch(() => null)
+      if (!userDoc) return base
 
-  const p = ((userDoc as unknown as { companyProfile?: RawUserCompanyProfile | null }).companyProfile ?? null)
-  const hasCustomHeader = Boolean(p && typeof p.name === 'string' && p.name.trim())
-  const userDocDefaults = p?.documentDefaults ? parseDocumentDefaults(p.documentDefaults) : {}
-  const mergedDocDefaults = { ...base.documentDefaults, ...userDocDefaults }
-  const disabledPlugins = Array.isArray(p?.disabledPlugins)
-    ? p!.disabledPlugins.filter((v): v is string => typeof v === 'string')
-    : base.disabledPlugins
+      const p = ((userDoc as unknown as { companyProfile?: RawUserCompanyProfile | null }).companyProfile ?? null)
+      const hasCustomHeader = Boolean(p && typeof p.name === 'string' && p.name.trim())
+      const userDocDefaults = p?.documentDefaults ? parseDocumentDefaults(p.documentDefaults) : {}
+      const mergedDocDefaults = { ...base.documentDefaults, ...userDocDefaults }
+      const disabledPlugins = Array.isArray(p?.disabledPlugins)
+        ? p!.disabledPlugins.filter((v): v is string => typeof v === 'string')
+        : base.disabledPlugins
 
-  if (!hasCustomHeader || !p) {
-    return {
-      ...base,
-      documentDefaults: mergedDocDefaults,
-      disabledPlugins,
-    }
-  }
+      if (!hasCustomHeader || !p) {
+        return {
+          ...base,
+          documentDefaults: mergedDocDefaults,
+          disabledPlugins,
+        }
+      }
 
-  const logo = p.logo && typeof p.logo === 'object' ? (p.logo as Media) : null
-  const qr = p.qrCode && typeof p.qrCode === 'object' ? (p.qrCode as Media) : null
-  const logoUrl = resolveMediaUrl(logo)
-  const qrUrl = resolveMediaUrl(qr)
-  const name = p.name!.trim()
+      const logo = p.logo && typeof p.logo === 'object' ? (p.logo as Media) : null
+      const qr = p.qrCode && typeof p.qrCode === 'object' ? (p.qrCode as Media) : null
+      const logoUrl = resolveMediaUrl(logo)
+      const qrUrl = resolveMediaUrl(qr)
+      const name = p.name!.trim()
 
-  return {
-    name,
-    slogan: p.slogan ?? null,
-    phone: p.phone ?? null,
-    email: p.email ?? null,
-    address: p.address ?? null,
-    qrCaption: p.qrCaption ?? null,
-    quoteNotes: p.quoteNotes ?? null,
-    contractTerms: p.contractTerms ?? base.contractTerms,
-    printProductImages: p.printProductImages !== false,
-    documentDefaults: mergedDocDefaults,
-    disabledPlugins,
-    aiModels: base.aiModels,
-    logo: logo && logoUrl ? { url: logoUrl, alt: logo.alt || name, width: logo.width ?? null, height: logo.height ?? null } : null,
-    qrCode: qr && qrUrl ? { url: qrUrl, alt: qr.alt || '二维码' } : null,
-    isCustom: true,
-  }
+      return {
+        name,
+        slogan: p.slogan ?? null,
+        phone: p.phone ?? null,
+        email: p.email ?? null,
+        address: p.address ?? null,
+        qrCaption: p.qrCaption ?? null,
+        quoteNotes: p.quoteNotes ?? null,
+        contractTerms: p.contractTerms ?? base.contractTerms,
+        printProductImages: p.printProductImages !== false,
+        documentDefaults: mergedDocDefaults,
+        disabledPlugins,
+        aiModels: base.aiModels,
+        logo: logo && logoUrl ? { url: logoUrl, alt: logo.alt || name, width: logo.width ?? null, height: logo.height ?? null } : null,
+        qrCode: qr && qrUrl ? { url: qrUrl, alt: qr.alt || '二维码' } : null,
+        isCustom: true,
+      }
+    },
+  )()
 }

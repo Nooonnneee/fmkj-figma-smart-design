@@ -23,11 +23,29 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
 
   return (
     <main className="grid min-h-screen bg-background lg:grid-cols-2">
-      <div className="hidden border-r bg-muted/40 p-10 lg:flex lg:flex-col lg:justify-between">
-        <div className="flex items-center gap-3">
-          <Image src="/brand/fmkj-logo.svg" alt={APP_NAME} width={436} height={120} unoptimized priority className="h-10 w-auto dark:hidden" />
-          <Image src="/brand/fmkj-logo-white.svg" alt={APP_NAME} width={436} height={120} unoptimized priority className="hidden h-10 w-auto dark:block" />
-          <span className="border-l pl-3 text-xs text-muted-foreground">{APP_TAGLINE}</span>
+      <aside className="relative hidden overflow-hidden bg-brand-night p-10 text-white lg:flex lg:flex-col lg:justify-between">
+        <div aria-hidden className="pointer-events-none absolute -top-32 -left-32 size-120 rounded-full bg-brand-indigo/30 blur-3xl" />
+        <div className="relative flex items-center gap-3">
+          <Image src="/brand/fmkj-logo-white.svg" alt={APP_NAME} width={436} height={120} unoptimized priority className="h-10 w-auto" />
+          <span className="border-l border-white/20 pl-3 text-xs text-white/60">{APP_TAGLINE}</span>
+        </div>
+
+        <div className="relative max-w-md space-y-8">
+          <BrandMark decorative className="size-16" />
+          <p className="text-3xl font-semibold tracking-normal">在户型图上布好点位，几分钟出报价和合同</p>
+          <ul className="space-y-5">
+            {HIGHLIGHTS.map(({ icon: Icon, title, description }) => (
+              <li key={title} className="flex gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/10">
+                  <Icon className="size-4" />
+                </span>
+                <span>
+                  <span className="block text-sm font-medium">{title}</span>
+                  <span className="block text-sm text-white/60">{description}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
 
         <p className="relative text-xs text-white/50">© {new Date().getFullYear()} {COMPANY_NAME}</p>

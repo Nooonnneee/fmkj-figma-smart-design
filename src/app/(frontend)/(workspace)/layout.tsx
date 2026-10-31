@@ -7,7 +7,6 @@ import { appAuth } from '@/lib/app-auth'
 import { getCompanyInfo } from '@/lib/cached-data'
 import { resolveMembership } from '@/lib/membership'
 import { getPayloadClient } from '@/lib/payload'
-import { countScenePoints } from '@/lib/point-count'
 import { PLUGINS } from '@/plugins'
 import { aiConfigured } from '@/plugins/ai-copilot/server'
 import { enabledAiModels } from '@/plugins/ai-copilot/templates'
@@ -16,21 +15,22 @@ import { enabledAiModels } from '@/plugins/ai-copilot/templates'
 export default async function WorkspaceLayout({ children }: { children: React.ReactNode }) {
   const user = await appAuth.getCurrentUser()
   if (!user) redirect('/login')
-  const company = await getCompanyInfo(user.id)
-
   const payload = await getPayloadClient()
-  const projectsRes = await payload
-    .find({
-      collection: 'projects',
-      where: { status: { not_equals: 'archived' } },
-      sort: '-updatedAt',
-      limit: 12,
-      depth: 0,
-      user,
-      overrideAccess: false,
-      select: { name: true, customerName: true, platform: true, pointMap: true },
-    })
-    .catch(() => ({ docs: [] }))
+  const [company, projectsRes] = await Promise.all([
+    getCompanyInfo(user.id),
+    payload
+      .find({
+        collection: 'projects',
+        where: { status: { not_equals: 'archived' } },
+        sort: '-updatedAt',
+        limit: 12,
+        depth: 0,
+        user,
+        overrideAccess: false,
+        select: { name: true, customerName: true, platform: true, pointCount: true },
+      })
+      .catch(() => ({ docs: [] })),
+  ])
 
   const disabled = new Set(company.disabledPlugins)
   const plugins = PLUGINS.map((p) => ({
@@ -47,7 +47,7 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
     name: proj.name,
     customerName: proj.customerName ?? null,
     platform: proj.platform ?? null,
-    pointCount: countScenePoints(proj.pointMap),
+    pointCount: proj.pointCount ?? 0,
   }))
 
   const activeAiModels = enabledAiModels(company.aiModels)

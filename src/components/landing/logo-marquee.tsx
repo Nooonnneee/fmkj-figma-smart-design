@@ -76,7 +76,7 @@ function MarqueeRow({ label, reverse = false, className, children }: { label: st
 }
 
 function BrandSet({ brands, hidden }: { brands: LandingBrand[]; hidden: boolean }) {
-  return [...brands, ...brands].map((brand, i) => <LogoChip key={`${brand.slug}-${i}`} brand={brand} hidden={hidden} duplicate={i >= brands.length} />)
+  return brands.map((brand, i) => <LogoChip key={`${brand.slug}-${i}`} brand={brand} hidden={hidden} duplicate={false} />)
 }
 
 function LogoChip({ brand, hidden, duplicate }: { brand: LandingBrand; hidden: boolean; duplicate: boolean }) {

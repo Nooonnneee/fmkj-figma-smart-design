@@ -10,7 +10,6 @@ import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
 import { getCompanyInfo } from '@/lib/cached-data'
 import { getPayloadClient } from '@/lib/payload'
-import { countScenePoints } from '@/lib/point-count'
 import { isPluginId, PLUGINS } from '@/plugins'
 import { DEFAULT_AI_TEMPLATES, enabledAiModels } from '@/plugins/ai-copilot/templates'
 import { PLUGIN_DOC_STYLES } from '@/plugins/doc-styles/styles'
@@ -46,7 +45,7 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
       depth: 0,
       user,
       overrideAccess: false,
-      select: { name: true, customerName: true, platform: true, pointMap: true },
+      select: { name: true, customerName: true, platform: true, pointCount: true },
     }),
   ])
 
@@ -58,7 +57,7 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
     name: p.name,
     customerName: p.customerName ?? null,
     platform: p.platform ?? null,
-    points: countScenePoints(p.pointMap),
+    points: p.pointCount ?? 0,
   }))
 
   return (
