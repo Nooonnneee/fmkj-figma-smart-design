@@ -1064,7 +1064,7 @@ export function PointMapEditor({
 
       {cropFile ? <SheetCropper file={cropFile} onCancel={cancelCrop} onConfirm={addSheet} /> : null}
 
-      <div className={cn('flex min-h-0 flex-1', cropFile && 'hidden')}>
+      <div className={cn('flex min-h-0 flex-1 flex-col lg:flex-row', cropFile && 'hidden')}>
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex items-center gap-1 overflow-x-auto border-b px-3 py-1.5">
             <span className="mr-1 flex shrink-0 items-center gap-1 text-xs text-muted-foreground"><Layers className="size-3.5" />图纸</span>
@@ -1191,7 +1191,7 @@ export function PointMapEditor({
           </div>
         </div>
 
-        <aside className="point-map-aside hidden w-84 shrink-0 flex-col border-l bg-background lg:flex">
+        <aside className="point-map-aside flex max-h-[38svh] w-full shrink-0 flex-col border-t bg-background lg:max-h-none lg:w-84 lg:border-t-0 lg:border-l">
           {selectedPoint ? (
             <SelectedPoint
               code={selectedPoint.code}

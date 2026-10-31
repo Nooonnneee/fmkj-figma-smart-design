@@ -201,9 +201,10 @@ export function parseAiModels(value: unknown): AiModelConfig[] {
   for (const raw of value) {
     if (!raw || typeof raw !== 'object') continue
     const r = raw as Record<string, unknown>
-    const id = cleanStr(r.id, 60).replace(/[^a-zA-Z0-9._:-]/g, '-')
     const name = cleanStr(r.name, 80)
-    const apiModel = cleanStr(r.apiModel, 120, id)
+    const apiModel = cleanStr(r.apiModel, 120)
+    const rawId = cleanStr(r.id, 60) || apiModel
+    const id = rawId.replace(/[^a-zA-Z0-9._:-]/g, '-')
     const channelId: AiProviderChannelId = isAiProviderChannelId(r.channelId) ? r.channelId : 'deepseek'
     const channel = AI_PROVIDER_CHANNELS[channelId]
     if (!id || !name || !apiModel || seen.has(id)) continue

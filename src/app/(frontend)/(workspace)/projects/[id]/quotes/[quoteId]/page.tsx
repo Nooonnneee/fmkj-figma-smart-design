@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 
 import { relId } from '@/lib/access'
-import { getCatalog } from '@/lib/cached-data'
+import { getCatalog, resolveMediaUrl } from '@/lib/cached-data'
 import type { StoredScene } from '@/lib/point-scene'
 import type { Media, Project } from '@/payload-types'
 
@@ -26,7 +26,7 @@ export default async function QuotePage({
         depth: 1,
         user,
         overrideAccess: false,
-        populate: { projects: { pointMap: true, defaultProducts: true }, products: { name: true }, media: { url: true } },
+        populate: { projects: { pointMap: true, defaultProducts: true }, products: { name: true } },
       })
       .catch(() => null),
     getProjectDeals(id),
@@ -79,7 +79,7 @@ export default async function QuotePage({
         notes: quote.notes ?? '',
         items: (quote.items ?? []).map((i) => {
           const productId = relId(i.product)
-          const snapshot = i.image && typeof i.image === 'object' ? ((i.image as Media).url ?? null) : null
+          const snapshot = i.image && typeof i.image === 'object' ? resolveMediaUrl(i.image as Media) : null
           const live = productId ? byId.get(productId) : undefined
           return {
             key: i.id ?? crypto.randomUUID(),

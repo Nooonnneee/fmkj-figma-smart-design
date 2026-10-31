@@ -1,6 +1,6 @@
 import { relId } from '@/lib/access'
 import { areaTypeLabel } from '@/lib/area-types'
-import type { CatalogProduct } from '@/lib/cached-data'
+import { resolveMediaUrl, type CatalogProduct } from '@/lib/cached-data'
 import { contractStatusLabel, paymentAmounts, rmbUpper } from '@/lib/contracts'
 import { categoryOfType, deviceTypeOf, DEVICE_TYPE_ORDER } from '@/lib/device-types'
 import { getPayloadClient } from '@/lib/payload'
@@ -79,7 +79,7 @@ export const presentQuoteSummary = (q: Pick<Quote, 'id' | 'title'> & Partial<Quo
   updatedAt: q.updatedAt ?? null,
 })
 
-const mediaUrl = (v: unknown) => (v && typeof v === 'object' ? ((v as Media).url ?? null) : null)
+const mediaUrl = (v: unknown) => (v && typeof v === 'object' ? resolveMediaUrl(v as Media) : null)
 
 export function presentQuote(q: Quote) {
   return {

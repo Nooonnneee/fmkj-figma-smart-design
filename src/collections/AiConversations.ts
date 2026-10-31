@@ -12,6 +12,7 @@ const ownOnly: Access = ({ req }) => {
 /** AI 对话会话。消息和积分扣减只由服务端对话接口写入。 */
 export const AiConversations: CollectionConfig = {
   slug: 'ai-conversations',
+  graphQL: false,
   labels: { singular: 'AI 会话', plural: 'AI 会话' },
   admin: { useAsTitle: 'title', defaultColumns: ['title', 'owner', 'model', 'updatedAt'], group: 'AI 对话' },
   access: {

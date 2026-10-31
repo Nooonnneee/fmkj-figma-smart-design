@@ -1537,16 +1537,21 @@ export interface CompanySetting {
    */
   disabledPlugins?: string[];
   /**
-   * 在系统「设置 → AI 模型与接口」里可视化添加、启停和切换多个 AI 模型（支持官方 API 与 NewAPI 聚合网关）
+   * 仅超级管理员在 /admin 后台配置，对全局所有网页与小程序用户生效。留空时默认使用内置 DeepSeek 模型。使用 NewAPI 聚合网关时请在环境变量配置 NEWAPI_BASE_URL 与 NEWAPI_API_KEY。
    */
   aiModels?:
     | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
+        name: string;
+        channelId: 'deepseek' | 'newapi' | 'siliconflow' | 'dashscope' | 'ark' | 'moonshot' | 'zhipu' | 'openrouter';
+        apiModel: string;
+        cost: number;
+        tag?: string | null;
+        description?: string | null;
+        enabled?: boolean | null;
+        isDefault?: boolean | null;
+        reasoning?: boolean | null;
+        id?: string | null;
+      }[]
     | null;
   createdBy?:
     | ({
@@ -1587,7 +1592,20 @@ export interface CompanySettingsSelect<T extends boolean = true> {
   printProductImages?: T;
   documentDefaults?: T;
   disabledPlugins?: T;
-  aiModels?: T;
+  aiModels?:
+    | T
+    | {
+        name?: T;
+        channelId?: T;
+        apiModel?: T;
+        cost?: T;
+        tag?: T;
+        description?: T;
+        enabled?: T;
+        isDefault?: T;
+        reasoning?: T;
+        id?: T;
+      };
   createdBy?: T;
   updatedBy?: T;
   updatedAt?: T;

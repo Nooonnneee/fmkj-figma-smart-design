@@ -7,7 +7,6 @@ import { getCompanyInfo } from '@/lib/cached-data'
 import { DEFAULT_CONTRACT_TERMS } from '@/lib/contracts'
 import { getPayloadClient } from '@/lib/payload'
 import type { Media } from '@/payload-types'
-import { getConfiguredEnvStatus } from '@/plugins/ai-copilot/server'
 import { getPluginFlags } from '@/plugins/state'
 
 import { CompanyForm } from './company-form'
@@ -26,7 +25,7 @@ export default async function SettingsPage() {
     <section className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight">设置</h1>
-        <p className="text-sm text-muted-foreground">抬头和联系方式、新报价和合同的默认内容、各类文档默认模板，以及多 AI 模型与网关配置</p>
+        <p className="text-sm text-muted-foreground">抬头和联系方式、新报价和合同的默认内容，以及各类文档的默认模板</p>
       </header>
       <CompanyForm
         initial={{
@@ -47,8 +46,6 @@ export default async function SettingsPage() {
           styles: allStyles().map((s) => ({ id: s.id, name: s.name, description: s.description, swatch: [s.colors.paper, s.colors.accent, s.colors.headBg], enabled: enabledStyles.has(s.id) })),
           defaults: company.documentDefaults,
         }}
-        aiModels={company.aiModels}
-        aiEnvStatus={getConfiguredEnvStatus()}
       />
     </section>
   )

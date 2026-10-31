@@ -121,7 +121,7 @@ export default async function PrintContractPage({ params, searchParams }: { para
         groups={docToolbarGroups(setup, href)}
       />
       <DocRoot style={style}>
-        <DocArticle className="px-[16mm] py-[16mm]">
+        <DocArticle className="px-[14mm] py-[12mm]">
           <DocHeader
             style={style}
             company={company}
@@ -132,7 +132,7 @@ export default async function PrintContractPage({ params, searchParams }: { para
               </>
             }
           />
-          <div className="pt-9 pb-7">
+          <div className="pt-6 pb-5">
             <DocTitle style={style} center title="智能家居工程合同" subtitle={style.header === 'editorial' ? `合同编号 ${contract.number}` : undefined} />
           </div>
 
@@ -141,14 +141,14 @@ export default async function PrintContractPage({ params, searchParams }: { para
             {party('乙方（承接方）', company.name, [company.phone && `电话：${company.phone}`, company.address && `地址：${company.address}`])}
           </section>
 
-          <p className="mt-5 indent-[2em]">甲乙双方本着平等自愿、诚实信用的原则，就甲方智能家居系统的设备供货及安装调试事宜，经协商一致，订立本合同，共同遵守。</p>
+          <p className="mt-4 indent-[2em]">甲乙双方本着平等自愿、诚实信用的原则，就甲方智能家居系统的设备供货及安装调试事宜，经协商一致，订立本合同，共同遵守。</p>
 
-          <div className="mt-5 space-y-5">
+          <div className="mt-4 space-y-3.5">
             {clauses.map((c, i) => (
               <section key={c.title} data-pdf-block className="break-inside-avoid">
                 <DocSectionHeading
                   style={style}
-                  className="mb-2"
+                  className="mb-1.5"
                   title={
                     <>
                       <span className="text-doc-accent">{NUMERALS[i]}、</span>
@@ -161,12 +161,12 @@ export default async function PrintContractPage({ params, searchParams }: { para
             ))}
           </div>
 
-          <footer className="mt-14 grid grid-cols-2 gap-10 text-[12px] break-inside-avoid">
-            <div className="space-y-7">
+          <footer data-pdf-block className="mt-8 grid grid-cols-2 gap-10 text-[12px] break-inside-avoid">
+            <div className="space-y-6">
               <div>甲方（签字）：</div>
               <div className="border-b border-doc-ink/40 pb-1 text-doc-muted">日期：</div>
             </div>
-            <div className="space-y-7">
+            <div className="space-y-6">
               <div>乙方（盖章）：{company.name}</div>
               <div className="border-b border-doc-ink/40 pb-1 text-doc-muted">日期：</div>
             </div>

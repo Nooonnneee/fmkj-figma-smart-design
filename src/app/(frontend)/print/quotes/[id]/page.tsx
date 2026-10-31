@@ -9,7 +9,7 @@ import { ProductThumb } from '@/components/product-thumb'
 import { DocArticle, DocFacts, DocFooter, DocHeader, DocRoot, DocSectionHeading, DocSignatures, DocTitle, docTable } from '@/documents/parts'
 import { docToolbarGroups, resolveDocSetup } from '@/documents/registry'
 import { appAuth } from '@/lib/app-auth'
-import { getCatalog } from '@/lib/cached-data'
+import { getCatalog, resolveMediaUrl } from '@/lib/cached-data'
 import { categoryOfType, DEVICE_CATEGORIES } from '@/lib/device-types'
 import { getPayloadClient } from '@/lib/payload'
 import type { StoredScene } from '@/lib/point-scene'
@@ -52,11 +52,19 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
         })
       ).docs
     : []
-  const imageOf = (i: { image?: unknown }) => (i.image && typeof i.image === 'object' ? ((i.image as Media).url ?? null) : null)
   const items = quote.items ?? []
   const fees = quote.fees ?? []
   const brandOf = new Map(catalog.map((p) => [p.id, p.brand]))
+  const imageByProduct = new Map(catalog.map((p) => [p.id, p.image?.url ?? null]))
   const productIdOf = (i: (typeof items)[number]) => (typeof i.product === 'object' ? (i.product ? String(i.product.id) : null) : (i.product ?? null))
+  const imageOf = (i: (typeof items)[number]) => {
+    if (i.image && typeof i.image === 'object') {
+      const u = resolveMediaUrl(i.image as Media)
+      if (u) return u
+    }
+    const pid = productIdOf(i)
+    return pid ? (imageByProduct.get(pid) ?? null) : null
+  }
   // 分区版：按点位图里的「楼层 → 房间」统计设备，单价与型号取自当前报价单
   const floors = project
     ? buildQuoteFloorGroups(

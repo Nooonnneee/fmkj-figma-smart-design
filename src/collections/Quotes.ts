@@ -35,6 +35,7 @@ async function contractUsing(req: PayloadRequest, quoteId: string, signedOnly: b
 
 export const Quotes: CollectionConfig = {
   slug: 'quotes',
+  graphQL: false,
   labels: { singular: '报价', plural: '报价' },
   admin: {
     useAsTitle: 'title',

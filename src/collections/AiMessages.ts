@@ -11,6 +11,7 @@ const ownOnly: Access = ({ req }) => {
 /** AI 对话消息：只读记录。写入由服务端对话接口完成（成员无法直接新建或修改，防止伪造积分消耗）。 */
 export const AiMessages: CollectionConfig = {
   slug: 'ai-messages',
+  graphQL: false,
   labels: { singular: 'AI 消息', plural: 'AI 消息' },
   admin: { useAsTitle: 'role', defaultColumns: ['conversation', 'role', 'model', 'cost', 'createdAt'], group: 'AI 对话' },
   access: {

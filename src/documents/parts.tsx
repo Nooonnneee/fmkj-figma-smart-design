@@ -17,7 +17,7 @@ import type { DocStyle } from './types'
 /** 文档根节点：写入风格变量，打印时保留背景色。 */
 export function DocRoot({ style, className, children }: { style: DocStyle; className?: string; children: React.ReactNode }) {
   return (
-    <div data-doc-style={style.id} style={docVars(style)} className={cn('doc-body text-doc-ink [print-color-adjust:exact]', className)}>
+    <div data-doc-style={style.id} style={docVars(style)} className={cn('doc-body overflow-x-auto text-doc-ink [print-color-adjust:exact] print:overflow-visible', className)}>
       {children}
     </div>
   )
@@ -43,7 +43,7 @@ export function DocSheetPage({ children, className }: { children: React.ReactNod
   return (
     <section
       data-export-page
-      className={cn('relative mx-auto flex h-[210mm] w-[297mm] flex-col overflow-hidden bg-doc-paper px-[12mm] py-[9mm] shadow-sm break-after-page print:shadow-none', className)}
+      className={cn('relative mx-auto flex h-[210mm] w-[297mm] flex-col overflow-hidden bg-doc-paper px-[12mm] py-[9mm] shadow-sm break-after-page last:break-after-auto print:h-[209mm] print:shadow-none', className)}
     >
       {children}
     </section>

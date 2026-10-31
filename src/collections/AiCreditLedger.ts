@@ -16,6 +16,7 @@ const ownOnly: Access = ({ req }) => {
  */
 export const AiCreditLedger: CollectionConfig = {
   slug: 'ai-credit-ledger',
+  graphQL: false,
   labels: { singular: '积分流水', plural: '积分流水' },
   admin: {
     useAsTitle: 'reason',

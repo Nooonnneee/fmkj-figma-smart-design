@@ -9,7 +9,7 @@ import type { Project, Quote } from '@/payload-types'
 export const GET = mpRoute<{ id: string }>(async ({ user, params }) => {
   const payload = await getPayloadClient()
   const quote = (await payload
-    .findByID({ collection: 'quotes', id: params.id, depth: 1, user, overrideAccess: false, populate: { projects: { name: true, status: true }, products: { name: true }, media: { url: true } } })
+    .findByID({ collection: 'quotes', id: params.id, depth: 1, user, overrideAccess: false, populate: { projects: { name: true, status: true }, products: { name: true } } })
     .catch(() => null)) as Quote | null
   if (!quote) return fail(404, '报价不存在或已被删除')
   const project = quote.project && typeof quote.project === 'object' ? (quote.project as Project) : null

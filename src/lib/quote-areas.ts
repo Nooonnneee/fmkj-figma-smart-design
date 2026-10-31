@@ -73,16 +73,26 @@ export function buildQuoteFloorGroups(
   quoteItems: QuoteLineRef[],
 ): QuoteFloorGroup[] {
   const { sheets, areas, points } = analyzeScene(pointMap)
-  if (!points.length) return []
+  if (!points.length && !quoteItems.length) return []
   const byId = new Map(catalog.map((p) => [p.id, p]))
   const defaults = parseDefaults(defaultProducts)
 
-  // 用报价单当前行做匹配（先按产品 ID，再按设备类型）
-  const byProduct = new Map<string, QuoteLineRef>()
-  const byType = new Map<string, QuoteLineRef>()
-  for (const item of quoteItems) {
-    if (item.product && !byProduct.has(item.product)) byProduct.set(item.product, item)
-    if (item.deviceType && !byType.has(item.deviceType)) byType.set(item.deviceType, item)
+  // 按产品 ID 和设备类型索引报价单中的有效行，并跟踪已分配给图纸点位的数量，确保楼层房间小计之和与整单产品小计严格相等
+  const activeItems = quoteItems.filter((item) => item.quantity > 0)
+  if (!activeItems.length) return []
+  const remainingQty = new Map<QuoteLineRef, number>(activeItems.map((item) => [item, item.quantity]))
+  const byProduct = new Map<string, QuoteLineRef[]>()
+  const byType = new Map<string, QuoteLineRef[]>()
+  for (const item of activeItems) {
+    if (item.product) byProduct.set(item.product, [...(byProduct.get(item.product) ?? []), item])
+    if (item.deviceType) byType.set(item.deviceType, [...(byType.get(item.deviceType) ?? []), item])
+  }
+
+  const pickItem = (productId: string | null, deviceType: string): QuoteLineRef | undefined => {
+    const prodCandidates = productId ? (byProduct.get(productId) ?? []) : []
+    const typeCandidates = byType.get(deviceType) ?? []
+    const all = [...prodCandidates, ...typeCandidates.filter((x) => !prodCandidates.includes(x))]
+    return all.find((x) => (remainingQty.get(x) ?? 0) > 0)
   }
 
   const areaById = new Map(areas.map((a) => [a.id, a]))
@@ -100,9 +110,10 @@ export function buildQuoteFloorGroups(
     const planPoints: PlanPoint[] = []
     for (const pt of sheetPoints) {
       const resolved = resolvePoint({ deviceType: pt.deviceType, productId: pt.productId }, byId, defaults)
-      const matched = (resolved.productId ? byProduct.get(resolved.productId) : undefined) ?? byType.get(pt.deviceType)
+      const matched = pickItem(resolved.productId, pt.deviceType)
       // 报价单里没有该设备类型（例如选了「不含灯具」或已删除该行）时跳过
       if (!matched) continue
+      remainingQty.set(matched, (remainingQty.get(matched) ?? 1) - 1)
 
       planPoints.push({
         id: pt.id,
@@ -122,7 +133,7 @@ export function buildQuoteFloorGroups(
         roomMap.set(rKey, room)
       }
 
-      const bKey = `${pt.deviceType}:${matched.product ?? matched.name}`
+      const bKey = `${pt.deviceType}:${matched.key ?? matched.product ?? matched.name}`
       let line = room.buckets.get(bKey)
       if (!line) {
         line = {
@@ -178,6 +189,43 @@ export function buildQuoteFloorGroups(
       pointCount: rooms.reduce((s, r) => s + r.pointCount, 0),
       subtotal: Math.round(rooms.reduce((s, r) => s + r.subtotal, 0) * 100) / 100,
     })
+  }
+
+  // 将报价单中手动新增或超出点位图数量的剩余明细行归入「全屋增项与补充配置」，确保楼层小计之和 === 整单产品小计
+  const leftoverLines: RoomDeviceLine[] = []
+  for (const item of activeItems) {
+    const rem = remainingQty.get(item) ?? 0
+    if (rem <= 0) continue
+    const dt = item.deviceType || 'other'
+    leftoverLines.push({
+      lineKey: item.key ?? null,
+      deviceType: dt,
+      typeName: deviceTypeOf(dt)?.name ?? '增项设备',
+      productId: item.product,
+      name: item.name,
+      sku: item.sku,
+      unit: item.unit,
+      image: item.image,
+      price: item.price,
+      quantity: rem,
+      subtotal: Math.round(item.price * rem * 100) / 100,
+      codes: [],
+    })
+  }
+  if (leftoverLines.length > 0 && floors.length > 0) {
+    const extraSubtotal = Math.round(leftoverLines.reduce((s, l) => s + l.subtotal, 0) * 100) / 100
+    const extraCount = leftoverLines.reduce((s, l) => s + l.quantity, 0)
+    const targetFloor = floors[floors.length - 1]
+    targetFloor.rooms.push({
+      id: `${targetFloor.sheetId}-extra`,
+      name: '全屋增项与补充配置',
+      typeLabel: '未分区',
+      lines: leftoverLines,
+      pointCount: extraCount,
+      subtotal: extraSubtotal,
+    })
+    targetFloor.pointCount += extraCount
+    targetFloor.subtotal = Math.round((targetFloor.subtotal + extraSubtotal) * 100) / 100
   }
   return floors
 }

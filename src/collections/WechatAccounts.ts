@@ -8,6 +8,7 @@ import { cmsAdminOnly } from '@/lib/access'
  */
 export const WechatAccounts: CollectionConfig = {
   slug: 'wechat-accounts',
+  graphQL: false,
   labels: { singular: '微信绑定', plural: '微信绑定' },
   admin: {
     useAsTitle: 'openid',

@@ -1,6 +1,6 @@
 import { relId } from '@/lib/access'
 import { analyzeProject, floorTagFromSheetName, groupRooms, roomKey, type AreaAnalysis } from '@/lib/area-analysis'
-import { getCatalog, getCompanyInfo, type CatalogProduct } from '@/lib/cached-data'
+import { getCatalog, getCompanyInfo, resolveMediaUrl, type CatalogProduct } from '@/lib/cached-data'
 import { categoryOfType, DEVICE_CATEGORIES, DEVICE_TYPE_ORDER, deviceTypeOf } from '@/lib/device-types'
 import { getPayloadClient } from '@/lib/payload'
 import { fillDefaultProducts, parseDefaults, resolvePoint } from '@/lib/point-map-items'
@@ -59,7 +59,6 @@ export async function loadProjectDocs(projectId: string, user: User, scope: Poin
       depth: 1,
       user,
       overrideAccess: false,
-      populate: { media: { url: true, alt: true } },
     }),
     payload.find({ collection: 'contracts', where: { project: { equals: project.id } }, limit: 1, depth: 0, user, overrideAccess: false }),
     payload.find({
@@ -99,7 +98,7 @@ export async function loadProjectDocs(projectId: string, user: User, scope: Poin
   if (activeQuote?.items?.length) {
     for (const item of activeQuote.items) {
       const pid = relId(item.product)
-      const imgUrl = item.image && typeof item.image === 'object' ? ((item.image as Media).url ?? null) : null
+      const imgUrl = item.image && typeof item.image === 'object' ? resolveMediaUrl(item.image as Media) : null
       if (pid) {
         const base = byId.get(pid)
         if (base) {

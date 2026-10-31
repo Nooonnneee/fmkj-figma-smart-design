@@ -9,6 +9,7 @@ export const PRODUCT_PLATFORMS = ['Apple Home', '米家', '华为', '涂鸦', 'M
 
 export const Products: CollectionConfig = {
   slug: 'products',
+  graphQL: false,
   labels: { singular: '产品', plural: '产品' },
   admin: {
     useAsTitle: 'name',

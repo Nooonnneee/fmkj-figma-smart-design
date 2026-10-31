@@ -41,6 +41,7 @@ const sameValue = (a: unknown, b: unknown) => {
 
 export const Projects: CollectionConfig = {
   slug: 'projects',
+  graphQL: false,
   labels: { singular: '项目', plural: '项目' },
   admin: {
     useAsTitle: 'name',

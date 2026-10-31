@@ -13,6 +13,14 @@ import { parseAiModels, type AiModelConfig } from '@/plugins/ai-copilot/template
 /** 兜底过期时间：即使有绕过 hook 的修改，最多 60 秒后也会生效。 */
 const TTL = 60_000
 
+/** 兼容云端存储与自托管本地存储：当 m.url 未直接填充时，按 filename 拼接标准文件访问路径 */
+export function resolveMediaUrl(m: Partial<Media> | null | undefined): string | null {
+  if (!m || typeof m !== 'object') return null
+  if (typeof m.url === 'string' && m.url) return m.url
+  if (typeof m.filename === 'string' && m.filename) return `/api/media/file/${encodeURIComponent(m.filename)}`
+  return null
+}
+
 export type CatalogProduct = {
   id: string
   name: string
@@ -33,7 +41,7 @@ export type CatalogProduct = {
 }
 
 export const getCatalog = memoize(
-  'catalog-products-v2',
+  'catalog-products-v3',
   [CACHE_TAGS.catalog],
   TTL,
   async (): Promise<CatalogProduct[]> => {
@@ -44,13 +52,15 @@ export const getCatalog = memoize(
       limit: 1000,
       sort: 'name',
       overrideAccess: true,
-      populate: { brands: { name: true, slug: true, logo: true }, categories: { name: true, slug: true }, media: { url: true, alt: true } },
+      populate: { brands: { name: true, slug: true, logo: true }, categories: { name: true, slug: true } },
     })
     return (result.docs as Product[]).map((p) => {
       const b = typeof p.brand === 'object' ? (p.brand as Brand | null) : null
       const c = typeof p.category === 'object' ? (p.category as Category | null) : null
       const m = typeof p.image === 'object' ? (p.image as Media | null) : null
       const logo = b && typeof b.logo === 'object' ? (b.logo as Media | null) : null
+      const imgUrl = resolveMediaUrl(m)
+      const logoUrl = resolveMediaUrl(logo)
       return {
         id: String(p.id),
         name: p.name,
@@ -65,9 +75,9 @@ export const getCatalog = memoize(
         deviceType: p.deviceType ?? null,
         tags: (p.tags ?? []) as string[],
         updatedAt: p.updatedAt,
-        brand: b ? { id: String(b.id), name: b.name, slug: b.slug, logo: logo?.url ?? null } : null,
+        brand: b ? { id: String(b.id), name: b.name, slug: b.slug, logo: logoUrl } : null,
         category: c ? { id: String(c.id), name: c.name, slug: c.slug } : null,
-        image: m?.url ? { id: String(m.id), url: m.url, alt: m.alt ?? p.name } : null,
+        image: m && imgUrl ? { id: String(m.id), url: imgUrl, alt: m.alt ?? p.name } : null,
       }
     })
   },
@@ -85,15 +95,15 @@ export const getCategories = memoize(
 )
 
 export const getBrands = memoize(
-  'catalog-brands-v2',
+  'catalog-brands-v3',
   [CACHE_TAGS.catalog],
   TTL,
   async () => {
     const payload = await getPayloadClient()
-    const r = await payload.find({ collection: 'brands', limit: 200, sort: 'name', depth: 1, overrideAccess: true, select: { name: true, slug: true, logo: true }, populate: { media: { url: true } } })
+    const r = await payload.find({ collection: 'brands', limit: 200, sort: 'name', depth: 1, overrideAccess: true, select: { name: true, slug: true, logo: true } })
     return (r.docs as Brand[]).map((b) => {
       const logo = typeof b.logo === 'object' ? (b.logo as Media | null) : null
-      return { id: String(b.id), name: b.name, slug: b.slug, logo: logo?.url ?? null }
+      return { id: String(b.id), name: b.name, slug: b.slug, logo: resolveMediaUrl(logo) }
     })
   },
 )
@@ -150,7 +160,7 @@ function parseDocumentDefaults(value: unknown): CompanyInfo['documentDefaults'] 
 }
 
 export const getCompanyInfo = memoize(
-  'company-settings-v5',
+  'company-settings-v6',
   [CACHE_TAGS.company],
   TTL,
   async (): Promise<CompanyInfo> => {
@@ -159,6 +169,8 @@ export const getCompanyInfo = memoize(
     const rawAiModels = (s as unknown as { aiModels?: unknown }).aiModels
     const logo = s.logo && typeof s.logo === 'object' ? (s.logo as Media) : null
     const qr = s.qrCode && typeof s.qrCode === 'object' ? (s.qrCode as Media) : null
+    const logoUrl = resolveMediaUrl(logo)
+    const qrUrl = resolveMediaUrl(qr)
     return {
       name: s.name || 'FMKJ 智能家居',
       slogan: s.slogan ?? null,
@@ -172,8 +184,8 @@ export const getCompanyInfo = memoize(
       documentDefaults: parseDocumentDefaults(s.documentDefaults),
       disabledPlugins: Array.isArray(s.disabledPlugins) ? s.disabledPlugins.filter((v): v is string => typeof v === 'string') : [],
       aiModels: parseAiModels(rawAiModels),
-      logo: logo?.url ? { url: logo.url, alt: logo.alt || s.name, width: logo.width ?? null, height: logo.height ?? null } : null,
-      qrCode: qr?.url ? { url: qr.url, alt: qr.alt || '二维码' } : null,
+      logo: logo && logoUrl ? { url: logoUrl, alt: logo.alt || s.name, width: logo.width ?? null, height: logo.height ?? null } : null,
+      qrCode: qr && qrUrl ? { url: qrUrl, alt: qr.alt || '二维码' } : null,
     }
   },
 )

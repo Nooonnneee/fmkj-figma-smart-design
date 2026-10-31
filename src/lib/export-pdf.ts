@@ -69,6 +69,25 @@ function collectBreaks(root: HTMLElement, scale: number): number[] {
     .sort((a, b) => a - b)
 }
 
+function isStripMostlyBlank(ctx: CanvasRenderingContext2D, width: number, startY: number, endY: number): boolean {
+  const h = endY - startY
+  if (h <= 0) return true
+  const data = ctx.getImageData(0, startY, width, h).data
+  const marginX = Math.floor(width * 0.04)
+  let darkPixels = 0
+  for (let row = 0; row < h; row += 2) {
+    const rowOffset = row * width * 4
+    for (let x = marginX; x < width - marginX; x += 4) {
+      const i = rowOffset + x * 4
+      if (data[i] < 240 || data[i + 1] < 240 || data[i + 2] < 240) {
+        darkPixels++
+        if (darkPixels > 12) return false
+      }
+    }
+  }
+  return true
+}
+
 /** 把纵向长画布按 A4 比例切成多页 A4 画布（按 DOM 块边界切页，不劈开卡片、点位图或表格行） */
 function slicePortraitCanvas(source: HTMLCanvasElement, domEl: HTMLElement, scale: number): PageJpeg[] {
   const W_PT = 595.28
@@ -83,6 +102,9 @@ function slicePortraitCanvas(source: HTMLCanvasElement, domEl: HTMLElement, scal
   const pages: PageJpeg[] = []
   let y = 0
   while (y < source.height - 8) {
+    if (pages.length > 0 && isStripMostlyBlank(srcCtx, source.width, y, source.height)) {
+      break
+    }
     const isFirst = y === 0
     const maxSlice = isFirst ? fullPageH - padY : contentH
     let nextY = y + maxSlice

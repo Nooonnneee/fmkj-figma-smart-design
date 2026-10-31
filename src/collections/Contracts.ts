@@ -47,6 +47,7 @@ type Payment = { name?: string | null; percent?: number | null; received?: boole
  */
 export const Contracts: CollectionConfig = {
   slug: 'contracts',
+  graphQL: false,
   labels: { singular: '合同', plural: '合同' },
   admin: {
     useAsTitle: 'number',

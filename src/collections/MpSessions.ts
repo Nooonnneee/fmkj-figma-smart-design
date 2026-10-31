@@ -12,6 +12,7 @@ import { cmsAdminOnly } from '@/lib/access'
  */
 export const MpSessions: CollectionConfig = {
   slug: 'mp-sessions',
+  graphQL: false,
   labels: { singular: '小程序登录', plural: '小程序登录' },
   admin: {
     useAsTitle: 'kind',
