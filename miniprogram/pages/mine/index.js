@@ -67,6 +67,13 @@ Page({
       showCancel: false,
     })
   },
+  privacy() {
+    if (wx.openPrivacyContract) {
+      wx.openPrivacyContract({ fail: () => toast('当前微信版本暂不支持打开隐私协议') })
+      return
+    }
+    toast('请在微信公众平台查看《用户隐私保护指引》')
+  },
   plugins() {
     const list = (this.meta && this.meta.plugins) || []
     wx.showModal({ title: '已启用插件', content: list.map((p) => p.name).join('\n') || '没有启用的插件', showCancel: false })
