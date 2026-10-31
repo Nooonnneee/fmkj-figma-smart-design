@@ -9,20 +9,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
-import { AI_PROVIDER_PRESETS, type AiModelConfig } from '@/plugins/ai-copilot/templates'
-
-const COMMON_ENV_HINTS = [
-  'DEEPSEEK_API_KEY',
-  'NEWAPI_API_KEY',
-  'ONEAPI_KEY',
-  'SILICONFLOW_API_KEY',
-  'DASHSCOPE_API_KEY',
-  'ARK_API_KEY',
-  'MOONSHOT_API_KEY',
-  'OPENROUTER_API_KEY',
-]
+import {
+  AI_PROVIDER_CHANNEL_LIST,
+  AI_PROVIDER_CHANNELS,
+  AI_PROVIDER_PRESETS,
+  type AiModelConfig,
+  type AiProviderChannelId,
+} from '@/plugins/ai-copilot/templates'
 
 function makeModelId(apiModel: string, existingIds: Set<string>): string {
   const base =
@@ -102,13 +98,14 @@ export function AiModelSettings({
         {
           id,
           name: '自定义 AI 模型',
-          provider: 'NewAPI / OpenAI 兼容',
+          provider: AI_PROVIDER_CHANNELS.newapi.label,
+          channelId: 'newapi',
           tag: '自定义',
           cost: 1,
           description: '支持任意兼容 OpenAI /v1/chat/completions 协议的官方接口或聚合网关',
           apiModel: 'gpt-4o-mini',
-          baseUrl: 'https://your-newapi-domain.com/v1',
-          apiKeyEnv: 'NEWAPI_API_KEY',
+          baseUrl: AI_PROVIDER_CHANNELS.newapi.baseUrl,
+          apiKeyEnv: AI_PROVIDER_CHANNELS.newapi.apiKeyEnv,
           reasoning: false,
           enabled: true,
           isDefault: false,
@@ -168,7 +165,8 @@ export function AiModelSettings({
         {/* 模型卡片列表 */}
         <div className="space-y-3">
           {models.map((m, idx) => {
-            const keyReady = Boolean(envStatus[m.apiKeyEnv])
+            const channel = AI_PROVIDER_CHANNELS[m.channelId] ?? AI_PROVIDER_CHANNELS.deepseek
+            const keyReady = Boolean(envStatus[channel.id])
             return (
               <div
                 key={m.id}
@@ -185,7 +183,7 @@ export function AiModelSettings({
                     </span>
                     <span className="text-sm font-semibold">{m.name || '未命名模型'}</span>
                     <Badge variant="outline" className="text-[11px]">
-                      {m.provider || 'OpenAI 兼容'}
+                      {channel.label}
                     </Badge>
                     {m.isDefault ? (
                       <Badge variant="default" className="gap-1 text-[11px]">
@@ -206,11 +204,11 @@ export function AiModelSettings({
                     {keyReady ? (
                       <Badge variant="success" className="gap-1 text-[11px]">
                         <Check className="size-3" />
-                        密钥已就绪（{m.apiKeyEnv}）
+                        密钥已就绪（{channel.apiKeyEnv}）
                       </Badge>
                     ) : (
                       <Badge variant="outline" className="text-[11px] text-muted-foreground">
-                        待配环境变量：{m.apiKeyEnv || '未填'}
+                        待配环境变量：{channel.id === 'newapi' ? 'NEWAPI_BASE_URL + NEWAPI_API_KEY' : channel.apiKeyEnv}
                       </Badge>
                     )}
                   </div>
@@ -253,14 +251,30 @@ export function AiModelSettings({
                     />
                   </div>
                   <div className="grid gap-1.5">
-                    <Label className="text-xs">渠道 / 平台名称</Label>
-                    <Input
-                      value={m.provider}
-                      maxLength={40}
-                      placeholder="如：NewAPI / DeepSeek / 通义千问"
-                      onChange={(e) => updateModel(m.id, { provider: e.target.value })}
-                      className="h-8 text-xs"
-                    />
+                    <Label className="text-xs">接口渠道（服务端固定绑定域名与密钥）</Label>
+                    <Select
+                      value={m.channelId}
+                      onValueChange={(v) => {
+                        const ch = AI_PROVIDER_CHANNELS[v as AiProviderChannelId] ?? AI_PROVIDER_CHANNELS.deepseek
+                        updateModel(m.id, {
+                          channelId: ch.id,
+                          provider: ch.label,
+                          baseUrl: ch.baseUrl,
+                          apiKeyEnv: ch.apiKeyEnv,
+                        })
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {AI_PROVIDER_CHANNEL_LIST.map((ch) => (
+                          <SelectItem key={ch.id} value={ch.id}>
+                            {ch.label}（{ch.apiKeyEnv}）
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="grid gap-1.5">
                     <Label className="text-xs">接口模型标识（model 参数）</Label>
@@ -276,24 +290,19 @@ export function AiModelSettings({
 
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_0.6fr]">
                   <div className="grid gap-1.5">
-                    <Label className="text-xs">接口地址（Base URL，自动补全 /chat/completions）</Label>
+                    <Label className="text-xs">服务端绑定接口地址（只读）</Label>
                     <Input
-                      value={m.baseUrl}
-                      maxLength={240}
-                      placeholder="https://api.deepseek.com/v1 或 https://你的newapi域名/v1"
-                      onChange={(e) => updateModel(m.id, { baseUrl: e.target.value })}
-                      className="h-8 font-mono text-xs"
+                      readOnly
+                      value={channel.id === 'newapi' ? '由服务端环境变量 NEWAPI_BASE_URL 指定' : `${channel.baseUrl}/chat/completions`}
+                      className="h-8 bg-muted/50 font-mono text-xs text-muted-foreground"
                     />
                   </div>
                   <div className="grid gap-1.5">
-                    <Label className="text-xs">密钥环境变量名（API Key Env）</Label>
+                    <Label className="text-xs">绑定密钥环境变量（只读）</Label>
                     <Input
-                      value={m.apiKeyEnv}
-                      maxLength={80}
-                      list="ai-env-key-suggestions"
-                      placeholder="如：NEWAPI_API_KEY 或 DEEPSEEK_API_KEY"
-                      onChange={(e) => updateModel(m.id, { apiKeyEnv: e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '') })}
-                      className="h-8 font-mono text-xs"
+                      readOnly
+                      value={channel.id === 'newapi' ? 'NEWAPI_API_KEY' : channel.apiKeyEnv}
+                      className="h-8 bg-muted/50 font-mono text-xs text-muted-foreground"
                     />
                   </div>
                   <div className="grid gap-1.5">
@@ -344,17 +353,11 @@ export function AiModelSettings({
           })}
         </div>
 
-        <datalist id="ai-env-key-suggestions">
-          {COMMON_ENV_HINTS.map((k) => (
-            <option key={k} value={k} />
-          ))}
-        </datalist>
-
         <div className="rounded-lg bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground">
           <p className="font-medium text-foreground">使用说明（官方 API 与 NewAPI 聚合网关通用）：</p>
           <ul className="mt-1 list-inside list-disc space-y-0.5">
             <li>
-              <strong>使用 NewAPI / OneAPI 聚合网关</strong>：多个模型可以共用同一个 <code className="rounded bg-muted px-1">Base URL</code>（如 <code className="rounded bg-muted px-1">https://api.your-newapi.com/v1</code>）和同一个密钥变量名（如 <code className="rounded bg-muted px-1">NEWAPI_API_KEY</code>），只需填写不同的「接口模型标识（model 参数）」即可一键切换。
+              <strong>使用 NewAPI / OneAPI 聚合网关</strong>：在服务端环境变量中配置 <code className="rounded bg-muted px-1">NEWAPI_BASE_URL</code>（如 <code className="rounded bg-muted px-1">https://api.your-newapi.com/v1</code>）和 <code className="rounded bg-muted px-1">NEWAPI_API_KEY</code>，然后在上方选择「NewAPI / OneAPI 聚合网关」渠道并填写不同的「接口模型标识（model 参数）」即可一键切换多个模型。
             </li>
             <li>
               <strong>使用各家官方 API</strong>：点击上方预设按钮即可自动带出 DeepSeek、阿里百炼、火山方舟、Kimi 等官方接口地址，在环境变量中配置对应的 API Key 后保存即可生效。

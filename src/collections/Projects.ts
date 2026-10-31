@@ -1,12 +1,36 @@
-import { APIError, type CollectionConfig } from 'payload'
+import { APIError, type Access, type CollectionConfig, type Where } from 'payload'
 
-import { cmsAdminOrMember, isMember, relId } from '@/lib/access'
+import { cmsAdminOrMember, fieldCmsAdminOnly, isCmsAdmin, isMember, relId } from '@/lib/access'
 import { countScenePoints } from '@/lib/point-count'
 import { canEditProject } from '@/lib/project-access'
 import { ARCHIVED_MESSAGE } from '@/lib/project-guards'
 import { autoProjectName, PROJECT_PLATFORMS, PROJECT_STATUSES } from '@/lib/projects'
 
 const opts = (list: readonly { value: string; label: string }[]) => list.map(({ value, label }) => ({ value, label }))
+
+/** 行级读取控制：成员只能看到自己创建的项目、受邀协作的项目，以及未指定负责人的演示项目。 */
+export const readProjectAccess: Access = ({ req }) => {
+  if (isCmsAdmin(req)) return true
+  if (!isMember(req) || !req.user) return false
+  const where: Where = {
+    or: [
+      { owner: { equals: req.user.id } },
+      { owner: { exists: false } },
+      { 'collaborators.user': { equals: req.user.id } },
+    ],
+  }
+  return where
+}
+
+/** 只有 CMS 管理员或项目创建者可以删除项目。 */
+const deleteProjectAccess: Access = ({ req }) => {
+  if (isCmsAdmin(req)) return true
+  if (!isMember(req) || !req.user) return false
+  const where: Where = {
+    or: [{ owner: { equals: req.user.id } }, { owner: { exists: false } }],
+  }
+  return where
+}
 
 /** 成员在已归档项目上可以改的字段：只有状态（恢复项目）。 */
 const EDITABLE_WHEN_ARCHIVED = new Set(['status', 'archivedAt', 'pointCount', 'updatedAt', 'createdAt', 'id'])
@@ -25,10 +49,10 @@ export const Projects: CollectionConfig = {
   },
   defaultSort: '-updatedAt',
   access: {
-    read: cmsAdminOrMember,
+    read: readProjectAccess,
     create: cmsAdminOrMember,
-    update: cmsAdminOrMember,
-    delete: cmsAdminOrMember,
+    update: readProjectAccess,
+    delete: deleteProjectAccess,
   },
   hooks: {
     beforeValidate: [
@@ -137,6 +161,10 @@ export const Projects: CollectionConfig = {
       type: 'array',
       labels: { singular: '协作者', plural: '协作者' },
       admin: { description: '通过项目协作链接加入的成员及其读写权限' },
+      access: {
+        create: fieldCmsAdminOnly,
+        update: fieldCmsAdminOnly,
+      },
       fields: [
         {
           type: 'row',
@@ -159,11 +187,16 @@ export const Projects: CollectionConfig = {
       ],
     },
     {
-      // 协作分享链接配置：{ enabled: boolean, token: string, role: 'read' | 'edit' }
+      // 协作分享链接配置：{ enabled: boolean, token: string, role: 'read' | 'edit' }，严禁向普通成员直接返回 token
       name: 'shareConfig',
       label: '协作链接配置',
       type: 'json',
       admin: { hidden: true },
+      access: {
+        read: fieldCmsAdminOnly,
+        create: fieldCmsAdminOnly,
+        update: fieldCmsAdminOnly,
+      },
     },
   ],
 }

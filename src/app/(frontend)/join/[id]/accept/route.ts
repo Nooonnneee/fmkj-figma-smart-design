@@ -7,15 +7,14 @@ const fail = (status: number, error: string) => Response.json({ ok: false, error
 
 /**
  * 接受项目协作邀请：
- * - 已登录用户直接加入项目协作者列表；
- * - 未登录用户支持在同一次请求中传入登录（mode=login）或新用户注册（mode=register）并自动加入该项目。
+ * 仅允许已由后台开通的成员账号（已登录，或通过 mode=login 验证邮箱密码）加入项目协作者列表；
+ * 不开放陌生访客自助注册，防止通过分享链接越权进入工作区。
  */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params
   const body = (await request.json().catch(() => ({}))) as {
     token?: string
-    mode?: 'current' | 'login' | 'register'
-    name?: string
+    mode?: 'current' | 'login'
     email?: string
     password?: string
   }
@@ -52,30 +51,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const res = await appAuth.login(email, password)
     if (!res.ok) return fail(401, res.error)
     user = await appAuth.getCurrentUser()
-  } else if (body.mode === 'register') {
-    const name = typeof body.name === 'string' ? body.name.trim().slice(0, 40) : ''
-    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 120) : ''
-    const password = typeof body.password === 'string' ? body.password : ''
-    if (!name) return fail(400, '请填写你的姓名')
-    if (!email || !email.includes('@')) return fail(400, '请填写有效的邮箱')
-    if (password.length < 6) return fail(400, '密码至少需要 6 位')
-
-    const existing = await payload.count({ collection: 'users', where: { email: { equals: email } }, overrideAccess: true })
-    if (existing.totalDocs > 0) {
-      return fail(409, '该邮箱已有账号，请切换到「已有账号登录」')
-    }
-    await payload.create({
-      collection: 'users',
-      data: { name, email, password, status: 'active' },
-      overrideAccess: true,
-      depth: 0,
-    })
-    const res = await appAuth.login(email, password)
-    if (!res.ok) return fail(500, '账号已创建，请使用刚才的邮箱密码登录')
-    user = await appAuth.getCurrentUser()
   }
 
-  if (!user) return fail(401, '请先登录或注册账号以加入项目协作')
+  if (!user) return fail(401, '请先使用已有成员账号登录以加入项目协作')
 
   const uid = String(user.id)
   const ownerId = relId(project.owner)

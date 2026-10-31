@@ -48,7 +48,7 @@ export default async function SettingsPage() {
           defaults: company.documentDefaults,
         }}
         aiModels={company.aiModels}
-        aiEnvStatus={getConfiguredEnvStatus(company.aiModels)}
+        aiEnvStatus={getConfiguredEnvStatus()}
       />
     </section>
   )

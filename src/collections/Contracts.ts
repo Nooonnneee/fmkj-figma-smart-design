@@ -1,8 +1,21 @@
-import { APIError, type CollectionConfig, type PayloadRequest } from 'payload'
+import { APIError, type Access, type CollectionConfig, type PayloadRequest, type Where } from 'payload'
 
-import { cmsAdminOrMember, isMember, relId } from '@/lib/access'
+import { cmsAdminOrMember, isCmsAdmin, isMember, relId } from '@/lib/access'
 import { CONTRACT_STATUSES, contractNumberPrefix, paymentPercentTotal } from '@/lib/contracts'
 import { assertProjectEditable } from '@/lib/project-guards'
+
+const readContractAccess: Access = ({ req }) => {
+  if (isCmsAdmin(req)) return true
+  if (!isMember(req) || !req.user) return false
+  const where: Where = {
+    or: [
+      { 'project.owner': { equals: req.user.id } },
+      { 'project.owner': { exists: false } },
+      { 'project.collaborators.user': { equals: req.user.id } },
+    ],
+  }
+  return where
+}
 
 /** 当天的下一个合同编号：HT20261030-01、-02 … */
 async function nextContractNumber(req: PayloadRequest) {
@@ -42,10 +55,10 @@ export const Contracts: CollectionConfig = {
   },
   defaultSort: '-updatedAt',
   access: {
-    read: cmsAdminOrMember,
+    read: readContractAccess,
     create: cmsAdminOrMember,
-    update: cmsAdminOrMember,
-    delete: cmsAdminOrMember,
+    update: readContractAccess,
+    delete: readContractAccess,
   },
   hooks: {
     beforeValidate: [

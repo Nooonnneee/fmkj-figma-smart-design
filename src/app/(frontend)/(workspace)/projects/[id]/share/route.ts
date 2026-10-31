@@ -54,11 +54,13 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     collaborators?: CollaboratorItem[] | null
     shareConfig?: unknown
   }
-  const role = getProjectRole({ owner: project.owner, collaborators: rawProj.collaborators }, user.id) ?? 'owner'
+  const role = getProjectRole({ owner: project.owner, collaborators: rawProj.collaborators }, user.id)
+  if (!role) return fail(403, '你没有该项目的访问权限')
+
   let shareConfig = parseShareConfig(rawProj.shareConfig)
 
-  // 首次打开时将自动生成的 token 持久化到项目中，确保复制出的链接立即可用
-  if (!rawProj.shareConfig || typeof (rawProj.shareConfig as { token?: unknown })?.token !== 'string') {
+  // 仅当项目管理员（owner）首次打开时将自动生成的 token 持久化到项目中
+  if (role === 'owner' && (!rawProj.shareConfig || typeof (rawProj.shareConfig as { token?: unknown })?.token !== 'string')) {
     await payload
       .update({
         collection: 'projects',

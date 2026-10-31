@@ -1,12 +1,78 @@
 import type { AiModelOption } from '@/components/ai/ai-elements'
 import type { PluginId } from '@/plugins/types'
 
+/**
+ * 受信任的 AI 渠道白名单：
+ * 每个渠道的请求域名（baseUrl）与密钥环境变量名（apiKeyEnv）在服务端严格一对一绑定，
+ * 严禁客户端自定义任意 URL 或读取任意环境变量，从根源杜绝 SSRF 与密钥外带。
+ */
+export const AI_PROVIDER_CHANNELS = {
+  deepseek: {
+    id: 'deepseek',
+    label: 'DeepSeek 官方',
+    baseUrl: 'https://api.deepseek.com/v1',
+    apiKeyEnv: 'DEEPSEEK_API_KEY',
+  },
+  newapi: {
+    id: 'newapi',
+    label: 'NewAPI / OneAPI 聚合网关',
+    // 聚合网关地址仅从服务端环境变量 NEWAPI_BASE_URL / APP_OPENAI_BASE_URL 读取
+    baseUrl: 'env:NEWAPI_BASE_URL',
+    apiKeyEnv: 'NEWAPI_API_KEY',
+  },
+  siliconflow: {
+    id: 'siliconflow',
+    label: '硅基流动 SiliconFlow',
+    baseUrl: 'https://api.siliconflow.cn/v1',
+    apiKeyEnv: 'SILICONFLOW_API_KEY',
+  },
+  dashscope: {
+    id: 'dashscope',
+    label: '阿里百炼（通义千问）',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    apiKeyEnv: 'DASHSCOPE_API_KEY',
+  },
+  ark: {
+    id: 'ark',
+    label: '火山方舟（豆包）',
+    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+    apiKeyEnv: 'ARK_API_KEY',
+  },
+  moonshot: {
+    id: 'moonshot',
+    label: '月之暗面 Kimi',
+    baseUrl: 'https://api.moonshot.cn/v1',
+    apiKeyEnv: 'MOONSHOT_API_KEY',
+  },
+  zhipu: {
+    id: 'zhipu',
+    label: '智谱清言 GLM',
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    apiKeyEnv: 'ZHIPU_API_KEY',
+  },
+  openrouter: {
+    id: 'openrouter',
+    label: 'OpenRouter',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    apiKeyEnv: 'OPENROUTER_API_KEY',
+  },
+} as const
+
+export type AiProviderChannelId = keyof typeof AI_PROVIDER_CHANNELS
+export const AI_PROVIDER_CHANNEL_LIST = Object.values(AI_PROVIDER_CHANNELS)
+
+export function isAiProviderChannelId(v: unknown): v is AiProviderChannelId {
+  return typeof v === 'string' && v in AI_PROVIDER_CHANNELS
+}
+
 export type AiModelConfig = AiModelOption & {
+  /** 绑定的受信任渠道 ID（决定服务端使用的固定 Base URL 与环境变量） */
+  channelId: AiProviderChannelId
   /** 实际传给接口的 model 参数名（如 deepseek-chat、gpt-4o、qwen-max） */
   apiModel: string
-  /** OpenAI 兼容接口 Base URL（如 https://api.deepseek.com/v1 或自建 NewAPI 地址） */
+  /** 只读展示：由 channelId 决定的接口地址说明 */
   baseUrl: string
-  /** 存放 API Key 的环境变量名（如 DEEPSEEK_API_KEY、NEWAPI_API_KEY），数据库不存明文密钥 */
+  /** 只读展示：由 channelId 决定的环境变量名 */
   apiKeyEnv: string
   /** 是否启用（开启后出现在网页与小程序的模型选择列表中） */
   enabled: boolean
@@ -21,13 +87,14 @@ export const DEFAULT_AI_MODELS: AiModelConfig[] = [
   {
     id: 'deepseek-flash',
     name: 'DeepSeek V4.1-Flash-1017',
-    provider: 'DeepSeek',
+    provider: AI_PROVIDER_CHANNELS.deepseek.label,
+    channelId: 'deepseek',
     tag: '默认 · 工具调用',
     cost: 1,
     description: '高速长上下文模型（1M 上下文），支持多步调用系统工具与已启用插件',
     apiModel: 'deepseek-flash',
-    baseUrl: 'https://api.deepseek.com',
-    apiKeyEnv: 'DEEPSEEK_API_KEY',
+    baseUrl: AI_PROVIDER_CHANNELS.deepseek.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.deepseek.apiKeyEnv,
     enabled: true,
     isDefault: true,
   },
@@ -39,79 +106,86 @@ export const AI_MODELS: AiModelOption[] = DEFAULT_AI_MODELS
 export const AI_PROVIDER_PRESETS: Omit<AiModelConfig, 'id' | 'enabled' | 'isDefault'>[] = [
   {
     name: 'NewAPI / OneAPI 聚合模型',
-    provider: 'NewAPI',
+    provider: AI_PROVIDER_CHANNELS.newapi.label,
+    channelId: 'newapi',
     tag: '聚合网关 · 多模型',
     cost: 1,
     description: '通过自建 NewAPI / OneAPI 统一网关调用各类大模型（兼容 OpenAI /v1/chat/completions）',
     apiModel: 'gpt-4o-mini',
-    baseUrl: 'https://your-newapi-domain.com/v1',
-    apiKeyEnv: 'NEWAPI_API_KEY',
+    baseUrl: AI_PROVIDER_CHANNELS.newapi.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.newapi.apiKeyEnv,
     reasoning: false,
   },
   {
     name: 'DeepSeek V3（官方）',
-    provider: 'DeepSeek',
+    provider: AI_PROVIDER_CHANNELS.deepseek.label,
+    channelId: 'deepseek',
     tag: '主力 · 工具调用',
     cost: 1,
     description: 'DeepSeek 官方主力对话模型，擅长全屋智能点位规划、选型与报价工具调用',
     apiModel: 'deepseek-chat',
-    baseUrl: 'https://api.deepseek.com/v1',
-    apiKeyEnv: 'DEEPSEEK_API_KEY',
+    baseUrl: AI_PROVIDER_CHANNELS.deepseek.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.deepseek.apiKeyEnv,
     reasoning: false,
   },
   {
     name: 'DeepSeek R1（深度思考）',
-    provider: 'DeepSeek',
+    provider: AI_PROVIDER_CHANNELS.deepseek.label,
+    channelId: 'deepseek',
     tag: '深度推理',
     cost: 2,
     description: 'DeepSeek 深度推理模型，适合复杂别墅多层方案审查与预算优化分析',
     apiModel: 'deepseek-reasoner',
-    baseUrl: 'https://api.deepseek.com/v1',
-    apiKeyEnv: 'DEEPSEEK_API_KEY',
+    baseUrl: AI_PROVIDER_CHANNELS.deepseek.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.deepseek.apiKeyEnv,
     reasoning: true,
   },
   {
     name: '硅基流动 SiliconFlow（DeepSeek V3）',
-    provider: 'SiliconFlow',
+    provider: AI_PROVIDER_CHANNELS.siliconflow.label,
+    channelId: 'siliconflow',
     tag: '国内聚合 · 高速',
     cost: 1,
     description: '通过硅基流动聚合 API 调用开源与商业模型，一个 Key 切换多模型',
     apiModel: 'deepseek-ai/DeepSeek-V3',
-    baseUrl: 'https://api.siliconflow.cn/v1',
-    apiKeyEnv: 'SILICONFLOW_API_KEY',
+    baseUrl: AI_PROVIDER_CHANNELS.siliconflow.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.siliconflow.apiKeyEnv,
     reasoning: false,
   },
   {
     name: '通义千问 Qwen-Plus（阿里百炼）',
-    provider: '通义千问',
+    provider: AI_PROVIDER_CHANNELS.dashscope.label,
+    channelId: 'dashscope',
     tag: '阿里百炼 · 稳定',
     cost: 1,
     description: '阿里云百炼 OpenAI 兼容接口，支持工具调用与长文本方案生成',
     apiModel: 'qwen-plus',
-    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    apiKeyEnv: 'DASHSCOPE_API_KEY',
+    baseUrl: AI_PROVIDER_CHANNELS.dashscope.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.dashscope.apiKeyEnv,
     reasoning: false,
   },
   {
     name: '豆包 Doubao-Pro（火山方舟）',
-    provider: '豆包',
+    provider: AI_PROVIDER_CHANNELS.ark.label,
+    channelId: 'ark',
     tag: '火山引擎',
     cost: 1,
     description: '字节跳动火山方舟 OpenAI 兼容接口（可将模型名替换为你的推理接入点 ep-xxxx）',
     apiModel: 'doubao-1-5-pro-32k-250115',
-    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-    apiKeyEnv: 'ARK_API_KEY',
+    baseUrl: AI_PROVIDER_CHANNELS.ark.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.ark.apiKeyEnv,
     reasoning: false,
   },
   {
     name: 'Kimi（月之暗面 Moonshot）',
-    provider: 'Kimi',
+    provider: AI_PROVIDER_CHANNELS.moonshot.label,
+    channelId: 'moonshot',
     tag: '长上下文',
     cost: 1,
     description: 'Moonshot OpenAI 兼容接口，适合超长清单与方案文档分析',
     apiModel: 'kimi-k2-0711-preview',
-    baseUrl: 'https://api.moonshot.cn/v1',
-    apiKeyEnv: 'MOONSHOT_API_KEY',
+    baseUrl: AI_PROVIDER_CHANNELS.moonshot.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.moonshot.apiKeyEnv,
     reasoning: false,
   },
 ]
@@ -130,22 +204,24 @@ export function parseAiModels(value: unknown): AiModelConfig[] {
     const id = cleanStr(r.id, 60).replace(/[^a-zA-Z0-9._:-]/g, '-')
     const name = cleanStr(r.name, 80)
     const apiModel = cleanStr(r.apiModel, 120, id)
-    const baseUrl = cleanStr(r.baseUrl, 240, 'https://api.deepseek.com')
-    const apiKeyEnv = cleanStr(r.apiKeyEnv, 80, 'DEEPSEEK_API_KEY').replace(/[^a-zA-Z0-9_]/g, '')
-    if (!id || !name || !apiModel || !baseUrl || !apiKeyEnv || seen.has(id)) continue
+    const channelId: AiProviderChannelId = isAiProviderChannelId(r.channelId) ? r.channelId : 'deepseek'
+    const channel = AI_PROVIDER_CHANNELS[channelId]
+    if (!id || !name || !apiModel || seen.has(id)) continue
     seen.add(id)
     const costNum = Number(r.cost)
     out.push({
       id,
       name,
-      provider: cleanStr(r.provider, 40, 'OpenAI 兼容'),
+      provider: channel.label,
+      channelId,
       tag: cleanStr(r.tag, 40, '工具调用'),
       cost: Number.isInteger(costNum) && costNum >= 0 && costNum <= 100 ? costNum : 1,
       description: cleanStr(r.description, 200, `${name}（${apiModel}）`),
       reasoning: Boolean(r.reasoning),
       apiModel,
-      baseUrl,
-      apiKeyEnv,
+      // 强制使用受信任渠道的固定 baseUrl 与 apiKeyEnv，忽略客户端传入的任何自定义 URL 或变量名
+      baseUrl: channel.baseUrl,
+      apiKeyEnv: channel.apiKeyEnv,
       enabled: r.enabled !== false,
       isDefault: Boolean(r.isDefault),
     })

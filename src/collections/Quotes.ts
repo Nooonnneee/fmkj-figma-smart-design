@@ -1,9 +1,23 @@
-import { APIError, type CollectionConfig, type PayloadRequest } from 'payload'
+import { APIError, type Access, type CollectionConfig, type PayloadRequest, type Where } from 'payload'
 
-import { cmsAdminOrMember, isMember, relId } from '@/lib/access'
+import { cmsAdminOrMember, isCmsAdmin, isMember, relId } from '@/lib/access'
 import { DEVICE_TYPE_OPTIONS } from '@/lib/device-types'
 import { assertProjectEditable } from '@/lib/project-guards'
 import { QUOTE_STATUSES, quoteTotals } from '@/lib/quotes'
+
+/** 行级读取控制：只能读取自己有权访问的项目的报价单。 */
+const readQuoteAccess: Access = ({ req }) => {
+  if (isCmsAdmin(req)) return true
+  if (!isMember(req) || !req.user) return false
+  const where: Where = {
+    or: [
+      { 'project.owner': { equals: req.user.id } },
+      { 'project.owner': { exists: false } },
+      { 'project.collaborators.user': { equals: req.user.id } },
+    ],
+  }
+  return where
+}
 
 /** 报价被合同引用时的限制：已签订合同的报价不能再改；被任何合同引用的报价不能删除。 */
 async function contractUsing(req: PayloadRequest, quoteId: string, signedOnly: boolean) {
@@ -29,10 +43,10 @@ export const Quotes: CollectionConfig = {
   },
   defaultSort: '-updatedAt',
   access: {
-    read: cmsAdminOrMember,
+    read: readQuoteAccess,
     create: cmsAdminOrMember,
-    update: cmsAdminOrMember,
-    delete: cmsAdminOrMember,
+    update: readQuoteAccess,
+    delete: readQuoteAccess,
   },
   hooks: {
     beforeChange: [

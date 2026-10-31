@@ -36,52 +36,81 @@ import { autoSelectProducts, isSelectionTier, SELECTION_TIERS } from '@/plugins/
 import type { PluginFlags } from '@/plugins/state'
 import type { Project, User } from '@/payload-types'
 
-import { DEFAULT_AI_MODELS, enabledAiModels, type AiModelConfig } from './templates'
+import { AI_PROVIDER_CHANNELS, DEFAULT_AI_MODELS, enabledAiModels, isAiProviderChannelId, type AiModelConfig } from './templates'
 
 const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'
-const COMMON_AI_ENV_KEYS = [
-  'DEEPSEEK_API_KEY',
-  'NEWAPI_API_KEY',
-  'ONEAPI_KEY',
-  'SILICONFLOW_API_KEY',
-  'DASHSCOPE_API_KEY',
-  'ARK_API_KEY',
-  'MOONSHOT_API_KEY',
-  'ZHIPU_API_KEY',
-  'OPENROUTER_API_KEY',
-  'APP_OPENAI_API_KEY',
-  'OPENAI_API_KEY',
-] as const
 
-/** 解析模型的 API Key（优先按模型指定的环境变量名读取，未命中时兜底通用网关 Key） */
-export function resolveModelApiKey(model?: Pick<AiModelConfig, 'apiKeyEnv'> | null): string | null {
-  const envName = model?.apiKeyEnv?.trim()
-  if (envName && process.env[envName]?.trim()) return process.env[envName]!.trim()
-  for (const k of COMMON_AI_ENV_KEYS) {
-    if (process.env[k]?.trim()) return process.env[k]!.trim()
+function isPrivateOrLocalHost(hostname: string): boolean {
+  const h = hostname.toLowerCase()
+  if (
+    h === 'localhost' ||
+    h === '0.0.0.0' ||
+    h === '[::1]' ||
+    h.endsWith('.local') ||
+    h.endsWith('.internal') ||
+    h.endsWith('.localhost')
+  ) {
+    return true
   }
-  return null
+  if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(h)) return true
+  const m172 = /^172\.(\d+)\./.exec(h)
+  if (m172 && Number(m172[1]) >= 16 && Number(m172[1]) <= 31) return true
+  return false
 }
 
-/** 智能补全 OpenAI 兼容接口的 /chat/completions 路径 */
-export function resolveChatCompletionsUrl(rawBaseUrl?: string | null): string {
-  let base = (rawBaseUrl ?? '').trim()
-  if (base && /^[A-Z0-9_]+$/.test(base) && process.env[base]?.trim()) {
-    base = process.env[base]!.trim()
-  } else if ((!base || base.includes('your-newapi-domain.com')) && (process.env.NEWAPI_BASE_URL || process.env.APP_OPENAI_BASE_URL)) {
-    base = (process.env.NEWAPI_BASE_URL || process.env.APP_OPENAI_BASE_URL)!.trim()
+/**
+ * 严格按受信任渠道（channelId）解析 API Key 与请求地址，两个值一对一绑定：
+ * - 官方渠道只读对应官方环境变量，且只发往对应官方 HTTPS 域名；
+ * - NewAPI 聚合网关只从服务端环境变量 NEWAPI_BASE_URL（需为公网 HTTPS）与 NEWAPI_API_KEY 读取，绝不接受客户端传入的 URL 或环境变量名。
+ */
+export function resolveModelEndpoint(model?: Pick<AiModelConfig, 'channelId'> | null): {
+  url: string
+  apiKey: string | null
+  envKey: string
+} {
+  const channelId = isAiProviderChannelId(model?.channelId) ? model.channelId : 'deepseek'
+  const channel = AI_PROVIDER_CHANNELS[channelId]
+
+  if (channelId === 'newapi') {
+    const rawBase = (process.env.NEWAPI_BASE_URL || process.env.APP_OPENAI_BASE_URL || '').trim().replace(/\/+$/, '')
+    let validUrl = ''
+    if (rawBase) {
+      try {
+        const parsed = new URL(rawBase.endsWith('/chat/completions') ? rawBase : `${rawBase}/chat/completions`)
+        if (parsed.protocol === 'https:' && !isPrivateOrLocalHost(parsed.hostname)) {
+          validUrl = parsed.toString()
+        }
+      } catch {
+        validUrl = ''
+      }
+    }
+    const apiKey = (process.env.NEWAPI_API_KEY || process.env.ONEAPI_KEY || '').trim() || null
+    return {
+      url: validUrl,
+      apiKey: validUrl ? apiKey : null,
+      envKey: 'NEWAPI_BASE_URL + NEWAPI_API_KEY',
+    }
   }
-  if (!base) return DEEPSEEK_URL
-  base = base.replace(/\/+$/, '')
-  if (base.endsWith('/chat/completions')) return base
-  return `${base}/chat/completions`
+
+  const apiKey = process.env[channel.apiKeyEnv]?.trim() || null
+  const base = channel.baseUrl.replace(/\/+$/, '')
+  return {
+    url: base.endsWith('/chat/completions') ? base : `${base}/chat/completions`,
+    apiKey,
+    envKey: channel.apiKeyEnv,
+  }
 }
 
-/** 检查给定的环境变量名列表中哪些已在服务端配置（仅返回布尔状态，绝不暴露密钥值） */
-export function getConfiguredEnvStatus(models: AiModelConfig[]): Record<string, boolean> {
-  const keys = new Set<string>([...COMMON_AI_ENV_KEYS, ...models.map((m) => m.apiKeyEnv).filter(Boolean)])
+export function resolveModelApiKey(model?: Pick<AiModelConfig, 'channelId'> | null): string | null {
+  return resolveModelEndpoint(model).apiKey
+}
+
+/** 检查受信任渠道列表中哪些已在服务端配置好环境变量（仅返回固定渠道的布尔状态，不探测任意环境变量） */
+export function getConfiguredEnvStatus(): Record<string, boolean> {
   const out: Record<string, boolean> = {}
-  for (const k of keys) out[k] = Boolean(process.env[k]?.trim())
+  for (const ch of Object.values(AI_PROVIDER_CHANNELS)) {
+    out[ch.id] = Boolean(resolveModelEndpoint({ channelId: ch.id }).apiKey)
+  }
   return out
 }
 
@@ -101,7 +130,7 @@ const parseQuoteStatus = (v: unknown): QuoteStatus | null => {
 
 export const aiConfigured = (models?: AiModelConfig[]) => {
   if (models?.length) return models.some((m) => m.enabled && Boolean(resolveModelApiKey(m)))
-  return Boolean(resolveModelApiKey(null))
+  return Boolean(resolveModelApiKey({ channelId: 'deepseek' }))
 }
 
 export const findModel = (id: unknown, models: AiModelConfig[] = DEFAULT_AI_MODELS): AiModelConfig => {
@@ -146,11 +175,10 @@ function toModelConfig(modelOrId: AiModelConfig | string): AiModelConfig {
 
 async function post(modelOrId: AiModelConfig | string, body: Record<string, unknown>, timeoutMs: number) {
   const model = toModelConfig(modelOrId)
-  const apiKey = resolveModelApiKey(model)
-  if (!apiKey) {
-    throw new AiError(`模型「${model.name}」尚未配置密钥环境变量 ${model.apiKeyEnv}，请在环境变量 / Secrets 中添加`, 503)
+  const { url, apiKey, envKey } = resolveModelEndpoint(model)
+  if (!url || !apiKey) {
+    throw new AiError(`模型「${model.name}」尚未配置服务端环境变量（${envKey}），请在环境变量 / Secrets 中添加`, 503)
   }
-  const url = resolveChatCompletionsUrl(model.baseUrl)
   const apiModel = model.apiModel || model.id
   const payloadBody = { ...body, model: apiModel }
   let res = await postOnce(url, apiKey, payloadBody, timeoutMs)
@@ -163,7 +191,7 @@ async function post(modelOrId: AiModelConfig | string, body: Record<string, unkn
   }
   if (!res.ok) {
     const detail = (await res.json().catch(() => null)) as { error?: { message?: string } } | null
-    if (res.status === 401) throw new AiError(`模型「${model.name}」密钥无效，请检查环境变量 ${model.apiKeyEnv}`, 503)
+    if (res.status === 401) throw new AiError(`模型「${model.name}」密钥无效，请检查环境变量 ${envKey}`, 503)
     if (res.status === 402) throw new AiError(`模型「${model.name}」对应账户余额不足，请先在对应平台充值`, 503)
     if (res.status === 429) throw new AiError('请求太频繁，请稍后再试', 429)
     if (res.status === 520) throw new AiError('当前预览环境不允许连接外部 AI 服务。请点击 Publish 发布后，在正式站点或自建服务器使用。', 503)

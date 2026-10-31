@@ -46,7 +46,8 @@ export const getProject = cache(async (id: string) => {
     project.pointCount = countScenePoints(full?.pointMap)
   }
   const collabs = ((project as unknown as { collaborators?: CollaboratorItem[] | null }).collaborators ?? [])
-  const role = getProjectRole({ owner: project.owner, collaborators: collabs }, user.id) ?? 'read'
+  const role = getProjectRole({ owner: project.owner, collaborators: collabs }, user.id)
+  if (!role) notFound()
   const archived = project.status === 'archived'
   return {
     user,

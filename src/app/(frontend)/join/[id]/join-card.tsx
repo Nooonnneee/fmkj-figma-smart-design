@@ -8,7 +8,6 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { cn } from '@/lib/utils'
 import type { CollaboratorRole } from '@/lib/project-access'
 
 export function JoinCard({
@@ -23,14 +22,12 @@ export function JoinCard({
   currentUser: { name: string; email: string } | null
 }) {
   const router = useRouter()
-  const [tab, setTab] = useState<'login' | 'register'>('register')
-  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function submit(mode: 'current' | 'login' | 'register') {
+  async function submit(mode: 'current' | 'login') {
     if (busy) return
     setBusy(true)
     setError(null)
@@ -38,7 +35,7 @@ export function JoinCard({
       const res = await fetch(`/join/${projectId}/accept`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, mode, name, email, password }),
+        body: JSON.stringify({ token, mode, email, password }),
       })
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
       if (!res.ok || !data.ok) {
@@ -76,62 +73,32 @@ export function JoinCard({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 rounded-lg bg-muted p-0.5 text-xs">
-        <button
-          type="button"
-          onClick={() => {
-            setTab('register')
-            setError(null)
-          }}
-          className={cn('rounded-md py-1.5 font-medium transition-colors', tab === 'register' ? 'bg-background text-foreground shadow-2xs' : 'text-muted-foreground')}
-        >
-          新成员一键加入
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setTab('login')
-            setError(null)
-          }}
-          className={cn('rounded-md py-1.5 font-medium transition-colors', tab === 'login' ? 'bg-background text-foreground shadow-2xs' : 'text-muted-foreground')}
-        >
-          已有账号登录
-        </button>
-      </div>
-
       <form
         className="space-y-3"
         onSubmit={(e) => {
           e.preventDefault()
-          void submit(tab)
+          void submit('login')
         }}
       >
-        {tab === 'register' ? (
-          <div className="grid gap-1.5">
-            <Label htmlFor="join-name" className="text-xs">
-              你的姓名
-            </Label>
-            <Input id="join-name" required value={name} onChange={(e) => setName(e.target.value)} placeholder="如：张工" />
-          </div>
-        ) : null}
         <div className="grid gap-1.5">
           <Label htmlFor="join-email" className="text-xs">
-            登录邮箱
+            成员邮箱
           </Label>
           <Input id="join-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="join-password" className="text-xs">
-            {tab === 'register' ? '设置登录密码（至少 6 位）' : '密码'}
+            密码
           </Label>
           <Input id="join-password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••" />
         </div>
         {error ? <p className="text-xs text-destructive">{error}</p> : null}
         <Button type="submit" className="w-full" disabled={busy}>
           {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-          {tab === 'register' ? '创建账号并加入项目' : '登录并加入项目'}
+          登录并加入项目
           <ArrowRight className="size-4" />
         </Button>
+        <p className="text-center text-xs text-muted-foreground">请使用管理员为您开通的成员账号登录</p>
       </form>
     </div>
   )
