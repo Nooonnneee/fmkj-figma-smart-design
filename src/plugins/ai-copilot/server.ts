@@ -36,9 +36,54 @@ import { autoSelectProducts, isSelectionTier, SELECTION_TIERS } from '@/plugins/
 import type { PluginFlags } from '@/plugins/state'
 import type { Project, User } from '@/payload-types'
 
-import { AI_MODELS } from './templates'
+import { DEFAULT_AI_MODELS, enabledAiModels, type AiModelConfig } from './templates'
 
 const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'
+const COMMON_AI_ENV_KEYS = [
+  'DEEPSEEK_API_KEY',
+  'NEWAPI_API_KEY',
+  'ONEAPI_KEY',
+  'SILICONFLOW_API_KEY',
+  'DASHSCOPE_API_KEY',
+  'ARK_API_KEY',
+  'MOONSHOT_API_KEY',
+  'ZHIPU_API_KEY',
+  'OPENROUTER_API_KEY',
+  'APP_OPENAI_API_KEY',
+  'OPENAI_API_KEY',
+] as const
+
+/** 解析模型的 API Key（优先按模型指定的环境变量名读取，未命中时兜底通用网关 Key） */
+export function resolveModelApiKey(model?: Pick<AiModelConfig, 'apiKeyEnv'> | null): string | null {
+  const envName = model?.apiKeyEnv?.trim()
+  if (envName && process.env[envName]?.trim()) return process.env[envName]!.trim()
+  for (const k of COMMON_AI_ENV_KEYS) {
+    if (process.env[k]?.trim()) return process.env[k]!.trim()
+  }
+  return null
+}
+
+/** 智能补全 OpenAI 兼容接口的 /chat/completions 路径 */
+export function resolveChatCompletionsUrl(rawBaseUrl?: string | null): string {
+  let base = (rawBaseUrl ?? '').trim()
+  if (base && /^[A-Z0-9_]+$/.test(base) && process.env[base]?.trim()) {
+    base = process.env[base]!.trim()
+  } else if ((!base || base.includes('your-newapi-domain.com')) && (process.env.NEWAPI_BASE_URL || process.env.APP_OPENAI_BASE_URL)) {
+    base = (process.env.NEWAPI_BASE_URL || process.env.APP_OPENAI_BASE_URL)!.trim()
+  }
+  if (!base) return DEEPSEEK_URL
+  base = base.replace(/\/+$/, '')
+  if (base.endsWith('/chat/completions')) return base
+  return `${base}/chat/completions`
+}
+
+/** 检查给定的环境变量名列表中哪些已在服务端配置（仅返回布尔状态，绝不暴露密钥值） */
+export function getConfiguredEnvStatus(models: AiModelConfig[]): Record<string, boolean> {
+  const keys = new Set<string>([...COMMON_AI_ENV_KEYS, ...models.map((m) => m.apiKeyEnv).filter(Boolean)])
+  const out: Record<string, boolean> = {}
+  for (const k of keys) out[k] = Boolean(process.env[k]?.trim())
+  return out
+}
 
 /** 过滤 DeepSeek 偶发在纯文本模式输出的内部 DSML 协议标签 */
 export function stripDsml(text: string | null | undefined): string {
@@ -54,8 +99,15 @@ const parseQuoteStatus = (v: unknown): QuoteStatus | null => {
   return QUOTE_STATUSES.some((s) => s.value === v) ? (v as QuoteStatus) : null
 }
 
-export const aiConfigured = () => Boolean(process.env.DEEPSEEK_API_KEY)
-export const findModel = (id: unknown) => AI_MODELS.find((m) => m.id === id) ?? AI_MODELS[0]
+export const aiConfigured = (models?: AiModelConfig[]) => {
+  if (models?.length) return models.some((m) => m.enabled && Boolean(resolveModelApiKey(m)))
+  return Boolean(resolveModelApiKey(null))
+}
+
+export const findModel = (id: unknown, models: AiModelConfig[] = DEFAULT_AI_MODELS): AiModelConfig => {
+  const list = enabledAiModels(models)
+  return list.find((m) => m.id === id) ?? list[0] ?? DEFAULT_AI_MODELS[0]
+}
 
 export type LlmMessage =
   | { role: 'system' | 'user'; content: string }
@@ -72,12 +124,12 @@ export class AiError extends Error {
   }
 }
 
-async function postOnce(body: Record<string, unknown>, timeoutMs: number) {
+async function postOnce(url: string, apiKey: string, body: Record<string, unknown>, timeoutMs: number) {
   let res: Response
   try {
-    res = await fetch(DEEPSEEK_URL, {
+    res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(timeoutMs),
     })
@@ -87,30 +139,43 @@ async function postOnce(body: Record<string, unknown>, timeoutMs: number) {
   return res
 }
 
-async function post(body: Record<string, unknown>, timeoutMs: number) {
-  let res = await postOnce(body, timeoutMs)
+function toModelConfig(modelOrId: AiModelConfig | string): AiModelConfig {
+  if (typeof modelOrId === 'string') return findModel(modelOrId)
+  return modelOrId
+}
+
+async function post(modelOrId: AiModelConfig | string, body: Record<string, unknown>, timeoutMs: number) {
+  const model = toModelConfig(modelOrId)
+  const apiKey = resolveModelApiKey(model)
+  if (!apiKey) {
+    throw new AiError(`模型「${model.name}」尚未配置密钥环境变量 ${model.apiKeyEnv}，请在环境变量 / Secrets 中添加`, 503)
+  }
+  const url = resolveChatCompletionsUrl(model.baseUrl)
+  const apiModel = model.apiModel || model.id
+  const payloadBody = { ...body, model: apiModel }
+  let res = await postOnce(url, apiKey, payloadBody, timeoutMs)
   // 兼容不同网关对 DeepSeek V4.1-Flash-1017 的模型 ID 命名（官方 /models 返回 deepseek-flash）
-  if (res.status === 400 && body.model === 'deepseek-flash') {
+  if (res.status === 400 && apiModel === 'deepseek-flash') {
     for (const alias of ['deepseek-v4.1-flash-1017', 'DeepSeek-V4.1-Flash', 'deepseek-chat']) {
-      res = await postOnce({ ...body, model: alias }, timeoutMs)
+      res = await postOnce(url, apiKey, { ...payloadBody, model: alias }, timeoutMs)
       if (res.ok) return res
     }
   }
   if (!res.ok) {
     const detail = (await res.json().catch(() => null)) as { error?: { message?: string } } | null
-    if (res.status === 401) throw new AiError('DeepSeek 密钥无效，请在 Make 设置 → Secrets 里检查 DEEPSEEK_API_KEY', 503)
-    if (res.status === 402) throw new AiError('DeepSeek 账户余额不足，请先在 DeepSeek 平台充值', 503)
+    if (res.status === 401) throw new AiError(`模型「${model.name}」密钥无效，请检查环境变量 ${model.apiKeyEnv}`, 503)
+    if (res.status === 402) throw new AiError(`模型「${model.name}」对应账户余额不足，请先在对应平台充值`, 503)
     if (res.status === 429) throw new AiError('请求太频繁，请稍后再试', 429)
     if (res.status === 520) throw new AiError('当前预览环境不允许连接外部 AI 服务。请点击 Publish 发布后，在正式站点或自建服务器使用。', 503)
-    console.error('[ai] deepseek error', res.status, detail?.error?.message)
-    throw new AiError('AI 服务出错，请稍后重试')
+    console.error('[ai] provider error', model.id, url, res.status, detail?.error?.message)
+    throw new AiError(detail?.error?.message ? `AI 服务出错：${detail.error.message.slice(0, 120)}` : 'AI 服务出错，请稍后重试')
   }
   return res
 }
 
 /** 不流式的一次调用（用于判断是否需要调用工具）。 */
-export async function complete(model: string, messages: LlmMessage[], tools?: unknown[]) {
-  const res = await post({ model, messages, ...(tools?.length ? { tools } : {}), stream: false }, 60_000)
+export async function complete(model: AiModelConfig | string, messages: LlmMessage[], tools?: unknown[]) {
+  const res = await post(model, { messages, ...(tools?.length ? { tools } : {}), stream: false }, 60_000)
   const json = (await res.json()) as { choices?: { message?: { content?: string | null; tool_calls?: LlmToolCall[] } }[] }
   const msg = json.choices?.[0]?.message ?? { content: '' }
   if (typeof msg.content === 'string') {
@@ -121,13 +186,13 @@ export async function complete(model: string, messages: LlmMessage[], tools?: un
 
 /** 流式调用：逐段回调正文和思考过程，返回完整正文。 */
 export async function stream(
-  model: string,
+  model: AiModelConfig | string,
   messages: LlmMessage[],
   onDelta: (text: string) => void,
   onReasoning: (text: string) => void,
   signal?: AbortSignal,
 ) {
-  const res = await post({ model, messages, stream: true }, 120_000)
+  const res = await post(model, { messages, stream: true }, 120_000)
   const reader = res.body!.getReader()
   const decoder = new TextDecoder()
   let buffer = ''

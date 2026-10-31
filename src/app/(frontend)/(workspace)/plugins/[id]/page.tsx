@@ -7,10 +7,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
+import { getCompanyInfo } from '@/lib/cached-data'
 import { getPayloadClient } from '@/lib/payload'
 import { countScenePoints } from '@/lib/point-count'
 import { isPluginId, PLUGINS } from '@/plugins'
-import { AI_MODELS, DEFAULT_AI_TEMPLATES } from '@/plugins/ai-copilot/templates'
+import { DEFAULT_AI_TEMPLATES, enabledAiModels } from '@/plugins/ai-copilot/templates'
 import { PLUGIN_DOC_STYLES } from '@/plugins/doc-styles/styles'
 import { PROPOSAL_TEMPLATES } from '@/plugins/proposal/templates'
 import { getPluginFlags } from '@/plugins/state'
@@ -20,7 +21,7 @@ import { PluginDetailToggle } from './plugin-detail-toggle'
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const plugin = PLUGINS.find((p) => p.id === id)
-  return { title: pageTitle(plugin ? `${plugin.name} · 插件` : '插件详情') }
+  return { title: pageTitle(plugin ? `${plugin.name} · 插件市场` : '插件详情') }
 }
 
 export default async function PluginDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -33,8 +34,9 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
   if (!plugin) notFound()
 
   const payload = await getPayloadClient()
-  const [flags, projectsRes] = await Promise.all([
+  const [flags, company, projectsRes] = await Promise.all([
     getPluginFlags(),
+    getCompanyInfo(),
     payload.find({
       collection: 'projects',
       where: { status: { not_equals: 'archived' } },
@@ -49,6 +51,7 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
 
   const enabled = flags[plugin.id]
   const pending = plugin.status === 'coming-soon'
+  const activeAiModels = enabledAiModels(company.aiModels)
   const projects = projectsRes.docs.map((p) => ({
     id: String(p.id),
     name: p.name,
@@ -63,7 +66,7 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
         <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
           <Link href="/plugins">
             <ArrowLeft className="size-4" />
-            返回插件列表
+            返回插件市场
           </Link>
         </Button>
         <Button asChild variant="outline" size="sm">
@@ -112,7 +115,7 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {DEFAULT_AI_TEMPLATES.map((tpl) => {
-                    const m = AI_MODELS.find((x) => x.id === tpl.recommendedModelId)
+                    const m = activeAiModels.find((x) => x.id === tpl.recommendedModelId) ?? activeAiModels[0]
                     return (
                       <div key={tpl.id} className="rounded-lg border p-3">
                         <div className="flex items-center justify-between gap-2">
@@ -134,7 +137,7 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
               <div className="space-y-2 border-t pt-3">
                 <div className="text-xs font-medium text-muted-foreground">支持切换的模型与积分定价</div>
                 <div className="grid gap-2 sm:grid-cols-3">
-                  {AI_MODELS.map((m) => (
+                  {activeAiModels.map((m) => (
                     <div key={m.id} className="rounded-lg border p-2.5 text-xs">
                       <div className="flex items-center justify-between font-medium">
                         <span>{m.name}</span>
@@ -204,7 +207,7 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
           </div>
           <div className="flex items-center gap-2 pt-1">
             <Button asChild variant="outline" size="sm">
-              <Link href="/plugins">查看全部插件</Link>
+              <Link href="/plugins">返回插件市场</Link>
             </Button>
             <Button asChild size="sm">
               <Link href={`/ai?plugin=${plugin.id}`}>去 AI 对话推演需求</Link>

@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ChevronLeft, FileDown, ImageDown, Loader2, Printer } from 'lucide-react'
+import { ChevronDown, ChevronLeft, FileDown, ImageDown, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { exportPagesAsPdf } from '@/lib/export-pdf'
 import { cn } from '@/lib/utils'
 
@@ -96,15 +97,25 @@ export function PrintToolbar({
           </div>
         ))}
         <div className="ml-auto flex gap-2">
-          <Button variant="outline" size="sm" disabled={busy !== null} onClick={() => void exportImages()}>
-            {busy === 'img' ? <Loader2 className="size-4 animate-spin" /> : <ImageDown className="size-4" />}导出图片
-          </Button>
-          <Button variant="outline" size="sm" disabled={busy !== null} onClick={() => window.print()}>
-            <Printer className="size-4" />打印
-          </Button>
-          <Button size="sm" disabled={busy !== null} onClick={() => void exportPdf()}>
-            {busy === 'pdf' ? <Loader2 className="size-4 animate-spin" /> : <FileDown className="size-4" />}导出 PDF
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" disabled={busy !== null}>
+                {busy !== null ? <Loader2 className="size-4 animate-spin" /> : <FileDown className="size-4" />}
+                导出
+                <ChevronDown className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuItem onSelect={() => void exportPdf()}>
+                <FileDown className="size-4" />
+                导出 PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void exportImages()}>
+                <ImageDown className="size-4" />
+                导出图片
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </div>

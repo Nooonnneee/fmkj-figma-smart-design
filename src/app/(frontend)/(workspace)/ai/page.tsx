@@ -5,10 +5,12 @@ import { Bot } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
+import { getCompanyInfo } from '@/lib/cached-data'
 import { getPayloadClient } from '@/lib/payload'
 import { countScenePoints } from '@/lib/point-count'
 import { PLUGINS } from '@/plugins'
 import { aiConfigured } from '@/plugins/ai-copilot/server'
+import { enabledAiModels } from '@/plugins/ai-copilot/templates'
 import { getPluginFlags } from '@/plugins/state'
 
 import { AiSidebarDock } from '@/components/ai/ai-sidebar-dock'
@@ -24,9 +26,10 @@ export default async function AiPage({
   if (!user) redirect('/login')
 
   const payload = await getPayloadClient()
-  const [sp, flags, projectsRes] = await Promise.all([
+  const [sp, flags, company, projectsRes] = await Promise.all([
     searchParams,
     getPluginFlags(),
+    getCompanyInfo(),
     payload.find({
       collection: 'projects',
       where: { status: { not_equals: 'archived' } },
@@ -74,9 +77,11 @@ export default async function AiPage({
     pointCount: countScenePoints(proj.pointMap),
   }))
 
+  const activeModels = enabledAiModels(company.aiModels)
+
   return (
     <div className="mx-auto flex h-[calc(100svh-7.5rem)] w-full max-w-3xl flex-col">
-      <AiSidebarDock plugins={plugins} projects={projects} credits={user.aiCredits ?? 0} configured={aiConfigured()} />
+      <AiSidebarDock plugins={plugins} projects={projects} credits={user.aiCredits ?? 0} configured={aiConfigured(activeModels)} models={activeModels} />
     </div>
   )
 }

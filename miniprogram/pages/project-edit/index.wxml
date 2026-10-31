@@ -47,4 +47,3 @@
     <button class="btn btn-primary" hover-class="btn-hover" loading="{{saving}}" disabled="{{saving}}" bindtap="save">{{id ? '保存' : '创建项目'}}</button>
   </view>
 </view>
-<privacy-popup id="privacy-popup" />

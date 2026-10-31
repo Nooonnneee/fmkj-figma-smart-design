@@ -2,6 +2,7 @@ import { APIError, type CollectionConfig } from 'payload'
 
 import { cmsAdminOrMember, isMember, relId } from '@/lib/access'
 import { countScenePoints } from '@/lib/point-count'
+import { canEditProject } from '@/lib/project-access'
 import { ARCHIVED_MESSAGE } from '@/lib/project-guards'
 import { autoProjectName, PROJECT_PLATFORMS, PROJECT_STATUSES } from '@/lib/projects'
 
@@ -39,6 +40,13 @@ export const Projects: CollectionConfig = {
     ],
     beforeChange: [
       ({ data, operation, originalDoc, req }) => {
+        // 协作权限检查：仅查看（read）协作者不能修改项目
+        if (operation === 'update' && originalDoc && isMember(req) && req.user) {
+          // 允许通过协作链接加入时由服务端 overrideAccess 更新 collaborators，普通成员请求需校验编辑权限
+          if (!canEditProject(originalDoc as never, req.user.id)) {
+            throw new APIError('你对该项目仅有查看权限，无法修改', 403)
+          }
+        }
         // 已归档的项目只读：成员只能把它恢复为进行中（Payload 会用原值补齐未提交的字段，所以逐个比较值）
         if (operation === 'update' && originalDoc?.status === 'archived' && data.status === 'archived' && isMember(req)) {
           const changed = Object.keys(data).filter((k) => !EDITABLE_WHEN_ARCHIVED.has(k) && !sameValue(data[k], originalDoc[k]))
@@ -120,6 +128,40 @@ export const Projects: CollectionConfig = {
       // 项目默认型号：{ [设备类型]: 产品 ID }。点位未指定产品时，报价按这里取型号。
       name: 'defaultProducts',
       label: '项目默认型号',
+      type: 'json',
+      admin: { hidden: true },
+    },
+    {
+      name: 'collaborators',
+      label: '协作者',
+      type: 'array',
+      labels: { singular: '协作者', plural: '协作者' },
+      admin: { description: '通过项目协作链接加入的成员及其读写权限' },
+      fields: [
+        {
+          type: 'row',
+          fields: [
+            { name: 'user', label: '成员', type: 'relationship', relationTo: 'users', required: true },
+            {
+              name: 'role',
+              label: '权限',
+              type: 'select',
+              required: true,
+              defaultValue: 'read',
+              options: [
+                { label: '仅查看', value: 'read' },
+                { label: '可编辑', value: 'edit' },
+              ],
+            },
+            { name: 'joinedAt', label: '加入时间', type: 'date' },
+          ],
+        },
+      ],
+    },
+    {
+      // 协作分享链接配置：{ enabled: boolean, token: string, role: 'read' | 'edit' }
+      name: 'shareConfig',
+      label: '协作链接配置',
       type: 'json',
       admin: { hidden: true },
     },

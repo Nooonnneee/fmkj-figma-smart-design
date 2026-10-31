@@ -1,2 +1,1 @@
 <web-view src="{{src}}" />
-<privacy-popup id="privacy-popup" />

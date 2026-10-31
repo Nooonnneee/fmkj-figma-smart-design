@@ -85,7 +85,7 @@ export default async function ChecklistPrintPage({
   return (
     <div className="min-h-screen bg-muted/40 pb-8 print:bg-white print:pb-0">
       <PrintToolbar
-        back={{ href: `/projects/${id}/point-map`, label: '返回点位' }}
+        back={{ href: `/projects/${id}/archive`, label: '返回归档' }}
         exportName={`${d.project.name}-${title}`}
         groups={[
           ...(d.projectList.length > 1

@@ -13,7 +13,7 @@ export const POST = mpPublicRoute(async (request: Request) => {
   const session = await code2Session(code)
   if (!session.ok) return fail(400, session.error, 'WECHAT_LOGIN_FAILED')
 
-  const binding = await findBinding(session.openid)
+  const binding = await findBinding(session.openid, session.unionid)
   const user = binding ? await loadActiveUser(relId(binding.user)) : null
   if (binding && user) {
     await bindOpenid(String(user.id), session.openid, session.unionid, text(body.nickname, 40) || null)

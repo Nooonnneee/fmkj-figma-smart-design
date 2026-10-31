@@ -9,6 +9,7 @@ import { getPayloadClient } from '@/lib/payload'
 import { countScenePoints } from '@/lib/point-count'
 import { PLUGINS } from '@/plugins'
 import { aiConfigured } from '@/plugins/ai-copilot/server'
+import { enabledAiModels } from '@/plugins/ai-copilot/templates'
 
 /** 需要成员登录的系统页面。 */
 export default async function WorkspaceLayout({ children }: { children: React.ReactNode }) {
@@ -47,6 +48,8 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
     pointCount: countScenePoints(proj.pointMap),
   }))
 
+  const activeAiModels = enabledAiModels(company.aiModels)
+
   return (
     <SidebarProvider>
       <AppSidebar
@@ -54,7 +57,7 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
         brand={{ name: company.name, logo: company.logo?.url ?? null }}
         plugins={plugins}
         projects={projects}
-        ai={{ credits: user.aiCredits ?? 0, configured: aiConfigured() }}
+        ai={{ credits: user.aiCredits ?? 0, configured: aiConfigured(activeAiModels), models: activeAiModels }}
       />
       <SidebarInset>
         <SiteHeader />

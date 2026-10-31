@@ -8,15 +8,32 @@ import { ThemeMenu } from '@/components/site-header'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
+import type { ProjectRole } from '@/lib/project-access'
 import { PROJECT_SECTIONS, sectionHref } from '@/lib/projects'
 import { cn } from '@/lib/utils'
+
+import { ProjectShareDialog } from './project-share-dialog'
 
 /**
  * 项目顶栏：项目名称 + 五个板块（信息、点位、报价、合同、归档）。
  * 替代全局顶栏，桌面端一行 48px；窄屏时板块换到第二行。
  * 有未保存修改时，切换板块会先自动保存（见 leave-guard）。
  */
-export function ProjectHeader({ projectId, name, subtitle, archived }: { projectId: string; name: string; subtitle: string; archived: boolean }) {
+export function ProjectHeader({
+  projectId,
+  name,
+  subtitle,
+  archived,
+  role = 'owner',
+  collaboratorCount = 0,
+}: {
+  projectId: string
+  name: string
+  subtitle: string
+  archived: boolean
+  role?: ProjectRole
+  collaboratorCount?: number
+}) {
   const segment = useSelectedLayoutSegment()
   const active = PROJECT_SECTIONS.find((s) => s.segment === segment)?.key ?? 'info'
 
@@ -35,13 +52,24 @@ export function ProjectHeader({ projectId, name, subtitle, archived }: { project
             {subtitle ? <p className="truncate text-[11px] leading-tight text-muted-foreground">{subtitle}</p> : null}
           </div>
         </div>
-        <div className="flex h-12 items-center gap-1 pr-3 md:order-last md:ml-auto md:pr-4">
+        <div className="flex h-12 items-center gap-1.5 pr-3 md:order-last md:ml-auto md:pr-4">
+          {role !== 'owner' ? (
+            <Badge variant={role === 'edit' ? 'outline' : 'secondary'} className="text-[11px]">
+              {role === 'edit' ? '协作 · 可编辑' : '协作 · 仅查看'}
+            </Badge>
+          ) : null}
           {archived ? (
             <Badge variant="secondary">
               <Archive className="size-3" />
               已归档
             </Badge>
           ) : null}
+          <ProjectShareDialog
+            projectId={projectId}
+            projectName={name}
+            initialRole={role}
+            initialCollaboratorCount={collaboratorCount}
+          />
           <ThemeMenu />
         </div>
         <nav

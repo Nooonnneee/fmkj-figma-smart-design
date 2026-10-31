@@ -51,7 +51,7 @@ export default async function ProposalPage({
     <div className="min-h-screen bg-neutral-200/70 print:bg-white">
       <style>{'@media print { @page { size: A4 landscape; margin: 0; } }'}</style>
       <PrintToolbar
-        back={{ href: `/projects/${id}/point-map`, label: '返回点位' }}
+        back={{ href: `/projects/${id}/archive`, label: '返回归档' }}
         exportName={`${d.project.name}-${tpl.label}${scope === 'all' ? '' : '-' + POINT_SCOPES.find((x) => x.value === scope)!.label}`}
         wide={t === 'qixu'}
         groups={[

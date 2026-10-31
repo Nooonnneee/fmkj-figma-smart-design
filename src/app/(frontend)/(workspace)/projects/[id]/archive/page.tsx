@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import { Check, Circle, FileText, Printer } from 'lucide-react'
+import { Check, ChevronRight, Circle, FileDown, FileText } from 'lucide-react'
 
+import { Button } from '@/components/ui/button'
 import { relId } from '@/lib/access'
 import { contractStatusLabel, fmtLongDate, paymentAmounts } from '@/lib/contracts'
 import { PROPOSAL_TEMPLATES } from '@/plugins/proposal/templates'
@@ -14,7 +15,7 @@ import { ArchiveButton } from './archive-button'
 /** 归档：交付前核对资料是否齐全，打印留档，然后归档（项目转为只读）。 */
 export default async function ProjectArchivePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const [{ project, archived }, { quotes, contract }, flags] = await Promise.all([getProject(id), getProjectDeals(id), getPluginFlags()])
+  const [{ project, archived, role }, { quotes, contract }, flags] = await Promise.all([getProject(id), getProjectDeals(id), getPluginFlags()])
   const pid = String(project.id)
   const points = project.pointCount ?? 0
   const finalQuote = quotes.find((q) => String(q.id) === relId(contract?.quote)) ?? quotes.find((q) => q.status === 'accepted') ?? quotes[0] ?? null
@@ -75,13 +76,24 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
 
       <section aria-labelledby="docs-title" className="rounded-xl bg-card shadow-sm ring-1 ring-foreground/5 dark:ring-foreground/10">
         <div className="border-b px-5 py-3.5">
-          <h3 id="docs-title" className="text-base font-semibold">打印留档</h3>
-          <p className="text-sm text-muted-foreground">都可以打印或导出 PDF、图片；版式和风格在打印页顶部切换，默认值在「设置 → 文档模板」。</p>
+          <h3 id="docs-title" className="text-base font-semibold">资料导出</h3>
+          <p className="text-sm text-muted-foreground">项目全套交付资料统一在此查看与导出；版式和风格可在预览页顶部切换，默认值在「设置 → 文档模板」。</p>
         </div>
         <div className="divide-y">
           <DocLink href={points ? `/print/projects/${pid}/plans` : null} title="点位图" note={points ? '每张图纸一页，附设备图例和统计' : '还没有布置点位'} />
           <DocLink href={points ? `/print/projects/${pid}/checklist` : null} title="点位交底清单" note={points ? `${points} 个点位，给安装团队逐点核对` : '还没有布置点位'} />
-          <DocLink href={finalQuote ? `/print/quotes/${finalQuote.id}` : null} title="报价单" note={finalQuote ? finalQuote.title : '还没有报价'} />
+          {quotes.length > 0 ? (
+            quotes.map((q) => (
+              <DocLink
+                key={String(q.id)}
+                href={`/print/quotes/${q.id}`}
+                title={`报价单 · ${q.title}`}
+                note={`${quoteStatusLabel(q.status)} · ${yuan(q.total)}`}
+              />
+            ))
+          ) : (
+            <DocLink href={null} title="报价单" note="还没有报价" />
+          )}
           <DocLink href={contract ? `/print/contracts/${contract.id}` : null} title="合同" note={contract ? `${contract.number}（含报价明细附件）` : '还没有合同'} />
           {flags.proposal
             ? PROPOSAL_TEMPLATES.map((t) => (
@@ -91,30 +103,43 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
         </div>
       </section>
 
-      <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed px-5 py-4">
-        <div className="text-sm">
-          <div className="font-medium">{archived ? '恢复项目' : ready ? '资料齐全，可以归档' : '可以随时归档'}</div>
-          <div className="text-muted-foreground">{archived ? '恢复后回到「进行中」，可以继续修改。' : ready ? '归档后仍然可以随时查看和打印。' : '未完成的项也可以先归档，之后恢复再补。'}</div>
-        </div>
-        <ArchiveButton projectId={pid} archived={archived} primary={ready} />
-      </section>
+      {role !== 'read' ? (
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed px-5 py-4">
+          <div className="text-sm">
+            <div className="font-medium">{archived ? '恢复项目' : ready ? '资料齐全，可以归档' : '可以随时归档'}</div>
+            <div className="text-muted-foreground">{archived ? '恢复后回到「进行中」，可以继续修改。' : ready ? '归档后仍然可以随时查看和导出资料。' : '未完成的项也可以先归档，之后恢复再补。'}</div>
+          </div>
+          <ArchiveButton projectId={pid} archived={archived} primary={ready} />
+        </section>
+      ) : null}
     </div>
   )
 }
 
 function DocLink({ href, title, note }: { href: string | null; title: string; note: string }) {
-  const body = (
-    <>
-      {href ? <Printer className="size-4 shrink-0 text-muted-foreground" /> : <FileText className="size-4 shrink-0 text-muted-foreground/50" />}
+  return href ? (
+    <Link href={href} className="flex items-center justify-between gap-3 px-5 py-3 transition-colors hover:bg-muted/40">
+      <div className="flex min-w-0 items-center gap-3">
+        <FileDown className="size-4 shrink-0 text-muted-foreground" />
+        <span className="min-w-0">
+          <span className="block text-sm font-medium">{title}</span>
+          <span className="block truncate text-xs text-muted-foreground">{note}</span>
+        </span>
+      </div>
+      <Button asChild variant="outline" size="xs" className="pointer-events-none shrink-0">
+        <span>
+          导出
+          <ChevronRight className="size-3.5" />
+        </span>
+      </Button>
+    </Link>
+  ) : (
+    <div aria-disabled className="flex items-center gap-3 px-5 py-3">
+      <FileText className="size-4 shrink-0 text-muted-foreground/50" />
       <span className="min-w-0">
         <span className={cn('block text-sm font-medium', !href && 'text-muted-foreground')}>{title}</span>
         <span className="block truncate text-xs text-muted-foreground">{note}</span>
       </span>
-    </>
-  )
-  return href ? (
-    <Link href={href} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-muted/40">{body}</Link>
-  ) : (
-    <div aria-disabled className="flex items-center gap-3 px-5 py-3">{body}</div>
+    </div>
   )
 }

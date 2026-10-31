@@ -12,6 +12,7 @@ import {
   type AiAttachment,
   type AiChatMessage,
   type AiConnectablePlugin,
+  type AiModelOption,
   type AiProjectContext,
   type AiToolCall,
 } from '@/components/ai/ai-elements'
@@ -29,12 +30,12 @@ import { AI_MODELS, DEFAULT_AI_TEMPLATES, fillPromptTemplate } from '@/plugins/a
 type ConvSummary = { id: string; title: string }
 type StoredMessage = { id: string; role: 'user' | 'assistant'; content: string; model: string | null; cost: number | null; toolCalls: AiToolCall[] | null; createdAt: string }
 
-const toChat = (m: StoredMessage): AiChatMessage => ({
+const toChat = (m: StoredMessage, modelList: AiModelOption[]): AiChatMessage => ({
   id: m.id,
   role: m.role,
   content: m.content,
   createdAt: m.createdAt,
-  modelName: AI_MODELS.find((x) => x.id === m.model)?.name,
+  modelName: modelList.find((x) => x.id === m.model)?.name ?? AI_MODELS.find((x) => x.id === m.model)?.name ?? m.model ?? undefined,
   cost: m.cost ?? undefined,
   toolCalls: m.toolCalls ?? undefined,
 })
@@ -45,12 +46,15 @@ export function AiSidebarDock({
   projects: initialProjects,
   credits: initialCredits,
   configured,
+  models: customModels,
 }: {
   plugins: AiConnectablePlugin[]
   projects: AiProjectContext[]
   credits: number
   configured: boolean
+  models?: AiModelOption[]
 }) {
+  const availableModels = customModels?.length ? customModels : AI_MODELS
   const pathname = usePathname()
   const router = useRouter()
   const [projectList, setProjectList] = useState<AiProjectContext[]>(initialProjects)
@@ -64,7 +68,7 @@ export function AiSidebarDock({
     return id && projectList.some((p) => p.id === id) ? id : null
   }, [pathname, projectList])
 
-  const [modelId, setModelId] = useState(AI_MODELS[0].id)
+  const [modelId, setModelId] = useState(availableModels[0].id)
   const [connected, setConnected] = useState<string[]>(() => plugins.filter((p) => p.status === 'ready' && p.enabled).map((p) => p.id))
   const [projectId, setProjectId] = useState<string | null>(routeProjectId)
   const [credits, setCredits] = useState(initialCredits)
@@ -85,7 +89,7 @@ export function AiSidebarDock({
     if (routeProjectId) setProjectId(routeProjectId)
   }, [routeProjectId])
 
-  const model = AI_MODELS.find((m) => m.id === modelId) ?? AI_MODELS[0]
+  const model = availableModels.find((m) => m.id === modelId) ?? availableModels[0]
   const project = projectList.find((p) => p.id === projectId) ?? null
   const activeTitle = conversations.find((c) => c.id === activeId)?.title ?? '新对话'
 
@@ -112,7 +116,7 @@ export function AiSidebarDock({
       const res = await fetch(`/ai/conversations/${id}`)
       const data = (await res.json()) as { ok?: boolean; messages?: StoredMessage[]; error?: string }
       if (!res.ok || !data.messages) throw new Error(data.error)
-      setMessages(data.messages.map(toChat))
+      setMessages(data.messages.map((m) => toChat(m, availableModels)))
     } catch {
       toast.error('读取会话失败')
     } finally {
@@ -244,7 +248,9 @@ export function AiSidebarDock({
   function pickTemplate(id: string) {
     const tpl = DEFAULT_AI_TEMPLATES.find((t) => t.id === id)
     if (!tpl) return
-    setModelId(tpl.recommendedModelId)
+    if (availableModels.some((m) => m.id === tpl.recommendedModelId)) {
+      setModelId(tpl.recommendedModelId)
+    }
     setConnected((prev) => Array.from(new Set([...prev, ...tpl.requiredPlugins])))
     setInput(fillPromptTemplate(tpl, {}))
   }
@@ -474,7 +480,7 @@ export function AiSidebarDock({
         {!configured ? (
           <div className="flex items-start gap-2 rounded-xl border border-dashed p-3 text-xs text-muted-foreground">
             <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
-            <span>还没有配置 AI 密钥。请在 Make 设置 → Secrets 里添加 DEEPSEEK_API_KEY，保存后刷新页面。</span>
+            <span>还没有配置当前 AI 模型的密钥环境变量。请在「设置 → AI 模型与接口配置」中查看所需的环境变量名并添加密钥。</span>
           </div>
         ) : null}
         {loadingHistory ? (
@@ -514,14 +520,14 @@ export function AiSidebarDock({
         )}
       </div>
 
-      <div className="p-2.5 pt-1">
+      <div className="p-3 pt-1.5 pb-3.5">
         <AiPromptComposer
           value={input}
           onChange={setInput}
           onSubmit={() => void send(input)}
           streaming={streaming}
           onStop={() => abortRef.current?.abort()}
-          models={AI_MODELS}
+          models={availableModels}
           selectedModel={model}
           onSelectModel={setModelId}
           plugins={plugins}

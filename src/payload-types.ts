@@ -318,6 +318,26 @@ export interface Project {
     | number
     | boolean
     | null;
+  /**
+   * 通过项目协作链接加入的成员及其读写权限
+   */
+  collaborators?:
+    | {
+        user: string | User;
+        role: 'read' | 'edit';
+        joinedAt?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  shareConfig?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   createdBy?:
     | ({
         relationTo: 'admins';
@@ -1153,6 +1173,15 @@ export interface ProjectsSelect<T extends boolean = true> {
   notes?: T;
   pointMap?: T;
   defaultProducts?: T;
+  collaborators?:
+    | T
+    | {
+        user?: T;
+        role?: T;
+        joinedAt?: T;
+        id?: T;
+      };
+  shareConfig?: T;
   createdBy?: T;
   updatedBy?: T;
   updatedAt?: T;
@@ -1507,6 +1536,18 @@ export interface CompanySetting {
    * @maxItems 50
    */
   disabledPlugins?: string[];
+  /**
+   * 在系统「设置 → AI 模型与接口」里可视化添加、启停和切换多个 AI 模型（支持官方 API 与 NewAPI 聚合网关）
+   */
+  aiModels?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   createdBy?:
     | ({
         relationTo: 'admins';
@@ -1546,6 +1587,7 @@ export interface CompanySettingsSelect<T extends boolean = true> {
   printProductImages?: T;
   documentDefaults?: T;
   disabledPlugins?: T;
+  aiModels?: T;
   createdBy?: T;
   updatedBy?: T;
   updatedAt?: T;

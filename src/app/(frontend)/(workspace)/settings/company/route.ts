@@ -2,6 +2,7 @@ import { allStyles, DOC_KIND_LIST, DOC_KINDS } from '@/documents/registry'
 import { appAuth } from '@/lib/app-auth'
 import { getPayloadClient } from '@/lib/payload'
 import { PLUGINS } from '@/plugins'
+import { parseAiModels } from '@/plugins/ai-copilot/templates'
 
 const MAX_IMAGE = 3 * 1024 * 1024
 const TEXT_FIELDS = { name: 60, slogan: 80, phone: 30, email: 80, address: 200, qrCaption: 40, quoteNotes: 2000, contractTerms: 5000 } as const
@@ -66,11 +67,29 @@ export async function POST(request: Request) {
   // 插件开关：没勾选的记为关闭（新安装的插件默认开启）
   const disabledPlugins = form.get('plugins-present') === '1' ? PLUGINS.filter((p) => form.get(`plugin-${p.id}`) !== 'on').map((p) => p.id) : undefined
 
+  // AI 模型与接口配置：校验并规范化 JSON
+  const rawAiModelsJson = form.get('aiModelsJson')
+  let aiModels: ReturnType<typeof parseAiModels> | undefined
+  if (typeof rawAiModelsJson === 'string' && rawAiModelsJson.trim()) {
+    try {
+      aiModels = parseAiModels(JSON.parse(rawAiModelsJson))
+    } catch {
+      return fail(400, 'AI 模型配置格式无效')
+    }
+  }
+
   try {
     const printProductImages = form.get('printProductImages') === 'on'
     await payload.updateGlobal({
       slug: 'company-settings',
-      data: { ...data, ...images, printProductImages, ...(documentDefaults ? { documentDefaults } : {}), ...(disabledPlugins ? { disabledPlugins } : {}) } as never,
+      data: {
+        ...data,
+        ...images,
+        printProductImages,
+        ...(documentDefaults ? { documentDefaults } : {}),
+        ...(disabledPlugins ? { disabledPlugins } : {}),
+        ...(aiModels ? { aiModels } : {}),
+      } as never,
       user,
       overrideAccess: false,
     })

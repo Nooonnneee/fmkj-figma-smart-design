@@ -116,7 +116,7 @@ export default async function PrintContractPage({ params, searchParams }: { para
   return (
     <div className="min-h-screen bg-muted/40 pb-8 print:bg-white print:pb-0">
       <PrintToolbar
-        back={{ href: project ? `/projects/${project.id}/contract` : '/projects', label: '返回合同' }}
+        back={{ href: project ? `/projects/${project.id}/archive` : '/projects', label: '返回归档' }}
         exportName={`${project?.name ?? '项目'}-合同-${contract.number}`}
         groups={docToolbarGroups(setup, href)}
       />

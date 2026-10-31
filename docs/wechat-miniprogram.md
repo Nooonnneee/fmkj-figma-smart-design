@@ -155,7 +155,9 @@
 | --- | --- | --- |
 | `WECHAT_MP_APPID` | 启用微信一键登录时必填 | 微信小程序 AppID（如 `wx1234567890abcdef`） |
 | `WECHAT_MP_SECRET` | 启用微信一键登录时必填 | 微信小程序 AppSecret（仅存服务端，严禁放入小程序代码） |
-| `DEEPSEEK_API_KEY` | 启用 AI 顾问时配置 | DeepSeek 密钥（服务端读取，小程序与网页共用） |
+| `APP_OPENAI_API_KEY` / `OPENAI_API_KEY` | 启用 AI 顾问时配置 | AI 对话模型密钥（遵循项目既有 AI 插件配置） |
+| `APP_OPENAI_BASE_URL` / `OPENAI_BASE_URL` | 可选 | 兼容 OpenAI 协议的模型服务地址 |
+| `AI_MODEL` | 可选 | 默认对话模型名称（未设置时使用系统默认模型） |
 
 > 未设置 `WECHAT_MP_APPID` / `WECHAT_MP_SECRET` 时，`GET /mp/v1` 返回 `wechatLogin: false`，小程序登录页会自动隐藏或降级微信一键登录按钮，改用邮箱密码登录。
 

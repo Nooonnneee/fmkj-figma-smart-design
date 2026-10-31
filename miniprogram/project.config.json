@@ -4,7 +4,7 @@
   "miniprogramRoot": "./",
   "compileType": "miniprogram",
   "projectname": "fmkj-miniprogram",
-  "appid": "wx7c2c4901a6de8423",
+  "appid": "touristappid",
   "libVersion": "3.4.0",
   "setting": {
     "urlCheck": true,

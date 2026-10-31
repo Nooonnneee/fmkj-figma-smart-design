@@ -11,7 +11,7 @@ import { ContractEditor, CreateContractPanel, type QuoteOption } from './contrac
 /** 合同：每个项目一份，由报价生成；签订后锁定内容，继续登记收款。 */
 export default async function ProjectContractPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const [{ project, archived }, { quotes, contract }] = await Promise.all([getProject(id), getProjectDeals(id)])
+  const [{ project, archived, readOnly }, { quotes, contract }] = await Promise.all([getProject(id), getProjectDeals(id)])
   const pid = String(project.id)
   const options: QuoteOption[] = quotes.map((q) => ({ id: String(q.id), title: q.title, total: q.total ?? 0, status: q.status }))
 
@@ -23,8 +23,10 @@ export default async function ProjectContractPage({ params }: { params: Promise<
           <h2 className="text-xl font-semibold tracking-tight">合同</h2>
           <p className="text-sm text-muted-foreground">客户确认报价后，用它生成合同，打印给客户签字。</p>
         </header>
-        {archived ? (
-          <p className="rounded-xl border border-dashed px-6 py-10 text-center text-sm text-muted-foreground">项目已归档，没有合同记录。</p>
+        {readOnly ? (
+          <p className="rounded-xl border border-dashed px-6 py-10 text-center text-sm text-muted-foreground">
+            {archived ? '项目已归档，没有合同记录。' : '该项目尚未生成合同（当前为仅查看权限）。'}
+          </p>
         ) : defaultQuote ? (
           <CreateContractPanel projectId={pid} quotes={options} defaultQuoteId={defaultQuote.id} />
         ) : (
@@ -48,7 +50,7 @@ export default async function ProjectContractPage({ params }: { params: Promise<
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
       <ContractEditor
-        readOnly={archived}
+        readOnly={readOnly}
         archived={archived}
         quotes={options}
         initial={{

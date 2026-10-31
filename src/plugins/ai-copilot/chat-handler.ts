@@ -1,9 +1,10 @@
+import { getCompanyInfo } from '@/lib/cached-data'
 import { getPayloadClient } from '@/lib/payload'
 import { loadProjectDocs } from '@/lib/project-docs'
 import type { User } from '@/payload-types'
 import { getPluginFlags } from '@/plugins/state'
 
-import { aiConfigured, AiError, availableTools, complete, findModel, runTool, stream, stripDsml, systemPrompt, type LlmMessage, type ToolContext } from './server'
+import { AiError, availableTools, complete, findModel, resolveModelApiKey, runTool, stream, stripDsml, systemPrompt, type LlmMessage, type ToolContext } from './server'
 
 const MAX_INPUT = 32000
 const HISTORY = 20
@@ -14,16 +15,18 @@ const fail = (status: number, error: string) => Response.json({ ok: false, error
  * 返回 NDJSON 流：meta → tool* → reasoning* / delta* → done | error。调用成功后才扣积分，出错不扣。
  */
 export async function handleAiChat(request: Request, user: User): Promise<Response> {
-  const flags = await getPluginFlags()
+  const [flags, company] = await Promise.all([getPluginFlags(), getCompanyInfo()])
   if (!flags['ai-copilot']) return fail(404, '「AI 对话」插件已关闭')
-  if (!aiConfigured()) return fail(503, '还没有配置 AI 密钥（DEEPSEEK_API_KEY），请在 Make 设置 → Secrets 里添加')
 
   const body = (await request.json().catch(() => null)) as { conversationId?: unknown; message?: unknown; modelId?: unknown; projectId?: unknown; pluginIds?: unknown } | null
   const text = typeof body?.message === 'string' ? body.message.trim() : ''
   if (!text) return fail(400, '请输入内容')
   if (text.length > MAX_INPUT) return fail(400, `单条消息最多 ${MAX_INPUT} 字`)
-  const model = findModel(body?.modelId)
+  const model = findModel(body?.modelId, company.aiModels)
   if (!model) return fail(400, '不支持的模型')
+  if (!resolveModelApiKey(model)) {
+    return fail(503, `模型「${model.name}」还没有配置密钥环境变量（${model.apiKeyEnv}），请在设置或环境变量中添加`)
+  }
   const pluginIds = Array.isArray(body?.pluginIds) ? body.pluginIds.filter((v): v is string => typeof v === 'string') : []
 
   const payload = await getPayloadClient()
@@ -88,7 +91,7 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
         if (tools.length) {
           // 支持多步连续调用工具（最多 10 轮，例如：新建项目 → 添加户型图 → 智能选型 → 生成报价单 → 生成合同）
           for (let step = 0; step < 10; step++) {
-            const turn = await complete(model.id, messages, tools.map((t) => t.definition))
+            const turn = await complete(model, messages, tools.map((t) => t.definition))
             if (!turn.tool_calls?.length) {
               content = stripDsml(turn.content)
               if (content) send({ type: 'delta', text: content })
@@ -108,7 +111,7 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
         }
         if (!content) {
           const raw = await stream(
-            model.id,
+            model,
             messages,
             (t) => {
               if (!t.includes('DSML')) send({ type: 'delta', text: t })

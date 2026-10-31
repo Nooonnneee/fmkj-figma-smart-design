@@ -11,7 +11,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import type { AiModelConfig } from '@/plugins/ai-copilot/templates'
 
+import { AiModelSettings } from './ai-model-settings'
 import { DocumentTemplateSettings, type DocKindOption, type DocStyleOption } from './document-plugin-settings'
 
 type Values = {
@@ -87,9 +89,13 @@ function ImageField({ name, label, url, hint }: { name: 'logo' | 'qrCode'; label
 export function CompanyForm({
   initial,
   documents,
+  aiModels,
+  aiEnvStatus,
 }: {
   initial: Values
   documents: { kinds: DocKindOption[]; styles: DocStyleOption[]; defaults: Record<string, { style?: string; layout?: string }> }
+  aiModels: AiModelConfig[]
+  aiEnvStatus: Record<string, boolean>
 }) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
@@ -179,6 +185,7 @@ export function CompanyForm({
         </CardContent>
       </Card>
       <DocumentTemplateSettings kinds={documents.kinds} styles={documents.styles} defaults={documents.defaults} />
+      <AiModelSettings initialModels={aiModels} envStatus={aiEnvStatus} />
       <div className="sticky bottom-0 -mx-1 flex justify-end bg-background/95 px-1 py-3">
         <Button type="submit" disabled={saving}>
           {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}保存

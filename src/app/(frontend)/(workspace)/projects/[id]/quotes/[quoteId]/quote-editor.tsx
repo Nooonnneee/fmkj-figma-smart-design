@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, ArrowLeftRight, ArrowRight, ChevronDown, ChevronLeft, FileDown, FileSignature, ImageIcon, Layers, Loader2, Lock, MapPinned, Plus, Printer, RefreshCw, RotateCcw, Save, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowLeftRight, ArrowRight, ChevronDown, ChevronLeft, FileSignature, ImageIcon, Layers, Loader2, Lock, MapPinned, Plus, RefreshCw, RotateCcw, Save, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { DeviceSymbol } from '@/components/device-symbol'
@@ -264,18 +264,11 @@ export function QuoteEditor({
     try {
       const result = await createContract(project.id, quote.id)
       if (!result.ok) return void toast.error(result.error)
-      toast.success('已生成合同，请核对内容后打印')
+      toast.success('已生成合同，请核对内容')
       router.push(`/projects/${project.id}/contract`)
     } finally {
       setCreatingContract(false)
     }
-  }
-
-  const openPrint = (autoPdf = false) => {
-    const url = autoPdf ? `/print/quotes/${quote.id}?auto=pdf` : `/print/quotes/${quote.id}`
-    const go = () => router.push(url)
-    if (dirty && !readOnly) save(go)
-    else go()
   }
 
   /** 无缝跳回点位图（如有未保存的临时改价或换型号，先自动保存再跳转；支持直接定位到指定楼层、房间或点位代号） */
@@ -362,8 +355,6 @@ export function QuoteEditor({
           <Button variant="outline" size="sm" disabled={saving || syncing} onClick={() => switchToPointMap()}>
             <MapPinned className="size-4" />调整点位
           </Button>
-          <Button variant="outline" size="sm" onClick={() => openPrint(false)}><Printer className="size-4" />打印预览</Button>
-          <Button variant="outline" size="sm" onClick={() => openPrint(true)}><FileDown className="size-4" />导出 PDF</Button>
           {readOnly ? null : (
             <Button size="sm" disabled={saving} onClick={() => save()}>
               {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}保存

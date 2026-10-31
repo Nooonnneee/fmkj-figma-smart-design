@@ -3,15 +3,31 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ChevronRight } from 'lucide-react'
+import {
+  Blocks,
+  Bot,
+  Cable,
+  ChevronRight,
+  ClipboardList,
+  FileUp,
+  KeyRound,
+  PackageCheck,
+  Palette,
+  Presentation,
+  ScanSearch,
+  Sparkles,
+  Wand2,
+  Wrench,
+  type LucideIcon,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
+import type { PluginId } from '@/plugins/types'
 
 export type PluginViewItem = {
   id: string
@@ -21,6 +37,21 @@ export type PluginViewItem = {
   where: string
   provides: string[]
   enabled: boolean
+}
+
+const PLUGIN_ICONS: Record<PluginId, LucideIcon> = {
+  'ai-copilot': Bot,
+  'doc-styles': Palette,
+  proposal: Presentation,
+  'room-insights': Sparkles,
+  'smart-select': Wand2,
+  'ai-import': ScanSearch,
+  'dwg-import': FileUp,
+  'site-survey': ClipboardList,
+  'wiring-schedule': Cable,
+  procurement: PackageCheck,
+  'scene-handover': KeyRound,
+  'after-sales': Wrench,
 }
 
 export function PluginList({ items, selectedId }: { items: PluginViewItem[]; selectedId: string | null }) {
@@ -57,88 +88,118 @@ export function PluginList({ items, selectedId }: { items: PluginViewItem[]; sel
   const ready = items.filter((p) => p.status === 'ready')
   const comingSoon = items.filter((p) => p.status === 'coming-soon')
 
-  const renderRow = (p: PluginViewItem) => {
+  const renderCard = (p: PluginViewItem) => {
     const enabled = optimistic[p.id] ?? p.enabled
     const pending = p.status === 'coming-soon'
     const selected = selectedId === p.id
+    const Icon = PLUGIN_ICONS[p.id as PluginId] ?? Blocks
     return (
-      <div
+      <Card
         key={p.id}
         id={p.id}
         className={cn(
-          'flex items-start justify-between gap-4 py-4 first:pt-0 last:pb-0',
-          selected && '-mx-3 rounded-lg bg-muted/60 px-3',
+          'flex flex-col justify-between gap-4 py-4 transition-shadow hover:shadow-md',
+          pending && 'bg-muted/25 opacity-85',
+          selected && 'ring-2 ring-primary',
         )}
       >
-        <div className="min-w-0 flex-1 space-y-1.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href={`/plugins/${p.id}`}
-              className={cn('text-sm font-semibold underline-offset-4 hover:underline', pending && 'text-muted-foreground')}
+        <CardHeader className="flex flex-row items-start justify-between gap-3 pb-0">
+          <div className="flex min-w-0 items-start gap-3">
+            <div
+              className={cn(
+                'flex size-10 shrink-0 items-center justify-center rounded-xl border',
+                pending
+                  ? 'bg-muted text-muted-foreground'
+                  : enabled
+                    ? 'border-primary/20 bg-primary/10 text-primary'
+                    : 'bg-muted/60 text-muted-foreground',
+              )}
             >
-              {p.name}
-            </Link>
+              <Icon className="size-5" />
+            </div>
+            <div className="min-w-0 space-y-1">
+              <CardTitle className="text-base leading-snug">
+                <Link
+                  href={`/plugins/${p.id}`}
+                  className={cn('underline-offset-4 hover:underline', pending && 'text-muted-foreground')}
+                >
+                  {p.name}
+                </Link>
+              </CardTitle>
+              <div>
+                {pending ? (
+                  <Badge variant="outline" className="h-5 px-1.5 text-[11px] text-muted-foreground">
+                    待开发
+                  </Badge>
+                ) : (
+                  <Badge variant={enabled ? 'success' : 'outline'} className="h-5 px-1.5 text-[11px]">
+                    {enabled ? '已开启' : '已关闭'}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="shrink-0 pt-0.5">
             {pending ? (
-              <Badge variant="outline" className="text-muted-foreground">
-                待开发
-              </Badge>
+              <span className="text-xs text-muted-foreground">规划中</span>
             ) : (
-              <Badge variant={enabled ? 'success' : 'outline'}>{enabled ? '已开启' : '已关闭'}</Badge>
+              <Switch
+                id={`plugin-${p.id}`}
+                checked={enabled}
+                disabled={busyId === p.id}
+                onCheckedChange={(next) => void toggle(p, next)}
+                aria-label={`切换${p.name}`}
+              />
             )}
           </div>
-          <p className="text-xs leading-relaxed text-muted-foreground">{p.description}</p>
-          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-            <span className="text-[11px] text-muted-foreground">{pending ? '规划位置：' : '生效位置：'}{p.where}</span>
-            <span className="text-[11px] text-muted-foreground">·</span>
+        </CardHeader>
+
+        <CardContent className="flex flex-1 flex-col justify-between gap-3 py-0">
+          <p className="line-clamp-3 text-xs leading-relaxed text-muted-foreground">{p.description}</p>
+          <div className="flex flex-wrap gap-1.5">
             {p.provides.map((x) => (
-              <span key={x} className="rounded-sm bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+              <span key={x} className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
                 {x}
               </span>
             ))}
           </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-2 pt-0.5">
-          {pending ? (
-            <span className="text-xs text-muted-foreground">待开发</span>
-          ) : (
-            <Switch
-              id={`plugin-${p.id}`}
-              checked={enabled}
-              disabled={busyId === p.id}
-              onCheckedChange={(next) => void toggle(p, next)}
-              aria-label={`切换${p.name}`}
-            />
-          )}
-          <Button asChild variant="ghost" size="xs" className="text-muted-foreground">
+        </CardContent>
+
+        <CardFooter className="flex items-center justify-between gap-2 border-t pt-3 pb-0 text-xs text-muted-foreground">
+          <span className="truncate" title={p.where}>
+            {pending ? '规划：' : '位置：'}
+            {p.where}
+          </span>
+          <Button asChild variant="ghost" size="xs" className="-mr-2 shrink-0 text-muted-foreground hover:text-foreground">
             <Link href={`/plugins/${p.id}`}>
               详情
               <ChevronRight className="size-3.5" />
             </Link>
           </Button>
-        </div>
-      </div>
+        </CardFooter>
+      </Card>
     )
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-7">
       {ready.length ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>已开发插件</CardTitle>
-            <CardDescription>可以随时按需开启或关闭；关闭后相关入口自动隐藏，已有项目和报价数据不受影响</CardDescription>
-          </CardHeader>
-          <CardContent className="divide-y">{ready.map(renderRow)}</CardContent>
-        </Card>
+        <div className="space-y-3">
+          <div className="space-y-0.5">
+            <h2 className="text-base font-semibold">已开发插件</h2>
+            <p className="text-xs text-muted-foreground">可以随时按需开启或关闭；关闭后相关入口自动隐藏，已有项目和报价数据不受影响</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{ready.map(renderCard)}</div>
+        </div>
       ) : null}
       {comingSoon.length ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>待开发插件</CardTitle>
-            <CardDescription>围绕现场勘测、强弱电交底、采购备货与售后维保的外围能力规划，后续按独立插件逐步接入</CardDescription>
-          </CardHeader>
-          <CardContent className="divide-y">{comingSoon.map(renderRow)}</CardContent>
-        </Card>
+        <div className="space-y-3">
+          <div className="space-y-0.5">
+            <h2 className="text-base font-semibold">待开发插件</h2>
+            <p className="text-xs text-muted-foreground">围绕现场勘测、强弱电交底、采购备货与售后维保的外围能力规划，后续按独立插件逐步接入</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{comingSoon.map(renderCard)}</div>
+        </div>
       ) : null}
     </div>
   )

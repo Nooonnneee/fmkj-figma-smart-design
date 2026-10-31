@@ -92,9 +92,7 @@
 
   <view class="bottom-bar">
     <button class="btn btn-outline" hover-class="btn-hover" bindtap="more"><image class="icon-sm" src="/assets/icons/layers.svg" />更多</button>
-    <button class="btn btn-outline" hover-class="btn-hover" bindtap="print"><image class="icon-sm" src="/assets/icons/printer.svg" />打印</button>
     <button wx:if="{{!readOnly}}" class="btn btn-primary" hover-class="btn-hover" loading="{{saving}}" disabled="{{saving}}" bindtap="save">保存</button>
   </view>
 </view>
 <view wx:else class="empty">加载中…</view>
-<privacy-popup id="privacy-popup" />

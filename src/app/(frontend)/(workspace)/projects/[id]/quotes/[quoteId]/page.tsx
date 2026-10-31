@@ -17,7 +17,7 @@ export default async function QuotePage({
 }) {
   const { id, quoteId } = await params
   const { pending } = await searchParams
-  const { user, payload, project, archived } = await getProject(id)
+  const { user, payload, project, archived, role } = await getProject(id)
   const [quote, deals, catalog] = await Promise.all([
     payload
       .findByID({
@@ -62,6 +62,8 @@ export default async function QuotePage({
   const usesThisQuote = relId(contract?.quote) === String(quote.id)
   const lockReason = archived
     ? '项目已归档，报价只读。需要修改时请在「归档」里恢复项目。'
+    : role === 'read'
+      ? '你对该项目仅有查看权限，报价处于只读模式。'
     : usesThisQuote && contract?.status === 'signed'
       ? `这份报价已用于已签订的合同 ${contract.number}，内容已锁定。需要修改时请先在「合同」里撤销签订。`
       : null

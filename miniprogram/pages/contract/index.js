@@ -169,9 +169,10 @@ Page({
 
   more() {
     const c = this.data.contract
-    const actions = [{ label: '打印预览', run: () => openDocument('/print/contracts/' + c.id, '合同') }]
+    const actions = []
     if (c.quoteId) actions.push({ label: '查看依据的报价', run: () => wx.navigateTo({ url: '/pages/quote/index?id=' + c.quoteId }) })
     if (!this.data.signed && !this.data.readOnly) actions.push({ label: '删除合同', run: () => this.remove() })
+    if (!actions.length) return
     wx.showActionSheet({ itemList: actions.map((a) => a.label), success: (r) => actions[r.tapIndex].run() })
   },
   remove() {

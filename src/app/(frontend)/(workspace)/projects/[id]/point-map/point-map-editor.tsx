@@ -4,10 +4,9 @@ import '@excalidraw/excalidraw/index.css'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
-import { AlertTriangle, ArrowLeftRight, Check, Eye, FileText, ChevronDown, Download, ListChecks, Printer, FilePlus2, FileUp, ImagePlus, Layers, Loader2, MapPinned, Maximize2, Minus, Plus, ReceiptText, Save, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeftRight, Check, ChevronDown, Eye, FilePlus2, FileUp, ImagePlus, Layers, Loader2, MapPinned, Maximize2, Minus, Plus, ReceiptText, Save, X } from 'lucide-react'
 import { toast } from 'sonner'
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
 
@@ -48,8 +47,6 @@ import { SHEET } from '@/lib/sheet-spec'
 import { cn } from '@/lib/utils'
 
 import { createQuoteFromProject, syncQuoteFromPointMap } from '../quotes/actions'
-import { AiPanel, type ImportOutcome } from '@/plugins/ai-import/ai-panel'
-import { exportPoints, parsePointImport, planToElements, recognitionPrompt } from '@/plugins/ai-import/point-import'
 
 import {
   AreasPanel,
@@ -83,15 +80,6 @@ const kindOf = (el: SceneEl) => (typeof el.customData?.kind === 'string' ? (el.c
 const contains = (r: { x: number; y: number; width: number; height: number }, x: number, y: number) => x >= r.x && x <= r.x + r.width && y >= r.y && y <= r.y + r.height
 type Snapshot = { sheets: SheetInfo[]; areas: AreaInfo[]; points: PointInfo[] }
 type AppStateLike = { width: number; height: number; zoom: { value: number }; scrollX: number; scrollY: number; offsetLeft: number; offsetTop: number; selectedElementIds: Record<string, boolean> }
-
-function download(name: string, blob: Blob) {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
-}
 
 type ProjectQuoteSummary = { id: string; title: string; status: string; total: number }
 /** 点位图里由插件提供的功能是否可用（服务端按「设置 → 插件」计算后传入）。 */
@@ -730,49 +718,6 @@ export function PointMapEditor({
     [elementsNow, insertElements],
   )
 
-  const exportSheetPng = useCallback(async () => {
-    if (!api) return
-    const sheet = snap.sheets.find((s) => s.id === activeSheetId) ?? snap.sheets[0]
-    const els = api.getSceneElements() as unknown as SceneEl[]
-    const picked = els.filter((e) => !hidden.current.has(e.id)).filter((e) => !sheet || contains({ ...sheet, y: sheet.y - SHEET.titleOffset - 4, height: sheet.height + SHEET.titleOffset + 4 }, e.x + e.width / 2, e.y + e.height / 2))
-    // 导出图片时放大设备图标（24 → 32），并把下方文字从内部编号（K1）替换为类别名（单开、双开、中控屏等）
-    const exportSize = 32
-    const pointByGroup = new Map<string, { cx: number; cy: number; typeName: string }>()
-    for (const e of picked) {
-      if (isPointElement(e)) {
-        const g = e.groupIds?.[0]
-        const typeName = deviceTypeOf(String(e.customData?.deviceType ?? 'other'))?.name ?? '设备'
-        if (g) pointByGroup.set(g, { cx: e.x + e.width / 2, cy: e.y + e.height / 2, typeName })
-      }
-    }
-    const forExport = picked.map((e) => {
-      if (isPointElement(e)) {
-        const cx = e.x + e.width / 2
-        const cy = e.y + e.height / 2
-        return { ...e, x: cx - exportSize / 2, y: cy - exportSize / 2, width: exportSize, height: exportSize }
-      }
-      if (kindOf(e) === 'label') {
-        const g = e.groupIds?.[0]
-        const pt = g ? pointByGroup.get(g) : undefined
-        if (pt) {
-          const fontSize = 10
-          const w = Math.max(exportSize, pt.typeName.length * fontSize + 4)
-          return { ...e, x: pt.cx - w / 2, y: pt.cy + exportSize / 2 + 2, width: w, height: fontSize * 1.25, text: pt.typeName, originalText: pt.typeName, fontSize }
-        }
-      }
-      return e
-    })
-    const { exportToBlob } = await import('@excalidraw/excalidraw')
-    const blob = await exportToBlob({
-      elements: forExport as never,
-      appState: { ...api.getAppState(), exportBackground: true, exportWithDarkMode: false, exportScale: 2, viewBackgroundColor: '#ffffff' } as never,
-      files: api.getFiles(),
-      mimeType: 'image/png',
-      exportPadding: 16,
-    })
-    download(`${projectName}-${sheet?.name ?? '点位图'}.png`, blob)
-  }, [api, snap.sheets, activeSheetId, projectName])
-
   const importDwg = useCallback(
     async (file: File) => {
       if (converting) return
@@ -857,52 +802,6 @@ export function PointMapEditor({
     },
     [api],
   )
-
-  /* ---------------- AI 识别导入 ---------------- */
-
-  const activeSheet = snap.sheets.find((s) => s.id === activeSheetId) ?? snap.sheets[0] ?? null
-
-  const runImport = useCallback(
-    async (text: string, replace: boolean): Promise<ImportOutcome> => {
-      if (!api) return { ok: false, error: '画布还没有加载完成' }
-      const parsed = parsePointImport(text, snap.sheets, activeSheet?.id ?? null)
-      if (!parsed.ok) return parsed
-      const remove = new Set<string>()
-      if (replace) {
-        for (const { sheet } of parsed.plan.sheets) {
-          for (const el of elementsNow()) {
-            const k = kindOf(el)
-            if (el.isDeleted || k === 'sheet' || k === 'sheet-title') continue
-            if ((isPointElement(el) || k === 'label' || k === 'area' || k === 'area-label') && contains(sheet, el.x + el.width / 2, el.y + el.height / 2)) remove.add(el.id)
-          }
-        }
-      }
-      const codes = elementsNow().filter((e) => !e.isDeleted && !remove.has(e.id) && isPointElement(e)).map((e) => String(e.customData?.pointCode ?? ''))
-      const { areas, points } = planToElements(parsed.plan, codes)
-      ensureMarkers(parsed.plan.sheets.flatMap((s) => s.points.map((p) => p.deviceType)))
-      if (areas.length) await insertElements(areas, 'aboveSheets', { remove })
-      await insertElements(points, 'top', areas.length ? {} : { remove })
-      const first = parsed.plan.sheets[0]?.sheet.id
-      if (first) setTimeout(() => fitSheet(first), 60)
-      return { ok: true, points: parsed.plan.pointCount, areas: parsed.plan.areaCount, warnings: parsed.plan.warnings }
-    },
-    [api, snap.sheets, activeSheet, elementsNow, ensureMarkers, insertElements, fitSheet],
-  )
-
-  const copyPrompt = useCallback(async () => {
-    if (!activeSheet) return
-    try {
-      await navigator.clipboard.writeText(recognitionPrompt(activeSheet.name))
-      toast.success('识别提示词已复制，连同标准图纸一起发给 AI')
-    } catch {
-      toast.error('复制失败，请检查浏览器的剪贴板权限')
-    }
-  }, [activeSheet])
-
-  const exportJson = useCallback(() => {
-    const data = exportPoints(snap.sheets, snap.areas, snap.points)
-    download(`${projectName}-点位.json`, new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
-  }, [snap, projectName])
 
   /* ---------------- 点位编辑 ---------------- */
 
@@ -1009,15 +908,6 @@ export function PointMapEditor({
     [syncingQuote, saving, dirty, save, activeQuote, readOnly, router, scope],
   )
 
-  /** 打开打印文档（点位图、交底清单、方案）：有未保存的修改先保存 */
-  const openDocument = useCallback(
-    async (path: 'plans' | 'checklist' | 'proposal') => {
-      if (dirty && !readOnly && !(await save())) return
-      router.push(`/print/projects/${projectId}/${path}?scope=${scope}`)
-    },
-    [dirty, readOnly, save, router, projectId, scope],
-  )
-
   /* ---------------- 显示范围 ---------------- */
 
   useEffect(() => {
@@ -1120,34 +1010,6 @@ export function PointMapEditor({
               ) : null}
             </>
           )}
-          <Button variant="outline" size="sm" disabled={!api || !snap.sheets.length} onClick={() => void exportSheetPng()}><Download className="size-4" />导出图纸</Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" disabled={!api || saving}>
-                <Printer className="size-4" />打印<ChevronDown className="size-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem disabled={!snap.sheets.length} onSelect={() => void openDocument('plans')}>
-                <MapPinned className="size-4" />
-                <span className="flex-1">点位图</span>
-                <span className="text-xs text-muted-foreground">{scope === 'all' ? '全部' : POINT_SCOPES.find((x) => x.value === scope)?.label}</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled={!scopedPoints.length} onSelect={() => void openDocument('checklist')}>
-                <ListChecks className="size-4" />
-                <span className="flex-1">点位交底清单</span>
-              </DropdownMenuItem>
-              {plugins.proposal ? (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem disabled={!scopedPoints.length} onSelect={() => void openDocument('proposal')}>
-                    <FileText className="size-4" />
-                    <span className="flex-1">方案演示</span>
-                  </DropdownMenuItem>
-                </>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
           {readOnly ? (
             activeQuote ? (
               <Button variant="outline" size="sm" onClick={() => void switchToQuote()}><ReceiptText className="size-4" />查看报价</Button>
@@ -1236,7 +1098,6 @@ export function PointMapEditor({
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start">
                         <DropdownMenuItem onSelect={() => setRenaming({ id: s.id, name: s.name })}>重命名</DropdownMenuItem>
-                        {s.url ? <DropdownMenuItem asChild><a href={s.url} download={`${s.name}.png`}>下载标准图纸</a></DropdownMenuItem> : null}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           variant="destructive"
@@ -1303,11 +1164,6 @@ export function PointMapEditor({
                       <Button key={v} size="xs" variant="ghost" role="radio" aria-checked={scope === v} className={cn('h-6 rounded-md px-2', scope === v && 'bg-background shadow-sm')} onClick={() => setScope(v)}>{label}</Button>
                     ))}
                   </div>
-                  {scope !== 'all' ? (
-                    <Button asChild size="xs" variant="outline" className="h-7">
-                      <Link href={`/print/projects/${projectId}/plans?scope=${scope}`}><FileText className="size-3.5" />出{scope === 'switch' ? '开关' : scope === 'no-light' ? '不含灯具' : '灯光开关'}布局图</Link>
-                    </Button>
-                  ) : null}
               </div>
             ) : null}
             {notices.length || missingSheets ? (
@@ -1351,10 +1207,9 @@ export function PointMapEditor({
           ) : null}
 
           <Tabs value={tab} onValueChange={setTab} className="min-h-0 flex-1 gap-0">
-            <TabsList className={cn('mx-4 mt-3 grid w-auto', readOnly ? 'grid-cols-2' : 'grid-cols-4')}>
+            <TabsList className={cn('mx-4 mt-3 grid w-auto', readOnly ? 'grid-cols-2' : 'grid-cols-3')}>
               {readOnly ? null : <TabsTrigger value="place" className="text-xs">放置</TabsTrigger>}
               <TabsTrigger value="areas" className="text-xs">区域</TabsTrigger>
-              {readOnly || !plugins.aiImport ? null : <TabsTrigger value="ai" className="text-xs">AI 识别</TabsTrigger>}
               <TabsTrigger value="summary" className="text-xs">
                 统计
               </TabsTrigger>
@@ -1369,12 +1224,6 @@ export function PointMapEditor({
             <TabsContent value="areas" className="flex min-h-0 flex-col">
               <AreasPanel sheets={snap.sheets} areas={snap.areas} analysis={analysis} unassigned={unassigned} selectedAreaId={selectedAreaId} onAdd={(t) => void addArea(t)} onFocus={focusArea} readOnly={readOnly} />
             </TabsContent>
-
-            {readOnly || !plugins.aiImport ? null : (
-              <TabsContent value="ai" className="flex min-h-0 flex-col">
-                <AiPanel sheet={activeSheet} onCopyPrompt={() => void copyPrompt()} onImport={runImport} onExport={exportJson} readOnly={readOnly} />
-              </TabsContent>
-            )}
 
             <TabsContent value="summary" className="flex min-h-0 flex-col">
               <ScrollArea className="min-h-0 flex-1">

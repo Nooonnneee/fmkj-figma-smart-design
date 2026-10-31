@@ -35,4 +35,3 @@
     <view class="mt-16 desc">{{p.description}}</view>
   </view>
 </view>
-<privacy-popup id="privacy-popup" />

@@ -148,12 +148,6 @@ export function ContractEditor({ initial, quotes, readOnly, archived }: { initia
     }
   }, [dirty, readOnly])
 
-  const openPrint = () => {
-    const go = () => router.push(`/print/contracts/${values.id}`)
-    if (dirty && !readOnly) save(go)
-    else go()
-  }
-
   const changeStatus = async (status: 'signed' | 'draft') => {
     if (busy) return
     if (status === 'signed' && dirty && !(await persist())) return
@@ -222,7 +216,6 @@ export function ContractEditor({ initial, quotes, readOnly, archived }: { initia
           {dirty ? <Badge variant="outline">未保存</Badge> : null}
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={openPrint}><Printer className="size-4" />打印 / 导出 PDF</Button>
           {readOnly ? null : (
             <Button size="sm" disabled={saving || !dirty} onClick={() => save()}>
               {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}保存

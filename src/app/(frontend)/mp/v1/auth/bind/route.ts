@@ -23,7 +23,7 @@ export const POST = mpPublicRoute(async (request: Request) => {
   }
   const user = await loadActiveUser(userId)
   if (!user) return fail(403, '该账号已停用，请联系管理员')
-  const existing = await findBinding(ticket.openid)
+  const existing = await findBinding(ticket.openid, ticket.unionid)
   if (existing && relId(existing.user) !== String(user.id)) return fail(409, '这个微信已绑定其他账号，请先在后台解绑')
 
   try {

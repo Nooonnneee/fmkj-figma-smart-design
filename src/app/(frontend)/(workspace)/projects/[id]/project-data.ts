@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation'
 import { appAuth } from '@/lib/app-auth'
 import { countScenePoints } from '@/lib/point-count'
 import { getPayloadClient } from '@/lib/payload'
+import { getProjectRole, type CollaboratorItem } from '@/lib/project-access'
 
 /**
  * 项目板块共用的数据读取。用 React cache 去重：同一次请求里布局和页面只查一次。
@@ -29,6 +30,7 @@ export const getProject = cache(async (id: string) => {
         platform: true,
         budget: true,
         owner: true,
+        collaborators: true,
         notes: true,
         status: true,
         pointCount: true,
@@ -43,7 +45,18 @@ export const getProject = cache(async (id: string) => {
     const full = await payload.findByID({ collection: 'projects', id, depth: 0, user, overrideAccess: false, select: { pointMap: true } }).catch(() => null)
     project.pointCount = countScenePoints(full?.pointMap)
   }
-  return { user, payload, project, archived: project.status === 'archived' }
+  const collabs = ((project as unknown as { collaborators?: CollaboratorItem[] | null }).collaborators ?? [])
+  const role = getProjectRole({ owner: project.owner, collaborators: collabs }, user.id) ?? 'read'
+  const archived = project.status === 'archived'
+  return {
+    user,
+    payload,
+    project,
+    role,
+    collaboratorCount: collabs.length,
+    archived,
+    readOnly: archived || role === 'read',
+  }
 })
 
 /** 项目的报价（新的在前）和合同。 */

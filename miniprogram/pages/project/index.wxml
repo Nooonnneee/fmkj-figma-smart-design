@@ -102,7 +102,7 @@
     </view>
   </view>
 
-  <view class="section-title"><text class="title">打印与文档</text></view>
+  <view class="section-title"><text class="title">资料导出</text></view>
   <view class="card card-flush">
     <view wx:for="{{documents}}" wx:key="key" class="list-item" hover-class="list-item-hover" data-path="{{item.path}}" data-title="{{item.title}}" bindtap="openDoc">
       <image class="icon" src="/assets/icons/printer.svg" />
@@ -124,4 +124,3 @@
   </view>
 </view>
 <view wx:elif="{{loading}}" class="empty">加载中…</view>
-<privacy-popup id="privacy-popup" />

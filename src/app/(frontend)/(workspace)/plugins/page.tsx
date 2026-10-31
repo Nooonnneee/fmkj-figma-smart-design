@@ -8,7 +8,7 @@ import { getPluginFlags } from '@/plugins/state'
 
 import { PluginList, type PluginViewItem } from './plugin-list'
 
-export const metadata = { title: pageTitle('插件') }
+export const metadata = { title: pageTitle('插件市场') }
 
 type Tab = 'all' | 'ready' | 'coming-soon'
 
@@ -36,10 +36,10 @@ export default async function PluginsPage({
   const shown = tab === 'all' ? allItems : allItems.filter((p) => p.status === tab)
 
   return (
-    <section className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">插件</h1>
+          <h1 className="text-2xl font-bold tracking-tight">插件市场</h1>
           <p className="text-sm text-muted-foreground">
             核心主链路（项目信息 → 点位 → 报价 → 合同 → 归档）独立运行；外围功能按插件启用，尚未开发的功能标为「待开发」
           </p>

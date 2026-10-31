@@ -15,7 +15,7 @@ import { getProject, getProjectDeals } from './project-data'
 /** 信息：项目进度（由数据自动得出）+ 下一步 + 项目资料。 */
 export default async function ProjectInfoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const [{ project, archived }, { quotes, contract }, owners] = await Promise.all([getProject(id), getProjectDeals(id), getOwnerOptions()])
+  const [{ project, archived, readOnly }, { quotes, contract }, owners] = await Promise.all([getProject(id), getProjectDeals(id), getOwnerOptions()])
   const pid = String(project.id)
   // 当前负责人不在启用成员列表里（已停用或缓存未更新）时也要保留，避免保存时被清空
   const ownerId = relId(project.owner)
@@ -86,7 +86,7 @@ export default async function ProjectInfoPage({ params }: { params: Promise<{ id
 
       <ProjectForm
         owners={ownerOptions}
-        readOnly={archived}
+        readOnly={readOnly}
         initial={{
           id: pid,
           name: project.name,

@@ -36,4 +36,3 @@
 
   <view class="foot small muted">{{host}} · v{{version}}</view>
 </view>
-<privacy-popup id="privacy-popup" />

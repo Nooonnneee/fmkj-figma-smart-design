@@ -115,6 +115,7 @@ export const getMpUser = (request: Request) => userFromToken(bearerToken(request
 /* ---------------- 微信 ---------------- */
 
 export const wechatConfigured = () => Boolean(process.env.WECHAT_MP_APPID && process.env.WECHAT_MP_SECRET)
+export const wechatOpenConfigured = () => Boolean(process.env.WECHAT_OPEN_APPID && process.env.WECHAT_OPEN_SECRET)
 
 const WECHAT_ERRORS: Record<number, string> = {
   40029: '微信登录凭证无效，请重试',
@@ -147,15 +148,26 @@ export async function code2Session(code: string): Promise<{ ok: true; openid: st
   }
 }
 
-export async function findBinding(openid: string) {
+export async function findBinding(openid: string, unionid?: string | null) {
   const payload = await getPayloadClient()
   const { docs } = await payload.find({ collection: 'wechat-accounts', where: { openid: { equals: openid } }, limit: 1, depth: 0, overrideAccess: true })
-  return docs[0] ?? null
+  if (docs[0]) return docs[0]
+  if (unionid) {
+    const byUnion = await payload.find({
+      collection: 'wechat-accounts',
+      where: { unionid: { equals: unionid } },
+      limit: 1,
+      depth: 0,
+      overrideAccess: true,
+    })
+    if (byUnion.docs[0]) return byUnion.docs[0]
+  }
+  return null
 }
 
 export async function bindOpenid(userId: string, openid: string, unionid: string | null, nickname?: string | null) {
   const payload = await getPayloadClient()
-  const existing = await findBinding(openid)
+  const existing = await findBinding(openid, unionid)
   const data = { user: userId, unionid, lastLoginAt: new Date().toISOString(), ...(nickname ? { nickname: nickname.slice(0, 40) } : {}) }
   if (existing) return payload.update({ collection: 'wechat-accounts', id: existing.id, data, overrideAccess: true, depth: 0 })
   return payload.create({ collection: 'wechat-accounts', data: { openid, ...data }, overrideAccess: true, depth: 0 })

@@ -49,7 +49,7 @@ export default async function PlansPrintPage({
     <div className="min-h-screen bg-muted/40 print:bg-white">
       <style>{'@media print { @page { size: A4 landscape; margin: 0; } }'}</style>
       <PrintToolbar
-        back={{ href: `/projects/${id}/point-map`, label: '返回点位' }}
+        back={{ href: `/projects/${id}/archive`, label: '返回归档' }}
         exportName={`${d.project.name}-${kind}`}
         groups={[
           ...(d.projectList.length > 1

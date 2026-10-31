@@ -2,6 +2,7 @@ import { CACHE_TAGS } from '@/lib/cache-tags'
 import { memoize } from '@/lib/memo-cache'
 import { getPayloadClient } from '@/lib/payload'
 import type { Brand, Category, Media, Product } from '@/payload-types'
+import { parseAiModels, type AiModelConfig } from '@/plugins/ai-copilot/templates'
 
 /**
  * 很少变动的共享数据，缓存在服务端进程内，写入时由集合 hook 立即清除。
@@ -131,6 +132,8 @@ export type CompanyInfo = {
   documentDefaults: Record<string, { style?: string; layout?: string }>
   /** 已关闭的插件 */
   disabledPlugins: string[]
+  /** 后台配置的 AI 模型与渠道列表 */
+  aiModels: AiModelConfig[]
   logo: { url: string; alt: string; width: number | null; height: number | null } | null
   qrCode: { url: string; alt: string } | null
 }
@@ -147,12 +150,13 @@ function parseDocumentDefaults(value: unknown): CompanyInfo['documentDefaults'] 
 }
 
 export const getCompanyInfo = memoize(
-  'company-settings-v4',
+  'company-settings-v5',
   [CACHE_TAGS.company],
   TTL,
   async (): Promise<CompanyInfo> => {
     const payload = await getPayloadClient()
     const s = await payload.findGlobal({ slug: 'company-settings', depth: 1, overrideAccess: true })
+    const rawAiModels = (s as unknown as { aiModels?: unknown }).aiModels
     const logo = s.logo && typeof s.logo === 'object' ? (s.logo as Media) : null
     const qr = s.qrCode && typeof s.qrCode === 'object' ? (s.qrCode as Media) : null
     return {
@@ -167,6 +171,7 @@ export const getCompanyInfo = memoize(
       printProductImages: s.printProductImages !== false,
       documentDefaults: parseDocumentDefaults(s.documentDefaults),
       disabledPlugins: Array.isArray(s.disabledPlugins) ? s.disabledPlugins.filter((v): v is string => typeof v === 'string') : [],
+      aiModels: parseAiModels(rawAiModels),
       logo: logo?.url ? { url: logo.url, alt: logo.alt || s.name, width: logo.width ?? null, height: logo.height ?? null } : null,
       qrCode: qr?.url ? { url: qr.url, alt: qr.alt || '二维码' } : null,
     }

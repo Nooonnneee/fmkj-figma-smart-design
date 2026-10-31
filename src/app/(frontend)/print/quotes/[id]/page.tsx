@@ -88,7 +88,7 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
   return (
     <div className="min-h-screen bg-muted/40 pb-8 print:bg-white print:pb-0">
       <PrintToolbar
-        back={{ href: project ? `/projects/${project.id}/quotes/${id}` : '/projects', label: '返回报价' }}
+        back={{ href: project ? `/projects/${project.id}/archive` : '/projects', label: '返回归档' }}
         exportName={`${project ? `${project.name}-` : ''}${quote.title}-${setup.layouts.find((l) => l.value === layout)?.label ?? ''}`}
         groups={[
           ...(siblingQuotes.length > 1

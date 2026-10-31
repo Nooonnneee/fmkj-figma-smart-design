@@ -19,7 +19,7 @@ export default async function PointMapPage({
 }) {
   const { id } = await params
   const sp = await searchParams
-  const { user, payload, project, archived } = await getProject(id)
+  const { user, payload, project, readOnly } = await getProject(id)
   // 点位图、报价列表、产品库并行读取
   const [scene, deals, catalog, flags] = await Promise.all([
     payload
@@ -55,7 +55,7 @@ export default async function PointMapPage({
       platform={project.platform ?? null}
       initialScene={initialScene}
       warnings={warnings}
-      needsSave={repaired > 0 && !archived}
+      needsSave={repaired > 0 && !readOnly}
       products={products}
       initialDefaults={parseDefaults(scene.defaultProducts)}
       quotes={deals.quotes.map((q) => ({ id: String(q.id), title: q.title, status: q.status, total: q.total ?? 0 }))}
@@ -66,7 +66,7 @@ export default async function PointMapPage({
         point: typeof sp.point === 'string' ? sp.point : null,
         scope: isPointScope(sp.scope) ? (sp.scope as PointScope) : null,
       }}
-      readOnly={archived}
+      readOnly={readOnly}
       plugins={{
         aiImport: flags['ai-import'],
         smartSelect: flags['smart-select'],

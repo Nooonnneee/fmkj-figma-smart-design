@@ -6,28 +6,16 @@ import { usePathname } from "next/navigation"
 import {
   Blocks,
   Bot,
-  Cable,
   ChevronsUpDown,
-  ClipboardList,
-  FileUp,
   FolderKanban,
-  KeyRound,
   LayoutGrid,
   LogOut,
   MessageSquareText,
-  PackageCheck,
   PackageSearch,
-  Palette,
-  Presentation,
-  ScanSearch,
   Settings,
-  Sparkles,
-  Wand2,
-  Wrench,
-  type LucideIcon,
 } from "lucide-react"
 
-import type { AiProjectContext } from "@/components/ai/ai-elements"
+import type { AiModelOption, AiProjectContext } from "@/components/ai/ai-elements"
 import { AiSidebarDock } from "@/components/ai/ai-sidebar-dock"
 import { GuardedLink } from "@/components/guarded-link"
 import { LinkPending } from "@/components/link-pending"
@@ -45,14 +33,11 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-  SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar"
 import { APP_TAGLINE, brandInitials } from "@/lib/brand"
@@ -74,24 +59,9 @@ export type SidebarPlugin = {
 const baseNav = [
   { icon: FolderKanban, label: "项目", url: "/projects" },
   { icon: PackageSearch, label: "产品库", url: "/products" },
-  { icon: Blocks, label: "插件", url: "/plugins" },
+  { icon: Blocks, label: "插件市场", url: "/plugins" },
   { icon: Settings, label: "设置", url: "/settings" },
 ] as const
-
-const PLUGIN_ICONS: Record<PluginId, LucideIcon> = {
-  "ai-copilot": Bot,
-  "doc-styles": Palette,
-  proposal: Presentation,
-  "room-insights": Sparkles,
-  "smart-select": Wand2,
-  "ai-import": ScanSearch,
-  "dwg-import": FileUp,
-  "site-survey": ClipboardList,
-  "wiring-schedule": Cable,
-  procurement: PackageCheck,
-  "scene-handover": KeyRound,
-  "after-sales": Wrench,
-}
 
 const initials = (name: string) => name.trim().slice(0, 1).toUpperCase() || "我"
 
@@ -106,7 +76,7 @@ export function AppSidebar({
   brand: SidebarBrand
   plugins: SidebarPlugin[]
   projects: AiProjectContext[]
-  ai: { credits: number; configured: boolean }
+  ai: { credits: number; configured: boolean; models?: AiModelOption[] }
 }) {
   const pathname = usePathname()
   const { state, setOpen } = useSidebar()
@@ -210,117 +180,86 @@ export function AppSidebar({
 
       {effectiveMode === "chat" ? (
         <div className="flex min-h-0 flex-1 flex-col">
-          <AiSidebarDock plugins={plugins.filter((p) => p.id !== "ai-copilot")} projects={projects} credits={ai.credits} configured={ai.configured} />
+          <AiSidebarDock plugins={plugins.filter((p) => p.id !== "ai-copilot")} projects={projects} credits={ai.credits} configured={ai.configured} models={ai.models} />
         </div>
       ) : (
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarMenu>
-              {baseNav.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={item.url === "/plugins" ? pathname === "/plugins" : pathname.startsWith(item.url)}
-                    tooltip={item.label}
-                  >
-                    <GuardedLink href={item.url}>
-                      <item.icon />
-                      <span>{item.label}</span>
-                      <LinkPending className="ml-auto size-3.5" />
-                    </GuardedLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-              {aiCopilotEnabled ? (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={pathname.startsWith("/ai")} tooltip="AI 对话工作台">
-                    <GuardedLink href="/ai">
-                      <Bot />
-                      <span>AI 对话</span>
-                      <LinkPending className="ml-auto size-3.5" />
-                    </GuardedLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ) : null}
-            </SidebarMenu>
-          </SidebarGroup>
-
-          <SidebarSeparator />
-
-          <SidebarGroup>
-            <SidebarGroupLabel>插件</SidebarGroupLabel>
-            <SidebarMenu>
-              {plugins.map((p) => {
-                const Icon = PLUGIN_ICONS[p.id] ?? Blocks
-                const pending = p.status === "coming-soon"
-                const stateText = pending ? "待开发" : p.enabled ? "已开启" : "已关闭"
-                const href = `/plugins/${p.id}`
-                return (
-                  <SidebarMenuItem key={p.id}>
+        <>
+          <SidebarContent>
+            <SidebarGroup>
+              <SidebarMenu>
+                {baseNav.map((item) => (
+                  <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton
                       asChild
-                      size="sm"
-                      isActive={pathname === href}
-                      tooltip={`${p.name}（${stateText}）`}
-                      className="pr-14"
+                      isActive={pathname.startsWith(item.url)}
+                      tooltip={item.label}
                     >
-                      <GuardedLink href={href} className={cn(pending && "text-muted-foreground")}>
-                        <Icon />
-                        <span>{p.name}</span>
+                      <GuardedLink href={item.url}>
+                        <item.icon />
+                        <span>{item.label}</span>
+                        <LinkPending className="ml-auto size-3.5" />
                       </GuardedLink>
                     </SidebarMenuButton>
-                    <SidebarMenuBadge className={cn("text-[11px] font-normal", pending || !p.enabled ? "text-muted-foreground" : "text-success")}>
-                      {stateText}
-                    </SidebarMenuBadge>
                   </SidebarMenuItem>
-                )
-              })}
-            </SidebarMenu>
-          </SidebarGroup>
-        </SidebarContent>
-      )}
+                ))}
+                {aiCopilotEnabled ? (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={pathname.startsWith("/ai")} tooltip="AI 对话工作台">
+                      <GuardedLink href="/ai">
+                        <Bot />
+                        <span>AI 对话</span>
+                        <LinkPending className="ml-auto size-3.5" />
+                      </GuardedLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ) : null}
+              </SidebarMenu>
+            </SidebarGroup>
+          </SidebarContent>
 
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton
-                  size="lg"
-                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                >
-                  <Avatar className="size-8 rounded-lg">
-                    <AvatarFallback className="rounded-lg">{initials(user.name)}</AvatarFallback>
-                  </Avatar>
-                  <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">{user.name}</span>
-                    <span className="truncate text-xs text-muted-foreground">{user.email}</span>
-                  </div>
-                  <ChevronsUpDown className="ml-auto size-4" />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-                side="top"
-                sideOffset={4}
-              >
-                <DropdownMenuLabel className="p-0 font-normal">
-                  <div className="grid px-1 py-1.5 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">{user.name}</span>
-                    <span className="truncate text-xs text-muted-foreground">{user.email}</span>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem disabled={isLoggingOut} onSelect={() => void handleLogout()}>
-                  <LogOut />
-                  {isLoggingOut ? "退出中" : "退出登录"}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
+          <SidebarFooter>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <SidebarMenuButton
+                      size="lg"
+                      className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                    >
+                      <Avatar className="size-8 rounded-lg">
+                        <AvatarFallback className="rounded-lg">{initials(user.name)}</AvatarFallback>
+                      </Avatar>
+                      <div className="grid flex-1 text-left text-sm leading-tight">
+                        <span className="truncate font-semibold">{user.name}</span>
+                        <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+                      </div>
+                      <ChevronsUpDown className="ml-auto size-4" />
+                    </SidebarMenuButton>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+                    side="top"
+                    sideOffset={4}
+                  >
+                    <DropdownMenuLabel className="p-0 font-normal">
+                      <div className="grid px-1 py-1.5 text-left text-sm leading-tight">
+                        <span className="truncate font-semibold">{user.name}</span>
+                        <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem disabled={isLoggingOut} onSelect={() => void handleLogout()}>
+                      <LogOut />
+                      {isLoggingOut ? "退出中" : "退出登录"}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarFooter>
+        </>
+      )}
       <SidebarRail />
     </Sidebar>
   )

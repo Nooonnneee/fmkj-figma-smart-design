@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { AlertCircle, FileText, MapPinned, Printer } from 'lucide-react'
+import { AlertCircle, FileText, MapPinned } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -14,7 +14,7 @@ import { DeleteQuoteButton, GenerateQuoteForm } from './quote-controls'
 export default async function ProjectQuotesPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string }> }) {
   const { id } = await params
   const { error } = await searchParams
-  const [{ project, archived }, { quotes, contract }] = await Promise.all([getProject(id), getProjectDeals(id)])
+  const [{ project, readOnly }, { quotes, contract }] = await Promise.all([getProject(id), getProjectDeals(id)])
   const pid = String(project.id)
   const points = project.pointCount ?? 0
   const contractQuoteId = relId(contract?.quote)
@@ -28,7 +28,7 @@ export default async function ProjectQuotesPage({ params, searchParams }: { para
             {points ? `按点位图的 ${points} 个点位自动统计数量和型号` : '还没有布置点位，可以先建空白报价手动添加产品'}
           </p>
         </div>
-        {archived ? null : <GenerateQuoteForm projectId={pid} hasPoints={points > 0} />}
+        {readOnly ? null : <GenerateQuoteForm projectId={pid} hasPoints={points > 0} />}
       </header>
 
       {error ? (
@@ -69,12 +69,11 @@ export default async function ProjectQuotesPage({ params, searchParams }: { para
                   </div>
                 </div>
                 <span className="text-right text-base font-semibold tabular-nums">{yuan(q.total)}</span>
-                <div className="flex items-center gap-1">
-                  <Button asChild variant="ghost" size="sm" className="relative z-10" aria-label={`打印「${q.title}」`}>
-                    <Link href={`/print/quotes/${qid}`}><Printer className="size-4" /></Link>
-                  </Button>
-                  {archived || usedByContract ? null : <DeleteQuoteButton quoteId={qid} title={q.title} />}
-                </div>
+                {readOnly || usedByContract ? null : (
+                  <div className="flex items-center gap-1">
+                    <DeleteQuoteButton quoteId={qid} title={q.title} />
+                  </div>
+                )}
               </li>
             )
           })}

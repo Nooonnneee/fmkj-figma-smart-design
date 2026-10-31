@@ -6,10 +6,21 @@ const config = require('../../config')
 Page({
   data: { me: {}, initial: '', companyName: '', pluginCount: 0, host: '', version: config.VERSION, editing: false, form: { name: '', phone: '' }, saving: false },
 
+  onLoad(options) {
+    if (options && options.scene) {
+      this.pendingScene = decodeURIComponent(options.scene)
+    }
+  },
+
   onShow() {
     if (!requireLogin()) return
     this.setData({ host: config.BASE_URL.replace(/^https?:\/\//, '') })
     this.load()
+    if (this.pendingScene) {
+      const ticket = this.pendingScene
+      this.pendingScene = ''
+      this.confirmWebLogin(ticket)
+    }
   },
 
   async load() {
@@ -58,6 +69,28 @@ Page({
       },
     })
   },
+  scanWebLogin() {
+    wx.scanCode({
+      onlyFromCamera: false,
+      success: (r) => {
+        const raw = (r && (r.result || r.path)) || ''
+        if (!raw) return toast('未识别到二维码内容')
+        this.confirmWebLogin(raw)
+      },
+    })
+  },
+  confirmWebLogin(ticket) {
+    wx.showModal({
+      title: '登录电脑端工作台',
+      content: '确认在电脑网页端登录当前账号？',
+      confirmText: '确认登录',
+      success: async (r) => {
+        if (!r.confirm) return
+        await api.post('/auth/qr-confirm', { ticket })
+        toast('电脑端已登录')
+      },
+    })
+  },
   company() {
     const c = this.meta && this.meta.company
     if (!c) return
@@ -66,13 +99,6 @@ Page({
       content: [c.slogan, c.phone && '电话：' + c.phone, c.email && '邮箱：' + c.email, c.address && '地址：' + c.address].filter(Boolean).join('\n') || '在网页版「设置」里填写公司抬头和联系方式',
       showCancel: false,
     })
-  },
-  privacy() {
-    if (wx.openPrivacyContract) {
-      wx.openPrivacyContract({ fail: () => toast('当前微信版本暂不支持打开隐私协议') })
-      return
-    }
-    toast('请在微信公众平台查看《用户隐私保护指引》')
   },
   plugins() {
     const list = (this.meta && this.meta.plugins) || []

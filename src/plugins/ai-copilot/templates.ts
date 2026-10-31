@@ -1,11 +1,23 @@
 import type { AiModelOption } from '@/components/ai/ai-elements'
 import type { PluginId } from '@/plugins/types'
 
+export type AiModelConfig = AiModelOption & {
+  /** 实际传给接口的 model 参数名（如 deepseek-chat、gpt-4o、qwen-max） */
+  apiModel: string
+  /** OpenAI 兼容接口 Base URL（如 https://api.deepseek.com/v1 或自建 NewAPI 地址） */
+  baseUrl: string
+  /** 存放 API Key 的环境变量名（如 DEEPSEEK_API_KEY、NEWAPI_API_KEY），数据库不存明文密钥 */
+  apiKeyEnv: string
+  /** 是否启用（开启后出现在网页与小程序的模型选择列表中） */
+  enabled: boolean
+  /** 是否为默认选中模型 */
+  isDefault?: boolean
+}
+
 /**
- * 默认模型清单：当前仅保留 DeepSeek V4.1-Flash-1017（API 模型 ID 为 deepseek-flash）。
- * 后续接入更多模型时在此数组追加即可。
+ * 系统内置默认模型（未在后台自定义时使用）。
  */
-export const AI_MODELS: AiModelOption[] = [
+export const DEFAULT_AI_MODELS: AiModelConfig[] = [
   {
     id: 'deepseek-flash',
     name: 'DeepSeek V4.1-Flash-1017',
@@ -13,8 +25,146 @@ export const AI_MODELS: AiModelOption[] = [
     tag: '默认 · 工具调用',
     cost: 1,
     description: '高速长上下文模型（1M 上下文），支持多步调用系统工具与已启用插件',
+    apiModel: 'deepseek-flash',
+    baseUrl: 'https://api.deepseek.com',
+    apiKeyEnv: 'DEEPSEEK_API_KEY',
+    enabled: true,
+    isDefault: true,
   },
 ]
+
+export const AI_MODELS: AiModelOption[] = DEFAULT_AI_MODELS
+
+/** 后台「设置 → AI 模型与接口」里可一键添加的常用官方 API 与 NewAPI 聚合网关预设 */
+export const AI_PROVIDER_PRESETS: Omit<AiModelConfig, 'id' | 'enabled' | 'isDefault'>[] = [
+  {
+    name: 'NewAPI / OneAPI 聚合模型',
+    provider: 'NewAPI',
+    tag: '聚合网关 · 多模型',
+    cost: 1,
+    description: '通过自建 NewAPI / OneAPI 统一网关调用各类大模型（兼容 OpenAI /v1/chat/completions）',
+    apiModel: 'gpt-4o-mini',
+    baseUrl: 'https://your-newapi-domain.com/v1',
+    apiKeyEnv: 'NEWAPI_API_KEY',
+    reasoning: false,
+  },
+  {
+    name: 'DeepSeek V3（官方）',
+    provider: 'DeepSeek',
+    tag: '主力 · 工具调用',
+    cost: 1,
+    description: 'DeepSeek 官方主力对话模型，擅长全屋智能点位规划、选型与报价工具调用',
+    apiModel: 'deepseek-chat',
+    baseUrl: 'https://api.deepseek.com/v1',
+    apiKeyEnv: 'DEEPSEEK_API_KEY',
+    reasoning: false,
+  },
+  {
+    name: 'DeepSeek R1（深度思考）',
+    provider: 'DeepSeek',
+    tag: '深度推理',
+    cost: 2,
+    description: 'DeepSeek 深度推理模型，适合复杂别墅多层方案审查与预算优化分析',
+    apiModel: 'deepseek-reasoner',
+    baseUrl: 'https://api.deepseek.com/v1',
+    apiKeyEnv: 'DEEPSEEK_API_KEY',
+    reasoning: true,
+  },
+  {
+    name: '硅基流动 SiliconFlow（DeepSeek V3）',
+    provider: 'SiliconFlow',
+    tag: '国内聚合 · 高速',
+    cost: 1,
+    description: '通过硅基流动聚合 API 调用开源与商业模型，一个 Key 切换多模型',
+    apiModel: 'deepseek-ai/DeepSeek-V3',
+    baseUrl: 'https://api.siliconflow.cn/v1',
+    apiKeyEnv: 'SILICONFLOW_API_KEY',
+    reasoning: false,
+  },
+  {
+    name: '通义千问 Qwen-Plus（阿里百炼）',
+    provider: '通义千问',
+    tag: '阿里百炼 · 稳定',
+    cost: 1,
+    description: '阿里云百炼 OpenAI 兼容接口，支持工具调用与长文本方案生成',
+    apiModel: 'qwen-plus',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    apiKeyEnv: 'DASHSCOPE_API_KEY',
+    reasoning: false,
+  },
+  {
+    name: '豆包 Doubao-Pro（火山方舟）',
+    provider: '豆包',
+    tag: '火山引擎',
+    cost: 1,
+    description: '字节跳动火山方舟 OpenAI 兼容接口（可将模型名替换为你的推理接入点 ep-xxxx）',
+    apiModel: 'doubao-1-5-pro-32k-250115',
+    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+    apiKeyEnv: 'ARK_API_KEY',
+    reasoning: false,
+  },
+  {
+    name: 'Kimi（月之暗面 Moonshot）',
+    provider: 'Kimi',
+    tag: '长上下文',
+    cost: 1,
+    description: 'Moonshot OpenAI 兼容接口，适合超长清单与方案文档分析',
+    apiModel: 'kimi-k2-0711-preview',
+    baseUrl: 'https://api.moonshot.cn/v1',
+    apiKeyEnv: 'MOONSHOT_API_KEY',
+    reasoning: false,
+  },
+]
+
+const cleanStr = (v: unknown, max: number, fallback = '') =>
+  typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : fallback
+
+/** 解析并校验后台保存的 AI 模型列表；为空时回退到默认模型。 */
+export function parseAiModels(value: unknown): AiModelConfig[] {
+  if (!Array.isArray(value) || value.length === 0) return DEFAULT_AI_MODELS.map((m) => ({ ...m }))
+  const out: AiModelConfig[] = []
+  const seen = new Set<string>()
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') continue
+    const r = raw as Record<string, unknown>
+    const id = cleanStr(r.id, 60).replace(/[^a-zA-Z0-9._:-]/g, '-')
+    const name = cleanStr(r.name, 80)
+    const apiModel = cleanStr(r.apiModel, 120, id)
+    const baseUrl = cleanStr(r.baseUrl, 240, 'https://api.deepseek.com')
+    const apiKeyEnv = cleanStr(r.apiKeyEnv, 80, 'DEEPSEEK_API_KEY').replace(/[^a-zA-Z0-9_]/g, '')
+    if (!id || !name || !apiModel || !baseUrl || !apiKeyEnv || seen.has(id)) continue
+    seen.add(id)
+    const costNum = Number(r.cost)
+    out.push({
+      id,
+      name,
+      provider: cleanStr(r.provider, 40, 'OpenAI 兼容'),
+      tag: cleanStr(r.tag, 40, '工具调用'),
+      cost: Number.isInteger(costNum) && costNum >= 0 && costNum <= 100 ? costNum : 1,
+      description: cleanStr(r.description, 200, `${name}（${apiModel}）`),
+      reasoning: Boolean(r.reasoning),
+      apiModel,
+      baseUrl,
+      apiKeyEnv,
+      enabled: r.enabled !== false,
+      isDefault: Boolean(r.isDefault),
+    })
+  }
+  if (out.length === 0) return DEFAULT_AI_MODELS.map((m) => ({ ...m }))
+  if (!out.some((m) => m.enabled)) out[0].enabled = true
+  if (!out.some((m) => m.enabled && m.isDefault)) {
+    const firstEnabled = out.find((m) => m.enabled) ?? out[0]
+    firstEnabled.isDefault = true
+  }
+  return out
+}
+
+/** 获取当前已启用且排好序的模型（默认模型排第一）。 */
+export function enabledAiModels(models: AiModelConfig[]): AiModelConfig[] {
+  const active = models.filter((m) => m.enabled)
+  const list = active.length ? active : [models[0] ?? DEFAULT_AI_MODELS[0]]
+  return [...list].sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0))
+}
 
 export type AiTemplateVariable = {
   key: string

@@ -75,5 +75,12 @@ export const CompanySettings: GlobalConfig = {
       },
       admin: { description: '在系统「设置 → 插件」里修改' },
     },
+    {
+      // 多 AI 模型与网关配置（支持官方 API 与 NewAPI / OneAPI 聚合网关）
+      name: 'aiModels',
+      label: 'AI 模型与接口配置',
+      type: 'json',
+      admin: { description: '在系统「设置 → AI 模型与接口」里可视化添加、启停和切换多个 AI 模型（支持官方 API 与 NewAPI 聚合网关）' },
+    },
   ],
 }
