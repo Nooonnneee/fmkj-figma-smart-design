@@ -5,6 +5,7 @@ import * as migration_20261031_061256_latest_feature_sync from './20261031_06125
 import * as migration_20261031_065532_ai_admin_sync from './20261031_065532_ai_admin_sync';
 import * as migration_20261031_114930_personal_profile_demo from './20261031_114930_personal_profile_demo';
 import * as migration_20261031_161835_membership_codes from './20261031_161835_membership_codes';
+import * as migration_20261101_172228_ai_settings_sync from './20261101_172228_ai_settings_sync';
 
 export const migrations = [
   {
@@ -40,6 +41,11 @@ export const migrations = [
   {
     up: migration_20261031_161835_membership_codes.up,
     down: migration_20261031_161835_membership_codes.down,
-    name: '20261031_161835_membership_codes'
+    name: '20261031_161835_membership_codes',
+  },
+  {
+    up: migration_20261101_172228_ai_settings_sync.up,
+    down: migration_20261101_172228_ai_settings_sync.down,
+    name: '20261101_172228_ai_settings_sync'
   },
 ];

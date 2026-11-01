@@ -19,6 +19,7 @@ import { ItalicFeatureClient as ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0
 import { HeadingFeatureClient as HeadingFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { ParagraphFeatureClient as ParagraphFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { LLMInstructionsCell as LLMInstructionsCell_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
+import { AiModelFetcher as AiModelFetcher_fc5f7900ec34416f7d6ca97a05017e06 } from '@/components/admin/ai-model-fetcher'
 import { FigmaAvatar as FigmaAvatar_5b632879807206965a35b58cd5166e1c } from '@payloadcms/figma/client'
 import { DefaultLoginButton as DefaultLoginButton_5b632879807206965a35b58cd5166e1c } from '@payloadcms/figma/client'
 import { FigmaCloudLimitProvider as FigmaCloudLimitProvider_5b632879807206965a35b58cd5166e1c } from '@payloadcms/figma/client'
@@ -58,6 +59,7 @@ export const importMap = {
   "@payloadcms/richtext-lexical/client#HeadingFeatureClient": HeadingFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@payloadcms/richtext-lexical/client#ParagraphFeatureClient": ParagraphFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@payloadcms/ui/rsc#LLMInstructionsCell": LLMInstructionsCell_ab83ff7e88da8d3530831f296ec4756a,
+  "@/components/admin/ai-model-fetcher#AiModelFetcher": AiModelFetcher_fc5f7900ec34416f7d6ca97a05017e06,
   "@payloadcms/figma/client#FigmaAvatar": FigmaAvatar_5b632879807206965a35b58cd5166e1c,
   "@payloadcms/figma/client#DefaultLoginButton": DefaultLoginButton_5b632879807206965a35b58cd5166e1c,
   "@payloadcms/figma/client#FigmaCloudLimitProvider": FigmaCloudLimitProvider_5b632879807206965a35b58cd5166e1c,

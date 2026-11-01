@@ -4,7 +4,7 @@ import { deviceTypeOf } from '@/lib/device-types'
 import { memoize } from '@/lib/memo-cache'
 import { getPayloadClient } from '@/lib/payload'
 import type { Brand, Category, Media, Product } from '@/payload-types'
-import { parseAiModels, type AiModelConfig } from '@/plugins/ai-copilot/templates'
+import { parseAiModels, parseCustomChannels, type AiModelConfig } from '@/plugins/ai-copilot/templates'
 
 /**
  * 很少变动的共享数据，缓存在服务端进程内，写入时由集合 hook 立即清除。
@@ -206,13 +206,18 @@ function parseDocumentDefaults(value: unknown): CompanyInfo['documentDefaults'] 
 }
 
 const getBaseCompanyInfo = memoize(
-  'company-settings-v6',
+  'company-settings-v7',
   [CACHE_TAGS.company],
   TTL,
   async (): Promise<CompanyInfo> => {
     const payload = await getPayloadClient()
-    const s = await payload.findGlobal({ slug: 'company-settings', depth: 1, overrideAccess: true })
-    const rawAiModels = (s as unknown as { aiModels?: unknown }).aiModels
+    const [s, ai] = await Promise.all([
+      payload.findGlobal({ slug: 'company-settings', depth: 1, overrideAccess: true }),
+      payload.findGlobal({ slug: 'ai-settings', depth: 0, overrideAccess: true }).catch(() => null),
+    ])
+    // 优先读「AI 设置」；尚未配置时沿用旧位置（抬头与默认内容）里的模型
+    const newAiModels = (ai as unknown as { aiModels?: unknown } | null)?.aiModels
+    const rawAiModels = Array.isArray(newAiModels) && newAiModels.length ? newAiModels : (s as unknown as { aiModels?: unknown }).aiModels
     const logo = s.logo && typeof s.logo === 'object' ? (s.logo as Media) : null
     const qr = s.qrCode && typeof s.qrCode === 'object' ? (s.qrCode as Media) : null
     const logoUrl = resolveMediaUrl(logo)
@@ -229,7 +234,7 @@ const getBaseCompanyInfo = memoize(
       printProductImages: s.printProductImages !== false,
       documentDefaults: parseDocumentDefaults(s.documentDefaults),
       disabledPlugins: Array.isArray(s.disabledPlugins) ? s.disabledPlugins.filter((v): v is string => typeof v === 'string') : [],
-      aiModels: parseAiModels(rawAiModels),
+      aiModels: parseAiModels(rawAiModels, parseCustomChannels((ai as unknown as { customChannels?: unknown } | null)?.customChannels)),
       logo: logo && logoUrl ? { url: logoUrl, alt: logo.alt || s.name, width: logo.width ?? null, height: logo.height ?? null } : null,
       qrCode: qr && qrUrl ? { url: qrUrl, alt: qr.alt || '二维码' } : null,
     }

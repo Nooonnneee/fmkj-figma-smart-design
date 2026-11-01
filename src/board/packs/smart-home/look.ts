@@ -3,6 +3,7 @@ import type { SizeCm, SymbolObj } from '@/board/core/types'
 import { categoryOfType, deviceTypeOf, isDeviceType } from '@/lib/device-types'
 import { markerUrl } from '@/lib/point-markers'
 
+import { POINT_ICON_GEOM, POINT_ICON_VERSION } from './point-icons.generated'
 import { LIGHTING_FAMILIES, SYMBOL_ASSET_PAD, SYMBOL_ASSET_VERSION, SYMBOL_ASSETS, type LightingFamilyDef } from './symbols.generated'
 
 const BASE = '/board/symbols/smart-home'
@@ -11,6 +12,13 @@ export function artOf(key: string): SymbolArt | null {
   const a = SYMBOL_ASSETS[key]
   if (!a) return null
   return { src: `${BASE}/${key}.png?v=${SYMBOL_ASSET_VERSION}`, srcSm: `${BASE}/${key}.sm.png?v=${SYMBOL_ASSET_VERSION}`, gw: a.gw, gh: a.gh, pad: SYMBOL_ASSET_PAD }
+}
+
+/** 最终确定的点位图标（scripts/point-icons/mapping.json）：画板、面板、导出共用 */
+export function pointIconArt(type: string): SymbolArt | null {
+  const g = POINT_ICON_GEOM[type]
+  if (!g) return null
+  return { src: `/point-icons/${type}.png?v=${POINT_ICON_VERSION}`, srcSm: `/point-icons/${type}.sm.png?v=${POINT_ICON_VERSION}`, gw: g.gw, gh: g.gh, pad: SYMBOL_ASSET_PAD }
 }
 
 export type LightingVariant = { id: string; art: string; sizeCm: SizeCm | null; label: string; family: LightingFamily }
@@ -49,13 +57,15 @@ export const defaultVariant = (f: LightingFamily) => f.variants[Math.floor((f.va
 
 export function deviceLook(deviceType: string): SymbolLook {
   const t = deviceTypeOf(deviceType) ?? deviceTypeOf('other')!
+  // 有按设备类型单独挑选的图形（如单开 / 双开 / 三开 / 四开）就用它，否则用共用的符号
+  const own = pointIconArt(t.value) ?? artOf(t.value)
   return {
     key: t.value,
     name: t.name,
     color: categoryOfType(t.value)?.color ?? '#525252',
-    art: artOf(t.symbol),
-    marker: markerUrl(t.value),
-    badge: t.keys && t.keys > 1 ? String(t.keys) : undefined,
+    art: own ?? artOf(t.symbol),
+    marker: pointIconArt(t.value)?.src ?? markerUrl(t.value),
+    badge: !own && t.keys && t.keys > 1 ? String(t.keys) : undefined,
   }
 }
 

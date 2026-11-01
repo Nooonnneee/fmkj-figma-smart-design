@@ -40,7 +40,7 @@ const half = Math.ceil(LANDING_BRANDS.length / 2)
 const ROW_A = LANDING_BRANDS.slice(0, half)
 const ROW_B = LANDING_BRANDS.slice(half)
 
-/** 四行无缝滚动：品牌 → 平台 → 协议 → 品牌，方向交替。悬停暂停，品牌悬停显示原色。 */
+/** 四行无缝滚动：品牌 → 平台 → 协议 → 品牌，方向交替，悬停暂停。图标始终显示官方原色。 */
 export function LogoMarquee() {
   return (
     <section aria-labelledby="ecosystem-title" className="relative py-14 sm:py-18">
@@ -99,32 +99,24 @@ function LogoChip({ brand, hidden, duplicate }: { brand: LandingBrand; hidden: b
     <li
       aria-hidden={silent || undefined}
       className={cn(
-        'group/logo relative flex h-16 w-40 shrink-0 items-center justify-center rounded-2xl border border-border bg-card/40 px-6 transition-colors duration-300 hover:border-transparent hover:bg-foreground',
+        'relative flex h-16 w-40 shrink-0 items-center justify-center rounded-2xl bg-white px-6 shadow-sm ring-1 ring-black/5',
         duplicate && 'motion-reduce:hidden',
       )}
     >
       <Image
-        src={brandSrc(brand.slug, 'mono')}
+        src={brandSrc(brand.slug, 'color')}
         alt={silent ? '' : brand.name}
         title={brand.name}
         width={brand.width}
         height={brand.height}
         unoptimized
-        className={cn(height, 'w-auto max-w-28 object-contain opacity-70 transition-opacity duration-300 group-hover/logo:opacity-0')}
-      />
-      <Image
-        src={brandSrc(brand.slug, 'color')}
-        alt=""
-        width={brand.width}
-        height={brand.height}
-        unoptimized
-        className={cn(height, 'absolute top-1/2 left-1/2 w-auto max-w-28 -translate-x-1/2 -translate-y-1/2 object-contain opacity-0 transition-opacity duration-300 group-hover/logo:opacity-100')}
+        className={cn(height, 'w-auto max-w-28 object-contain')}
       />
     </li>
   )
 }
 
-/** 与品牌卡片同一样式：默认单色（白色剪影），悬停切换到浅底并显示原色 */
+/** 与品牌卡片同一样式：浅底卡片 + 官方原色图标 */
 function EcoSet({ items, hidden }: { items: EcoItem[]; hidden: boolean }) {
   return items.map(({ name, logo, w, h }) => {
     const ratio = w / h
@@ -133,7 +125,7 @@ function EcoSet({ items, hidden }: { items: EcoItem[]; hidden: boolean }) {
       <li
         key={name}
         aria-hidden={hidden || undefined}
-        className="group/logo relative flex h-16 w-40 shrink-0 items-center justify-center rounded-2xl border border-border bg-card/40 px-6 transition-colors duration-300 hover:border-transparent hover:bg-foreground"
+        className="relative flex h-16 w-40 shrink-0 items-center justify-center rounded-2xl bg-white px-6 shadow-sm ring-1 ring-black/5"
       >
         <Image
           src={`/ecosystem/${logo}`}
@@ -142,7 +134,7 @@ function EcoSet({ items, hidden }: { items: EcoItem[]; hidden: boolean }) {
           width={w}
           height={h}
           unoptimized
-          className={cn(height, 'w-auto max-w-28 object-contain opacity-70 brightness-0 invert transition-[opacity,filter] duration-300 group-hover/logo:opacity-100 group-hover/logo:filter-none')}
+          className={cn(height, 'w-auto max-w-28 object-contain')}
         />
       </li>
     )

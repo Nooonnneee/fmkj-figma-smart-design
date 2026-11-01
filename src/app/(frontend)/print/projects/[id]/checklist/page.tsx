@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 
 import { PlanFigure } from '@/components/plan-figure'
+import { PlanLegend } from '@/components/plan-legend'
 import { PointMarker } from '@/components/point-marker'
 import { PrintToolbar } from '@/components/print-toolbar'
 import { DocArticle, DocCheckbox, DocFacts, DocFooter, DocHeader, DocRoot, DocSectionHeading, DocSignatures, DocTitle, docTable } from '@/documents/parts'
@@ -164,6 +165,11 @@ export default async function ChecklistPrintPage({
                           .map((a) => ({ id: a.id, name: a.name, x0: (a.x - sheet.x) / sheet.width, y0: (a.y - sheet.y) / sheet.height, x1: (a.x + a.width - sheet.x) / sheet.width, y1: (a.y + a.height - sheet.y) / sheet.height }))}
                         className="w-full"
                       />
+                    </div>
+                  ) : null}
+                  {sheet ? (
+                    <div data-pdf-block className="mb-3 break-inside-avoid">
+                      <PlanLegend points={g.points} />
                     </div>
                   ) : null}
                   <table className="w-full border-collapse text-[11px]">

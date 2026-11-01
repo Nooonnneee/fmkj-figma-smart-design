@@ -104,6 +104,7 @@ export const DEVICE_TYPES = [
   { value: 'touch-panel', name: '中控屏', category: 'gateway', symbol: 'touch-panel', keywords: /中控屏|妙控屏|智能面板|缤纷面板|触控屏|智能屏/ },
   { value: 'gateway', name: '智能网关', category: 'gateway', symbol: 'hub', keywords: /网关|中控/ },
   { value: 'ac-router', name: 'AC 路由', category: 'network', symbol: 'router', keywords: /路由|AC控制器|ac 路由/i },
+  { value: 'ceiling-ap', name: '吸顶AP', category: 'network', symbol: 'mesh', keywords: /吸顶 ?AP|吸顶式 ?AP|天花 ?AP/i },
   { value: 'ap-node', name: 'AP 节点', category: 'network', symbol: 'mesh', keywords: /\bAP\b|mesh|面板 ?AP/i },
   { value: 'network-panel', name: '网络面板', category: 'network', symbol: 'data', keywords: /网络面板|网口|信息面板/ },
   { value: 'vrf-controller', name: 'VRF 控制器', category: 'vrf', symbol: 'ac-wall', keywords: /vrf|空调网关|多联机|中央空调/i },

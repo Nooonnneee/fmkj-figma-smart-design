@@ -20,7 +20,7 @@ export const PLUGINS: AppPlugin[] = [
   {
     id: 'doc-styles',
     name: '文档风格包',
-    description: '为报价单、点位图、合同和交底清单解锁 4 套扩展视觉风格。',
+    description: `为报价单、点位图、合同和交底清单解锁 ${PLUGIN_DOC_STYLES.length} 套扩展视觉风格（与方案模板配套）。`,
     status: 'ready',
     where: '打印页顶部「风格」切换、设置 → 文档模板',
     provides: PLUGIN_DOC_STYLES.map((s) => s.name),

@@ -810,10 +810,12 @@ export function PointMapEditor({
   const analysis = useMemo(() => (plugins.roomInsights ? analyzeAreas(snap.areas, scopedPoints) : new Map()), [plugins.roomInsights, snap.areas, scopedPoints])
   const unassigned = scopedPoints.filter((p) => !p.areaId).length
   const issues: CheckIssue[] = useMemo(() => pack.check(doc), [doc])
+  // 灯具统一在「灯光设计」里放（按款式和尺寸），智能设备不再重复列出
   const filteredGroups = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return DEVICE_GROUPS
-    return DEVICE_GROUPS.map((g) => ({
+    const groups = DEVICE_GROUPS.filter((g) => g.category.slug !== 'lighting')
+    if (!q) return groups
+    return groups.map((g) => ({
       ...g,
       types: g.types.filter((t) => `${g.category.name}${t.name}`.toLowerCase().includes(q) || (activeByType.get(t.value) ?? []).some((p) => `${p.name} ${p.sku} ${p.brand}`.toLowerCase().includes(q))),
     })).filter((g) => g.types.length)
