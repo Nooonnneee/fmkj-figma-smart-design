@@ -7,7 +7,7 @@ export function BrandLogo({ name, logo, className }: { name: string; logo: strin
     return <img src={logo} alt={name} className={cn('h-4 w-auto max-w-16 object-contain', className)} loading="lazy" />
   }
   return (
-    <span className={cn('flex h-4 min-w-4 items-center justify-center rounded bg-muted px-1 text-[10px] font-semibold text-muted-foreground', className)} aria-hidden>
+    <span className={cn('flex h-4 min-w-4 items-center justify-center rounded bg-muted px-1 text-xs font-semibold text-muted-foreground', className)} aria-hidden>
       {name.slice(0, 1)}
     </span>
   )

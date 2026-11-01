@@ -13,7 +13,6 @@ export function SectionEyebrow({ children, className }: { children: React.ReactN
 /** 分区标题：眉标 + 大标题 + 说明 */
 export function SectionHeading({
   id,
-  eyebrow,
   title,
   description,
   align = 'center',
@@ -28,11 +27,10 @@ export function SectionHeading({
 }) {
   return (
     <div className={cn('max-w-3xl', align === 'center' && 'mx-auto text-center', className)}>
-      {eyebrow ? <SectionEyebrow>{eyebrow}</SectionEyebrow> : null}
-      <h2 id={id} className="mt-5 text-3xl font-semibold tracking-tight text-balance sm:text-4xl lg:text-5xl">
+      <h2 id={id} className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl lg:text-5xl">
         {title}
       </h2>
-      {description ? <p className="mt-5 text-base text-pretty text-muted-foreground sm:text-lg">{description}</p> : null}
+      {description ? <p className="mt-4 text-base text-balance text-muted-foreground sm:text-lg">{description}</p> : null}
     </div>
   )
 }

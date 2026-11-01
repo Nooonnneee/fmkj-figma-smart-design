@@ -1,3 +1,4 @@
+import type { TokenUsage } from './billing'
 /**
  * AI 对话的服务端部分：调用 DeepSeek（OpenAI 兼容接口）、把系统全流程与插件包装成模型可调用的工具。
  * 只在服务端（路由处理函数）里使用，密钥只从 process.env.DEEPSEEK_API_KEY 读取。
@@ -32,6 +33,7 @@ import { loadProjectDocs } from '@/lib/project-docs'
 import { DEFAULT_PLATFORM, isProjectPlatform, PROJECT_PLATFORMS } from '@/lib/projects'
 import { QUOTE_STATUSES, type QuoteStatus } from '@/lib/quotes'
 import { parsePointImport, planToElements, resolveDeviceType } from '@/plugins/ai-import/point-import'
+import { CAMERA_PER_FLOOR, DESIGN_RULE_TEXT, isDrawingOnlyType, isSpeakerArea, NEEDS_SWITCH_TYPES, ONE_PER_AREA_TYPES, VRF_PER_FLOOR } from '@/lib/design-rules'
 import { autoSelectProducts, isSelectionTier, SELECTION_TIERS } from '@/plugins/smart-select/auto-select'
 import type { PluginFlags } from '@/plugins/state'
 import type { Project, User } from '@/payload-types'
@@ -204,11 +206,12 @@ async function post(modelOrId: AiModelConfig | string, body: Record<string, unkn
 /** 不流式的一次调用（用于判断是否需要调用工具）。 */
 export async function complete(model: AiModelConfig | string, messages: LlmMessage[], tools?: unknown[]) {
   const res = await post(model, { messages, ...(tools?.length ? { tools } : {}), stream: false }, 60_000)
-  const json = (await res.json()) as { choices?: { message?: { content?: string | null; tool_calls?: LlmToolCall[] } }[] }
-  const msg = json.choices?.[0]?.message ?? { content: '' }
+  const json = (await res.json()) as { choices?: { message?: { content?: string | null; tool_calls?: LlmToolCall[] } }[]; usage?: TokenUsage }
+  const msg: { content?: string | null; tool_calls?: LlmToolCall[]; usage?: TokenUsage } = json.choices?.[0]?.message ?? { content: '' }
   if (typeof msg.content === 'string') {
     msg.content = stripDsml(msg.content)
   }
+  msg.usage = json.usage
   return msg
 }
 
@@ -219,8 +222,10 @@ export async function stream(
   onDelta: (text: string) => void,
   onReasoning: (text: string) => void,
   signal?: AbortSignal,
+  onUsage?: (usage: TokenUsage) => void,
 ) {
-  const res = await post(model, { messages, stream: true }, 120_000)
+  // include_usage：让 OpenAI 兼容接口在最后一个分片返回 tokens 用量，用于按量计费
+  const res = await post(model, { messages, stream: true, stream_options: { include_usage: true } }, 120_000)
   const reader = res.body!.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
@@ -239,7 +244,9 @@ export async function stream(
       const data = line.trim().replace(/^data:\s*/, '')
       if (!data || data === '[DONE]' || !line.trim().startsWith('data:')) continue
       try {
-        const delta = (JSON.parse(data) as { choices?: { delta?: { content?: string; reasoning_content?: string } }[] }).choices?.[0]?.delta
+        const chunk = JSON.parse(data) as { choices?: { delta?: { content?: string; reasoning_content?: string } }[]; usage?: TokenUsage | null }
+        if (chunk.usage) onUsage?.(chunk.usage)
+        const delta = chunk.choices?.[0]?.delta
         if (delta?.reasoning_content) onReasoning(delta.reasoning_content)
         if (delta?.content) {
           full += delta.content
@@ -713,7 +720,7 @@ const TOOLS: AiTool[] = [
       function: {
         name: 'setup_rooms_and_points',
         description:
-          '仅用于【没有上传户型图】的纯文字需求项目，在空白示意图上创建房间框和设备点位。如果项目已经上传了真实户型图（非空白图），严禁调用此工具生成网格默认点位！',
+          '仅用于【没有上传户型图】的纯文字需求项目，在空白示意图上创建房间框和设备点位。只布置 WiFi AP、网络面板、窗帘电轨、网关、中控屏、VRF 控制器、人体传感器、音箱、摄像头；开关、插座、灯具没有图纸准确点位时不生成。VRF 控制器每层 1 个放客厅；中控屏需对照开关点位（空白图不放）；音箱只放客厅、书房；摄像头只放客厅和入户门口各 1 个。如果项目已经上传了真实户型图（非空白图），严禁调用此工具生成网格默认点位！',
         parameters: {
           type: 'object',
           properties: {
@@ -811,6 +818,9 @@ const TOOLS: AiTool[] = [
 
       let addedAreas = 0
       let addedPoints = 0
+      let ruleSkipped = 0
+      let vrfCount = 0
+      let cameraCount = 0
       for (const [idx, r] of rawRooms.entries()) {
         const rName = typeof r.name === 'string' && r.name.trim() ? r.name.trim().slice(0, 30) : `房间 ${idx + 1}`
         const rType = isAreaType(r.type) ? r.type : inferAreaType(rName)
@@ -827,7 +837,23 @@ const TOOLS: AiTool[] = [
         for (const d of devs) {
           const dt = resolveDeviceType(d.deviceType ?? d.type) ?? (isDeviceType(d.deviceType) ? String(d.deviceType) : null)
           if (!dt) continue
-          const c = Math.min(20, Math.max(1, Math.round(Number(d.count) || 1)))
+          // 设计规范：没有图纸就没有准确的开关 / 灯光点位，这类设备不生成
+          // 空白图没有开关点位：中控屏不加入；音箱只放客厅、书房
+          if (isDrawingOnlyType(dt) || NEEDS_SWITCH_TYPES.has(dt) || (dt === 'speaker' && !isSpeakerArea(typeof r.type === 'string' ? r.type : null, typeof r.name === 'string' ? r.name : ''))) {
+            ruleSkipped++
+            continue
+          }
+          let c = Math.min(20, Math.max(1, Math.round(Number(d.count) || 1)))
+          // 数量规范：VRF 每层 1 个、摄像头每层 2 个、音箱 / 中控屏每个区域只放一种一个
+          if (dt === 'vrf-controller') c = Math.min(c, VRF_PER_FLOOR - vrfCount)
+          if (dt === 'camera') c = Math.min(c, CAMERA_PER_FLOOR - cameraCount)
+          if (ONE_PER_AREA_TYPES.has(dt)) c = flatTypes.some((t) => ONE_PER_AREA_TYPES.has(t)) ? 0 : 1
+          if (c <= 0) {
+            ruleSkipped++
+            continue
+          }
+          if (dt === 'vrf-controller') vrfCount += c
+          if (dt === 'camera') cameraCount += c
           for (let i = 0; i < c; i++) flatTypes.push(dt)
         }
         if (!flatTypes.length) continue
@@ -863,8 +889,9 @@ const TOOLS: AiTool[] = [
           addedAreas,
           addedPoints,
           totalPoints: ctx.project?.points.length ?? addedPoints,
+          ...(ruleSkipped ? { skippedDrawingOnly: ruleSkipped, rule: DESIGN_RULE_TEXT } : {}),
         },
-        summary: `已布置 ${addedAreas} 个房间、${addedPoints} 个点位`,
+        summary: `已布置 ${addedAreas} 个房间、${addedPoints} 个点位${ruleSkipped ? `（按设计规范跳过 ${ruleSkipped} 项）` : ''}`,
         href: `/projects/${ctx.projectId}/point-map`,
         hrefLabel: '查看点位图',
       }

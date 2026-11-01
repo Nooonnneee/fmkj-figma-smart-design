@@ -5,9 +5,7 @@ import { usePathname } from "next/navigation"
 import {
   Blocks,
   Bot,
-  ChevronRight,
   ChevronsUpDown,
-  Coins,
   Crown,
   FolderKanban,
   LayoutGrid,
@@ -55,6 +53,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { APP_NAME, APP_TAGLINE } from "@/lib/brand"
 import type { PluginId } from "@/plugins/types"
+import { isDemoProjectName, projectDisplayName, projectInitial } from "@/lib/project-name"
 
 export type SidebarUser = { name: string; email: string; membershipBadge?: string }
 export type SidebarBrand = { name: string; logo: string | null }
@@ -240,9 +239,10 @@ export function AppSidebar({
                       <SidebarMenuButton asChild size="sm" isActive={isActive(`/projects/${p.id}`)} className="text-sidebar-foreground/80">
                         <GuardedLink href={`/projects/${p.id}`}>
                           <span aria-hidden className="flex size-4 shrink-0 items-center justify-center rounded-sm bg-sidebar-accent text-xs font-semibold text-sidebar-accent-foreground">
-                            {p.name.trim().slice(0, 1) || "项"}
+                            {projectInitial(p.name)}
                           </span>
-                          <span className="truncate">{p.name}</span>
+                          <span className="truncate">{projectDisplayName(p.name)}</span>
+                          {isDemoProjectName(p.name) ? <span className="ml-auto shrink-0 text-[0.6875rem] text-muted-foreground">示例</span> : null}
                         </GuardedLink>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -262,21 +262,6 @@ export function AppSidebar({
           </SidebarContent>
 
           <SidebarFooter>
-            {/* 积分余额：一眼可见，点击去充值 / 升级 */}
-            <GuardedLink
-              href="/membership"
-              className="group/credits flex items-center gap-3 rounded-lg border border-sidebar-border bg-sidebar-accent/50 px-3 py-2 transition-colors hover:bg-sidebar-accent group-data-[collapsible=icon]:hidden"
-            >
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary/10 text-sidebar-primary">
-                <Coins className="size-4" />
-              </span>
-              <span className="grid min-w-0 flex-1 leading-tight">
-                <span className="truncate text-sm font-medium tabular-nums">{ai.credits.toLocaleString("zh-CN")} 积分</span>
-                <span className="truncate text-xs text-muted-foreground">{user.membershipBadge ?? "体验版"} · 充值或升级</span>
-              </span>
-              <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover/credits:translate-x-0.5" />
-            </GuardedLink>
-
             <SidebarMenu>
               <SidebarMenuItem>
                 <DropdownMenu>
@@ -298,7 +283,9 @@ export function AppSidebar({
                             </Badge>
                           ) : null}
                         </span>
-                        <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+                        <span className="truncate text-xs text-muted-foreground tabular-nums">
+                          {ai.credits.toLocaleString("zh-CN")} 积分
+                        </span>
                       </div>
                       <ChevronsUpDown className="ml-auto size-4" />
                     </SidebarMenuButton>

@@ -175,7 +175,11 @@ export function QuoteEditor({
 
   const activeProducts = useMemo(() => products.filter((p) => p.status === 'active'), [products])
   const catalogPriceById = useMemo(() => new Map(products.map((p) => [p.id, p.price])), [products])
-  const catalogPriceOf = (productId: string | null) => (productId ? catalogPriceById.get(productId) : undefined)
+  // 产品库未定价（0 元）时没有可参照的原价，不提示「已改价」
+  const catalogPriceOf = (productId: string | null) => {
+    const price = productId ? catalogPriceById.get(productId) : undefined
+    return price && price > 0 ? price : undefined
+  }
   const pickerGroups = useMemo(
     () =>
       DEVICE_TYPE_ORDER.map((t) => ({ type: t, items: activeProducts.filter((p) => p.deviceType === t) }))
@@ -374,7 +378,6 @@ export function QuoteEditor({
         <div className="grid gap-2">
           <Label htmlFor="title">报价名称</Label>
           <Input id="title" value={quote.title} disabled={readOnly} onChange={(e) => update({ title: e.target.value })} className="text-base font-semibold" />
-          <p className="text-xs text-muted-foreground">{[project.name, project.customerName && `客户 ${project.customerName}`].filter(Boolean).join(' · ')}</p>
         </div>
         <div className="grid gap-2">
           <Label htmlFor="status">状态</Label>
@@ -394,10 +397,7 @@ export function QuoteEditor({
         </p>
       ) : !contract && !readOnly && quote.status === 'accepted' ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/40 px-4 py-3">
-          <div className="text-sm">
-            <div className="font-medium">客户已确认这份报价</div>
-            <div className="text-muted-foreground">下一步：用它生成合同，金额、客户信息和付款方式会自动带入。</div>
-          </div>
+          <span className="text-sm font-medium">客户已确认此报价，可直接生成合同</span>
           <Button size="sm" disabled={creatingContract || saving} onClick={() => void generateContract()}>
             {creatingContract ? <Loader2 className="size-4 animate-spin" /> : <FileSignature className="size-4" />}生成合同<ArrowRight className="size-4" />
           </Button>
@@ -405,15 +405,12 @@ export function QuoteEditor({
       ) : null}
 
       {pendingPoints ? (
-        <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
-          <div>
-            <div className="font-medium">点位图中有 {pendingPoints} 个点位待选型，未计入本报价</div>
-            <div className="text-muted-foreground">
-              可回到点位图给这些点位指定产品，或在「统计与默认型号」里设置项目默认型号后重新生成；也可以直接在下方「添加产品」。
-              <button type="button" className="ml-1 underline underline-offset-2" onClick={() => switchToPointMap()}>打开点位图</button>
-            </div>
-          </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning/40 bg-warning/10 px-4 py-2.5 text-sm">
+          <span className="flex items-center gap-2">
+            <AlertTriangle className="size-4 shrink-0 text-warning" />
+            <span>点位图中有 {pendingPoints} 个点位尚未匹配型号，未计入本报价</span>
+          </span>
+          <button type="button" className="text-xs font-medium underline underline-offset-2" onClick={() => switchToPointMap()}>去点位图查看</button>
         </div>
       ) : null}
 
@@ -433,7 +430,7 @@ export function QuoteEditor({
                     className={cn('h-7 rounded-md px-2.5 text-xs', viewMode === 'floors' && 'bg-background shadow-sm')}
                     onClick={() => setViewMode('floors')}
                   >
-                    <Layers className="size-3.5" />按楼层房间（{floorGroups.length} 层 / {floorGroups.reduce((s, f) => s + f.rooms.length, 0)} 间）
+                    <Layers className="size-3.5" />按房间（{floorGroups.reduce((s, f) => s + f.rooms.length, 0)}）
                   </Button>
                   <Button
                     type="button"
@@ -451,9 +448,9 @@ export function QuoteEditor({
                   <div className="flex rounded-lg bg-muted p-0.5" role="radiogroup" aria-label="点位图显示">
                     {(
                       [
-                        ['symbol', '点位图：设备图标'],
-                        ['product', '点位图：产品图'],
-                        ['hide', '收起点位图'],
+                        ['symbol', '设备图标'],
+                        ['product', '产品图'],
+                        ['hide', '隐藏图纸'],
                       ] as const
                     ).map(([v, label]) => (
                       <Button
@@ -563,9 +560,10 @@ export function QuoteEditor({
                       />
                     </div>
                   ) : null}
-                  <div className="grid gap-3 md:grid-cols-2">
+                  {/* 瀑布流两列：房间卡片高度差别大，网格会留下大块空白 */}
+                  <div className="gap-3 md:columns-2">
                     {floor.rooms.map((room) => (
-                      <div key={room.id} className="flex flex-col rounded-xl border bg-background p-3.5">
+                      <div key={room.id} className="mb-3 flex break-inside-avoid flex-col rounded-xl border bg-background p-3.5">
                         <div className="mb-2.5 flex items-baseline justify-between border-b pb-2">
                           <div className="flex flex-wrap items-baseline gap-1.5">
                             <span className="text-sm font-semibold">{room.name}</span>
@@ -595,7 +593,7 @@ export function QuoteEditor({
                                       <span>{line.typeName}</span>
                                       {line.sku ? <span>· {line.sku}</span> : null}
                                       {line.codes.length ? (
-                                        <span className="inline-flex flex-wrap items-center gap-1 font-mono text-[11px]">
+                                        <span className="inline-flex flex-wrap items-center gap-1 font-mono text-xs">
                                           （
                                           {line.codes.map((code, idx) => (
                                             <span key={code}>
@@ -639,14 +637,14 @@ export function QuoteEditor({
                                   </div>
                                   <div className="text-sm font-semibold sm:order-1">{yuan(line.subtotal)}</div>
                                   {priceChanged && line.lineKey ? (
-                                    <div className="mt-0.5 flex w-full items-center justify-end gap-1 text-[11px] text-warning sm:order-3 sm:w-auto">
+                                    <div className="mt-0.5 flex w-full items-center justify-end gap-1 text-xs text-warning sm:order-3 sm:w-auto">
                                       <span>原价 {yuan(originPrice)}</span>
                                       {!readOnly ? (
                                         <Button
                                           type="button"
                                           variant="link"
                                           size="xs"
-                                          className="h-auto p-0 text-[11px]"
+                                          className="h-auto p-0 text-xs"
                                           onClick={() => updateLine(line.lineKey!, { price: originPrice })}
                                         >
                                           <RotateCcw className="size-2.5" />恢复
@@ -711,10 +709,10 @@ export function QuoteEditor({
                       const originPrice = catalogPriceOf(l.product)
                       if (originPrice === undefined || Math.abs(originPrice - l.price) <= 0.001) return null
                       return (
-                        <div className="flex items-center justify-end gap-1 pl-12 text-[11px] text-warning tabular-nums">
+                        <div className="flex items-center justify-end gap-1 pl-12 text-xs text-warning tabular-nums">
                           <span>原价 {yuan(originPrice)}</span>
                           {!readOnly ? (
-                            <Button type="button" variant="link" size="xs" className="h-auto p-0 text-[11px]" onClick={() => updateLine(l.key, { price: originPrice })}>
+                            <Button type="button" variant="link" size="xs" className="h-auto p-0 text-xs" onClick={() => updateLine(l.key, { price: originPrice })}>
                               <RotateCcw className="size-2.5" />恢复
                             </Button>
                           ) : null}
@@ -781,10 +779,10 @@ export function QuoteEditor({
                           const originPrice = catalogPriceOf(l.product)
                           if (originPrice === undefined || Math.abs(originPrice - l.price) <= 0.001) return null
                           return (
-                            <span className="flex items-center gap-1 text-[11px] text-warning tabular-nums">
+                            <span className="flex items-center gap-1 text-xs text-warning tabular-nums">
                               原价 {yuan(originPrice)}
                               {!readOnly ? (
-                                <Button type="button" variant="link" size="xs" className="h-auto p-0 text-[11px]" onClick={() => updateLine(l.key, { price: originPrice })}>
+                                <Button type="button" variant="link" size="xs" className="h-auto p-0 text-xs" onClick={() => updateLine(l.key, { price: originPrice })}>
                                   <RotateCcw className="size-2.5" />恢复
                                 </Button>
                               ) : null}
@@ -860,15 +858,14 @@ export function QuoteEditor({
             </div>
             {margin ? (
               <div className="mt-3 space-y-1.5 rounded-lg bg-muted/60 p-3">
-                <div className="text-xs font-medium text-muted-foreground">内部参考，不会打印</div>
-                <div className="flex justify-between"><span className="text-muted-foreground">产品成本</span><span className="tabular-nums">{yuan(margin.cost)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">内部成本（不打印）</span><span className="tabular-nums">{yuan(margin.cost)}</span></div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">毛利</span>
                   <span className={`font-semibold tabular-nums ${margin.profit < 0 ? 'text-destructive-strong' : 'text-success'}`}>
                     {yuan(margin.profit)}（{(margin.rate * 100).toFixed(1)}%）
                   </span>
                 </div>
-                {margin.missing ? <p className="text-xs text-warning">有 {margin.missing} 行产品未设置成本，毛利按 0 成本计算</p> : null}
+                {margin.missing ? <p className="text-xs text-warning">{margin.missing} 行未设置成本</p> : null}
               </div>
             ) : null}
           </CardContent>
@@ -876,7 +873,7 @@ export function QuoteEditor({
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor="notes">备注（会打印在报价单上）</Label>
+        <Label htmlFor="notes">报价备注</Label>
         <Textarea id="notes" rows={3} value={quote.notes} disabled={readOnly} placeholder="例如：报价有效期 30 天；含一年免费上门维护" onChange={(e) => update({ notes: e.target.value })} />
       </div>
     </section>

@@ -8,9 +8,9 @@ import { APP_DESCRIPTION, APP_NAME, APP_TAGLINE, COMPANY_NAME } from '@/lib/bran
 
 const NAV = [
   // 带上首页路径，品牌资源页等其他公开页面也能直接跳到首页对应板块
+  { label: '真实流程', href: '/#workflow' },
   { label: '点位图', href: '/#pointmap' },
   { label: '报价单', href: '/#quote' },
-  { label: '工作流', href: '/#workflow' },
   { label: '更多能力', href: '/#features' },
 ]
 

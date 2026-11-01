@@ -17,6 +17,7 @@ import { PROPOSAL_TEMPLATES } from '@/plugins/proposal/templates'
 import { getPluginFlags } from '@/plugins/state'
 
 import { PluginDetailToggle } from './plugin-detail-toggle'
+import { projectDisplayName } from '@/lib/project-name'
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -54,7 +55,7 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
   const activeAiModels = enabledAiModels(company.aiModels)
   const projects = projectsRes.docs.map((p) => ({
     id: String(p.id),
-    name: p.name,
+    name: projectDisplayName(p.name),
     customerName: p.customerName ?? null,
     platform: p.platform ?? null,
     points: p.pointCount ?? 0,
@@ -118,13 +119,13 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
                       <div key={tpl.id} className="rounded-lg border p-3">
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-sm font-medium">{tpl.name}</span>
-                          <Badge variant="outline" className="h-4 px-1.5 text-[10px]">
+                          <Badge variant="outline" className="h-4 px-1.5 text-xs">
                             {tpl.category}
                           </Badge>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">{tpl.description}</p>
-                        <div className="mt-1.5 text-[11px] text-muted-foreground tabular-nums">
-                          推荐模型：{m?.name}（{m?.cost} 积分/次）· 自动连接 {tpl.requiredPlugins.length} 个插件
+                        <div className="mt-1.5 text-xs text-muted-foreground tabular-nums">
+                          推荐：{m?.name} · 连接 {tpl.requiredPlugins.length} 个插件
                         </div>
                       </div>
                     )
@@ -133,15 +134,15 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
               </div>
 
               <div className="space-y-2 border-t pt-3">
-                <div className="text-xs font-medium text-muted-foreground">支持切换的模型与积分定价</div>
+                <div className="text-xs font-medium text-muted-foreground">可用模型</div>
                 <div className="grid gap-2 sm:grid-cols-3">
                   {activeAiModels.map((m) => (
                     <div key={m.id} className="rounded-lg border p-2.5 text-xs">
                       <div className="flex items-center justify-between font-medium">
                         <span>{m.name}</span>
-                        <span className="text-muted-foreground tabular-nums">{m.cost} 积分</span>
+                        <span className="text-muted-foreground tabular-nums">×{m.cost}</span>
                       </div>
-                      <div className="mt-0.5 text-[11px] text-muted-foreground">{m.tag}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">{m.tag}</div>
                     </div>
                   ))}
                 </div>
@@ -200,7 +201,7 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
           <div className="space-y-1">
             <p className="text-sm font-medium">「{plugin.name}」尚在待开发阶段</p>
             <p className="max-w-md text-xs text-muted-foreground">
-              该插件已纳入插件清单（规划能力：{plugin.provides.join('、')}），开发完成后可直接在此开启并接入主流程，不影响现有项目数据。
+              规划能力：{plugin.provides.join('、')}
             </p>
           </div>
           <div className="flex items-center gap-2 pt-1">

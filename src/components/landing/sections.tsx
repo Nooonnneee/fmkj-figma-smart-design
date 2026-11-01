@@ -1,15 +1,17 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, ClipboardCheck, FileSignature, Layers, MapPinned, Play, Receipt, ScanLine, SlidersHorizontal, Upload, type LucideIcon } from 'lucide-react'
+import { ArrowRight, Layers, MapPinned, Play, ScanLine, SlidersHorizontal, type LucideIcon } from 'lucide-react'
 
 import { PointMarker } from '@/components/point-marker'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 import { CountUp } from './count-up'
 import { PLAN_POINTS, PLAN_ROOMS } from './demo-data'
+import type { LandingPlan } from '@/lib/landing-plan'
+
 import { FloorPlanDemo } from './floor-plan-demo'
+import { PlanCompare } from './plan-compare'
 import { Reveal } from './reveal'
 import { SectionHeading } from './section-heading'
 
@@ -24,7 +26,7 @@ export function StatsBand({ stats }: { stats: LandingStat[] }) {
         {stats.map((s, i) => (
           <div key={s.label} className={cn('flex flex-col-reverse items-center gap-2 text-center', i === stats.length - 1 && stats.length % 2 === 1 && 'col-span-2 sm:col-span-1')}>
             <dt className="text-sm text-muted-foreground">{s.label}</dt>
-            <dd className="bg-linear-to-b from-foreground to-foreground/55 bg-clip-text text-4xl font-semibold tracking-tight text-transparent sm:text-5xl">
+            <dd className="text-4xl font-semibold tracking-tight text-foreground tabular-nums sm:text-5xl">
               <CountUp value={s.value} suffix={s.suffix} />
             </dd>
           </div>
@@ -45,7 +47,7 @@ function planFeatures(deviceTypeCount: number): { icon: LucideIcon; title: strin
   ]
 }
 
-export function PointMapSection({ deviceTypeCount }: { deviceTypeCount: number }) {
+export function PointMapSection({ deviceTypeCount, plan = null }: { deviceTypeCount: number; plan?: LandingPlan | null }) {
   return (
     <section id="pointmap" aria-labelledby="pointmap-title" className="relative isolate scroll-mt-20 py-20 sm:py-28">
       <div aria-hidden className="pointer-events-none absolute top-1/3 -left-40 -z-10 size-140 rounded-full bg-chart-1/15 blur-3xl" />
@@ -55,25 +57,20 @@ export function PointMapSection({ deviceTypeCount }: { deviceTypeCount: number }
             id="pointmap-title"
             eyebrow="点位图"
             title="在户型图上布点，像画画一样简单"
-            description="不用再在 CAD 和表格之间来回切换。每个点位都带着型号和单价，画完点位，设备清单和预算也就有了。"
+            description="每个点位自带型号与单价，画完点位，设备清单和预算自动生成。"
           />
         </Reveal>
         <div className="mt-14 grid items-start gap-6 lg:grid-cols-12 lg:gap-8">
           <Reveal className="lg:col-span-8">
             <div className="rounded-2xl border border-border bg-card p-3 shadow-2xl sm:p-5">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                <div aria-hidden className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5">
-                  {['1F 一层', '2F 二层', '3F 三层'].map((floor, i) => (
-                    <span key={floor} className={cn('rounded-md px-2.5 py-1', i === 0 && 'bg-background text-foreground shadow-sm')}>
-                      {floor}
-                    </span>
-                  ))}
-                </div>
+                {/* 只演示一层，不放看似可点的楼层切换 */}
+                <span className="font-medium text-foreground">{plan ? `示例项目 · ${plan.name}` : '1F 一层平面图'}</span>
                 <span className="tabular-nums">
-                  {PLAN_POINTS.length} 个点位 · {PLAN_ROOMS.length} 个区域 · 悬停查看代号
+                  {plan ? `原始图纸 → 设计方案 · 拖动分割线对比` : `${PLAN_POINTS.length} 个点位 · ${PLAN_ROOMS.length} 个区域 · 悬停查看代号`}
                 </span>
               </div>
-              <FloorPlanDemo variant="full" />
+              {plan ? <PlanCompare plan={plan} /> : <FloorPlanDemo variant="full" />}
             </div>
           </Reveal>
           <ul className="grid gap-3 sm:grid-cols-2 lg:col-span-4 lg:grid-cols-1">
@@ -91,60 +88,6 @@ export function PointMapSection({ deviceTypeCount }: { deviceTypeCount: number }
               </li>
             ))}
           </ul>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-/* ---------------- 工作流 ---------------- */
-
-const STEPS: { icon: LucideIcon; title: string; text: string; output: string; tone: string }[] = [
-  { icon: Upload, title: '上传户型图', text: '支持图片与 DWG，自动裁切成标准图纸', output: '标准图纸', tone: 'text-chart-1 ring-chart-1/40' },
-  { icon: ScanLine, title: 'AI 识别点位', text: '识别开关插座布置图，批量导入点位与房间', output: '点位方案', tone: 'text-chart-4 ring-chart-4/40' },
-  { icon: SlidersHorizontal, title: '智能选型', text: '按生态与预算档位，为每类设备匹配型号', output: '设备清单', tone: 'text-chart-2 ring-chart-2/40' },
-  { icon: Receipt, title: '一键报价', text: '数量、单价、附加费用与优惠自动汇总', output: '报价单', tone: 'text-chart-3 ring-chart-3/40' },
-  { icon: FileSignature, title: '合同与方案', text: '报价一键转合同，横版方案随时导出', output: '合同 · 方案', tone: 'text-chart-5 ring-chart-5/40' },
-  { icon: ClipboardCheck, title: '交底与验收', text: '按房间生成交底清单，现场逐点打勾', output: '交底清单', tone: 'text-chart-2 ring-chart-2/40' },
-]
-
-export function WorkflowSection() {
-  return (
-    <section id="workflow" aria-labelledby="workflow-title" className="relative scroll-mt-20 py-20 sm:py-28">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <Reveal>
-          <SectionHeading
-            id="workflow-title"
-            eyebrow="工作流"
-            title="从户型图到签约交付，一条线走完"
-            description="每一步的结果都会自动流向下一步，不用重复录入，也不会前后对不上。"
-          />
-        </Reveal>
-        <div className="relative mt-16">
-          <div aria-hidden className="absolute inset-x-16 top-10 hidden h-px overflow-hidden bg-border xl:block">
-            <span className="absolute inset-y-0 w-40 bg-linear-to-r from-transparent via-chart-1 to-transparent motion-safe:animate-beam" />
-          </div>
-          <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            {STEPS.map(({ icon: Icon, title, text, output, tone }, i) => (
-              <li key={title}>
-                <Reveal delay={i * 80} className="h-full">
-                  <div className="flex h-full flex-col items-start rounded-2xl border border-border bg-card/50 p-5 xl:items-center xl:border-transparent xl:bg-transparent xl:p-2 xl:text-center">
-                    <span className={cn('relative flex size-16 items-center justify-center rounded-2xl border border-border bg-card shadow-lg ring-1', tone)}>
-                      <Icon className="size-7" />
-                      <span className="absolute -top-2 -right-2 flex size-6 items-center justify-center rounded-full border border-border bg-background text-xs font-semibold text-foreground tabular-nums">
-                        {i + 1}
-                      </span>
-                    </span>
-                    <h3 className="mt-5 text-base font-semibold">{title}</h3>
-                    <p className="mt-1.5 text-sm text-muted-foreground">{text}</p>
-                    <Badge variant="outline" className="mt-4 rounded-full">
-                      产出：{output}
-                    </Badge>
-                  </div>
-                </Reveal>
-              </li>
-            ))}
-          </ol>
         </div>
       </div>
     </section>
@@ -176,7 +119,7 @@ export function SceneSection() {
             id="scene-title"
             eyebrow="场景"
             title="每个房间，都恰到好处地聪明"
-            description="方案里的每一个点位，最终都会变成业主每天都能感受到的体验。把场景讲清楚，签单就容易一半。"
+            description="把每一个点位变成业主可感知的日常场景。"
           />
         </Reveal>
         <Reveal className="mt-14">
@@ -262,7 +205,7 @@ export function FinalCta() {
             <h2 id="cta-title" className="mx-auto max-w-2xl text-3xl font-semibold tracking-tight text-balance sm:text-5xl">
               下一个项目，从一张户型图开始
             </h2>
-            <p className="mx-auto mt-5 max-w-xl text-base text-pretty text-muted-foreground sm:text-lg">登录工作台，把今天的方案做得更快、更漂亮。</p>
+            <p className="mx-auto mt-5 max-w-xl text-base text-balance text-muted-foreground sm:text-lg">登录工作台，把今天的方案做得更快、更漂亮。</p>
             <div className="mt-9 flex flex-wrap justify-center gap-3">
               <Button asChild size="lg" className="h-11 rounded-full px-6 text-base">
                 <Link href="/projects">

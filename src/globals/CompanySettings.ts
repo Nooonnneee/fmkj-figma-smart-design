@@ -128,12 +128,15 @@ export const CompanySettings: GlobalConfig = {
           fields: [
             {
               name: 'cost',
-              label: '单次消耗积分',
+              label: '计费倍率',
               type: 'number',
               required: true,
               defaultValue: 1,
               min: 0,
               max: 100,
+              admin: {
+                description: '按用量计费：每次对话积分 = 倍率 ×（每 1K 输入 tokens 0.1 + 每 1K 输出 tokens 0.5）+ 工具调用费用，向上取整、最少 1。贵的模型可设 2、3。',
+              },
             },
             {
               name: 'tag',

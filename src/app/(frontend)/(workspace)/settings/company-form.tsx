@@ -130,27 +130,27 @@ export function CompanyForm({
       <Card>
         <CardHeader>
           <CardTitle>抬头</CardTitle>
-          <CardDescription>名称、副标题和 Logo 显示在报价单、方案和合同顶部，也用作侧边栏的标识</CardDescription>
+          <CardDescription>用于报价单、方案、合同页眉及侧边栏标识</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           {field('name', '名称', { required: true, maxLength: 60, placeholder: '公司、工作室或个人名称' })}
           {field('slogan', '副标题', { maxLength: 80 })}
           <div className="md:col-span-2">
-            <ImageField name="logo" label="Logo" url={initial.logoUrl} hint="建议横版或方形 PNG，透明背景，不超过 3MB" />
+            <ImageField name="logo" label="Logo" url={initial.logoUrl} hint="PNG 或 SVG，透明背景，≤ 3MB" />
           </div>
         </CardContent>
       </Card>
       <Card>
         <CardHeader>
           <CardTitle>联系方式</CardTitle>
-          <CardDescription>显示在报价单底部的「联系我们」和合同的乙方信息里</CardDescription>
+          <CardDescription>用于报价单页脚与合同乙方信息</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           {field('phone', '联系电话', { inputMode: 'tel', maxLength: 30 })}
           {field('email', '邮箱', { type: 'email', maxLength: 80 })}
           <div className="md:col-span-2">{field('address', '地址', { maxLength: 200 })}</div>
           <div className="md:col-span-2">
-            <ImageField name="qrCode" label="二维码" url={initial.qrCodeUrl} hint="例如企业微信或公众号二维码" />
+            <ImageField name="qrCode" label="二维码" url={initial.qrCodeUrl} hint="微信或公众号二维码" />
           </div>
           {field('qrCaption', '二维码说明', { maxLength: 40, placeholder: '扫码添加微信' })}
         </CardContent>
@@ -158,7 +158,7 @@ export function CompanyForm({
       <Card>
         <CardHeader>
           <CardTitle>默认内容</CardTitle>
-          <CardDescription>新报价、新合同会自动带上，生成后仍可单独修改</CardDescription>
+          <CardDescription>新建报价与合同时自动带入</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-5">
           <div className="grid gap-2">
@@ -170,10 +170,7 @@ export function CompanyForm({
             <Textarea id="contractTerms" name="contractTerms" rows={7} maxLength={5000} defaultValue={initial.contractTerms} className="leading-relaxed" />
           </div>
           <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-            <div className="space-y-0.5">
-              <Label htmlFor="printProductImages">打印报价单时显示产品图片</Label>
-              <p className="text-xs text-muted-foreground">每行产品前加一列缩略图；没有图片的产品留空</p>
-            </div>
+            <Label htmlFor="printProductImages">打印报价单时显示产品缩略图</Label>
             <Switch id="printProductImages" name="printProductImages" defaultChecked={initial.printProductImages} />
           </div>
         </CardContent>

@@ -136,7 +136,10 @@ export function ProjectForm({
           {text('budget', '预算（元）', { type: 'number', min: 0, step: 1000, inputMode: 'numeric', placeholder: '可不填' })}
           {owners && !isNew ? select('owner', '负责人', owners, '__none', true) : null}
           <div className={cn('grid content-start gap-2', owners && !isNew ? '' : 'md:col-span-2')}>
-            <Label htmlFor="name">项目名称</Label>
+            <div className="flex items-baseline justify-between gap-2">
+              <Label htmlFor="name">项目名称</Label>
+              <span id="name-hint" className="text-xs text-muted-foreground">留空自动生成</span>
+            </div>
             <Input
               id="name"
               name="name"
@@ -147,7 +150,6 @@ export function ProjectForm({
               aria-describedby="name-hint"
               disabled={readOnly}
             />
-            <p id="name-hint" className="text-xs text-muted-foreground">留空时按小区、房号或客户姓名自动命名</p>
           </div>
           <div className="grid gap-2 md:col-span-2">
             <Label htmlFor="notes">备注</Label>

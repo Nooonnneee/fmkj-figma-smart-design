@@ -165,7 +165,7 @@ export function SwapProductDialog({
                             <span className="block truncate text-sm font-medium">{p.name}</span>
                             <span className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
                               <span>{p.sku}</span>
-                              {p.platforms.map((pl) => <Badge key={pl} variant="outline" className="h-4 px-1 text-[10px]">{pl}</Badge>)}
+                              {p.platforms.map((pl) => <Badge key={pl} variant="outline" className="h-4 px-1 text-xs">{pl}</Badge>)}
                             </span>
                           </span>
                           <span className="shrink-0 text-right">

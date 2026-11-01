@@ -18,6 +18,7 @@ import { buildQuoteFloorGroups } from '@/lib/quote-areas'
 import { yuan } from '@/lib/quotes'
 import { cn } from '@/lib/utils'
 import type { Media, Project, User } from '@/payload-types'
+import { quoteShortTitle } from '@/lib/project-name'
 
 export const metadata = { title: '报价单', robots: { index: false, follow: false } }
 
@@ -107,12 +108,15 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
     return `${base}?${q.toString()}`
   }
   const address = [project?.community, project?.address].filter(Boolean).join(' ')
+  // 报价名称常带项目名（如「XX 方案 报价（不含灯具）」），副标题和导出文件名里去掉重复部分
+  const projectLabel = project?.name ?? null
+  const quoteLabel = quoteShortTitle(quote.title, project?.name)
 
   return (
     <div className="min-h-screen bg-muted/40 pb-8 print:bg-white print:pb-0">
       <PrintToolbar
         back={{ href: project ? `/projects/${project.id}/archive` : '/projects', label: '返回归档' }}
-        exportName={`${project ? `${project.name}-` : ''}${quote.title}-${setup.layouts.find((l) => l.value === layout)?.label ?? ''}`}
+        exportName={`${projectLabel ? `${projectLabel}-` : ''}${quoteLabel}-${setup.layouts.find((l) => l.value === layout)?.label ?? ''}`}
         groups={[
           ...(siblingQuotes.length > 1
             ? [
@@ -151,7 +155,7 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
               style={style}
               no={yuan(quote.total).replace('.00', '')}
               title="报价单"
-              subtitle={[project?.name ?? quote.title, quote.title].filter((v, i, a) => a.indexOf(v) === i).join(' · ')}
+              subtitle={projectLabel ? `${projectLabel} · ${quoteLabel}` : quote.title}
               tag="QUOTATION"
             />
           </div>
@@ -160,7 +164,7 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
             items={[
               ['客户', project?.customerName],
               ['电话', project?.customerPhone],
-              ['项目', project?.name ?? quote.title],
+              ['项目', projectLabel ?? quote.title],
               ['地址', address],
               ...(owner ? ([['联系人', `${owner.name}${owner.phone ? ` ${owner.phone}` : ''}`]] as [string, string][]) : []),
               ...(project?.platform ? ([['主平台', project.platform]] as [string, string][]) : []),

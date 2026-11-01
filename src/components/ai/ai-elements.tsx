@@ -248,9 +248,9 @@ export function AiPromptComposer({
       />
 
       {dragging ? (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-2xl bg-background/90 text-xs font-medium text-primary">
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-2xl bg-background/95 text-xs font-medium text-primary">
           <Upload className="size-4" />
-          <span>松开鼠标上传（支持户型图 PNG/JPG、点位 JSON、CSV/TXT 清单）</span>
+          <span>松开上传户型图、JSON 或清单</span>
         </div>
       ) : null}
 
@@ -286,7 +286,7 @@ export function AiPromptComposer({
                 <FileText className="size-3.5 shrink-0 text-muted-foreground" />
               )}
               <span className="max-w-36 truncate font-medium">{att.name}</span>
-              {att.summary ? <span className="shrink-0 text-[10px] text-muted-foreground">({att.summary})</span> : null}
+              {att.summary ? <span className="shrink-0 text-xs text-muted-foreground">({att.summary})</span> : null}
               <button
                 type="button"
                 aria-label={`移除 ${att.name}`}
@@ -318,7 +318,7 @@ export function AiPromptComposer({
             if (canSend) onSubmit()
           }
         }}
-        placeholder={attachments.length ? '补充说明（可直接回车让 AI 处理上传的文件）…' : '输入指令，或直接拖入户型图 / 点位 JSON / 需求清单…'}
+        placeholder={attachments.length ? '补充要求，或直接回车发送…' : '输入需求，或拖入户型图 / 清单…'}
         className="block max-h-[200px] w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-sm outline-none placeholder:text-muted-foreground"
       />
       <div className="flex items-center justify-between gap-2 px-2 pb-2">
@@ -403,7 +403,7 @@ export function AiPromptComposer({
                 <DropdownMenuItem key={m.id} onSelect={() => onSelectModel(m.id)} className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
                     <div className="text-sm">{m.name}</div>
-                    <div className="truncate text-xs text-muted-foreground">{m.tag} · {m.cost} 积分</div>
+                    <div className="truncate text-xs text-muted-foreground">{m.tag} · 按量计费{m.cost !== 1 ? ` ×${m.cost}` : ''}</div>
                   </div>
                   {m.id === selectedModel.id ? <Check className="size-3.5 shrink-0" /> : null}
                 </DropdownMenuItem>

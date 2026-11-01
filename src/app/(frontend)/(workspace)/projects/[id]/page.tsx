@@ -39,13 +39,13 @@ export default async function ProjectInfoPage({ params }: { params: Promise<{ id
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
       <section aria-labelledby="progress-title" className="rounded-xl bg-card shadow-sm ring-1 ring-foreground/5 dark:ring-foreground/10">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
-          <div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3.5">
+          <div className="flex items-baseline gap-2.5">
             <h2 id="progress-title" className="text-base font-semibold">进度</h2>
-            <p className="text-sm text-muted-foreground">{progress.next ? `下一步：${progress.next.label}` : '项目已归档，资料只读保存'}</p>
+            {!progress.next ? <span className="text-xs text-muted-foreground">已归档（只读）</span> : null}
           </div>
           {progress.next ? (
-            <Button asChild>
+            <Button asChild size="sm">
               <Link href={sectionHref(pid, progress.next.section)}>
                 {progress.next.label}
                 <ArrowRight className="size-4" />
@@ -53,16 +53,16 @@ export default async function ProjectInfoPage({ params }: { params: Promise<{ id
             </Button>
           ) : null}
         </div>
-        <ol className="grid grid-cols-1 sm:grid-cols-5">
+        <ol className="grid grid-cols-5">
           {PROJECT_SECTIONS.map((s, i) => {
             const step = steps[s.key]
             const current = progress.next?.section === s.key
             return (
-              <li key={s.key} className="border-b last:border-b-0 sm:border-r sm:border-b-0 sm:last:border-r-0">
+              <li key={s.key} className="border-r last:border-r-0">
                 <Link
                   href={sectionHref(pid, s.key)}
                   aria-current={current ? 'step' : undefined}
-                  className="flex h-full items-start gap-2.5 px-5 py-4 transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none sm:flex-col sm:gap-2 sm:px-4"
+                  className="flex h-full flex-col items-center gap-1.5 px-1 py-3 text-center transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none sm:items-start sm:gap-2 sm:px-4 sm:py-4 sm:text-left"
                 >
                   <span
                     className={cn(
@@ -72,15 +72,21 @@ export default async function ProjectInfoPage({ params }: { params: Promise<{ id
                   >
                     {step.done ? <Check className="size-3.5" /> : i + 1}
                   </span>
-                  <span className="min-w-0">
+                  <span className="w-full min-w-0">
                     <span className={cn('block text-sm font-medium', !step.done && !current && 'text-muted-foreground')}>{s.label}</span>
-                    <span className="block truncate text-xs text-muted-foreground" title={step.note}>{step.note}</span>
+                    <span className="hidden truncate text-xs text-muted-foreground sm:block" title={step.note}>{step.note}</span>
                   </span>
                 </Link>
               </li>
             )
           })}
         </ol>
+        {/* 窄屏只显示当前一步的说明，避免五行说明把表单挤到第二屏 */}
+        {progress.next ? (
+          <p className="border-t px-5 py-2.5 text-xs text-muted-foreground sm:hidden">
+            下一步 · {PROJECT_SECTIONS.find((s) => s.key === progress.next?.section)?.label}：{steps[progress.next.section].note}
+          </p>
+        ) : null}
       </section>
 
       <ProjectForm

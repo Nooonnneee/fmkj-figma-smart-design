@@ -71,15 +71,13 @@ export function PlacePanel({
         {armed ? (
           <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
             <PointMarker type={armed} className="size-5" />
-            <span className="min-w-0 flex-1">在图纸上点击放置「{deviceTypeOf(armed)?.name}」（右键空白处或 Esc 结束）</span>
+            <span className="min-w-0 flex-1">点击图纸放置「{deviceTypeOf(armed)?.name}」</span>
             <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => onArm(null)}>Esc 结束</Button>
           </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">选中设备后在图纸上点击放置（可连续放置），也可以直接拖到图纸上；产品型号在报价台统一配置。</p>
-        )}
+        ) : null}
         <div className="relative">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={query} onChange={(e) => onQuery(e.target.value)} placeholder="搜索设备或产品" aria-label="搜索设备" className="pl-9" />
+          <Input value={query} onChange={(e) => onQuery(e.target.value)} placeholder="搜索设备（点击或拖拽放置）" aria-label="搜索设备" className="pl-9" />
         </div>
       </div>
       <ScrollArea className="min-h-0 flex-1">
@@ -115,7 +113,7 @@ export function PlacePanel({
                       >
                         <PointMarker type={t.value} className="size-7" />
                         <span className="leading-tight">{t.name}</span>
-                        {n ? <span className="absolute top-1 right-1 rounded-full bg-primary px-1.5 text-[10px] leading-4 font-medium text-primary-foreground tabular-nums">{n}</span> : null}
+                        {n ? <span className="absolute top-1 right-1 rounded-full bg-primary px-1.5 text-xs leading-4 font-medium text-primary-foreground tabular-nums">{n}</span> : null}
                       </Button>
                     )
                   })}
@@ -134,7 +132,7 @@ export function PlacePanel({
 
 export function ScoreBadge({ score }: { score: number }) {
   return (
-    <Badge variant={score >= 100 ? 'success' : score >= 60 ? 'outline' : 'warning'} className="h-5 px-1.5 text-[10px] tabular-nums">
+    <Badge variant={score >= 100 ? 'success' : score >= 60 ? 'outline' : 'warning'} className="h-5 px-1.5 text-xs tabular-nums">
       {score}%
     </Badge>
   )
@@ -163,9 +161,8 @@ export function AreasPanel({
   const groups = [...sheets.map((s) => ({ key: s.id, name: s.name, items: areas.filter((a) => a.sheetId === s.id) })), { key: 'none', name: '图纸外', items: areas.filter((a) => !a.sheetId) }].filter((g) => g.items.length)
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="space-y-2 border-b p-4">
-        <p className="text-xs text-muted-foreground">用虚线框划出房间，点位按中心落在哪个框里自动归类；方案会按区域逐个做配置分析。</p>
-        {readOnly ? null : (
+      {readOnly ? null : (
+        <div className="border-b p-4">
           <div className="flex gap-2">
             <Select value={type} onValueChange={setType}>
               <SelectTrigger size="sm" className="flex-1"><SelectValue /></SelectTrigger>
@@ -175,11 +172,11 @@ export function AreasPanel({
             </Select>
             <Button size="sm" disabled={!sheets.length} onClick={() => onAdd(type)}><Plus className="size-4" />添加区域</Button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-4 p-4">
-          {groups.length === 0 ? <p className="text-xs text-muted-foreground">还没有区域。点上方按钮添加，拖动边框调整到房间范围。</p> : null}
+          {groups.length === 0 ? <p className="text-xs text-muted-foreground">添加区域并拖动边框框选房间，点位将自动归类。</p> : null}
           {groups.map((g) => (
             <section key={g.key} className="space-y-1.5">
               <h3 className="text-xs font-semibold text-muted-foreground">{g.name}</h3>
@@ -194,7 +191,7 @@ export function AreasPanel({
                   >
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">{a.name}</span>
-                      <span className="block text-[11px] text-muted-foreground">
+                      <span className="block text-xs text-muted-foreground">
                         {areaTypeLabel(a.areaType)} · {r?.total ?? 0} 个点位{r && r.missing.filter((m) => m.level !== 'optional').length ? ` · 建议补充 ${r.missing.filter((m) => m.level !== 'optional').length} 项` : ''}
                       </span>
                     </span>
@@ -476,12 +473,12 @@ export function PointMapContextMenu({
           <span className="truncate text-xs font-semibold">
             {target.code} · {deviceTypeOf(target.deviceType)?.name ?? '设备'}
           </span>
-          {target.areaName ? <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">{target.areaName}</span> : null}
+          {target.areaName ? <span className="ml-auto shrink-0 text-xs text-muted-foreground">{target.areaName}</span> : null}
         </div>
 
         {siblings.length > 0 ? (
           <div className="border-b px-2 py-1.5">
-            <div className="mb-1 text-[10px] text-muted-foreground">快速切换同组类型</div>
+            <div className="mb-1 text-xs text-muted-foreground">快速切换同组类型</div>
             <div className="flex flex-wrap gap-1">
               {siblings.map((t) => (
                 <button
@@ -491,7 +488,7 @@ export function PointMapContextMenu({
                     onChangePointType(target.pointId, t.value)
                     onClose()
                   }}
-                  className="inline-flex items-center gap-1 rounded-md border bg-background px-1.5 py-0.5 text-[11px] transition-colors hover:border-primary hover:bg-primary/5"
+                  className="inline-flex items-center gap-1 rounded-md border bg-background px-1.5 py-0.5 text-xs transition-colors hover:border-primary hover:bg-primary/5"
                 >
                   <PointMarker type={t.value} className="size-3.5" />
                   <span>{t.name}</span>
@@ -551,7 +548,7 @@ export function PointMapContextMenu({
       >
         <div className="border-b px-2 py-1.5 text-xs font-semibold">区域 · {target.name}</div>
         <div className="border-b px-2 py-1.5">
-          <div className="mb-1 text-[10px] text-muted-foreground">切换房间类型</div>
+          <div className="mb-1 text-xs text-muted-foreground">切换房间类型</div>
           <div className="flex flex-wrap gap-1">
             {AREA_TYPES.map((t) => (
               <button
@@ -562,7 +559,7 @@ export function PointMapContextMenu({
                   onClose()
                 }}
                 className={cn(
-                  'rounded-md border bg-background px-1.5 py-0.5 text-[11px] transition-colors hover:border-primary hover:bg-primary/5',
+                  'rounded-md border bg-background px-1.5 py-0.5 text-xs transition-colors hover:border-primary hover:bg-primary/5',
                   t.value === target.areaType && 'border-primary bg-primary/10 font-medium',
                 )}
               >

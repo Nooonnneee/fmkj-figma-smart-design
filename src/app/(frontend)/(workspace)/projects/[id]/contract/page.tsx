@@ -7,21 +7,21 @@ import { DEFAULT_CONTRACT_TERMS } from '@/lib/contracts'
 
 import { getProject, getProjectDeals } from '../project-data'
 import { ContractEditor, CreateContractPanel, type QuoteOption } from './contract-editor'
+import { quoteShortTitle } from '@/lib/project-name'
 
 /** 合同：每个项目一份，由报价生成；签订后锁定内容，继续登记收款。 */
 export default async function ProjectContractPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const [{ project, archived, readOnly }, { quotes, contract }] = await Promise.all([getProject(id), getProjectDeals(id)])
   const pid = String(project.id)
-  const options: QuoteOption[] = quotes.map((q) => ({ id: String(q.id), title: q.title, total: q.total ?? 0, status: q.status }))
+  const options: QuoteOption[] = quotes.map((q) => ({ id: String(q.id), title: quoteShortTitle(q.title, project.name), total: q.total ?? 0, status: q.status }))
 
   if (!contract) {
     const defaultQuote = options.find((q) => q.status === 'accepted') ?? options[0]
     return (
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
-        <header className="space-y-1">
+        <header>
           <h2 className="text-xl font-semibold tracking-tight">合同</h2>
-          <p className="text-sm text-muted-foreground">客户确认报价后，用它生成合同，打印给客户签字。</p>
         </header>
         {readOnly ? (
           <p className="rounded-xl border border-dashed px-6 py-10 text-center text-sm text-muted-foreground">

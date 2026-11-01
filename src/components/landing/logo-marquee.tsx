@@ -1,12 +1,11 @@
 import Image from 'next/image'
-import { Cable, Cpu, PlugZap, Zap, type LucideIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
 import { brandSrc, LANDING_BRANDS, type LandingBrand } from './brand-logos'
 
-/** 智能平台与通信协议：有官方标识的显示图标（放在浅色小底板上保证深色背景下可见），无标识的用线性图标 */
-type EcoItem = { name: string; logo?: string; w?: number; h?: number; icon?: LucideIcon }
+/** 智能平台与通信协议：仅展示官方单图标，不配文字 */
+type EcoItem = { name: string; logo: string; w: number; h: number }
 
 const PLATFORMS: EcoItem[] = [
   { name: 'Apple Home', logo: 'apple-home.svg', w: 512, h: 512 },
@@ -20,7 +19,6 @@ const PLATFORMS: EcoItem[] = [
   { name: '涂鸦智能', logo: 'tuya-smart.svg', w: 60, h: 30 },
   { name: '天猫精灵', logo: 'tmall-genie.webp', w: 969, h: 96 },
   { name: '小度', logo: 'xiaodu.svg', w: 48, h: 48 },
-  { name: 'Control4', icon: Cpu },
 ]
 
 const PROTOCOLS: EcoItem[] = [
@@ -36,11 +34,7 @@ const PROTOCOLS: EcoItem[] = [
   { name: 'Modbus', logo: 'modbus.webp', w: 282, h: 96 },
   { name: 'MQTT', logo: 'mqtt.svg', w: 24, h: 24 },
   { name: '以太网', logo: 'ethernet.svg', w: 24, h: 24 },
-  { name: 'PLC 电力载波', icon: Zap },
-  { name: 'RS485', icon: Cable },
-  { name: 'PoE 供电', icon: PlugZap },
 ]
-const TONES = ['text-chart-1', 'text-chart-2', 'text-chart-3', 'text-chart-4', 'text-chart-5']
 
 const half = Math.ceil(LANDING_BRANDS.length / 2)
 const ROW_A = LANDING_BRANDS.slice(0, half)
@@ -49,13 +43,11 @@ const ROW_B = LANDING_BRANDS.slice(half)
 /** 四行无缝滚动：品牌 → 平台 → 协议 → 品牌，方向交替。悬停暂停，品牌悬停显示原色。 */
 export function LogoMarquee() {
   return (
-    <section aria-labelledby="ecosystem-title" className="relative py-16 sm:py-20">
-      <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
-        <h2 id="ecosystem-title" className="text-sm font-medium text-muted-foreground">
-          兼容主流品牌、生态与通信协议，选型不被单一品牌绑定
-        </h2>
-      </div>
-      <div className="mt-10 space-y-4">
+    <section aria-labelledby="ecosystem-title" className="relative py-14 sm:py-18">
+      <h2 id="ecosystem-title" className="sr-only">
+        兼容主流品牌、生态与通信协议
+      </h2>
+      <div className="space-y-4">
         <MarqueeRow label="兼容品牌（一）" className="[--marquee-duration:80s]">
           {(hidden) => <BrandSet brands={ROW_A} hidden={hidden} />}
         </MarqueeRow>
@@ -107,7 +99,7 @@ function LogoChip({ brand, hidden, duplicate }: { brand: LandingBrand; hidden: b
     <li
       aria-hidden={silent || undefined}
       className={cn(
-        'group/logo relative flex h-16 shrink-0 items-center rounded-2xl border border-border bg-card/40 px-6 transition-colors duration-300 hover:border-transparent hover:bg-foreground',
+        'group/logo relative flex h-16 w-40 shrink-0 items-center justify-center rounded-2xl border border-border bg-card/40 px-6 transition-colors duration-300 hover:border-transparent hover:bg-foreground',
         duplicate && 'motion-reduce:hidden',
       )}
     >
@@ -118,7 +110,7 @@ function LogoChip({ brand, hidden, duplicate }: { brand: LandingBrand; hidden: b
         width={brand.width}
         height={brand.height}
         unoptimized
-        className={cn(height, 'w-auto opacity-70 transition-opacity duration-300 group-hover/logo:opacity-0')}
+        className={cn(height, 'w-auto max-w-28 object-contain opacity-70 transition-opacity duration-300 group-hover/logo:opacity-0')}
       />
       <Image
         src={brandSrc(brand.slug, 'color')}
@@ -126,26 +118,33 @@ function LogoChip({ brand, hidden, duplicate }: { brand: LandingBrand; hidden: b
         width={brand.width}
         height={brand.height}
         unoptimized
-        className={cn(height, 'absolute top-1/2 left-6 w-auto -translate-y-1/2 opacity-0 transition-opacity duration-300 group-hover/logo:opacity-100')}
+        className={cn(height, 'absolute top-1/2 left-1/2 w-auto max-w-28 -translate-x-1/2 -translate-y-1/2 object-contain opacity-0 transition-opacity duration-300 group-hover/logo:opacity-100')}
       />
     </li>
   )
 }
 
+/** 与品牌卡片同一样式：默认单色（白色剪影），悬停切换到浅底并显示原色 */
 function EcoSet({ items, hidden }: { items: EcoItem[]; hidden: boolean }) {
-  return items.map(({ name, logo, w = 1, h = 1, icon: Icon }, i) => (
-    <li
-      key={name}
-      className="flex h-12 shrink-0 items-center gap-2.5 rounded-full border border-border bg-card/40 py-1.5 pr-5 pl-1.5 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
-    >
-      <span className="flex h-full min-w-9 items-center justify-center rounded-full bg-white px-2.5">
-        {logo ? (
-          <Image src={`/ecosystem/${logo}`} alt="" width={w} height={h} unoptimized className={cn('w-auto', w / h > 2.2 ? 'h-3.5 max-w-24' : 'h-5')} />
-        ) : Icon ? (
-          <Icon className={cn('size-4', TONES[i % TONES.length])} />
-        ) : null}
-      </span>
-      <span aria-hidden={hidden || undefined}>{name}</span>
-    </li>
-  ))
+  return items.map(({ name, logo, w, h }) => {
+    const ratio = w / h
+    const height = ratio < 1.6 ? 'h-9' : ratio < 3.6 ? 'h-7' : 'h-6'
+    return (
+      <li
+        key={name}
+        aria-hidden={hidden || undefined}
+        className="group/logo relative flex h-16 w-40 shrink-0 items-center justify-center rounded-2xl border border-border bg-card/40 px-6 transition-colors duration-300 hover:border-transparent hover:bg-foreground"
+      >
+        <Image
+          src={`/ecosystem/${logo}`}
+          alt={hidden ? '' : name}
+          title={name}
+          width={w}
+          height={h}
+          unoptimized
+          className={cn(height, 'w-auto max-w-28 object-contain opacity-70 brightness-0 invert transition-[opacity,filter] duration-300 group-hover/logo:opacity-100 group-hover/logo:filter-none')}
+        />
+      </li>
+    )
+  })
 }

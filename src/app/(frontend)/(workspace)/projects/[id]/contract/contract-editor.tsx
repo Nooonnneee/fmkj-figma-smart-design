@@ -46,8 +46,8 @@ export function CreateContractPanel({ projectId, quotes, defaultQuoteId }: { pro
   return (
     <div className="rounded-xl bg-card shadow-sm ring-1 ring-foreground/5 dark:ring-foreground/10">
       <div className="border-b px-5 py-4">
-        <h3 className="text-base font-semibold">选择合同依据的报价</h3>
-        <p className="text-sm text-muted-foreground">合同金额、客户信息会按报价和项目资料自动填好，付款方式、工期、质保和条款带默认值，生成后都可以修改。</p>
+        <h3 className="text-base font-semibold">选择报价生成合同</h3>
+        <p className="text-sm text-muted-foreground">自动带入报价金额、客户资料与默认条款，生成后可修改。</p>
       </div>
       <div role="radiogroup" aria-label="合同依据的报价" className="divide-y">
         {quotes.map((q) => (
@@ -285,7 +285,6 @@ export function ContractEditor({ initial, quotes, readOnly, archived }: { initia
                 </Button>
               ) : null}
             </div>
-            <p className="text-xs text-muted-foreground">报价明细会作为合同附件打印。</p>
           </div>
           {field('customerName', '甲方（客户）', { maxLength: 60 })}
           {field('customerPhone', '甲方电话', { maxLength: 30, inputMode: 'tel' })}
@@ -360,7 +359,6 @@ export function ContractEditor({ initial, quotes, readOnly, archived }: { initia
         </div>
         <div className="p-5">
           <Textarea aria-label="合同条款" rows={8} maxLength={5000} value={values.terms} disabled={locked} onChange={(e) => set({ terms: e.target.value })} className="leading-relaxed" />
-          <p className="mt-2 text-xs text-muted-foreground">默认条款可以在「设置」里修改，之后生成的合同都会带上。</p>
         </div>
       </section>
 
@@ -368,10 +366,7 @@ export function ContractEditor({ initial, quotes, readOnly, archived }: { initia
         <section aria-labelledby="sign-title" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed px-5 py-4">
           {signed ? (
             <>
-              <div>
-                <h3 id="sign-title" className="flex items-center gap-1.5 text-sm font-medium"><Check className="size-4 text-success" />已于 {fmtLongDate(initial.signedAt)} 签订</h3>
-                <p className="text-sm text-muted-foreground">撤销签订后可以修改合同内容和依据的报价。</p>
-              </div>
+              <h3 id="sign-title" className="flex items-center gap-1.5 text-sm font-medium"><Check className="size-4 text-success" />已于 {fmtLongDate(initial.signedAt)} 签订</h3>
               <Button variant="outline" size="sm" disabled={busy !== null} onClick={() => void changeStatus('draft')}>
                 {busy === 'unsign' ? <Loader2 className="size-4 animate-spin" /> : <Undo2 className="size-4" />}撤销签订
               </Button>
@@ -379,8 +374,8 @@ export function ContractEditor({ initial, quotes, readOnly, archived }: { initia
           ) : (
             <>
               <div>
-                <h3 id="sign-title" className="text-sm font-medium">客户签字后，标记为已签订</h3>
-                <p className="text-sm text-muted-foreground">签订后合同和依据的报价都会锁定，避免和纸质合同对不上。</p>
+                <h3 id="sign-title" className="text-sm font-medium">标记为已签订</h3>
+                <p className="text-xs text-muted-foreground">签订后合同与关联报价将锁定</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Label htmlFor="sign-date" className="sr-only">签订日期</Label>

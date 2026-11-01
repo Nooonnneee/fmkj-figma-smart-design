@@ -51,7 +51,7 @@ export function AppearanceSettings() {
     <Card id="appearance">
       <CardHeader>
         <CardTitle>外观</CardTitle>
-        <CardDescription>只对当前浏览器生效；打印和导出的报价单、合同始终是白底文档样式。</CardDescription>
+        <CardDescription>仅对当前浏览器生效，打印文档始终保持白底样式。</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
         <div className="flex flex-col gap-2">

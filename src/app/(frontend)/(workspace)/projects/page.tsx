@@ -1,7 +1,7 @@
 import Form from 'next/form'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowRight, CircleCheck, FileSignature, FolderKanban, MapPin, Plus, Search, Wallet } from 'lucide-react'
+import { ArrowRight, CircleCheck, FolderKanban, Plus, Search } from 'lucide-react'
 import type { Where } from 'payload'
 
 import { BrandMark } from '@/components/brand/brand-mark'
@@ -15,21 +15,21 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { relId } from '@/lib/access'
 import { appAuth } from '@/lib/app-auth'
-import { APP_NAME, pageTitle } from '@/lib/brand'
+import { pageTitle } from '@/lib/brand'
 import { getCompanyInfo } from '@/lib/cached-data'
 import { getPayloadClient } from '@/lib/payload'
 import { countScenePoints } from '@/lib/point-count'
 import { fmtDate, PROJECT_SECTIONS, projectProgress } from '@/lib/projects'
 import { yuan } from '@/lib/quotes'
 import { cn } from '@/lib/utils'
+import { isDemoProjectName, projectDisplayName } from '@/lib/project-name'
 
 export const metadata = { title: pageTitle('项目') }
 
 type Amount = { value: number; caption: string }
 
 /** 系统为新成员发放的示例项目，名称带「【示例】」前缀 */
-const DEMO_PREFIX = '【示例】'
-const isDemo = (name: string) => name.startsWith(DEMO_PREFIX)
+const isDemo = isDemoProjectName
 
 const compactYuan = (n: number) => `¥${Math.round(n).toLocaleString('zh-CN')}`
 
@@ -147,12 +147,6 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
       if (contractOf.get(pid)?.status === 'signed') totals.signed++
     }
   }
-  const stats = [
-    { label: '进行中项目', value: `${activeCount.totalDocs}`, icon: FolderKanban },
-    { label: '项目金额合计', value: compactYuan(totals.amount), icon: Wallet },
-    { label: '已签合同', value: `${totals.signed}`, icon: FileSignature },
-    { label: '点位总数', value: totals.points.toLocaleString('zh-CN'), icon: MapPin },
-  ]
 
   // 新成员上手引导：还没有自己的项目时显示，建好第一个项目后自动消失
   const demo = !archived && !keyword ? projects.find((p) => isDemo(p.name)) : undefined
@@ -160,10 +154,10 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   const company = isNewMember ? await getCompanyInfo(user.id) : null
   const steps = [
     ...(demo
-      ? [{ title: '看看示例项目', description: '三层别墅的点位、选型和报价，一看就懂', href: `/projects/${demo.id}/point-map`, done: false }]
+      ? [{ title: '浏览示例项目', description: '查看三层别墅点位与报价', href: `/projects/${demo.id}/point-map`, done: false }]
       : []),
-    { title: '完善公司资料', description: '名称、Logo、联系方式会印在报价单和合同上', href: '/settings', done: Boolean(company?.isCustom) },
-    { title: '新建第一个项目', description: '填好客户与房屋信息，就能开始布置点位', href: '/projects/new', done: false },
+    { title: '完善公司抬头', description: '用于报价单与合同页眉', href: '/settings', done: Boolean(company?.isCustom) },
+    { title: '新建首个项目', description: '录入客户信息并布置点位', href: '/projects/new', done: false },
   ]
 
   return (
@@ -171,10 +165,13 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
       <PageHeader
         title="项目"
         description={
-          <>
-            {archived ? '已归档' : '进行中'} <span className="font-medium text-foreground tabular-nums">{projects.length}</span> 个
-            {keyword ? `，匹配「${keyword}」` : '，每个项目按「信息 → 点位 → 报价 → 合同 → 归档」推进'}
-          </>
+          overview ? (
+            <span className="tabular-nums">
+              共 {totals.points.toLocaleString('zh-CN')} 个点位 · 已签合同 {totals.signed} 份 · 合计 <span className="font-medium text-foreground">{compactYuan(totals.amount)}</span>
+            </span>
+          ) : keyword ? (
+            <>匹配「{keyword}」共 <span className="font-medium text-foreground tabular-nums">{projects.length}</span> 个</>
+          ) : undefined
         }
         actions={
           <Button asChild>
@@ -184,13 +181,10 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
       />
 
       {isNewMember ? (
-        <Card className="gap-4 px-5 ring-primary/20">
-          <div className="flex items-start gap-3">
-            <BrandMark decorative className="size-9" />
-            <div className="space-y-0.5">
-              <p className="font-semibold">欢迎来到{APP_NAME}，三步开始第一个项目</p>
-              <p className="text-sm text-muted-foreground">先用示例项目熟悉流程；公司资料填好后，报价单和合同会自动带上你的抬头。</p>
-            </div>
+        <Card className="gap-3 px-5 py-4 ring-primary/20">
+          <div className="flex items-center gap-2.5">
+            <BrandMark decorative className="size-6" />
+            <p className="text-sm font-semibold">快速上手</p>
           </div>
           <ol className={cn('grid gap-2', steps.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2')}>
             {steps.map((s, i) => (
@@ -218,22 +212,6 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
         </Card>
       ) : null}
 
-      {overview ? (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {stats.map((s) => (
-            <Card key={s.label} size="sm" className="flex-row items-center gap-3 px-4">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <s.icon className="size-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">{s.label}</p>
-                <p className="truncate text-lg font-semibold tabular-nums">{s.value}</p>
-              </div>
-            </Card>
-          ))}
-        </div>
-      ) : null}
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <FilterTabs
           label="项目状态"
@@ -259,7 +237,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
           </span>
           <p className="font-medium">{keyword ? '没有找到符合条件的项目' : archived ? '还没有归档的项目' : '还没有进行中的项目'}</p>
           <p className="text-sm text-muted-foreground">
-            {keyword ? '换个关键词试试。' : archived ? '项目签约交付后，在项目的「归档」里归档。' : '新建项目后，按「信息 → 点位 → 报价 → 合同 → 归档」推进。'}
+            {keyword ? '请尝试其他关键词' : archived ? '交付完成的项目可在「归档」页移入此处' : '创建项目后即可上传户型图并布置点位'}
           </p>
           {!keyword && !archived ? (
             <Button asChild size="sm" className="mt-2"><Link href="/projects/new"><Plus className="size-4" />新建项目</Link></Button>
@@ -287,7 +265,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                     <TableCell className="max-w-0 pl-4 sm:pl-6">
                       <div className="flex min-w-0 items-center gap-2">
                         <Link href={`/projects/${pid}`} className="truncate font-medium after:absolute after:inset-0 hover:underline">
-                          {isDemo(p.name) ? p.name.slice(DEMO_PREFIX.length) : p.name}
+                          {projectDisplayName(p.name)}
                         </Link>
                         {isDemo(p.name) ? <Badge variant="secondary" className="shrink-0">示例</Badge> : null}
                       </div>

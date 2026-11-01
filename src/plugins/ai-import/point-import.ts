@@ -14,13 +14,14 @@
  * 只给一张图纸时可以省略 sheets，直接写 { "points": [...] }，导入到当前图纸。
  */
 import { AREA_TYPES, inferAreaType, isAreaType, type AreaType } from '@/lib/area-types'
-import { categoryOf, DEVICE_TYPES, deviceTypeOf, inferDeviceType, isDeviceType } from '@/lib/device-types'
+import { categoryOf, categoryOfType, DEVICE_TYPES, deviceTypeOf, inferDeviceType, isDeviceType } from '@/lib/device-types'
 import { buildAreaElements, buildPointElements, nextPointCode, type AreaInfo, type PointInfo, type SceneEl, type SheetInfo } from '@/lib/point-scene'
+import { DESIGN_RULE_TEXT, isDrawingOnlyType, NEEDS_SWITCH_TYPES } from '@/lib/design-rules'
 import { SHEET } from '@/lib/sheet-spec'
 
 export const IMPORT_FORMAT = 'fmkj-points'
 
-type PlanPoint = { deviceType: string; rx: number; ry: number; note: string | null }
+type PlanPoint = { deviceType: string; rx: number; ry: number; note: string | null; fromDesign?: boolean }
 type PlanArea = { name: string; areaType: AreaType; rect: [number, number, number, number] }
 export type ImportPlan = { sheets: { sheet: SheetInfo; points: PlanPoint[]; areas: PlanArea[] }[]; warnings: string[]; pointCount: number; areaCount: number }
 
@@ -93,6 +94,7 @@ export function parsePointImport(input: unknown, sheets: SheetInfo[], activeShee
   const warnings: string[] = []
   const unknownTypes = new Map<string, number>()
   let skipped = 0
+  let ruleSkipped = 0
   const plan: ImportPlan = { sheets: [], warnings, pointCount: 0, areaCount: 0 }
   for (const raw of rawSheets) {
     if (!raw || typeof raw !== 'object') continue
@@ -117,8 +119,13 @@ export function parsePointImport(input: unknown, sheets: SheetInfo[], activeShee
         continue
       }
       const resolved = resolveDeviceType(p.type ?? p.deviceType ?? p.name)
+      // 设计规范：开关 / 插座 / 灯具只照图识别，AI 自行设计（source: design）的一律不导入
+      if (resolved && p.source === 'design' && isDrawingOnlyType(resolved)) {
+        ruleSkipped++
+        continue
+      }
       if (!resolved) unknownTypes.set(String(p.type ?? p.name ?? '未写类型'), (unknownTypes.get(String(p.type ?? p.name ?? '未写类型')) ?? 0) + 1)
-      entry.points.push({ deviceType: resolved ?? 'other', rx: sx(x), ry: sy(y), note: typeof p.note === 'string' ? p.note.slice(0, 60) : null })
+      entry.points.push({ deviceType: resolved ?? 'other', rx: sx(x), ry: sy(y), note: typeof p.note === 'string' ? p.note.slice(0, 60) : null, fromDesign: p.source === 'design' })
     }
     for (const a of areas) {
       const name = typeof a?.name === 'string' ? a.name.trim().slice(0, 30) : ''
@@ -141,9 +148,16 @@ export function parsePointImport(input: unknown, sheets: SheetInfo[], activeShee
     }
     plan.pointCount += entry.points.length
     plan.areaCount += entry.areas.length
+    // 设计规范：中控屏对照开关点位布置，这张图纸没有开关点位时，AI 设计的中控屏不导入
+    if (!entry.points.some((p) => categoryOfType(p.deviceType)?.slug === 'switch')) {
+      const before = entry.points.length
+      entry.points = entry.points.filter((p) => !(p.fromDesign && NEEDS_SWITCH_TYPES.has(p.deviceType)))
+      ruleSkipped += before - entry.points.length
+    }
     if (entry.points.length || entry.areas.length) plan.sheets.push(entry)
   }
   if (unknownTypes.size) warnings.push(`${[...unknownTypes.entries()].map(([t, n]) => `「${t}」${n} 个`).join('、')}无法识别设备类型，已记为「其他设备」`)
+  if (ruleSkipped) warnings.push(`按设计规范，${ruleSkipped} 个 AI 推测的点位未导入（开关 / 插座 / 灯具只照图生成；没有开关点位时不加中控屏）`)
   if (skipped) warnings.push(`${skipped} 条数据缺少坐标或名称，已跳过`)
   if (!plan.pointCount && !plan.areaCount) return { ok: false, error: warnings[0] ?? '没有可导入的点位或区域' }
   return { ok: true, plan }
@@ -193,7 +207,11 @@ export function recognitionPrompt(sheetName: string) {
   const types = DEVICE_TYPES.map((t) => `- ${t.value}：${categoryOf(t.category)?.name}·${t.name}`).join('\n')
   const areas = AREA_TYPES.filter((a) => a.value !== 'other').map((a) => `${a.value}（${a.label}）`).join('、')
   return `你是全屋智能设计助手。附图是一张已经裁掉图框和标题栏的户型图（标准图纸，宽高比 3:2，图名「${sheetName}」）。
-请找出图上所有智能设备的点位（开关、插座、灯具、传感器、窗帘、网关、AP 等），并划分房间区域，只输出 JSON，不要其他文字。
+请划分房间区域并输出点位，只输出 JSON，不要其他文字。
+
+设计规范（必须遵守）：${DESIGN_RULE_TEXT}
+- 识别：图上已画出的设备符号（开关、灯具、插座等）按符号中心照图输出，source 为 "drawing"。
+- 设计：按房间功能布置上述默认设备，source 为 "design"。没有准确开关 / 灯光点位的图纸，只输出默认设计设备。
 
 坐标规则：以图片左上角为原点，x 向右、y 向下，用 0–1 的比例表示（x = 距左边 / 图片宽度，y = 距上边 / 图片高度），保留 3 位小数。点位坐标取图例符号的中心。
 
@@ -210,7 +228,7 @@ ${types}
     "name": "${sheetName}",
     "unit": "ratio",
     "areas": [{ "name": "客厅", "type": "living", "rect": [0.30, 0.10, 0.72, 0.58] }],
-    "points": [{ "type": "downlight", "x": 0.412, "y": 0.233, "note": "可选，原图标注" }]
+    "points": [{ "type": "ap-node", "x": 0.412, "y": 0.233, "source": "design", "note": "可选，原图标注" }]
   }]
 }`
 }

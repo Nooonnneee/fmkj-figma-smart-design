@@ -6,6 +6,13 @@
 
 /* 文档模板「栖序雅致」使用的字体（来自 Figma 设计，按需加载：只有用到这些字体的页面才会下载） */
 @font-face {
+  font-family: "Inter";
+  src: url("https://static.figma.com/font/Inter_1") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
   font-family: "Inter:Light";
   src: url("https://static.figma.com/font/Inter_1") format("woff2");
   font-style: normal;
@@ -106,6 +113,7 @@
 }
 
 :root {
+  --font-sans: "Inter", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", ui-sans-serif, sans-serif;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -330,7 +338,7 @@
 
   /* 选中态属于设计系统的一部分，浏览器默认的蓝色和这套中性色不搭。 */
   ::selection {
-    background: oklch(0.62 0.02 250 / 28%);
+    background: color-mix(in oklch, var(--foreground) 16%, transparent);
   }
 
   /* 滚动条、光标和键盘焦点也属于界面的一部分，跟随中性色而不是浏览器默认样式。 */
@@ -368,8 +376,8 @@
   z-index: 2147483647;
   transform: translateY(-150%);
   border-radius: 6px;
-  background: #111827;
-  color: #fff;
+  background: var(--foreground);
+  color: var(--background);
   padding: 8px 12px;
   font: 600 14px/1.2 system-ui, sans-serif;
   text-decoration: none;
@@ -460,7 +468,7 @@
 @theme inline {
   --animate-marquee: landing-marquee var(--marquee-duration, 60s) linear infinite;
   --animate-float: landing-float 7s ease-in-out var(--landing-delay, 0s) infinite;
-  --animate-pop: landing-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-pop: landing-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-draw: landing-draw 1.6s cubic-bezier(0.65, 0, 0.35, 1) both;
   --animate-fade: landing-fade 0.8s ease-out both;
   --animate-rise: landing-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) var(--landing-delay, 0s) both;
@@ -474,6 +482,9 @@
   --animate-beam: landing-beam 4.5s ease-in-out var(--landing-delay, 0s) infinite;
   --animate-typing: landing-typing 1.2s ease-in-out infinite;
   --animate-progress: landing-progress 2.4s cubic-bezier(0.65, 0, 0.35, 1) var(--landing-delay, 0s) both;
+  /* 首页真实流程：自动轮播进度条、报价卡入场 */
+  --animate-flow-progress: landing-progress 5s linear both;
+  --animate-flow-card: landing-rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 
   @keyframes landing-marquee {
     from {
@@ -647,11 +658,11 @@
 }
 /* 滚动条两端渐隐 */
 @utility landing-mask-x {
-  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(to right, transparent, var(--foreground) 8%, var(--foreground) 92%, transparent);
 }
 /* 中心清晰、四周渐隐（用于网格背景） */
 @utility landing-mask-radial {
-  mask-image: radial-gradient(ellipse 65% 55% at 50% 35%, #000 25%, transparent 78%);
+  mask-image: radial-gradient(ellipse 65% 55% at 50% 35%, var(--foreground) 25%, transparent 78%);
 }
 /* 配合 pathLength="1" 的描边动画：虚线长度等于整条路径 */
 @utility landing-draw {
@@ -660,7 +671,7 @@
 
 /* 首页是深色主题（繁梦紫）：页面滚动到边界时也保持同色深底，并启用锚点平滑滚动 */
 html:has([data-landing]) {
-  background-color: oklch(0.155 0.02 283);
+  background-color: var(--background);
   color-scheme: dark;
 }
 @media (prefers-reduced-motion: no-preference) {

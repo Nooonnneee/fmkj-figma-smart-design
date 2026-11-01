@@ -1000,10 +1000,10 @@ export function PointMapEditor({
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {readOnly ? null : (
             <>
-              <Button variant="outline" size="sm" disabled={!api || !!cropFile} onClick={() => fileInput.current?.click()}><ImagePlus className="size-4" />添加图纸</Button>
+              <Button variant="outline" size="sm" disabled={!api || !!cropFile} onClick={() => fileInput.current?.click()} aria-label="添加图纸" title="添加图纸"><ImagePlus className="size-4" /><span className="hidden sm:inline">添加图纸</span></Button>
               {dwgEnabled ? (
-                <Button variant="outline" size="sm" disabled={!api || converting || !!cropFile} onClick={() => dwgInput.current?.click()}>
-                  {converting ? <Loader2 className="size-4 animate-spin" /> : <FileUp className="size-4" />}导入 DWG
+                <Button variant="outline" size="sm" disabled={!api || converting || !!cropFile} onClick={() => dwgInput.current?.click()} aria-label="导入 DWG" title="导入 DWG">
+                  {converting ? <Loader2 className="size-4 animate-spin" /> : <FileUp className="size-4" />}<span className="hidden sm:inline">导入 DWG</span>
                 </Button>
               ) : null}
             </>
@@ -1087,7 +1087,7 @@ export function PointMapEditor({
                   <Button variant="ghost" size="sm" className={cn('pr-1.5', s.id === activeSheetId && 'font-semibold')} onClick={() => fitSheet(s.id)}>
                     {s.missing ? <AlertTriangle className="size-3.5 text-warning" /> : null}
                     {s.name}
-                    <span className="text-[11px] font-normal text-muted-foreground tabular-nums">{scopedPoints.filter((p) => p.sheetId === s.id).length}</span>
+                    <span className="text-xs font-normal text-muted-foreground tabular-nums">{scopedPoints.filter((p) => p.sheetId === s.id).length}</span>
                   </Button>
                   {readOnly ? null : (
                     <DropdownMenu onOpenChange={(open) => !open && setConfirmDelete(null)}>
@@ -1177,7 +1177,7 @@ export function PointMapEditor({
                   <ImagePlus className="size-8 text-muted-foreground" />
                   <div className="space-y-1">
                     <p className="text-sm font-semibold">先添加户型图</p>
-                    <p className="text-xs text-muted-foreground">上传图片后会自动裁掉图框、标题栏和图名，放进 3:2 标准图纸，缩放 100% 时正好铺满画布。</p>
+                    <p className="text-xs text-muted-foreground">支持 PNG / JPG 户型图，自动裁切适配标准图纸。</p>
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" onClick={() => fileInput.current?.click()}><ImagePlus className="size-4" />添加图纸</Button>
@@ -1189,7 +1189,7 @@ export function PointMapEditor({
           </div>
         </div>
 
-        <aside className="point-map-aside flex max-h-[38svh] w-full shrink-0 flex-col border-t bg-background lg:max-h-none lg:w-84 lg:border-t-0 lg:border-l">
+        <aside className="point-map-aside flex max-h-[32svh] w-full shrink-0 flex-col border-t bg-background lg:max-h-none lg:w-84 lg:border-t-0 lg:border-l">
           {selectedPoint ? (
             <SelectedPoint
               code={selectedPoint.code}
@@ -1245,9 +1245,8 @@ export function PointMapEditor({
                   ))}
                 </div>
               </ScrollArea>
-              <div className="space-y-2 border-t p-4 text-sm">
-                <p className="text-xs text-muted-foreground">布置完成后生成或同步报价，即可在报价台统一配置与更换产品型号。</p>
-                {readOnly ? null : (
+              {readOnly ? null : (
+                <div className="border-t p-4">
                   <Button className="w-full" size="sm" disabled={!api || saving || syncingQuote || !scopedPoints.length} onClick={() => void switchToQuote()}>
                     {syncingQuote ? <Loader2 className="size-4 animate-spin" /> : activeQuote ? <ArrowLeftRight className="size-4" /> : <FilePlus2 className="size-4" />}
                     {activeQuote
@@ -1256,8 +1255,8 @@ export function PointMapEditor({
                         ? '生成报价'
                         : `生成报价（${POINT_SCOPES.find((s) => s.value === scope)?.label}）`}
                   </Button>
-                )}
-              </div>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </aside>

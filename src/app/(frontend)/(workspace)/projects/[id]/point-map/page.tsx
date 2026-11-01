@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 
+import { relId } from '@/lib/access'
 import { getCatalog } from '@/lib/cached-data'
 import { parseDefaults } from '@/lib/point-map-items'
 import { isPointScope, type PointScope } from '@/lib/point-scopes'
@@ -27,7 +28,7 @@ export default async function PointMapPage({
       .catch(() => null),
     getProjectDeals(id),
     getCatalog(),
-    getPluginFlags(),
+    getPluginFlags(relId(project.owner) || user.id),
   ])
   if (!scene) notFound()
 

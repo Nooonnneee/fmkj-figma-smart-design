@@ -98,14 +98,14 @@ export function MembershipClient({
 
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-      <PageHeader title="会员与积分" description="查看当前账号的会员权益、活跃项目额度、AI 积分余额，或使用兑换码激活升级" />
+      <PageHeader title="会员与积分" />
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center justify-between">
               <span>当前会员等级</span>
-              <Crown className="size-4 text-chart-4" />
+              <Crown className="size-4 text-muted-foreground" />
             </CardDescription>
             <CardTitle className="flex items-center gap-2 text-xl">
               <span>{m.label}</span>
@@ -114,11 +114,11 @@ export function MembershipClient({
           </CardHeader>
           <CardContent className="text-xs text-muted-foreground">
             {m.expired ? (
-              <span className="text-warning">原会员已于 {fmtDate(m.expiresAt)} 到期，已恢复为标准体验版</span>
+              <span className="text-warning">已于 {fmtDate(m.expiresAt)} 到期</span>
             ) : m.expiresAt ? (
               <span>有效期至 {fmtDate(m.expiresAt)}</span>
             ) : m.effectiveTier === 'free' ? (
-              <span>输入兑换码可升级为专业版或旗舰版</span>
+              <span>可使用兑换码升级</span>
             ) : (
               <span>长期有效</span>
             )}
@@ -129,12 +129,12 @@ export function MembershipClient({
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center justify-between">
               <span>AI 积分余额</span>
-              <Coins className="size-4 text-chart-3" />
+              <Coins className="size-4 text-muted-foreground" />
             </CardDescription>
             <CardTitle className="text-2xl tabular-nums">{initial.aiCredits.toLocaleString('zh-CN')}</CardTitle>
           </CardHeader>
           <CardContent className="text-xs text-muted-foreground">
-            用于 AI 户型点位识别、智能选型与 AI 方案助手对话
+            按实际 Token 与工具调用扣减
           </CardContent>
         </Card>
 
@@ -142,7 +142,7 @@ export function MembershipClient({
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center justify-between">
               <span>进行中项目额度</span>
-              <FolderKanban className="size-4 text-chart-1" />
+              <FolderKanban className="size-4 text-muted-foreground" />
             </CardDescription>
             <CardTitle className="text-2xl tabular-nums">
               {initial.activeProjectCount}
@@ -150,39 +150,37 @@ export function MembershipClient({
             </CardTitle>
           </CardHeader>
           <CardContent className="text-xs text-muted-foreground">
-            已归档的项目不占用进行中额度
+            归档项目不占额度
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Gift className="size-4 text-chart-4" />
-            使用兑换码激活会员或充值积分
-          </CardTitle>
-          <CardDescription>输入管理员发放的兑换码（如 FMKJ-XXXX-XXXX-XXXX），会员时长与 AI 积分立即到账</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleRedeem} className="flex flex-col gap-3 sm:flex-row">
+      <Card className="py-4">
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Gift className="size-4 text-muted-foreground" />
+            <span>兑换码激活或充值</span>
+          </div>
+          <form onSubmit={handleRedeem} className="flex flex-1 flex-col gap-2 sm:max-w-md sm:flex-row">
             <Input
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="请输入兑换码，例如 FMKJ-8K3P-9M2X-4Q7W"
+              placeholder="FMKJ-XXXX-XXXX-XXXX"
+              aria-label="兑换码"
               maxLength={40}
               disabled={pending}
-              className="sm:max-w-sm font-mono uppercase tracking-wider"
+              className="font-mono uppercase tracking-wider"
             />
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending} className="shrink-0">
               {pending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-              立即兑换
+              兑换
             </Button>
           </form>
         </CardContent>
       </Card>
 
       <div className="space-y-3">
-        <h2 className="text-base font-semibold">会员等级与权益说明</h2>
+        <h2 className="text-base font-semibold">会员权益</h2>
         <div className="grid gap-4 md:grid-cols-3">
           {initial.tiers.map((tier) => {
             const current = m.effectiveTier === tier.value
@@ -215,9 +213,8 @@ export function MembershipClient({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <History className="size-4 text-muted-foreground" />
-            AI 积分变动明细
+            积分明细
           </CardTitle>
-          <CardDescription>最近 30 条积分发放、兑换码充值与 AI 对话扣减记录</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {initial.ledger.length === 0 ? (

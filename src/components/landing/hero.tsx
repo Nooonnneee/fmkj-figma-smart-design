@@ -26,17 +26,14 @@ export function Hero() {
       <HeroBackdrop />
       <div className="mx-auto max-w-7xl px-4 pt-16 pb-20 sm:px-6 sm:pt-24 lg:px-8">
         <div className="mx-auto max-w-3xl text-center">
-          <Badge variant="outline" className="relative h-7 gap-1.5 rounded-full bg-card/60 px-3 text-muted-foreground backdrop-blur motion-safe:animate-rise">
-            <Sparkles className="text-chart-4" />
-            AI 户型识别 · 智能选型 · 一键出报价
-            <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-linear-to-r from-transparent via-foreground/20 to-transparent motion-safe:animate-shimmer" />
-          </Badge>
-          <h1 id="hero-title" className="mt-7 text-4xl font-semibold tracking-tight text-balance sm:text-6xl lg:text-7xl motion-safe:animate-rise [--landing-delay:80ms]">
+          <h1 id="hero-title" className="text-4xl font-semibold tracking-tight text-balance sm:text-6xl lg:text-7xl motion-safe:animate-rise">
             画完点位，
-            <span className="bg-linear-to-r from-chart-2 via-chart-1 to-chart-4 bg-size-[200%_auto] bg-clip-text text-transparent motion-safe:animate-gradient-x">报价就好了</span>
+            <span className="text-primary">报价就好了</span>
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-base text-pretty text-muted-foreground sm:text-lg motion-safe:animate-rise [--landing-delay:160ms]">
-            为全屋智能设计师和集成商打造的方案工作台：上传户型图，AI 识别点位、智能选型，一键生成报价单、合同、方案演示和施工交底。
+          {/* 按分句换行：中文自动平衡换行会把「型号」这类词拆开 */}
+          <p className="mx-auto mt-5 max-w-xl text-base text-muted-foreground sm:text-lg motion-safe:animate-rise [--landing-delay:120ms]">
+            <span className="inline-block">上传户型图，AI 自动识别点位、匹配型号，</span>
+            <span className="inline-block">一键导出报价单、合同与施工交底。</span>
           </p>
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3 motion-safe:animate-rise [--landing-delay:240ms]">
             <Button asChild size="lg" className="h-11 rounded-full px-6 text-base">

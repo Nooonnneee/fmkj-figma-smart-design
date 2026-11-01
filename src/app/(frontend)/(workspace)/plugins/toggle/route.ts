@@ -1,3 +1,5 @@
+import { revalidatePath } from 'next/cache'
+
 import { appAuth } from '@/lib/app-auth'
 import { getCompanyInfo } from '@/lib/cached-data'
 import { getPayloadClient } from '@/lib/payload'
@@ -56,6 +58,8 @@ export async function POST(request: Request) {
       overrideAccess: true,
       depth: 0,
     })
+    // 插件开关影响整个工作区（侧边栏、归档页文档入口等），统一失效页面缓存
+    revalidatePath('/', 'layout')
     return Response.json({ ok: true, enabled: body.enabled })
   } catch (error) {
     const status = (error as { status?: number })?.status

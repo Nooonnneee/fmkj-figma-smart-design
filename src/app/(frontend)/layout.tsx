@@ -1,6 +1,5 @@
 import React from "react"
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
 import Script from "next/script"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ACCENT_INIT_SCRIPT } from "@/lib/appearance"
@@ -13,8 +12,6 @@ import {
   sanitizeHtmlAttribute,
 } from "@/lib/make-site-settings"
 import "./styles.css"
-
-const fontSans = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" })
 
 const defaultTitle = `${APP_NAME} ${APP_TAGLINE}`
 const title = makeSiteSettings.title ?? defaultTitle
@@ -63,7 +60,7 @@ export default function RootLayout({
   const customScripts = makeSiteSettings.customScripts
 
   return (
-    <html lang={language} suppressHydrationWarning className={`${fontSans.variable} bg-background`}>
+    <html lang={language} suppressHydrationWarning className="bg-background">
       <head>
         {/* 恢复主题风格，避免首屏闪烁 */}
         <script dangerouslySetInnerHTML={{ __html: ACCENT_INIT_SCRIPT }} />

@@ -6,7 +6,6 @@ import { AppWindow, ArrowRight, Keyboard, Printer, RefreshCw, Server, ShieldChec
 import { DesktopHeroActions, DesktopPlatformCards } from '@/components/download/desktop-downloads'
 import { LandingFooter, LandingNav } from '@/components/landing/landing-chrome'
 import { SectionHeading } from '@/components/landing/section-heading'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Kbd, KbdGroup } from '@/components/ui/kbd'
 import { APP_NAME, pageTitle } from '@/lib/brand'
@@ -24,12 +23,12 @@ const SHORTCUTS = [
 ]
 
 const FEATURES = [
-  { icon: AppWindow, title: '独立窗口，专注工作', text: '不再和浏览器标签页混在一起。记住窗口大小和位置，下次打开直接回到上次的页面，也能同时开多个窗口对照方案。' },
-  { icon: Keyboard, title: '常用操作有快捷键', text: '在项目、产品库之间快速切换，打印报价单、新开窗口都不用找按钮。macOS 上把 Ctrl 换成 ⌘。' },
-  { icon: Printer, title: '打印和导出更顺手', text: '报价单、合同直接调用系统打印；导出文件时先选择保存位置，下载完成会通知，并能一键打开所在文件夹。' },
-  { icon: RefreshCw, title: '自动更新，断网重连', text: 'Windows 版在后台下载新版本，重启即完成更新；macOS 版有新版本时及时提醒。网络中断时自动重试，恢复后回到原来的页面。' },
-  { icon: ShieldCheck, title: '只连接你的服务器', text: '客户端只加载繁梦空间服务器上的页面，其它链接一律交给系统浏览器打开。在公用电脑上可以一键退出登录并清除本地数据。' },
-  { icon: Server, title: '支持私有部署', text: '团队自建服务器时，在「帮助 → 服务器设置」里填写自己的地址即可，新版本也从你的服务器下发。' },
+  { icon: AppWindow, title: '独立窗口，专注工作', text: '记住窗口尺寸与上次打开的页面，支持多窗口并排对照方案。' },
+  { icon: Keyboard, title: '全局快捷键', text: '快速切换项目与产品库、一键唤起打印（macOS 使用 ⌘）。' },
+  { icon: Printer, title: '顺手打印与导出', text: '直接调用系统打印；导出 PDF 时自选路径，完成后一键打开目录。' },
+  { icon: RefreshCw, title: '自动更新与断网重连', text: '后台静默更新版本，网络波动自动重连并恢复当前工作页。' },
+  { icon: ShieldCheck, title: '安全隔离', text: '仅加载工作台安全域名，公用电脑支持一键退出并清理本地缓存。' },
+  { icon: Server, title: '支持私有部署', text: '在「帮助 → 服务器设置」配置团队自建服务器地址。' },
 ]
 
 const INSTALL_STEPS = [
@@ -50,7 +49,7 @@ const INSTALL_STEPS = [
 /** 下载页：Windows / macOS 桌面客户端与网页安装版 */
 export default function DownloadPage() {
   return (
-    <div data-landing className="dark relative min-h-svh overflow-x-clip bg-background text-foreground">
+    <div data-landing data-accent="fanmeng" className="dark relative min-h-svh overflow-x-clip bg-background text-foreground">
       <LandingNav />
       <main>
         <section aria-labelledby="download-title" className="relative isolate overflow-hidden">
@@ -60,13 +59,10 @@ export default function DownloadPage() {
           </div>
           <div className="mx-auto grid max-w-6xl items-center gap-14 px-4 pt-20 pb-16 sm:px-6 sm:pt-28 lg:grid-cols-2 lg:px-8">
             <div>
-              <Badge variant="outline" className="h-7 rounded-full bg-card/60 px-3 text-muted-foreground">
-                桌面客户端 · Windows / macOS
-              </Badge>
-              <h1 id="download-title" className="mt-6 text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+              <h1 id="download-title" className="text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
                 把{APP_NAME}装进你的电脑
               </h1>
-              <p className="mt-5 max-w-xl text-base text-pretty text-muted-foreground sm:text-lg">
+              <p className="mt-4 max-w-xl text-base text-balance text-muted-foreground sm:text-lg">
                 独立窗口打开工作台，设计、报价、合同一气呵成。登录一次长期有效，新版本自动送达。
               </p>
               <DesktopHeroActions />

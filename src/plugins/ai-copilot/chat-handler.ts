@@ -4,6 +4,7 @@ import { loadProjectDocs } from '@/lib/project-docs'
 import type { User } from '@/payload-types'
 import { getPluginFlags } from '@/plugins/state'
 
+import { UsageMeter } from './billing'
 import { AiError, availableTools, complete, findModel, resolveModelApiKey, runTool, stream, stripDsml, systemPrompt, type LlmMessage, type ToolContext } from './server'
 
 const MAX_INPUT = 32000
@@ -12,10 +13,11 @@ const fail = (status: number, error: string) => Response.json({ ok: false, error
 
 /**
  * AI 对话（网页侧栏和微信小程序共用）：{ conversationId?, message, modelId, projectId?, pluginIds? }
- * 返回 NDJSON 流：meta → tool* → reasoning* / delta* → done | error。调用成功后才扣积分，出错不扣。
+ * 返回 NDJSON 流：meta → tool* → reasoning* / delta* → done | error。
+ * 按实际用量计费（tokens × 模型倍率 + 工具调用费用，见 billing.ts），调用成功后才扣，出错不扣。
  */
 export async function handleAiChat(request: Request, user: User): Promise<Response> {
-  const [flags, company] = await Promise.all([getPluginFlags(), getCompanyInfo()])
+  const [flags, company] = await Promise.all([getPluginFlags(user.id), getCompanyInfo(user.id)])
   if (!flags['ai-copilot']) return fail(404, '「AI 对话」插件已关闭')
 
   const body = (await request.json().catch(() => null)) as { conversationId?: unknown; message?: unknown; modelId?: unknown; projectId?: unknown; pluginIds?: unknown } | null
@@ -31,7 +33,7 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
 
   const payload = await getPayloadClient()
   const me = await payload.findByID({ collection: 'users', id: user.id, depth: 0, overrideAccess: true, select: { aiCredits: true } })
-  if ((me.aiCredits ?? 0) < model.cost) return fail(402, `积分不足（剩余 ${me.aiCredits ?? 0}，本次需要 ${model.cost}），请联系管理员发放`)
+  if ((me.aiCredits ?? 0) < 1) return fail(402, '积分已用完，请在「会员与积分」页兑换或联系管理员发放')
 
   // 会话：沿用自己的会话，或新建
   let conversationId = typeof body?.conversationId === 'string' && body.conversationId ? body.conversationId : null
@@ -86,12 +88,16 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
           send({ type: 'project', project: proj })
         },
       }
+      const meter = new UsageMeter()
+      const promptText = () => messages.map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n')
       try {
         let content = ''
         if (tools.length) {
           // 支持多步连续调用工具（最多 10 轮，例如：新建项目 → 添加户型图 → 智能选型 → 生成报价单 → 生成合同）
           for (let step = 0; step < 10; step++) {
+            const input = promptText()
             const turn = await complete(model, messages, tools.map((t) => t.definition))
+            meter.add(turn.usage, { input, output: (turn.content ?? '') + JSON.stringify(turn.tool_calls ?? '') })
             if (!turn.tool_calls?.length) {
               content = stripDsml(turn.content)
               if (content) send({ type: 'delta', text: content })
@@ -100,6 +106,7 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
             messages.push({ role: 'assistant', content: turn.content ?? null, tool_calls: turn.tool_calls })
             for (const call of turn.tool_calls) {
               const r = await runTool(tools, call, ctx)
+              if (r.tool) meter.tool(call.function.name)
               if (r.tool) {
                 const entry = { pluginId: r.tool.pluginId ?? 'core', pluginName: r.tool.pluginName, summary: r.summary ?? '', href: r.href, hrefLabel: r.hrefLabel }
                 toolLog.push(entry)
@@ -110,15 +117,25 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
           }
         }
         if (!content) {
+          const input = promptText()
+          let usage: { prompt_tokens?: number; completion_tokens?: number } | null = null
+          let reasoning = ''
           const raw = await stream(
             model,
             messages,
             (t) => {
               if (!t.includes('DSML')) send({ type: 'delta', text: t })
             },
-            (t) => send({ type: 'reasoning', text: t }),
+            (t) => {
+              reasoning += t
+              send({ type: 'reasoning', text: t })
+            },
             request.signal,
+            (u) => {
+              usage = u
+            },
           )
+          meter.add(usage, { input, output: raw + reasoning })
           content = stripDsml(raw)
         }
         if (!content.trim() && toolLog.length) {
@@ -127,24 +144,30 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
         }
         if (!content.trim()) throw new AiError('AI 没有返回内容，请重试')
 
+        // 按量计费；余额不够本次实际用量时扣到 0 为止（调用前已确认余额 ≥ 1）
+        const fresh = await payload.findByID({ collection: 'users', id: user.id, depth: 0, overrideAccess: true, select: { aiCredits: true } })
+        const cost = Math.min(meter.credits(model.cost), Math.max(0, fresh.aiCredits ?? 0))
+        const usage = { inputTokens: meter.inputTokens, outputTokens: meter.outputTokens, toolCalls: meter.tools.length, estimated: meter.estimated > 0 }
         const reply = await payload.create({
           collection: 'ai-messages',
-          data: { conversation: conversationId, owner: user.id, role: 'assistant', content, model: model.id, cost: model.cost, toolCalls: toolLog.length ? toolLog : undefined },
+          data: { conversation: conversationId, owner: user.id, role: 'assistant', content, model: model.id, cost, toolCalls: toolLog.length ? toolLog : undefined },
           overrideAccess: true,
           depth: 0,
         })
         let balance: number | null = null
-        try {
-          const entry = await payload.create({
-            collection: 'ai-credit-ledger',
-            data: { user: user.id, delta: -model.cost, reason: `AI 对话 · ${model.name}`, model: model.id, message: reply.id },
-            overrideAccess: true,
-            depth: 0,
-          })
-          balance = entry.balanceAfter ?? null
-        } catch (error) {
-          console.error('[ai] credit deduction failed', error)
-        }
+        if (cost > 0) {
+          try {
+            const entry = await payload.create({
+              collection: 'ai-credit-ledger',
+              data: { user: user.id, delta: -cost, reason: `AI 对话 · ${model.name} · ${meter.summary()}`.slice(0, 120), model: model.id, message: reply.id },
+              overrideAccess: true,
+              depth: 0,
+            })
+            balance = entry.balanceAfter ?? null
+          } catch (error) {
+            console.error('[ai] credit deduction failed', error)
+          }
+        } else balance = fresh.aiCredits ?? 0
         await payload
           .update({
             collection: 'ai-conversations',
@@ -154,7 +177,7 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
             depth: 0,
           })
           .catch(() => null)
-        send({ type: 'done', messageId: String(reply.id), cost: model.cost, balance, mutated: ctx.mutated, projectId: ctx.projectId })
+        send({ type: 'done', messageId: String(reply.id), cost, usage, balance, mutated: ctx.mutated, projectId: ctx.projectId })
       } catch (error) {
         send({ type: 'error', error: error instanceof AiError ? error.message : 'AI 服务出错，请稍后重试' })
         if (!(error instanceof AiError)) console.error('[ai] chat failed', error)

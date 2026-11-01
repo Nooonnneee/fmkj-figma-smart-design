@@ -104,10 +104,10 @@ export function PluginList({ items, selectedId }: { items: PluginViewItem[]; sel
         )}
       >
         <CardHeader className="flex flex-row items-start justify-between gap-3 pb-0">
-          <div className="flex min-w-0 items-start gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <div
               className={cn(
-                'flex size-10 shrink-0 items-center justify-center rounded-xl border',
+                'flex size-9 shrink-0 items-center justify-center rounded-xl border',
                 pending
                   ? 'bg-muted text-muted-foreground'
                   : enabled
@@ -115,33 +115,20 @@ export function PluginList({ items, selectedId }: { items: PluginViewItem[]; sel
                     : 'bg-muted/60 text-muted-foreground',
               )}
             >
-              <Icon className="size-5" />
+              <Icon className="size-4.5" />
             </div>
-            <div className="min-w-0 space-y-1">
-              <CardTitle className="text-base leading-snug">
-                <Link
-                  href={`/plugins/${p.id}`}
-                  className={cn('underline-offset-4 hover:underline', pending && 'text-muted-foreground')}
-                >
-                  {p.name}
-                </Link>
-              </CardTitle>
-              <div>
-                {pending ? (
-                  <Badge variant="outline" className="h-5 px-1.5 text-[11px] text-muted-foreground">
-                    待开发
-                  </Badge>
-                ) : (
-                  <Badge variant={enabled ? 'success' : 'outline'} className="h-5 px-1.5 text-[11px]">
-                    {enabled ? '已开启' : '已关闭'}
-                  </Badge>
-                )}
-              </div>
-            </div>
+            <CardTitle className="min-w-0 truncate text-base leading-snug">
+              <Link
+                href={`/plugins/${p.id}`}
+                className={cn('underline-offset-4 hover:underline', pending && 'text-muted-foreground')}
+              >
+                {p.name}
+              </Link>
+            </CardTitle>
           </div>
           <div className="shrink-0 pt-0.5">
             {pending ? (
-              <span className="text-xs text-muted-foreground">规划中</span>
+              <Badge variant="outline" className="text-xs text-muted-foreground">待开发</Badge>
             ) : (
               <Switch
                 id={`plugin-${p.id}`}
@@ -155,10 +142,10 @@ export function PluginList({ items, selectedId }: { items: PluginViewItem[]; sel
         </CardHeader>
 
         <CardContent className="flex flex-1 flex-col justify-between gap-3 py-0">
-          <p className="line-clamp-3 text-xs leading-relaxed text-muted-foreground">{p.description}</p>
+          <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{p.description}</p>
           <div className="flex flex-wrap gap-1.5">
             {p.provides.map((x) => (
-              <span key={x} className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+              <span key={x} className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                 {x}
               </span>
             ))}
@@ -167,7 +154,6 @@ export function PluginList({ items, selectedId }: { items: PluginViewItem[]; sel
 
         <CardFooter className="flex items-center justify-between gap-2 border-t pt-3 pb-0 text-xs text-muted-foreground">
           <span className="truncate" title={p.where}>
-            {pending ? '规划：' : '位置：'}
             {p.where}
           </span>
           <Button asChild variant="ghost" size="xs" className="-mr-2 shrink-0 text-muted-foreground hover:text-foreground">
@@ -182,22 +168,16 @@ export function PluginList({ items, selectedId }: { items: PluginViewItem[]; sel
   }
 
   return (
-    <div className="flex flex-col gap-7">
+    <div className="flex flex-col gap-6">
       {ready.length ? (
         <div className="space-y-3">
-          <div className="space-y-0.5">
-            <h2 className="text-base font-semibold">已开发插件</h2>
-            <p className="text-xs text-muted-foreground">可以随时按需开启或关闭；关闭后相关入口自动隐藏，已有项目和报价数据不受影响</p>
-          </div>
+          {comingSoon.length ? <h2 className="text-sm font-semibold text-muted-foreground">已开发</h2> : null}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{ready.map(renderCard)}</div>
         </div>
       ) : null}
       {comingSoon.length ? (
         <div className="space-y-3">
-          <div className="space-y-0.5">
-            <h2 className="text-base font-semibold">待开发插件</h2>
-            <p className="text-xs text-muted-foreground">围绕现场勘测、强弱电交底、采购备货与售后维保的外围能力规划，后续按独立插件逐步接入</p>
-          </div>
+          {ready.length ? <h2 className="text-sm font-semibold text-muted-foreground">待开发</h2> : null}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{comingSoon.map(renderCard)}</div>
         </div>
       ) : null}

@@ -40,7 +40,7 @@ export default async function PluginsPage({
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <PageHeader
         title="插件市场"
-        description="核心流程（信息 → 点位 → 报价 → 合同 → 归档）始终可用；外围功能按需启用，标「待开发」的即将上线"
+        description="按需启用外围扩展能力，关闭后不影响已有项目数据"
         actions={
           <FilterTabs
             label="插件状态筛选"

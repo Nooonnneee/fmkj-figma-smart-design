@@ -260,7 +260,7 @@ export function AiSidebarDock({
     const text = raw.trim()
     if ((!text && readyAtts.length === 0) || streaming) return
     if (!configured) return toast.error('还没有配置 AI 密钥')
-    if (credits < model.cost) return toast.error(`积分不足（剩余 ${credits}，需要 ${model.cost}），请联系管理员发放`)
+    if (credits < 1) return toast.error('积分已用完，请在「会员与积分」页兑换或联系管理员发放')
 
     // 如果用户只拖入了附件没有输入文字，自动补一句默认说明
     const displayPrompt =
@@ -418,8 +418,8 @@ export function AiSidebarDock({
           <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Upload className="size-5" />
           </div>
-          <p className="text-sm font-medium text-foreground">释放鼠标上传文件到 AI 对话</p>
-          <p className="text-xs text-muted-foreground">支持户型图（PNG / JPG / WebP）、点位识别 JSON（fmkj-points）、CSV / TXT 需求清单</p>
+          <p className="text-sm font-medium text-foreground">松开上传文件</p>
+          <p className="text-xs text-muted-foreground">支持户型图、点位 JSON、CSV / TXT 清单</p>
         </div>
       ) : null}
 
@@ -480,7 +480,7 @@ export function AiSidebarDock({
         {!configured ? (
           <div className="flex items-start gap-2 rounded-xl border border-dashed p-3 text-xs text-muted-foreground">
             <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
-            <span>还没有配置当前 AI 模型的密钥环境变量。请在「设置 → AI 模型与接口配置」中查看所需的环境变量名并添加密钥。</span>
+            <span>尚未配置 AI 密钥，请联系管理员在后台配置。</span>
           </div>
         ) : null}
         {loadingHistory ? (
@@ -542,7 +542,6 @@ export function AiSidebarDock({
           onAddFiles={(files) => void handleAddFiles(files)}
           onRemoveAttachment={(id) => setAttachments((prev) => prev.filter((a) => a.id !== id))}
         />
-        <p className="mt-1.5 text-center text-[11px] text-muted-foreground">AI 生成内容仅供参考，请核对后使用</p>
       </div>
     </div>
   )

@@ -22,6 +22,7 @@ import { ProjectShareDialog } from './project-share-dialog'
 export function ProjectHeader({
   projectId,
   name,
+  demo = false,
   subtitle,
   archived,
   role = 'owner',
@@ -29,6 +30,7 @@ export function ProjectHeader({
 }: {
   projectId: string
   name: string
+  demo?: boolean
   subtitle: string
   archived: boolean
   role?: ProjectRole
@@ -48,13 +50,16 @@ export function ProjectHeader({
           </GuardedLink>
           <ChevronRight aria-hidden className="hidden size-3.5 shrink-0 text-muted-foreground/60 sm:block" />
           <div className="min-w-0 md:max-w-[16rem] xl:max-w-[22rem]">
-            <h1 className="truncate text-sm leading-tight font-semibold" title={name}>{name}</h1>
-            {subtitle ? <p className="truncate text-[11px] leading-tight text-muted-foreground">{subtitle}</p> : null}
+            <div className="flex min-w-0 items-center gap-1.5">
+              <h1 className="truncate text-sm leading-tight font-semibold" title={name}>{name}</h1>
+              {demo ? <Badge variant="secondary" className="h-4 shrink-0 px-1.5 text-[0.6875rem]">示例</Badge> : null}
+            </div>
+            {subtitle ? <p className="truncate text-xs leading-tight text-muted-foreground">{subtitle}</p> : null}
           </div>
         </div>
         <div className="flex h-12 items-center gap-1.5 pr-3 md:order-last md:ml-auto md:pr-4">
           {role !== 'owner' ? (
-            <Badge variant={role === 'edit' ? 'outline' : 'secondary'} className="text-[11px]">
+            <Badge variant={role === 'edit' ? 'outline' : 'secondary'} className="text-xs">
               {role === 'edit' ? '协作 · 可编辑' : '协作 · 仅查看'}
             </Badge>
           ) : null}

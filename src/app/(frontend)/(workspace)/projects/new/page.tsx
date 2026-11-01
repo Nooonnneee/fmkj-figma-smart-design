@@ -36,7 +36,7 @@ export default async function NewProjectPage() {
       <Button asChild variant="ghost" size="sm" className="-ml-2 w-fit text-muted-foreground">
         <Link href="/projects"><ChevronLeft className="size-4" />项目</Link>
       </Button>
-      <PageHeader title="新建项目" description="除了名称都可以先空着，之后在项目「信息」里补充；创建后就能上传户型图布置点位。" />
+      <PageHeader title="新建项目" />
       <ProjectForm initial={{ platform }} />
     </section>
   )

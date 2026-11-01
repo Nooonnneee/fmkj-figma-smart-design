@@ -11,11 +11,13 @@ import { cn } from '@/lib/utils'
 
 import { getProject, getProjectDeals } from '../project-data'
 import { ArchiveButton } from './archive-button'
+import { quoteShortTitle } from '@/lib/project-name'
 
 /** 归档：交付前核对资料是否齐全，打印留档，然后归档（项目转为只读）。 */
 export default async function ProjectArchivePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const [{ project, archived, role }, { quotes, contract }, flags] = await Promise.all([getProject(id), getProjectDeals(id), getPluginFlags()])
+  const [{ user, project, archived, role }, { quotes, contract }] = await Promise.all([getProject(id), getProjectDeals(id)])
+  const flags = await getPluginFlags(relId(project.owner) || user.id)
   const pid = String(project.id)
   const points = project.pointCount ?? 0
   const finalQuote = quotes.find((q) => String(q.id) === relId(contract?.quote)) ?? quotes.find((q) => q.status === 'accepted') ?? quotes[0] ?? null
@@ -28,7 +30,7 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
     {
       label: '定稿报价',
       done: Boolean(finalQuote && (finalQuote.status === 'accepted' || contract)),
-      note: finalQuote ? `${finalQuote.title} · ${quoteStatusLabel(finalQuote.status)} · ${yuan(finalQuote.total)}` : '还没有报价',
+      note: finalQuote ? `${quoteShortTitle(finalQuote.title, project.name)} · ${quoteStatusLabel(finalQuote.status)} · ${yuan(finalQuote.total)}` : '还没有报价',
       href: finalQuote ? `/projects/${pid}/quotes/${finalQuote.id}` : `/projects/${pid}/quotes`,
     },
     {
@@ -55,7 +57,7 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
       <header className="space-y-1">
         <h2 className="text-xl font-semibold tracking-tight">归档</h2>
         <p className="text-sm text-muted-foreground">
-          {archived ? `项目于 ${fmtLongDate(project.archivedAt)} 归档，所有资料只读保存。` : '交付完成后归档：项目移到「已归档」，点位、报价、合同都转为只读。'}
+          {archived ? `已于 ${fmtLongDate(project.archivedAt)} 归档（只读）` : '核对交付资料、导出打印并归档'}
         </p>
       </header>
 
@@ -75,9 +77,9 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
       </section>
 
       <section aria-labelledby="docs-title" className="rounded-xl bg-card shadow-sm ring-1 ring-foreground/5 dark:ring-foreground/10">
-        <div className="border-b px-5 py-3.5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 border-b px-5 py-3.5">
           <h3 id="docs-title" className="text-base font-semibold">资料导出</h3>
-          <p className="text-sm text-muted-foreground">项目全套交付资料统一在此查看与导出；版式和风格可在预览页顶部切换，默认值在「设置 → 文档模板」。</p>
+          <span className="text-xs text-muted-foreground">进入预览可切换版式、风格并导出 PDF</span>
         </div>
         <div className="divide-y">
           <DocLink href={points ? `/print/projects/${pid}/plans` : null} title="点位图" note={points ? '每张图纸一页，附设备图例和统计' : '还没有布置点位'} />
@@ -87,7 +89,7 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
               <DocLink
                 key={String(q.id)}
                 href={`/print/quotes/${q.id}`}
-                title={`报价单 · ${q.title}`}
+                title={`报价单 · ${quoteShortTitle(q.title, project.name)}`}
                 note={`${quoteStatusLabel(q.status)} · ${yuan(q.total)}`}
               />
             ))
@@ -106,8 +108,8 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
       {role !== 'read' ? (
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed px-5 py-4">
           <div className="text-sm">
-            <div className="font-medium">{archived ? '恢复项目' : ready ? '资料齐全，可以归档' : '可以随时归档'}</div>
-            <div className="text-muted-foreground">{archived ? '恢复后回到「进行中」，可以继续修改。' : ready ? '归档后仍然可以随时查看和导出资料。' : '未完成的项也可以先归档，之后恢复再补。'}</div>
+            <div className="font-medium">{archived ? '恢复为进行中项目' : ready ? '资料已齐备，可归档' : '归档项目'}</div>
+            <div className="text-xs text-muted-foreground">{archived ? '恢复后可继续编辑点位、报价和合同' : '归档后转为只读，仍可查看与导出资料'}</div>
           </div>
           <ArchiveButton projectId={pid} archived={archived} primary={ready} />
         </section>

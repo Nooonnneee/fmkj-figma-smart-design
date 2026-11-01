@@ -14,7 +14,6 @@ import { yuan } from '@/lib/quotes'
 import { cn } from '@/lib/utils'
 
 import { DEMO_QUOTE, DEMO_QUOTE_TOTALS } from './demo-data'
-import { SectionEyebrow } from './section-heading'
 
 /** 首页样张用的示例抬头 */
 const DEMO_COMPANY: CompanyInfo = {
@@ -50,12 +49,11 @@ export function QuoteShowcase({ styles, layouts }: { styles: DocStyle[]; layouts
       <div aria-hidden className="pointer-events-none absolute top-1/4 right-0 -z-10 size-160 translate-x-1/3 rounded-full bg-chart-4/15 blur-3xl" />
       <Tabs value={value} onValueChange={setValue} className="mx-auto grid max-w-7xl items-center gap-14 px-4 sm:px-6 lg:grid-cols-12 lg:gap-16 lg:px-8">
         <div className="lg:col-span-5">
-          <SectionEyebrow>报价单</SectionEyebrow>
-          <h2 id="quote-title" className="mt-5 text-3xl font-semibold tracking-tight text-balance sm:text-4xl lg:text-5xl">
+          <h2 id="quote-title" className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl lg:text-5xl">
             一份让客户眼前一亮的报价单
           </h2>
-          <p className="mt-5 text-base text-pretty text-muted-foreground sm:text-lg">
-            同一份数据，{layouts.length} 种版式、{styles.length} 套风格随心切换。分区明细、产品图文、签字盖章一应俱全，金额由系统自动核算。
+          <p className="mt-4 text-base text-balance text-muted-foreground sm:text-lg">
+            同一份数据，{layouts.length} 种版式、{styles.length} 套风格即时切换，金额自动核算。
           </p>
           <div className="mt-8">
             <p className="text-sm font-medium">换一套风格看看</p>

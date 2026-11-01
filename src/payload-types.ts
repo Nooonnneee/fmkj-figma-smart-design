@@ -1696,6 +1696,9 @@ export interface CompanySetting {
         name: string;
         channelId: 'deepseek' | 'newapi' | 'siliconflow' | 'dashscope' | 'ark' | 'moonshot' | 'zhipu' | 'openrouter';
         apiModel: string;
+        /**
+         * 按用量计费：每次对话积分 = 倍率 ×（每 1K 输入 tokens 0.1 + 每 1K 输出 tokens 0.5）+ 工具调用费用，向上取整、最少 1。贵的模型可设 2、3。
+         */
         cost: number;
         tag?: string | null;
         description?: string | null;

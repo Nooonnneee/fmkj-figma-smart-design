@@ -23,7 +23,7 @@ export function DocumentTemplateSettings({ kinds, styles, defaults }: { kinds: D
     <Card>
       <CardHeader>
         <CardTitle>文档模板</CardTitle>
-        <CardDescription>打印报价单、点位图、合同和交底清单时默认使用的风格与版式，打印页顶部仍可临时切换</CardDescription>
+        <CardDescription>各类交付文档的默认风格与版式，预览时可随时切换</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         {kinds.map((k) => {
@@ -60,15 +60,6 @@ export function DocumentTemplateSettings({ kinds, styles, defaults }: { kinds: D
             </div>
           )
         })}
-        <div className="grid gap-1.5 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
-          {styles.map((s) => (
-            <p key={s.id} className="flex items-center gap-2">
-              <Swatch colors={s.swatch} />
-              <span className="shrink-0 font-medium text-foreground">{s.name}</span>
-              <span className="min-w-0">{s.description}</span>
-            </p>
-          ))}
-        </div>
       </CardContent>
     </Card>
   )

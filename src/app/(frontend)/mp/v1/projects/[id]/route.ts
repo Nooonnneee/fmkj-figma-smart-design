@@ -7,8 +7,9 @@ import { getPluginFlags } from '@/plugins/state'
 
 /** 项目详情：资料、进度、点位与预算概况、报价、合同、可打印的文档。 */
 export const GET = mpRoute<{ id: string }>(async ({ user, params }) => {
-  const [d, flags] = await Promise.all([loadProjectDocs(params.id, user, 'all'), getPluginFlags()])
+  const d = await loadProjectDocs(params.id, user, 'all')
   if (!d) return fail(404, '项目不存在或已被删除')
+  const flags = await getPluginFlags(d.owner?.id ?? user.id)
   const id = String(d.project.id)
   const latestQuote = d.quotes[0] ?? null
   return ok({

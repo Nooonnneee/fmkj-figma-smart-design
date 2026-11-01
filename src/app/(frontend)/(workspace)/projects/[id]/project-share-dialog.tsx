@@ -153,7 +153,7 @@ export function ProjectShareDialog({
         <Button variant="outline" size="xs" className="h-7 gap-1.5 px-2.5 text-xs">
           <Users className="size-3.5" />
           <span>协作</span>
-          {count > 0 ? <span className="rounded-full bg-muted px-1.5 text-[10px] tabular-nums">{count}</span> : null}
+          {count > 0 ? <span className="rounded-full bg-muted px-1.5 text-xs tabular-nums">{count}</span> : null}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
@@ -163,9 +163,7 @@ export function ProjectShareDialog({
             项目协作 · {projectName}
           </DialogTitle>
           <DialogDescription>
-            {isOwner
-              ? '你是该项目的创建者（管理员）。复制下方链接发给他人，即可授予该项目「仅查看」或「可编辑」权限。'
-              : '你正在参与该项目的协作，以下为当前项目的权限信息。'}
+            {isOwner ? '通过分享链接邀请同事或客户查看、编辑此项目' : '当前项目的协作权限与成员'}
           </DialogDescription>
         </DialogHeader>
 
@@ -208,8 +206,8 @@ export function ProjectShareDialog({
                       >
                         <Eye className="size-4 shrink-0 text-muted-foreground" />
                         <div>
-                          <div className="font-medium">仅查看（只读）</div>
-                          <div className="text-[11px] text-muted-foreground">可看点位、报价与导出资料</div>
+                          <div className="font-medium">仅查看</div>
+                          <div className="text-xs text-muted-foreground">查看点位、报价与导出</div>
                         </div>
                       </button>
                       <button
@@ -223,8 +221,8 @@ export function ProjectShareDialog({
                       >
                         <PencilLine className="size-4 shrink-0 text-muted-foreground" />
                         <div>
-                          <div className="font-medium">可编辑（共同协作）</div>
-                          <div className="text-[11px] text-muted-foreground">可一起改点位、报价与合同</div>
+                          <div className="font-medium">可编辑</div>
+                          <div className="text-xs text-muted-foreground">共同编辑点位、报价与合同</div>
                         </div>
                       </button>
                     </div>
@@ -248,7 +246,7 @@ export function ProjectShareDialog({
                     </div>
                   </>
                 ) : (
-                  <p className="text-xs text-muted-foreground">协作链接已关闭，其他人无法再通过链接新加入，已加入的协作者不受影响。</p>
+                  <p className="text-xs text-muted-foreground">链接已关闭，仅已加入成员可访问。</p>
                 )}
               </div>
             ) : null}
@@ -261,11 +259,11 @@ export function ProjectShareDialog({
                 <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 text-xs">
                   <div className="min-w-0">
                     <div className="truncate font-medium">{state.owner.name}</div>
-                    {state.owner.email ? <div className="truncate text-[11px] text-muted-foreground">{state.owner.email}</div> : null}
+                    {state.owner.email ? <div className="truncate text-xs text-muted-foreground">{state.owner.email}</div> : null}
                   </div>
-                  <Badge variant="outline" className="shrink-0 gap-1 text-[11px]">
+                  <Badge variant="outline" className="shrink-0 gap-1 text-xs">
                     <Shield className="size-3 text-primary" />
-                    项目管理员（创建者）
+                    创建者
                   </Badge>
                 </div>
 
@@ -274,7 +272,7 @@ export function ProjectShareDialog({
                   <div key={c.userId} className="flex items-center justify-between gap-3 px-3.5 py-2.5 text-xs">
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium">{c.name}</div>
-                      {c.email ? <div className="truncate text-[11px] text-muted-foreground">{c.email}</div> : null}
+                      {c.email ? <div className="truncate text-xs text-muted-foreground">{c.email}</div> : null}
                     </div>
                     {isOwner ? (
                       <div className="flex shrink-0 items-center gap-1.5">
@@ -304,7 +302,7 @@ export function ProjectShareDialog({
                         </Button>
                       </div>
                     ) : (
-                      <Badge variant="secondary" className="text-[11px]">
+                      <Badge variant="secondary" className="text-xs">
                         {c.role === 'edit' ? '可编辑' : '仅查看'}
                       </Badge>
                     )}
@@ -313,7 +311,7 @@ export function ProjectShareDialog({
 
                 {state.collaborators.length === 0 ? (
                   <div className="px-3.5 py-4 text-center text-xs text-muted-foreground">
-                    还没有其他协作者。复制上方协作链接发给同事或客户即可邀请加入。
+                    暂无协作者
                   </div>
                 ) : null}
               </div>

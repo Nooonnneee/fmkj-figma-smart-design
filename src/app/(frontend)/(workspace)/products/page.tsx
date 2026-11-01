@@ -133,7 +133,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   const shown = products.slice((page - 1) * PAGE, page * PAGE)
   const pageHref = (n: number) => { const h = href({}); const q = n > 1 ? `page=${n}` : ''; return q ? (h.includes('?') ? `${h}&${q}` : `${h}?${q}`) : h }
 
-  const n = (v: number) => <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">{v}</span>
+  const n = (v: number) => <span className="ml-auto text-xs text-muted-foreground tabular-nums">{v}</span>
   const navItem = (label: React.ReactNode, active: boolean, to: string, extra?: React.ReactNode, key?: string) => (
     <Link
       key={key}
@@ -155,7 +155,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   )
   const section = (title: string, children: React.ReactNode) => (
     <div className="flex flex-col gap-0.5">
-      <h3 className="px-2 pb-1 text-[11px] font-semibold tracking-wider text-muted-foreground/80">{title}</h3>
+      <h3 className="px-2 pb-1 text-xs font-semibold tracking-wider text-muted-foreground/80">{title}</h3>
       {children}
     </div>
   )
@@ -184,7 +184,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         title="产品库"
         description={
           <>
-            共 <span className="font-medium text-foreground tabular-nums">{products.length}</span> 个产品，点位选型和报价都从这里取价，在后台（/admin）维护
+            共 <span className="font-medium text-foreground tabular-nums">{products.length}</span> 款设备
           </>
         }
         actions={
@@ -211,7 +211,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           htmlFor="product-filters"
           className="flex h-9 cursor-pointer items-center justify-between rounded-lg border bg-background px-3 text-sm font-medium peer-focus-visible:ring-2 peer-focus-visible:ring-ring lg:hidden"
         >
-          <span className="flex items-center gap-2"><SlidersHorizontal className="size-4" />筛选{activeCount ? <span className="rounded-full bg-primary px-1.5 text-[11px] text-primary-foreground tabular-nums">{activeCount}</span> : null}</span>
+          <span className="flex items-center gap-2"><SlidersHorizontal className="size-4" />筛选{activeCount ? <span className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground tabular-nums">{activeCount}</span> : null}</span>
           <ChevronDown className="size-4 text-muted-foreground" />
         </label>
         {/* 吸顶时让出 48px 顶栏 */}
@@ -288,7 +288,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         </aside>
 
         <div className="flex min-w-0 flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-2">
+          {/* 窄屏三组筛选排成一行横向滑动，不再叠成三行把产品挤出首屏 */}
+          <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&>*]:shrink-0">
             {seg(STATUSES, f.status, 'status', '销售状态')}
             {seg([{ value: '', label: '全部图片' }, { value: 'yes', label: '有图' }, { value: 'no', label: '缺图' }], f.img, 'img', '图片')}
             <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -332,7 +333,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                       ) : (
                         <ImageIcon className="size-8 text-muted-foreground/40" aria-hidden="true" />
                       )}
-                      <span className="absolute top-2 left-2 flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-medium shadow-sm ring-1 ring-black/5" style={{ color }}>
+                      <span className="absolute top-2 left-2 flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-xs font-medium shadow-sm ring-1 ring-black/5" style={{ color }}>
                         <span className="size-3.5"><DeviceSymbol type={p.deviceType} /></span>
                         {deviceTypeLabel(p.deviceType)}
                       </span>
@@ -342,17 +343,23 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         {p.brand?.logo ? <BrandLogo name={p.brand.name} logo={p.brand.logo} className="h-3.5" /> : null}
                         <span className="truncate">{p.brand?.name ?? '未知品牌'}</span>
-                        {p.platforms.length ? <span className="ml-auto shrink-0 truncate text-[11px]">{p.platforms.join(' · ')}</span> : null}
+                        {p.platforms.length ? <span className="ml-auto shrink-0 truncate text-xs">{p.platforms.join(' · ')}</span> : null}
                       </div>
                       <h2 className="line-clamp-2 text-sm leading-snug font-medium" title={p.name}>{p.name}</h2>
-                      <p className="truncate font-mono text-[11px] text-muted-foreground" title={model ?? p.sku}>{model ?? p.sku}</p>
+                      <p className="truncate font-mono text-xs text-muted-foreground" title={model ?? p.sku}>{model ?? p.sku}</p>
                       <div className="mt-auto flex items-end justify-between gap-2 pt-2">
                         <div className="leading-tight">
-                          <span className="text-base font-semibold tabular-nums">{yuan(p.price)}</span>
-                          <span className="ml-0.5 text-xs text-muted-foreground">/{p.unit}</span>
-                          <p className="text-[11px] text-muted-foreground tabular-nums">成本 {yuan(p.cost)}</p>
+                          {p.price > 0 ? (
+                            <>
+                              <span className="text-base font-semibold tabular-nums">{yuan(p.price)}</span>
+                              <span className="ml-0.5 text-xs text-muted-foreground">/{p.unit}</span>
+                            </>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">未定价</span>
+                          )}
+                          {p.cost != null && p.cost > 0 ? <p className="text-xs text-muted-foreground tabular-nums">成本 {yuan(p.cost)}</p> : null}
                         </div>
-                        {p.stock !== null ? <span className="text-[11px] text-muted-foreground tabular-nums">{p.stock > 0 ? `库存 ${p.stock}` : '无库存'}</span> : null}
+                        {p.stock !== null ? <span className="text-xs text-muted-foreground tabular-nums">{p.stock > 0 ? `库存 ${p.stock}` : '无库存'}</span> : null}
                       </div>
                     </div>
                   </li>

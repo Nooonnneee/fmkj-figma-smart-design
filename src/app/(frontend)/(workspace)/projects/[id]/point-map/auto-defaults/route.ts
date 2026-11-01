@@ -1,3 +1,4 @@
+import { relId } from '@/lib/access'
 import { appAuth } from '@/lib/app-auth'
 import { autoSelectProducts, isSelectionTier } from '@/plugins/smart-select/auto-select'
 import { getPluginFlags } from '@/plugins/state'
@@ -17,7 +18,6 @@ const fail = (status: number, error: string) => Response.json({ ok: false, error
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await appAuth.getCurrentUser()
   if (!user) return fail(401, '登录已过期，请重新登录')
-  if (!(await getPluginFlags())['smart-select']) return fail(404, '「智能选型」插件已关闭')
   const body = (await request.json().catch(() => null)) as { tier?: unknown; overwrite?: unknown; scope?: unknown } | null
   if (!body || !isSelectionTier(body.tier)) return fail(400, '请选择档次')
   const scope = isPointScope(body.scope) ? body.scope : 'all'
@@ -25,9 +25,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { id } = await params
   const payload = await getPayloadClient()
   const project = await payload
-    .findByID({ collection: 'projects', id, depth: 0, user, overrideAccess: false, select: { platform: true, pointMap: true, defaultProducts: true } })
+    .findByID({ collection: 'projects', id, depth: 0, user, overrideAccess: false, select: { owner: true, platform: true, pointMap: true, defaultProducts: true } })
     .catch(() => null)
   if (!project) return fail(404, '项目不存在或已被删除')
+  if (!(await getPluginFlags(relId(project.owner) || user.id))['smart-select']) return fail(404, '「智能选型」插件已关闭')
 
   const catalog = await getCatalog()
   const byId = new Map(catalog.map((p) => [p.id, p]))

@@ -5,7 +5,6 @@ import { Check, Download, X } from 'lucide-react'
 
 import { LandingFooter, LandingNav } from '@/components/landing/landing-chrome'
 import { SectionHeading } from '@/components/landing/section-heading'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { APP_NAME, COMPANY_NAME } from '@/lib/brand'
 import { cn } from '@/lib/utils'
@@ -69,7 +68,7 @@ function Surface({ dark, className, children }: { dark: boolean; className?: str
 /** 品牌规范页：标志释义、组合、应用图标、品牌色、字体与使用规范，所有资源可下载。 */
 export default function BrandPage() {
   return (
-    <div data-landing className="dark relative min-h-svh overflow-x-clip bg-background text-foreground">
+    <div data-landing data-accent="fanmeng" className="dark relative min-h-svh overflow-x-clip bg-background text-foreground">
       <LandingNav />
       <main>
         <section aria-labelledby="brand-title" className="relative isolate overflow-hidden">
@@ -78,9 +77,8 @@ export default function BrandPage() {
             <div className="absolute -top-40 left-1/2 size-160 -translate-x-1/2 rounded-full bg-brand-indigo/25 blur-3xl" />
           </div>
           <div className="mx-auto max-w-5xl px-4 pt-20 pb-16 text-center sm:px-6 sm:pt-28 lg:px-8">
-            <Badge variant="outline" className="h-7 rounded-full bg-card/60 px-3 text-muted-foreground">品牌标识 · Brand Identity</Badge>
             <h1 id="brand-title" className="sr-only">{COMPANY_NAME}品牌标识</h1>
-            <Image src={`${B}/fmkj-logo-vertical-white.svg`} alt={`${APP_NAME}标识`} width={200} height={290} unoptimized priority className="mx-auto mt-10 h-48 w-auto sm:h-60" />
+            <Image src={`${B}/fmkj-logo-vertical-white.svg`} alt={`${APP_NAME}标识`} width={200} height={290} unoptimized priority className="mx-auto h-48 w-auto sm:h-60" />
             <p className="mx-auto mt-8 max-w-2xl text-base text-pretty text-muted-foreground sm:text-lg">
               {COMPANY_NAME}的品牌标识由「家、新月、繁星」三个元素构成：为每一个家，编织安心入梦的智能空间。
             </p>

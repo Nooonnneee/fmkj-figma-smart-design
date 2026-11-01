@@ -28,7 +28,7 @@ export function SiteHeader() {
   const title = TITLES.find(([re]) => re.test(pathname))?.[1] ?? '工作台'
   return (
     // 顶栏只承载侧边栏开关、当前位置和外观设置，压到 48px，把首屏高度还给内容。
-    <header className="sticky top-0 z-50 flex h-12 shrink-0 items-center gap-2 border-b bg-background/85 px-3 backdrop-blur md:px-4">
+    <header className="sticky top-0 z-50 flex h-12 shrink-0 items-center gap-2 border-b bg-background px-3 md:px-4">
       <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
       <Separator orientation="vertical" className="mx-1 data-vertical:h-4 data-vertical:self-center" />
       <nav aria-label="当前位置" className="flex min-w-0 items-center gap-1.5 text-sm">

@@ -1,3 +1,4 @@
+import { relId } from '@/lib/access'
 import { appAuth } from '@/lib/app-auth'
 import { getPluginFlags } from '@/plugins/state'
 import { getPayloadClient } from '@/lib/payload'
@@ -9,7 +10,6 @@ const fail = (status: number, error: string) => Response.json({ ok: false, error
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await appAuth.getCurrentUser()
   if (!user) return fail(401, '登录已过期，请重新登录')
-  if (!(await getPluginFlags())['dwg-import']) return fail(404, '「DWG 导入」插件已关闭')
 
   const payload = await getPayloadClient()
   const settings = getDwgSettings(payload.config)
@@ -17,9 +17,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const { id } = await params
   const project = await payload
-    .findByID({ collection: 'projects', id, depth: 0, user, overrideAccess: false, select: { name: true } })
+    .findByID({ collection: 'projects', id, depth: 0, user, overrideAccess: false, select: { name: true, owner: true } })
     .catch(() => null)
   if (!project) return fail(404, '项目不存在或已被删除')
+  if (!(await getPluginFlags(relId(project.owner) || user.id))['dwg-import']) return fail(404, '「DWG 导入」插件已关闭')
 
   const form = await request.formData().catch(() => null)
   const file = form?.get('file')

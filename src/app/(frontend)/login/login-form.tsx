@@ -9,8 +9,21 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
+const LOGIN_METHOD_KEY = 'fmkj-login-method'
+const rememberMethod = (method: 'wechat' | 'password') => {
+  try {
+    window.localStorage.setItem(LOGIN_METHOD_KEY, method)
+  } catch {}
+}
+
 export function LoginForm({ redirectTo }: { redirectTo: string }) {
   const [loginTab, setLoginTab] = useState<'wechat' | 'password'>('wechat')
+  // 记住上次成功登录的方式：用邮箱登录过的人下次直接看到邮箱表单（预览环境里扫码登录不可用）
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(LOGIN_METHOD_KEY) === 'password') setLoginTab('password')
+    } catch {}
+  }, [])
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -62,6 +75,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
         if (data.status === 'confirmed') {
           setQrStatus('confirmed')
           clearInterval(timer)
+          rememberMethod('wechat')
           window.location.assign(data.redirectTo || redirectTo)
         } else if (data.status === 'expired') {
           setQrStatus('expired')
@@ -95,6 +109,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
         setLoading(false)
         return
       }
+      rememberMethod('password')
       window.location.assign(redirectTo)
     } catch {
       setError('网络错误，请稍后重试')
@@ -164,7 +179,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
             <div className="space-y-1">
               <div className="text-sm font-medium">请使用微信小程序扫码登录</div>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                打开手机微信小程序，在「我的 → 扫码登录电脑端」扫一扫上方二维码（正式版小程序也支持直接用微信扫一扫）
+                打开小程序「我的 → 扫码登录」或直接用微信扫一扫
               </p>
             </div>
           </div>

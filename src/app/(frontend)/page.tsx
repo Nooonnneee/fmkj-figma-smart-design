@@ -6,11 +6,13 @@ import { Hero } from '@/components/landing/hero'
 import { LandingFooter, LandingNav } from '@/components/landing/landing-chrome'
 import { LogoMarquee } from '@/components/landing/logo-marquee'
 import { QuoteShowcase } from '@/components/landing/quote-showcase'
-import { FinalCta, PointMapSection, SceneSection, StatsBand, WorkflowSection } from '@/components/landing/sections'
+import { RealFlowSection } from '@/components/landing/real-flow'
+import { FinalCta, PointMapSection, SceneSection, StatsBand } from '@/components/landing/sections'
 import { MINIMAL_STYLE } from '@/documents/minimal'
 import { DOC_KIND_LIST, DOC_KINDS } from '@/documents/registry'
 import { APP_NAME } from '@/lib/brand'
 import { DEVICE_TYPE_ORDER } from '@/lib/device-types'
+import { getLandingPlan } from '@/lib/landing-plan'
 import { PLUGIN_DOC_STYLES } from '@/plugins/doc-styles/styles'
 
 export const metadata: Metadata = {
@@ -25,7 +27,11 @@ const NOSCRIPT_CSS =
 const DOC_STYLES = [MINIMAL_STYLE, ...PLUGIN_DOC_STYLES]
 
 /** 首页：面向全屋智能设计师与集成商的产品介绍（静态页面，进入工作台需登录）。 */
-export default function HomePage() {
+/** 首页对照图读取示例项目，按小时重新生成 */
+export const revalidate = 3600
+
+export default async function HomePage() {
+  const plan = await getLandingPlan().catch(() => null)
   const stats = [
     { label: '种设备点位图标', value: DEVICE_TYPE_ORDER.length },
     { label: '种报价单版式', value: DOC_KINDS.quote.layouts.length },
@@ -44,11 +50,11 @@ export default function HomePage() {
       <LandingNav />
       <main>
         <Hero />
+        <RealFlowSection />
         <LogoMarquee />
         <StatsBand stats={stats} />
-        <PointMapSection deviceTypeCount={DEVICE_TYPE_ORDER.length} />
+        <PointMapSection deviceTypeCount={DEVICE_TYPE_ORDER.length} plan={plan} />
         <QuoteShowcase styles={DOC_STYLES} layouts={DOC_KINDS.quote.layouts} />
-        <WorkflowSection />
         <SceneSection />
         <FeatureBento />
         <FinalCta />

@@ -1,3 +1,5 @@
+import type { PayloadRequest } from 'payload'
+
 import { DEFAULT_CONTRACT_TERMS, DEFAULT_DURATION_DAYS, DEFAULT_PAYMENTS, DEFAULT_WARRANTY_MONTHS } from '@/lib/contracts'
 import { relId } from '@/lib/access'
 import { PLAN_H, PLAN_POINTS, PLAN_ROOMS, PLAN_W } from '@/components/landing/demo-data'
@@ -213,28 +215,59 @@ export async function ensureDemoTemplateProject(): Promise<Project | null> {
   return template
 }
 
+function coerceRelId(val: unknown, sampleId: string | number): string | number | null {
+  const raw = relId(val)
+  if (!raw) return null
+  if (typeof sampleId === 'number') {
+    const n = Number(raw)
+    return Number.isFinite(n) ? n : null
+  }
+  return raw
+}
+
 /**
  * 为新注册/新建的成员账号自动发放一份独立的示例项目副本（含三层点位图、默认选型与示例报价单）。
  * 副本的 owner 为该新用户自己，用户可以自由编辑点位、改报价、打印导出或直接删除，互不影响。
  */
-export async function cloneDemoProjectForUser(userId: string | number): Promise<string | null> {
-  const uid = String(userId).trim()
-  if (!uid) return null
+export async function cloneDemoProjectForUser(
+  userId: string | number,
+  req?: PayloadRequest,
+): Promise<string | null> {
+  if (userId === null || userId === undefined || String(userId).trim() === '') return null
 
   try {
     const payload = await getPayloadClient()
+    // 母版项目的读取与初始化在独立连接中完成，避免与当前用户创建事务产生锁冲突
     const template = await ensureDemoTemplateProject()
     if (!template) return null
+
+    const ownerId = coerceRelId(userId, template.id) ?? userId
+    // 若在 Users.afterChange 钩子中调用，复用当前事务（清空 user 以免触发普通成员权限拦截），
+    // 这样未提交的新用户记录在同一事务内对外键检查可见，不会报 projects_owner_id_users_id_fk。
+    const txReq = req?.transactionID ? ({ ...req, user: null } as unknown as PayloadRequest) : undefined
 
     // 避免同一用户重复发放示例项目
     const existing = await payload.count({
       collection: 'projects',
       where: {
-        and: [{ owner: { equals: uid } }, { name: { equals: template.name } }],
+        and: [{ owner: { equals: ownerId } }, { name: { equals: template.name } }],
       },
+      req: txReq,
       overrideAccess: true,
     })
     if (existing.totalDocs > 0) return null
+
+    // 母版报价单也用独立连接预先读取
+    const templateQuotes = await payload
+      .find({
+        collection: 'quotes',
+        where: { project: { equals: template.id } },
+        sort: 'createdAt',
+        limit: 5,
+        depth: 0,
+        overrideAccess: true,
+      })
+      .catch(() => null)
 
     const createdProject = await payload.create({
       collection: 'projects',
@@ -247,7 +280,7 @@ export async function cloneDemoProjectForUser(userId: string | number): Promise<
         platform: template.platform ?? '米家',
         budget: template.budget ?? 55000,
         status: 'active',
-        owner: uid,
+        owner: ownerId,
         isDemoTemplate: false,
         notes:
           template.notes ??
@@ -255,29 +288,18 @@ export async function cloneDemoProjectForUser(userId: string | number): Promise<
         pointMap: template.pointMap ?? null,
         defaultProducts: template.defaultProducts ?? null,
       } as never,
+      req: txReq,
       overrideAccess: true,
       depth: 0,
     })
 
-    const newProjectId = String(createdProject.id)
-
-    // 同步克隆母版项目下的示例报价单
-    const templateQuotes = await payload
-      .find({
-        collection: 'quotes',
-        where: { project: { equals: template.id } },
-        sort: 'createdAt',
-        limit: 5,
-        depth: 0,
-        overrideAccess: true,
-      })
-      .catch(() => null)
+    const newProjectId = createdProject.id
 
     for (const q of (templateQuotes?.docs ?? []) as Quote[]) {
       const cleanItems = (q.items ?? []).map((item) => ({
-        product: relId(item.product) || null,
+        product: coerceRelId(item.product, template.id),
         deviceType: item.deviceType ?? null,
-        image: relId(item.image) || null,
+        image: coerceRelId(item.image, template.id),
         name: item.name,
         sku: item.sku ?? null,
         unit: item.unit ?? '个',
@@ -300,6 +322,7 @@ export async function cloneDemoProjectForUser(userId: string | number): Promise<
             discount: q.discount ?? 0,
             notes: q.notes ?? null,
           } as never,
+          req: txReq,
           overrideAccess: true,
           depth: 0,
         })
@@ -313,7 +336,7 @@ export async function cloneDemoProjectForUser(userId: string | number): Promise<
             collection: 'contracts',
             data: {
               project: newProjectId,
-              quote: String(clonedQuote.id),
+              quote: clonedQuote.id,
               status: 'draft',
               amount: q.total ?? 51820,
               customerName: template.customerName ?? '林先生',
@@ -324,6 +347,7 @@ export async function cloneDemoProjectForUser(userId: string | number): Promise<
               payments: DEFAULT_PAYMENTS.map((p) => ({ name: p.name, percent: p.percent, received: false })),
               terms: DEFAULT_CONTRACT_TERMS,
             } as never,
+            req: txReq,
             overrideAccess: true,
             depth: 0,
           })
@@ -331,7 +355,7 @@ export async function cloneDemoProjectForUser(userId: string | number): Promise<
       }
     }
 
-    return newProjectId
+    return String(newProjectId)
   } catch (err) {
     console.error('[demo-project] cloneDemoProjectForUser failed', err)
     return null

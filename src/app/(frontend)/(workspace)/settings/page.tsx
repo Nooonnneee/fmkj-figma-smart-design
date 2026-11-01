@@ -21,7 +21,7 @@ export default async function SettingsPage() {
 
   return (
     <section className="mx-auto flex w-full max-w-3xl flex-col gap-5">
-      <PageHeader title="设置" description="外观偏好，以及当前账号专属的报价单 / 合同抬头、联系方式、默认条款和文档模板" />
+      <PageHeader title="设置" />
       <AppearanceSettings />
       <CompanyForm
         initial={{
