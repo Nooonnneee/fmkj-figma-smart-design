@@ -15,8 +15,19 @@ function dataUrlToBytes(dataUrl: string): Uint8Array {
   return out
 }
 
-/** 在 targetY 往上找一整行几乎全白的位置切页，避免截断文字或表格边线 */
-function findSafeCutY(ctx: CanvasRenderingContext2D, width: number, targetY: number, minY: number): number {
+type Rgb = [number, number, number]
+
+/** 纸张底色：取画布左上角（页边距内）的颜色。暖白、燕麦等有底色的风格也能正确识别空白行 */
+function paperColor(ctx: CanvasRenderingContext2D): Rgb {
+  const d = ctx.getImageData(4, 4, 1, 1).data
+  return [d[0], d[1], d[2]]
+}
+
+/** 像素和纸张底色是否明显不同（文字、线条、图片） */
+const inked = (data: Uint8ClampedArray, i: number, bg: Rgb) => Math.abs(data[i] - bg[0]) > 13 || Math.abs(data[i + 1] - bg[1]) > 13 || Math.abs(data[i + 2] - bg[2]) > 13
+
+/** 在 targetY 往上找一整行几乎只有纸色的位置切页，避免截断文字或表格边线 */
+function findSafeCutY(ctx: CanvasRenderingContext2D, width: number, targetY: number, minY: number, bg: Rgb): number {
   const searchH = Math.min(180, targetY - minY)
   if (searchH <= 8) return targetY
   const startY = targetY - searchH
@@ -27,7 +38,7 @@ function findSafeCutY(ctx: CanvasRenderingContext2D, width: number, targetY: num
     const rowOffset = row * width * 4
     for (let x = marginX; x < width - marginX; x += 2) {
       const i = rowOffset + x * 4
-      if (data[i] < 242 || data[i + 1] < 242 || data[i + 2] < 242) {
+      if (inked(data, i, bg)) {
         dark++
         if (dark > 3) break
       }
@@ -79,7 +90,7 @@ function collectBreaks(root: HTMLElement, scale: number): number[] {
     .sort((a, b) => a - b)
 }
 
-function isStripMostlyBlank(ctx: CanvasRenderingContext2D, width: number, startY: number, endY: number): boolean {
+function isStripMostlyBlank(ctx: CanvasRenderingContext2D, width: number, startY: number, endY: number, bg: Rgb): boolean {
   const h = endY - startY
   if (h <= 0) return true
   const data = ctx.getImageData(0, startY, width, h).data
@@ -89,7 +100,7 @@ function isStripMostlyBlank(ctx: CanvasRenderingContext2D, width: number, startY
     const rowOffset = row * width * 4
     for (let x = marginX; x < width - marginX; x += 4) {
       const i = rowOffset + x * 4
-      if (data[i] < 240 || data[i + 1] < 240 || data[i + 2] < 240) {
+      if (inked(data, i, bg)) {
         darkPixels++
         if (darkPixels > 12) return false
       }
@@ -106,13 +117,14 @@ function slicePortraitCanvas(source: HTMLCanvasElement, domEl: HTMLElement, scal
   const padY = Math.round(fullPageH * 0.035)
   const contentH = fullPageH - padY * 2
   const srcCtx = source.getContext('2d', { willReadFrequently: true })!
+  const bg = paperColor(srcCtx)
   const blocks = collectAtomicBlocks(domEl, scale)
   const breaks = collectBreaks(domEl, scale)
 
   const pages: PageJpeg[] = []
   let y = 0
   while (y < source.height - 8) {
-    if (pages.length > 0 && isStripMostlyBlank(srcCtx, source.width, y, source.height)) {
+    if (pages.length > 0 && isStripMostlyBlank(srcCtx, source.width, y, source.height, bg)) {
       break
     }
     const isFirst = y === 0
@@ -136,14 +148,15 @@ function slicePortraitCanvas(source: HTMLCanvasElement, domEl: HTMLElement, scal
           }
         }
       }
-      nextY = findSafeCutY(srcCtx, source.width, nextY, Math.max(minCut, nextY - Math.round(48 * scale)))
+      nextY = findSafeCutY(srcCtx, source.width, nextY, Math.max(minCut, nextY - Math.round(48 * scale)), bg)
     }
     const sliceH = Math.max(1, nextY - y)
     const pageCanvas = document.createElement('canvas')
     pageCanvas.width = source.width
     pageCanvas.height = fullPageH
     const pCtx = pageCanvas.getContext('2d')!
-    pCtx.fillStyle = '#ffffff'
+    // 续页上下留白用纸张底色填充，有底色的风格不会出现白边
+    pCtx.fillStyle = `rgb(${bg[0]}, ${bg[1]}, ${bg[2]})`
     pCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height)
     pCtx.drawImage(source, 0, y, source.width, sliceH, 0, isFirst ? 0 : padY, source.width, sliceH)
     pages.push({
@@ -246,12 +259,13 @@ export async function exportPagesAsPdf(elements: HTMLElement[], fileName: string
     })
     const isLandscapeCard = elements.length > 1 || canvas.width > canvas.height * 1.15
     if (isLandscapeCard) {
+      // 横版卡片按自身比例成页（A4 比例的卡片仍是标准 A4；3:2 的方案页不会被压扁）
       pdfPages.push({
         bytes: dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.92)),
         widthPx: canvas.width,
         heightPx: canvas.height,
         widthPt: 841.89,
-        heightPt: 595.28,
+        heightPt: Math.round(841.89 * (canvas.height / Math.max(1, canvas.width)) * 100) / 100,
       })
     } else {
       const scale = canvas.height / Math.max(1, el.getBoundingClientRect().height)

@@ -1,4 +1,5 @@
 import { relId } from '@/lib/access'
+import { pointIconArt } from '@/board/packs/smart-home/look'
 import { areaTypeLabel } from '@/lib/area-types'
 import { resolveMediaUrl, type CatalogProduct } from '@/lib/cached-data'
 import { contractStatusLabel, paymentAmounts, rmbUpper } from '@/lib/contracts'
@@ -16,7 +17,7 @@ import type { Contract, Media, Project, Quote, User } from '@/payload-types'
 export const presentType = (t: string | null | undefined) => {
   const type = t || 'other'
   const cat = categoryOfType(type)
-  return { value: type, name: deviceTypeOf(type)?.name ?? '其他设备', category: cat?.name ?? '其他', color: cat?.color ?? '#525252', marker: markerUrl(type) }
+  return { value: type, name: deviceTypeOf(type)?.name ?? '其他设备', category: cat?.name ?? '其他', color: cat?.color ?? '#525252', marker: pointIconArt(type)?.src ?? markerUrl(type) }
 }
 
 export function presentProduct(p: CatalogProduct, detail = false) {

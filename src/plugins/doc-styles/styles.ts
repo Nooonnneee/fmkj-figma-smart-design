@@ -112,4 +112,68 @@ export const TECH_STYLE: DocStyle = {
   radius: '8px',
 }
 
-export const PLUGIN_DOC_STYLES = [QIXU_STYLE, BUSINESS_STYLE, ORIENTAL_STYLE, TECH_STYLE]
+/** 墨金臻选：象牙白纸、墨黑表头配香槟金、衬线标题（与方案模板「墨金臻选」配套，纸面版适合打印）。 */
+export const NOIR_STYLE: DocStyle = {
+  id: 'noir',
+  name: '墨金臻选',
+  description: '象牙白纸、墨黑表头配香槟金、衬线标题，适合别墅大宅与高端客户',
+  colors: {
+    paper: '#fffdf8',
+    ink: '#1c1b19',
+    muted: '#7a7466',
+    accent: '#9c7a3c',
+    soft: '#f4ecdc',
+    softTo: '#efe4cd',
+    rule: '#e3dac8',
+    headBg: '#1c1b19',
+    headFg: '#e8d5a8',
+    stripe: '#faf5ea',
+  },
+  fonts: {
+    display: SERIF,
+    strong: `'Noto Sans SC:Medium', ${NOTO_FALLBACK}`,
+    body: `'Noto Sans SC:Regular', ${NOTO_FALLBACK}`,
+    numeral: SERIF,
+    latin: `'Inter:Regular', ${SANS}`,
+  },
+  weights: { display: 700, strong: 500, numeral: 400 },
+  header: 'editorial',
+  title: 'underline',
+  table: 'dark',
+  radius: '0px',
+  tagline: 'PRIVATE RESIDENCE',
+}
+
+/** 原木自然：燕麦纸色、橄榄绿点缀、衬线标题、圆角卡片（与方案模板「原木自然」配套）。 */
+export const GROVE_STYLE: DocStyle = {
+  id: 'grove',
+  name: '原木自然',
+  description: '燕麦纸色、橄榄绿点缀、衬线标题与圆角卡片，适合原木、日式与自然风住宅',
+  colors: {
+    paper: '#f6f2ea',
+    ink: '#2e2b25',
+    muted: '#7d7668',
+    accent: '#5e6e4f',
+    soft: '#e6eadb',
+    softTo: '#f0e9da',
+    rule: '#ddd4c3',
+    headBg: '#e3e8d7',
+    headFg: '#3d4a33',
+    stripe: '#efe9dd',
+  },
+  fonts: {
+    display: SERIF,
+    strong: `'Noto Sans SC:Medium', ${NOTO_FALLBACK}`,
+    body: `'Noto Sans SC:Regular', ${NOTO_FALLBACK}`,
+    numeral: SERIF,
+    latin: `'Inter:Regular', ${SANS}`,
+  },
+  weights: { display: 600, strong: 500, numeral: 400 },
+  header: 'line',
+  title: 'numbered',
+  table: 'ruled',
+  radius: '10px',
+  tagline: 'NATURAL LIVING',
+}
+
+export const PLUGIN_DOC_STYLES = [QIXU_STYLE, NOIR_STYLE, GROVE_STYLE, BUSINESS_STYLE, ORIENTAL_STYLE, TECH_STYLE]

@@ -65,9 +65,47 @@ export function isAiProviderChannelId(v: unknown): v is AiProviderChannelId {
   return typeof v === 'string' && v in AI_PROVIDER_CHANNELS
 }
 
+/** 后台自定义渠道（OpenAI 兼容接口，如腾讯云 CloudBase、自建网关）；密钥仍只放在环境变量里 */
+export type AiCustomChannel = { key: string; label: string; baseUrl: string; apiKeyEnv: string }
+
+/** 自定义渠道的密钥变量名必须以 AI_ 开头，避免借此读取平台或其它业务的密钥 */
+export const CUSTOM_KEY_ENV_RE = /^AI_[A-Z0-9_]{2,60}$/
+
+const PRIVATE_HOST_RE = /^(localhost|0\.0\.0\.0|\[::1\]|127\.|10\.|192\.168\.|169\.254\.|0\.|172\.(1[6-9]|2\d|3[01])\.)|\.(local|internal|localhost)$/i
+
+/** 规范化自定义渠道的接口根地址：必须是公网 HTTPS；去掉结尾的 /chat/completions 与斜杠 */
+export function normalizeCustomBaseUrl(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  const base = raw.trim().replace(/\/+$/, '').replace(/\/chat\/completions$/, '')
+  try {
+    const u = new URL(base)
+    if (u.protocol !== 'https:' || PRIVATE_HOST_RE.test(u.hostname)) return null
+    return base
+  } catch {
+    return null
+  }
+}
+
+export function parseCustomChannels(value: unknown): AiCustomChannel[] {
+  if (!Array.isArray(value)) return []
+  const out: AiCustomChannel[] = []
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') continue
+    const r = raw as Record<string, unknown>
+    const key = cleanStr(r.key, 40).replace(/[^a-zA-Z0-9_-]/g, '')
+    const baseUrl = normalizeCustomBaseUrl(r.baseUrl)
+    const apiKeyEnv = cleanStr(r.apiKeyEnv, 64)
+    if (!key || !baseUrl || !CUSTOM_KEY_ENV_RE.test(apiKeyEnv) || out.some((c) => c.key === key)) continue
+    out.push({ key, label: cleanStr(r.label, 60, key), baseUrl, apiKeyEnv })
+  }
+  return out
+}
+
 export type AiModelConfig = AiModelOption & {
-  /** 绑定的受信任渠道 ID（决定服务端使用的固定 Base URL 与环境变量） */
-  channelId: AiProviderChannelId
+  /** 绑定的渠道：内置受信任渠道 ID，或 custom（配合 customChannel 指向后台自定义渠道） */
+  channelId: AiProviderChannelId | 'custom'
+  /** channelId 为 custom 时对应的自定义渠道标识 */
+  customChannel?: string
   /** 实际传给接口的 model 参数名（如 deepseek-chat、gpt-4o、qwen-max） */
   apiModel: string
   /** 只读展示：由 channelId 决定的接口地址说明 */
@@ -194,7 +232,7 @@ const cleanStr = (v: unknown, max: number, fallback = '') =>
   typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : fallback
 
 /** 解析并校验后台保存的 AI 模型列表；为空时回退到默认模型。 */
-export function parseAiModels(value: unknown): AiModelConfig[] {
+export function parseAiModels(value: unknown, customChannels: AiCustomChannel[] = []): AiModelConfig[] {
   if (!Array.isArray(value) || value.length === 0) return DEFAULT_AI_MODELS.map((m) => ({ ...m }))
   const out: AiModelConfig[] = []
   const seen = new Set<string>()
@@ -205,8 +243,11 @@ export function parseAiModels(value: unknown): AiModelConfig[] {
     const apiModel = cleanStr(r.apiModel, 120)
     const rawId = cleanStr(r.id, 60) || apiModel
     const id = rawId.replace(/[^a-zA-Z0-9._:-]/g, '-')
-    const channelId: AiProviderChannelId = isAiProviderChannelId(r.channelId) ? r.channelId : 'deepseek'
-    const channel = AI_PROVIDER_CHANNELS[channelId]
+    const custom = r.channelId === 'custom' ? customChannels.find((c) => c.key === r.customChannel) : undefined
+    // 指向不存在（或校验未通过）的自定义渠道时跳过该模型
+    if (r.channelId === 'custom' && !custom) continue
+    const channelId: AiProviderChannelId | 'custom' = custom ? 'custom' : isAiProviderChannelId(r.channelId) ? r.channelId : 'deepseek'
+    const channel = custom ? { label: custom.label, baseUrl: custom.baseUrl, apiKeyEnv: custom.apiKeyEnv } : AI_PROVIDER_CHANNELS[channelId as AiProviderChannelId]
     if (!id || !name || !apiModel || seen.has(id)) continue
     seen.add(id)
     const costNum = Number(r.cost)
@@ -215,12 +256,13 @@ export function parseAiModels(value: unknown): AiModelConfig[] {
       name,
       provider: channel.label,
       channelId,
+      ...(custom ? { customChannel: custom.key } : {}),
       tag: cleanStr(r.tag, 40, '工具调用'),
       cost: Number.isInteger(costNum) && costNum >= 0 && costNum <= 100 ? costNum : 1,
       description: cleanStr(r.description, 200, `${name}（${apiModel}）`),
       reasoning: Boolean(r.reasoning),
       apiModel,
-      // 强制使用受信任渠道的固定 baseUrl 与 apiKeyEnv，忽略客户端传入的任何自定义 URL 或变量名
+      // 内置渠道用固定 baseUrl 与 apiKeyEnv；自定义渠道用后台已校验的地址与 AI_ 前缀变量名
       baseUrl: channel.baseUrl,
       apiKeyEnv: channel.apiKeyEnv,
       enabled: r.enabled !== false,

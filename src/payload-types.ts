@@ -134,9 +134,11 @@ export interface Config {
   fallbackLocale: ('false' | 'none' | 'null') | false | null | 'en' | 'en'[];
   globals: {
     'company-settings': CompanySetting;
+    'ai-settings': AiSetting;
   };
   globalsSelect: {
     'company-settings': CompanySettingsSelect<false> | CompanySettingsSelect<true>;
+    'ai-settings': AiSettingsSelect<false> | AiSettingsSelect<true>;
   };
   locale: 'en';
   widgets: {
@@ -563,6 +565,7 @@ export interface Quote {
               | 'touch-panel'
               | 'gateway'
               | 'ac-router'
+              | 'ceiling-ap'
               | 'ap-node'
               | 'network-panel'
               | 'vrf-controller'
@@ -653,6 +656,7 @@ export interface Product {
         | 'touch-panel'
         | 'gateway'
         | 'ac-router'
+        | 'ceiling-ap'
         | 'ap-node'
         | 'network-panel'
         | 'vrf-controller'
@@ -1694,7 +1698,81 @@ export interface CompanySetting {
   aiModels?:
     | {
         name: string;
-        channelId: 'deepseek' | 'newapi' | 'siliconflow' | 'dashscope' | 'ark' | 'moonshot' | 'zhipu' | 'openrouter';
+        channelId:
+          'deepseek' | 'newapi' | 'siliconflow' | 'dashscope' | 'ark' | 'moonshot' | 'zhipu' | 'openrouter' | 'custom';
+        /**
+         * 填写上方自定义渠道的「标识」，如 cloudbase
+         */
+        customChannel?: string | null;
+        apiModel: string;
+        /**
+         * 按用量计费：每次对话积分 = 倍率 ×（每 1K 输入 tokens 0.1 + 每 1K 输出 tokens 0.5）+ 工具调用费用，向上取整、最少 1。贵的模型可设 2、3。
+         */
+        cost: number;
+        tag?: string | null;
+        description?: string | null;
+        enabled?: boolean | null;
+        isDefault?: boolean | null;
+        reasoning?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
+  createdBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
+ * API 密钥不在这里填写：请在 Figma Make「设置 → Secrets」中添加对应环境变量（如 DEEPSEEK_API_KEY、DASHSCOPE_API_KEY、ARK_API_KEY；聚合网关为 NEWAPI_BASE_URL + NEWAPI_API_KEY）。这里只配置给用户使用的模型列表。
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ai-settings".
+ */
+export interface AiSetting {
+  id: string;
+  /**
+   * 任意兼容 OpenAI 接口（/chat/completions、/models）的服务。密钥不在这里填：在 Figma Make「设置 → Secrets」里新建一个以 AI_ 开头的变量（如 AI_CLOUDBASE_KEY），再把变量名填到下面。
+   */
+  customChannels?:
+    | {
+        key: string;
+        label?: string | null;
+        apiKeyEnv: string;
+        /**
+         * 填到 /v1 这一级即可；系统自动拼接 /chat/completions 和 /models。必须是公网 HTTPS。
+         */
+        baseUrl: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * 仅超级管理员在 /admin 后台配置，对全局所有网页与小程序用户生效。留空时默认使用内置 DeepSeek 模型。使用 NewAPI 聚合网关时请在环境变量配置 NEWAPI_BASE_URL 与 NEWAPI_API_KEY。
+   */
+  aiModels?:
+    | {
+        name: string;
+        channelId:
+          'deepseek' | 'newapi' | 'siliconflow' | 'dashscope' | 'ark' | 'moonshot' | 'zhipu' | 'openrouter' | 'custom';
+        /**
+         * 填写上方自定义渠道的「标识」，如 cloudbase
+         */
+        customChannel?: string | null;
         apiModel: string;
         /**
          * 按用量计费：每次对话积分 = 倍率 ×（每 1K 输入 tokens 0.1 + 每 1K 输出 tokens 0.5）+ 工具调用费用，向上取整、最少 1。贵的模型可设 2、3。
@@ -1752,6 +1830,42 @@ export interface CompanySettingsSelect<T extends boolean = true> {
     | {
         name?: T;
         channelId?: T;
+        customChannel?: T;
+        apiModel?: T;
+        cost?: T;
+        tag?: T;
+        description?: T;
+        enabled?: T;
+        isDefault?: T;
+        reasoning?: T;
+        id?: T;
+      };
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ai-settings_select".
+ */
+export interface AiSettingsSelect<T extends boolean = true> {
+  customChannels?:
+    | T
+    | {
+        key?: T;
+        label?: T;
+        apiKeyEnv?: T;
+        baseUrl?: T;
+        id?: T;
+      };
+  aiModels?:
+    | T
+    | {
+        name?: T;
+        channelId?: T;
+        customChannel?: T;
         apiModel?: T;
         cost?: T;
         tag?: T;

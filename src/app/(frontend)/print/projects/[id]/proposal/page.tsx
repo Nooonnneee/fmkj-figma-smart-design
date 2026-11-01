@@ -2,18 +2,24 @@ import { Fragment } from 'react'
 import { notFound, redirect } from 'next/navigation'
 
 import { PrintToolbar } from '@/components/print-toolbar'
-import { DocEmpty, DocRoot } from '@/documents/parts'
+import { DocEmpty } from '@/documents/parts'
 import { appAuth } from '@/lib/app-auth'
 import { isPointScope, loadProjectDocs, POINT_SCOPES } from '@/lib/project-docs'
-import { QIXU_STYLE } from '@/plugins/doc-styles/styles'
-import { classicDeckPages } from '@/plugins/proposal/classic-deck'
-import { qixuDeckPages } from '@/plugins/proposal/qixu-deck'
-import { isProposalTemplate, PROPOSAL_TEMPLATES, type ProposalTemplate } from '@/plugins/proposal/templates'
+import { constructionDeckPages } from '@/plugins/proposal/construction-deck'
+import { DeckRoot, deckPages } from '@/plugins/proposal/deck'
+import {
+  DEFAULT_PROPOSAL_TEMPLATE,
+  isProposalMarkers,
+  resolveProposalTemplate,
+  PROPOSAL_TEMPLATES,
+  type ProposalMarkers,
+  type ProposalTemplate,
+} from '@/plugins/proposal/templates'
 import { getPluginFlags } from '@/plugins/state'
 
 export const metadata = { title: '智能家居方案', robots: { index: false, follow: false } }
 
-/** 方案演示（插件）：横版多页方案，可打印、导出 PDF 或图片。 */
+/** 方案演示（插件）：三种风格的 8 章横版提案 + 施工交底，可打印、导出 PDF 或图片。 */
 export default async function ProposalPage({
   params,
   searchParams,
@@ -30,14 +36,22 @@ export default async function ProposalPage({
   if (!d) notFound()
   const flags = await getPluginFlags(d.owner?.id ?? user.id)
   if (!flags.proposal) notFound()
-  const t: ProposalTemplate = isProposalTemplate(sp.template) ? sp.template : 'qixu'
+  // 模板：网址参数 → 设置里的默认方案模板 → 栖序雅致
+  const saved = d.company.documentDefaults.proposal?.layout
+  const t: ProposalTemplate = resolveProposalTemplate(sp.template) ?? resolveProposalTemplate(saved) ?? DEFAULT_PROPOSAL_TEMPLATE
   const tpl = PROPOSAL_TEMPLATES.find((x) => x.value === t)!
-  const markers = sp.markers === 'product' || sp.markers === 'symbol' ? sp.markers : tpl.markers
+  const deck = t !== 'construction'
+  const markerOptions: { value: ProposalMarkers; label: string }[] = deck
+    ? [
+        { value: 'number', label: '编号' },
+        { value: 'symbol', label: '设备图标' },
+      ]
+    : [
+        { value: 'symbol', label: '设备图标' },
+        { value: 'product', label: '产品图' },
+      ]
+  const markers: ProposalMarkers = isProposalMarkers(sp.markers) && markerOptions.some((o) => o.value === sp.markers) ? sp.markers : tpl.markers
   const date = new Date().toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: 'long', day: 'numeric' })
-  const pages =
-    t === 'qixu'
-      ? qixuDeckPages(d, markers, flags['room-insights'])
-      : classicDeckPages(d, t, markers, flags['room-insights'], date).map((render, i) => <Fragment key={i}>{render(i + 1)}</Fragment>)
   const base = `/print/projects/${id}/proposal`
   const activeQuoteId = d.quote ? String(d.quote.id) : ''
   const href = (patch: { template?: string; markers?: string; scope?: string; quoteId?: string }) => {
@@ -46,10 +60,11 @@ export default async function ProposalPage({
       markers: patch.markers ?? markers,
       scope: patch.scope ?? scope,
     })
-    const nextQuoteId = patch.quoteId !== undefined ? patch.quoteId : (patch.scope && patch.scope !== scope ? '' : activeQuoteId)
+    const nextQuoteId = patch.quoteId !== undefined ? patch.quoteId : patch.scope && patch.scope !== scope ? '' : activeQuoteId
     if (nextQuoteId) q.set('quoteId', nextQuoteId)
     return `${base}?${q.toString()}`
   }
+  const empty = d.points.length === 0 ? <DocEmpty projectId={id}>点位图里还没有点位。布置好设备后，这里会生成整套方案。</DocEmpty> : null
 
   return (
     <div className="min-h-screen bg-neutral-200/70 print:min-h-0 print:bg-white">
@@ -57,7 +72,7 @@ export default async function ProposalPage({
       <PrintToolbar
         back={{ href: `/projects/${id}/archive`, label: '返回归档' }}
         exportName={`${d.project.name}-${tpl.label}${scope === 'all' ? '' : '-' + POINT_SCOPES.find((x) => x.value === scope)!.label}`}
-        wide={t === 'qixu'}
+        wide={deck}
         groups={[
           ...(d.projectList.length > 1
             ? [
@@ -87,21 +102,20 @@ export default async function ProposalPage({
                 },
               ]
             : []),
-          { label: '点位', value: markers, options: [{ value: 'symbol', label: '设备图标', href: href({ markers: 'symbol' }) }, { value: 'product', label: '产品图', href: href({ markers: 'product' }) }] },
+          { label: '点位', value: markers, options: markerOptions.map((o) => ({ ...o, href: href({ markers: o.value }) })) },
         ]}
       />
-      {t === 'qixu' ? (
-        // 栖序提案的页面按设计稿 1440px 宽排版，窄屏时横向滚动
-        <DocRoot style={QIXU_STYLE} className="overflow-x-auto print:overflow-visible">
-          <div className="min-w-[1440px] space-y-6 py-6 print:min-w-0 print:space-y-0 print:py-0">
-            {d.points.length === 0 ? <DocEmpty projectId={id}>点位图里还没有点位。布置好设备后，这里会生成整套方案。</DocEmpty> : null}
-            {pages}
-          </div>
-        </DocRoot>
+      {deck ? (
+        <DeckRoot themeId={t}>
+          {empty}
+          {deckPages(d, t, { markers, insights: flags['room-insights'] })}
+        </DeckRoot>
       ) : (
         <div className="space-y-6 py-6 print:space-y-0 print:py-0">
-          {d.points.length === 0 ? <DocEmpty projectId={id}>点位图里还没有点位。布置好设备后，这里会生成整套方案。</DocEmpty> : null}
-          {pages}
+          {empty}
+          {constructionDeckPages(d, markers === 'product' ? 'product' : 'symbol', flags['room-insights'], date).map((render, i) => (
+            <Fragment key={i}>{render(i + 1)}</Fragment>
+          ))}
         </div>
       )}
     </div>

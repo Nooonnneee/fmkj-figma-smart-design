@@ -1,3 +1,5 @@
+import { POINT_ICON_DATA } from '@/board/packs/smart-home/point-icons.generated'
+
 import { MARKER_SVGS } from './point-marker-svgs'
 import { BLANK_SHEET_FILE_ID, isMarkerFileId, markerFileId } from './point-markers'
 
@@ -6,6 +8,9 @@ import { BLANK_SHEET_FILE_ID, isMarkerFileId, markerFileId } from './point-marke
  * 保存时 compactScene 会换回静态地址，数据库里不存图片内容。
  */
 export function markerDataUrl(type: string) {
+  // 有最终确定的点位图标就用它（与画板放置后的图形一致）
+  const icon = POINT_ICON_DATA[type]
+  if (icon) return icon
   const svg = MARKER_SVGS[type] ?? MARKER_SVGS.other
   return `data:image/svg+xml;base64,${btoa(svg)}`
 }

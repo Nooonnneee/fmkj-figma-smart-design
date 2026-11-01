@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, ImageIcon, Loader2, Save, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -13,6 +13,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 
 import { DocumentTemplateSettings, type DocKindOption, type DocStyleOption } from './document-plugin-settings'
+import { SquareCropDialog } from './square-crop-dialog'
 
 type Values = {
   name: string
@@ -28,10 +29,17 @@ type Values = {
   qrCodeUrl: string | null
 }
 
-function ImageField({ name, label, url, hint }: { name: 'logo' | 'qrCode'; label: string; url: string | null; hint: string }) {
+function ImageField({ name, label, url, hint, squareCrop }: { name: 'logo' | 'qrCode'; label: string; url: string | null; hint: string; squareCrop?: boolean }) {
   const [preview, setPreview] = useState(url)
   const [removed, setRemoved] = useState(false)
   const [fileName, setFileName] = useState<string | null>(null)
+  const [cropping, setCropping] = useState<File | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const apply = (f: File) => {
+    setPreview(URL.createObjectURL(f))
+    setFileName(f.name)
+    setRemoved(false)
+  }
   return (
     <div className="grid gap-2">
       <Label htmlFor={name}>{label}</Label>
@@ -47,6 +55,7 @@ function ImageField({ name, label, url, hint }: { name: 'logo' | 'qrCode'; label
         <div className="grid flex-1 gap-1.5">
           {/* 原生文件框的按钮文字由浏览器决定（常显示英文），这里隐藏原生控件、用中文按钮代替 */}
           <input
+            ref={inputRef}
             id={name}
             name={name}
             type="file"
@@ -54,11 +63,9 @@ function ImageField({ name, label, url, hint }: { name: 'logo' | 'qrCode'; label
             accept="image/png,image/jpeg,image/webp,image/svg+xml"
             onChange={(e) => {
               const f = e.target.files?.[0]
-              if (f) {
-                setPreview(URL.createObjectURL(f))
-                setFileName(f.name)
-                setRemoved(false)
-              }
+              if (!f) return
+              if (squareCrop) setCropping(f)
+              else apply(f)
             }}
           />
           <div className="flex min-w-0 items-center gap-2">
@@ -80,6 +87,26 @@ function ImageField({ name, label, url, hint }: { name: 'logo' | 'qrCode'; label
         ) : null}
       </div>
       {removed ? <input type="hidden" name={`${name}Remove`} value="1" /> : null}
+      {squareCrop ? (
+        <SquareCropDialog
+          file={cropping}
+          onCancel={() => {
+            // 放弃裁剪：清空本次选择，保留原来的图片
+            if (inputRef.current) inputRef.current.value = ''
+            setCropping(null)
+          }}
+          onDone={(f) => {
+            const input = inputRef.current
+            if (input) {
+              const dt = new DataTransfer()
+              dt.items.add(f)
+              input.files = dt.files
+            }
+            apply(f)
+            setCropping(null)
+          }}
+        />
+      ) : null}
     </div>
   )
 }
@@ -150,7 +177,7 @@ export function CompanyForm({
           {field('email', '邮箱', { type: 'email', maxLength: 80 })}
           <div className="md:col-span-2">{field('address', '地址', { maxLength: 200 })}</div>
           <div className="md:col-span-2">
-            <ImageField name="qrCode" label="二维码" url={initial.qrCodeUrl} hint="微信或公众号二维码" />
+            <ImageField name="qrCode" label="二维码" url={initial.qrCodeUrl} hint="微信或公众号二维码，上传后可裁剪为正方形" squareCrop />
           </div>
           {field('qrCaption', '二维码说明', { maxLength: 40, placeholder: '扫码添加微信' })}
         </CardContent>

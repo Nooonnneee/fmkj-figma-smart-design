@@ -4,7 +4,7 @@
  */
 
 /** 资源版本（拼进图片地址，改了生成参数后浏览器会重新加载） */
-export const SYMBOL_ASSET_VERSION = 1
+export const SYMBOL_ASSET_VERSION = 2
 
 /** 每张符号图四周的留白（相对主体长边） */
 export const SYMBOL_ASSET_PAD = 0.1
@@ -64,8 +64,8 @@ export const SYMBOL_ASSETS: Record<string, { gw: number; gh: number }> = {
     "gh": 0.042
   },
   "touch-panel": {
-    "gw": 0.8103,
-    "gh": 1
+    "gw": 1,
+    "gh": 0.7262
   },
   "motion-sensor": {
     "gw": 1,
@@ -109,7 +109,7 @@ export const SYMBOL_ASSETS: Record<string, { gw: number; gh: number }> = {
   },
   "router": {
     "gw": 1,
-    "gh": 1
+    "gh": 0.75
   },
   "mesh": {
     "gw": 1,
@@ -117,7 +117,7 @@ export const SYMBOL_ASSETS: Record<string, { gw: number; gh: number }> = {
   },
   "data": {
     "gw": 1,
-    "gh": 0.4116
+    "gh": 1
   },
   "contact-sensor": {
     "gw": 1,
@@ -422,6 +422,22 @@ export const SYMBOL_ASSETS: Record<string, { gw: number; gh: number }> = {
   "lt-floor-arc-lamp-192x48cm-76x19": {
     "gw": 1,
     "gh": 0.2579
+  },
+  "switch-1": {
+    "gw": 1,
+    "gh": 1
+  },
+  "switch-2": {
+    "gw": 1,
+    "gh": 0.9952
+  },
+  "switch-3": {
+    "gw": 1,
+    "gh": 1
+  },
+  "switch-4": {
+    "gw": 1,
+    "gh": 1
   }
 }
 

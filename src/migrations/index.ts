@@ -1,45 +1,9 @@
 import * as migration_20261029_075429_initial from './20261029_075429_initial';
-import * as migration_20261030_115036_dual_sync from './20261030_115036_dual_sync';
-import * as migration_20261030_173534_mp_sync from './20261030_173534_mp_sync';
-import * as migration_20261031_061256_latest_feature_sync from './20261031_061256_latest_feature_sync';
-import * as migration_20261031_065532_ai_admin_sync from './20261031_065532_ai_admin_sync';
-import * as migration_20261031_114930_personal_profile_demo from './20261031_114930_personal_profile_demo';
-import * as migration_20261031_161835_membership_codes from './20261031_161835_membership_codes';
 
 export const migrations = [
   {
     up: migration_20261029_075429_initial.up,
     down: migration_20261029_075429_initial.down,
-    name: '20261029_075429_initial',
-  },
-  {
-    up: migration_20261030_115036_dual_sync.up,
-    down: migration_20261030_115036_dual_sync.down,
-    name: '20261030_115036_dual_sync',
-  },
-  {
-    up: migration_20261030_173534_mp_sync.up,
-    down: migration_20261030_173534_mp_sync.down,
-    name: '20261030_173534_mp_sync',
-  },
-  {
-    up: migration_20261031_061256_latest_feature_sync.up,
-    down: migration_20261031_061256_latest_feature_sync.down,
-    name: '20261031_061256_latest_feature_sync',
-  },
-  {
-    up: migration_20261031_065532_ai_admin_sync.up,
-    down: migration_20261031_065532_ai_admin_sync.down,
-    name: '20261031_065532_ai_admin_sync',
-  },
-  {
-    up: migration_20261031_114930_personal_profile_demo.up,
-    down: migration_20261031_114930_personal_profile_demo.down,
-    name: '20261031_114930_personal_profile_demo',
-  },
-  {
-    up: migration_20261031_161835_membership_codes.up,
-    down: migration_20261031_161835_membership_codes.down,
-    name: '20261031_161835_membership_codes'
+    name: '20261029_075429_initial'
   },
 ];

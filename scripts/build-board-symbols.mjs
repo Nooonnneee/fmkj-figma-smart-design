@@ -31,10 +31,13 @@ const argOf = (name, fallback) => {
 }
 const SRC = path.resolve(argOf('--src', process.env.BOARD_ASSETS ?? path.join(root, '../fmkj-board-system')))
 const PREVIEW = args.includes('--preview')
+/** 只重做人工挑选的图标（不需要素材仓库，其余符号保持不变） */
+const PICKS_ONLY = args.includes('--picks-only')
+const PICKS_DIR = path.join(root, 'scripts/board-symbol-picks')
 const OUT_DIR = path.join(root, 'public/board/symbols/smart-home')
 const MANIFEST = path.join(root, 'src/board/packs/smart-home/symbols.generated.ts')
 /** 资源版本：改了生成参数就加一，浏览器会重新加载 */
-const ASSET_VERSION = 1
+const ASSET_VERSION = 2
 
 /* ------------------------------ 参数 ------------------------------ */
 
@@ -68,6 +71,11 @@ const POINT_SOURCES = {
   curtain: 'curtain', hub: 'hub', speaker: 'speaker', router: 'router', mesh: 'mesh', data: 'data',
 }
 const POINT_LABELED = new Set(['downlight', 'spotlight', 'ceiling-light', 'pendant-light', 'other-light'])
+/**
+ * 人工挑选的图标（scripts/board-symbol-picks/<键>.png，来自工具箱 original-409，清单见 _选中清单.csv）：
+ * 覆盖同名点位符号；开关按键数各一张（switch-1…4），不再共用一张加角标。
+ */
+const PICKS = ['motion-sensor', 'smoke-sensor', 'water-sensor', 'temp-sensor', 'router', 'mesh', 'doorbell', 'lock', 'camera', 'hub', 'speaker', 'touch-panel', 'data', 'switch-1', 'switch-2', 'switch-3', 'switch-4']
 /** 工具箱里没有的三个：用站点现有标记的同一图形（lucide），走同一套线稿处理，风格保持一致 */
 const LUCIDE_SOURCES = { 'contact-sensor': 'door-open', 'ac-wall': 'air-vent', other: 'box' }
 
@@ -459,44 +467,13 @@ function lightingVariants(lib) {
   })
 }
 
-async function main() {
-  if (!fs.existsSync(path.join(SRC, 'assets/point-symbols'))) {
-    throw new Error(`找不到素材仓库：${SRC}（用 --src 指定 fmkj-board-system 的本地路径）`)
-  }
-  const lib = JSON.parse(fs.readFileSync(path.join(SRC, 'assets/library.json'), 'utf8'))
-  const families = lightingVariants(lib)
+const colorOfKey = (key) => symbolColor.get(key) ?? typeColor.get(key)
 
-  if (PREVIEW) return preview(families)
+async function renderPicks(save) {
+  for (const key of PICKS) save(key, await processIcon(path.join(PICKS_DIR, `${key}.png`), { labeled: false, color: colorOfKey(key) }))
+}
 
-  fs.rmSync(OUT_DIR, { recursive: true, force: true })
-  fs.mkdirSync(OUT_DIR, { recursive: true })
-  const assets = {}
-  const save = (id, r) => {
-    fs.writeFileSync(path.join(OUT_DIR, `${id}.png`), r.lg)
-    fs.writeFileSync(path.join(OUT_DIR, `${id}.sm.png`), r.sm)
-    assets[id] = { gw: r.gw, gh: r.gh }
-  }
-  for (const [key, file] of Object.entries(POINT_SOURCES)) {
-    save(key, await processIcon(path.join(SRC, 'assets/point-symbols', `${file}.png`), { labeled: POINT_LABELED.has(key), color: symbolColor.get(key) }))
-  }
-  for (const [key, icon] of Object.entries(LUCIDE_SOURCES)) {
-    save(key, await processIcon(await sharp(lucideSvg(icon)).png().toBuffer(), { labeled: false, color: symbolColor.get(key) }))
-  }
-  for (const fam of families) {
-    for (const p of await familyArt(fam)) {
-      p.it.art = p.art
-      if (p.art === p.it.id) save(p.it.id, await renderIcon(p.prep, typeColor.get(fam.deviceType)))
-    }
-  }
-
-  const lighting = families.map(({ id, name, group, deviceType, linear, items }) => ({
-    id,
-    name,
-    group,
-    deviceType,
-    linear: !!linear,
-    variants: items.map((it) => ({ id: it.id, art: it.art, sizeCm: it.sizeCm })),
-  }))
+function writeManifest(assets, lighting) {
   const body = `/**
  * 由 scripts/build-board-symbols.mjs 生成，请勿手动修改。
  * 素材：fmkj-board-system 仓库（原图优化，内部使用；对外交付前确认授权）。
@@ -530,6 +507,50 @@ export const LIGHTING_FAMILIES: LightingFamilyDef[] = ${JSON.stringify(lighting,
 `
   fs.mkdirSync(path.dirname(MANIFEST), { recursive: true })
   fs.writeFileSync(MANIFEST, body)
+}
+
+async function main() {
+  const assets = {}
+  const save = (id, r) => {
+    fs.writeFileSync(path.join(OUT_DIR, `${id}.png`), r.lg)
+    fs.writeFileSync(path.join(OUT_DIR, `${id}.sm.png`), r.sm)
+    assets[id] = { gw: r.gw, gh: r.gh }
+  }
+  if (PICKS_ONLY) {
+    const src = fs.readFileSync(MANIFEST, 'utf8')
+    const json = (name) => JSON.parse(src.slice(src.indexOf('= ', src.indexOf(`export const ${name}`)) + 2).split(/\n\n/)[0].trim())
+    Object.assign(assets, json('SYMBOL_ASSETS'))
+    const lighting = json('LIGHTING_FAMILIES')
+    await renderPicks(save)
+    writeManifest(assets, lighting)
+    return console.log(`re-rendered ${PICKS.length} picked symbols`)
+  }
+  if (!fs.existsSync(path.join(SRC, 'assets/point-symbols'))) {
+    throw new Error(`找不到素材仓库：${SRC}（用 --src 指定 fmkj-board-system 的本地路径；只改挑选图标用 --picks-only）`)
+  }
+  const lib = JSON.parse(fs.readFileSync(path.join(SRC, 'assets/library.json'), 'utf8'))
+  const families = lightingVariants(lib)
+  if (PREVIEW) return preview(families)
+
+  fs.rmSync(OUT_DIR, { recursive: true, force: true })
+  fs.mkdirSync(OUT_DIR, { recursive: true })
+  for (const [key, file] of Object.entries(POINT_SOURCES)) {
+    save(key, await processIcon(path.join(SRC, 'assets/point-symbols', `${file}.png`), { labeled: POINT_LABELED.has(key), color: symbolColor.get(key) }))
+  }
+  for (const [key, icon] of Object.entries(LUCIDE_SOURCES)) {
+    save(key, await processIcon(await sharp(lucideSvg(icon)).png().toBuffer(), { labeled: false, color: symbolColor.get(key) }))
+  }
+  await renderPicks(save)
+  for (const fam of families) {
+    for (const p of await familyArt(fam)) {
+      p.it.art = p.art
+      if (p.art === p.it.id) save(p.it.id, await renderIcon(p.prep, typeColor.get(fam.deviceType)))
+    }
+  }
+  writeManifest(
+    assets,
+    families.map(({ id, name, group, deviceType, linear, items }) => ({ id, name, group, deviceType, linear: !!linear, variants: items.map((it) => ({ id: it.id, art: it.art, sizeCm: it.sizeCm })) })),
+  )
   const count = Object.keys(assets).length
   console.log(`generated ${count} symbols (${count * 2} PNG) → public/board/symbols/smart-home, ${path.relative(root, MANIFEST)}`)
 }

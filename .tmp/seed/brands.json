@@ -1,0 +1,5 @@
+{"slug":"brands","returning":true,"select":{"slug":true},"documents":[
+{"data":{"name":"Aqara","slug":"aqara"}},
+{"data":{"name":"小米","slug":"xiaomi"}},
+{"data":{"name":"易来","slug":"yeelight"}},
+{"data":{"name":"华为","slug":"huawei"}}]}

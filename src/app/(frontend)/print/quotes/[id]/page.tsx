@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 
 import { BrandLogo } from '@/components/brand-logo'
 import { PlanFigure } from '@/components/plan-figure'
+import { PlanLegend } from '@/components/plan-legend'
 import { PointMarker } from '@/components/point-marker'
 import { PrintToolbar } from '@/components/print-toolbar'
 import { ProductThumb } from '@/components/product-thumb'
@@ -240,6 +241,9 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
                             <PlanFigure sheetUrl={floor.sheetUrl} points={floor.planPoints} areas={floor.planAreas} mode={markers} className="w-full" />
                           </div>
                         ) : null}
+                        {showPlans && floor.sheetUrl ? (
+                          <PlanLegend points={floor.planPoints} className="break-inside-avoid" />
+                        ) : null}
                         <div className="grid grid-cols-2 gap-2.5">
                           {floor.rooms.map((r) => (
                             <div key={r.id} className="rounded-doc border border-doc-rule p-2.5 text-[11px] break-inside-avoid">
@@ -336,6 +340,7 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
                   <div className="overflow-hidden rounded-doc border border-doc-rule bg-white">
                     <PlanFigure sheetUrl={floor.sheetUrl} points={floor.planPoints} areas={floor.planAreas} mode={markers} className="w-full" />
                   </div>
+                  <PlanLegend points={floor.planPoints} className="pt-1" />
                 </div>
               ))}
             </section>

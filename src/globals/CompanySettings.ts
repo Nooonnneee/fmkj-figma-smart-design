@@ -1,9 +1,9 @@
-import type { GlobalConfig } from 'payload'
+import type { Field, GlobalConfig } from 'payload'
 
 import { CACHE_TAGS, expireGlobalOnChange } from '@/lib/cache-tags'
-import { fieldCmsAdminOnly, isCmsAdmin, isMember } from '@/lib/access'
+import { isCmsAdmin, isMember } from '@/lib/access'
 import { DEFAULT_CONTRACT_TERMS } from '@/lib/contracts'
-import { AI_PROVIDER_CHANNEL_LIST } from '@/plugins/ai-copilot/templates'
+import { aiModelsField } from './AiSettings'
 
 /** 抬头与默认内容：报价单、合同上的名称、联系方式、Logo、二维码，以及新报价备注和合同条款的默认值。 */
 export const CompanySettings: GlobalConfig = {
@@ -76,92 +76,7 @@ export const CompanySettings: GlobalConfig = {
       },
       admin: { description: '在系统「设置 → 插件」里修改' },
     },
-    {
-      // 全局 AI 模型与网关配置（仅限 /admin 超级管理员查看与修改，前台普通用户无权读取或修改）
-      name: 'aiModels',
-      label: '全局 AI 模型与接口配置（仅管理员）',
-      type: 'array',
-      labels: { singular: 'AI 模型', plural: 'AI 模型' },
-      access: {
-        read: fieldCmsAdminOnly,
-        update: fieldCmsAdminOnly,
-      },
-      admin: {
-        description:
-          '仅超级管理员在 /admin 后台配置，对全局所有网页与小程序用户生效。留空时默认使用内置 DeepSeek 模型。使用 NewAPI 聚合网关时请在环境变量配置 NEWAPI_BASE_URL 与 NEWAPI_API_KEY。',
-      },
-      fields: [
-        {
-          type: 'row',
-          fields: [
-            {
-              name: 'name',
-              label: '显示名称（展示给用户）',
-              type: 'text',
-              required: true,
-              maxLength: 80,
-              admin: { placeholder: '如：DeepSeek V3 / GPT-4o / 通义千问 Max' },
-            },
-            {
-              name: 'channelId',
-              label: '接口渠道',
-              type: 'select',
-              required: true,
-              defaultValue: 'deepseek',
-              options: AI_PROVIDER_CHANNEL_LIST.map((ch) => ({
-                label: `${ch.label}（${ch.apiKeyEnv}）`,
-                value: ch.id,
-              })),
-            },
-            {
-              name: 'apiModel',
-              label: '接口模型名（model 参数）',
-              type: 'text',
-              required: true,
-              maxLength: 120,
-              admin: { placeholder: '如：deepseek-chat / gpt-4o-mini / qwen-plus' },
-            },
-          ],
-        },
-        {
-          type: 'row',
-          fields: [
-            {
-              name: 'cost',
-              label: '计费倍率',
-              type: 'number',
-              required: true,
-              defaultValue: 1,
-              min: 0,
-              max: 100,
-              admin: {
-                description: '按用量计费：每次对话积分 = 倍率 ×（每 1K 输入 tokens 0.1 + 每 1K 输出 tokens 0.5）+ 工具调用费用，向上取整、最少 1。贵的模型可设 2、3。',
-              },
-            },
-            {
-              name: 'tag',
-              label: '展示标签',
-              type: 'text',
-              defaultValue: '工具调用',
-              maxLength: 40,
-            },
-            {
-              name: 'description',
-              label: '模型简介',
-              type: 'text',
-              maxLength: 200,
-            },
-          ],
-        },
-        {
-          type: 'row',
-          fields: [
-            { name: 'enabled', label: '启用该模型', type: 'checkbox', defaultValue: true },
-            { name: 'isDefault', label: '设为默认模型', type: 'checkbox', defaultValue: false },
-            { name: 'reasoning', label: '支持深度思考过程（如 R1）', type: 'checkbox', defaultValue: false },
-          ],
-        },
-      ],
-    },
+    // 旧位置：已迁到独立的「AI 设置」，这里隐藏保留，避免已有配置丢失（新设置为空时仍读这里）
+    { ...aiModelsField, admin: { ...aiModelsField.admin, hidden: true } } as Field,
   ],
 }

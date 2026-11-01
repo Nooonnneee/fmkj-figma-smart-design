@@ -38,7 +38,7 @@ import { autoSelectProducts, isSelectionTier, SELECTION_TIERS } from '@/plugins/
 import type { PluginFlags } from '@/plugins/state'
 import type { Project, User } from '@/payload-types'
 
-import { AI_PROVIDER_CHANNELS, DEFAULT_AI_MODELS, enabledAiModels, isAiProviderChannelId, type AiModelConfig } from './templates'
+import { AI_PROVIDER_CHANNELS, CUSTOM_KEY_ENV_RE, DEFAULT_AI_MODELS, enabledAiModels, isAiProviderChannelId, normalizeCustomBaseUrl, type AiModelConfig } from './templates'
 
 const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'
 
@@ -65,11 +65,17 @@ function isPrivateOrLocalHost(hostname: string): boolean {
  * - 官方渠道只读对应官方环境变量，且只发往对应官方 HTTPS 域名；
  * - NewAPI 聚合网关只从服务端环境变量 NEWAPI_BASE_URL（需为公网 HTTPS）与 NEWAPI_API_KEY 读取，绝不接受客户端传入的 URL 或环境变量名。
  */
-export function resolveModelEndpoint(model?: Pick<AiModelConfig, 'channelId'> | null): {
+export function resolveModelEndpoint(model?: (Pick<AiModelConfig, 'channelId'> & Partial<Pick<AiModelConfig, 'baseUrl' | 'apiKeyEnv'>>) | null): {
   url: string
   apiKey: string | null
   envKey: string
 } {
+  // 自定义渠道：地址与变量名已在 parseAiModels 中校验（公网 HTTPS、AI_ 前缀），这里再校验一次
+  if (model?.channelId === 'custom') {
+    const base = normalizeCustomBaseUrl(model.baseUrl)
+    const envKey = model.apiKeyEnv && CUSTOM_KEY_ENV_RE.test(model.apiKeyEnv) ? model.apiKeyEnv : ''
+    return { url: base ? `${base}/chat/completions` : '', apiKey: base && envKey ? process.env[envKey]?.trim() || null : null, envKey }
+  }
   const channelId = isAiProviderChannelId(model?.channelId) ? model.channelId : 'deepseek'
   const channel = AI_PROVIDER_CHANNELS[channelId]
 
@@ -103,7 +109,7 @@ export function resolveModelEndpoint(model?: Pick<AiModelConfig, 'channelId'> | 
   }
 }
 
-export function resolveModelApiKey(model?: Pick<AiModelConfig, 'channelId'> | null): string | null {
+export function resolveModelApiKey(model?: Parameters<typeof resolveModelEndpoint>[0]): string | null {
   return resolveModelEndpoint(model).apiKey
 }
 

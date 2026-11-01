@@ -20,6 +20,7 @@ import { RedemptionCodes } from './collections/RedemptionCodes'
 import { Tags } from './collections/Tags'
 import { Users } from './collections/Users'
 import { WechatAccounts } from './collections/WechatAccounts'
+import { AiSettings } from './globals/AiSettings'
 import { CompanySettings } from './globals/CompanySettings'
 import { PLUGINS } from './plugins'
 
@@ -69,7 +70,7 @@ export const sharedConfig = {
     WechatAccounts,
     MpSessions,
   ],
-  globals: [CompanySettings],
+  globals: [CompanySettings, AiSettings],
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },
