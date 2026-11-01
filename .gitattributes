@@ -151,3 +151,4 @@ public/brand/** -filter -diff -merge -text
 public/favicon.ico -filter -diff -merge -text
 src/app/*.png -filter -diff -merge -text
 desktop/resources/*.png -filter -diff -merge -text
+public/point-icons/** -filter -diff -merge -text
