@@ -3,11 +3,11 @@ import Image from 'next/image'
 import { APP_NAME, APP_NAME_EN } from '@/lib/brand'
 import { cn } from '@/lib/utils'
 
-/** 繁梦空间标志：房屋（空间）+ 新月（梦）+ 星光（繁 · 智能）。 */
+/** 繁梦空间应用图标：Dream 手写字 + SPACE 几何字 + 倾斜光环 + 星芒（圆角方形底）。 */
 export function BrandMark({ className, decorative = false, priority = false }: { className?: string; decorative?: boolean; priority?: boolean }) {
   return (
     <Image
-      src="/brand/fmkj-mark.svg"
+      src="/brand/fmkj-app-icon.svg"
       alt={decorative ? '' : APP_NAME}
       width={64}
       height={64}

@@ -640,14 +640,14 @@
 /* 细网格背景（线条颜色跟随前景色） */
 /* 繁梦空间品牌色（标志、品牌规范页使用；与 public/brand 下的标识文件一致） */
 @theme {
-  --color-brand-indigo: #4f46e5;
-  --color-brand-violet: #7c3aed;
-  --color-brand-moon: #f59e0b;
-  --color-brand-moon-light: #fde68a;
-  --color-brand-night: #0b0c1e;
-  --color-brand-ink: #111827;
+  --color-brand-indigo: #8f72ff;
+  --color-brand-violet: #4f86ff;
+  --color-brand-moon: #3c6bff;
+  --color-brand-moon-light: #c3b6ff;
+  --color-brand-night: #17123f;
+  --color-brand-ink: #141b3e;
   --color-brand-paper: #ffffff;
-  --color-brand-mist: #f4f4f8;
+  --color-brand-mist: #eef1fa;
 }
 
 @utility landing-grid {

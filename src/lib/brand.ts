@@ -1,7 +1,7 @@
 /** 产品名称与页面标题。 */
 export const APP_NAME = '繁梦空间'
 /** 英文名（标识副标） */
-export const APP_NAME_EN = 'Fanmeng Space'
+export const APP_NAME_EN = 'Dream Space'
 /** 公司名称（品牌标识与版权信息使用） */
 export const COMPANY_NAME = '繁梦空间智能信息技术'
 export const APP_TAGLINE = '智能家居设计报价'

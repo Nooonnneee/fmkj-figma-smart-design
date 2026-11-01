@@ -17,9 +17,9 @@ export const metadata: Metadata = {
 const B = '/brand'
 
 const CONCEPTS = [
-  { src: `${B}/concept-home.svg`, title: '家 · 空间', text: '圆润的房屋轮廓代表「空间」，也是我们服务的每一个家。紫蓝渐变象征科技与安心。' },
-  { src: `${B}/concept-moon.svg`, title: '新月 · 梦', text: '屋内一弯暖金色新月取「繁梦」之意：夜晚灯光渐暖、全家安睡，是智能家居最好的样子。' },
-  { src: `${B}/concept-stars.svg`, title: '繁星 · 智能互联', text: '三颗相连的星点既是夜空繁星，也是方案里的设备点位与互联网络，呼应「繁」与智能。' },
+  { src: `${B}/concept-home.svg`, title: 'Dream · 繁梦手写字', text: '流畅柔和的手写笔触，代表客户与团队心中丰富的想象力，也传递有温度的服务体验。' },
+  { src: `${B}/concept-moon.svg`, title: 'SPACE · 几何字与光环', text: '方正稳固的定制几何字形搭配 -18° 倾斜轨道光环，象征可靠的技术底座与持续陪伴。' },
+  { src: `${B}/concept-stars.svg`, title: '星芒 · AI 智能与灵感', text: '以四角星芒替代字母 A 的横画，象征 AI 驱动的智能设计与点亮空间的灵感。' },
 ]
 
 type Asset = { span: string; name: string; note: string; preview: string; w: number; h: number; dark: boolean; downloads: { label: string; href: string }[] }
@@ -29,18 +29,18 @@ const LOCKUPS: Asset[] = [
   { span: 'sm:col-span-2 lg:col-span-6', name: '公司全称组合', note: '合同、发票、公文、官网页脚', preview: `${B}/fmkj-logo-full.svg`, w: 760, h: 120, dark: false, downloads: [{ label: 'SVG', href: `${B}/fmkj-logo-full.svg` }, { label: '反白 SVG', href: `${B}/fmkj-logo-full-white.svg` }] },
   { span: 'lg:col-span-2', name: '竖版标识', note: '方形空间、海报、包装、启动页', preview: `${B}/fmkj-logo-vertical.svg`, w: 200, h: 290, dark: false, downloads: [{ label: 'SVG', href: `${B}/fmkj-logo-vertical.svg` }, { label: 'PNG', href: `${B}/fmkj-logo-vertical@2x.png` }] },
   { span: 'lg:col-span-2', name: '竖版标识 · 反白', note: '深色方形空间', preview: `${B}/fmkj-logo-vertical-white.svg`, w: 200, h: 290, dark: true, downloads: [{ label: 'SVG', href: `${B}/fmkj-logo-vertical-white.svg` }] },
-  { span: 'lg:col-span-2', name: '标志 · 彩色', note: '空间有限时单独使用', preview: `${B}/fmkj-mark.svg`, w: 256, h: 256, dark: false, downloads: [{ label: 'SVG', href: `${B}/fmkj-mark.svg` }, { label: 'PNG', href: `${B}/fmkj-mark-512.png` }] },
-  { span: 'lg:col-span-3', name: '标志 · 单色黑', note: '黑白印刷、盖章、雕刻', preview: `${B}/fmkj-mark-black.svg`, w: 256, h: 256, dark: false, downloads: [{ label: 'SVG', href: `${B}/fmkj-mark-black.svg` }] },
+  { span: 'lg:col-span-2', name: '标志 · 浅色背景', note: '单独使用标志图形（浅色底）', preview: `${B}/fmkj-mark.svg`, w: 256, h: 256, dark: false, downloads: [{ label: 'SVG', href: `${B}/fmkj-mark.svg` }, { label: 'PNG', href: `${B}/fmkj-mark-512.png` }] },
+  { span: 'lg:col-span-3', name: '标志 · 单色墨蓝', note: '黑白印刷、盖章、雕刻', preview: `${B}/fmkj-mark-black.svg`, w: 256, h: 256, dark: false, downloads: [{ label: 'SVG', href: `${B}/fmkj-mark-black.svg` }] },
   { span: 'lg:col-span-3', name: '标志 · 单色白', note: '深色或照片背景上的单色使用', preview: `${B}/fmkj-mark-white.svg`, w: 256, h: 256, dark: true, downloads: [{ label: 'SVG', href: `${B}/fmkj-mark-white.svg` }] },
 ]
 
 const COLORS = [
-  { name: '繁梦蓝', en: 'Dream Indigo', hex: '#4F46E5', rgb: '79 70 229', swatch: 'bg-brand-indigo', use: '主色：标志、主按钮、链接' },
-  { name: '星夜紫', en: 'Night Violet', hex: '#7C3AED', rgb: '124 58 237', swatch: 'bg-brand-violet', use: '渐变终点、强调与高亮' },
-  { name: '月光金', en: 'Moon Gold', hex: '#F59E0B', rgb: '245 158 11', swatch: 'bg-brand-moon', use: '点缀色：新月、重要数字（少量使用）' },
-  { name: '深空黑', en: 'Deep Space', hex: '#0B0C1E', rgb: '11 12 30', swatch: 'bg-brand-night', use: '深色背景、应用图标底色' },
-  { name: '墨色', en: 'Ink', hex: '#111827', rgb: '17 24 39', swatch: 'bg-brand-ink', use: '标识文字与正文' },
-  { name: '云白', en: 'Cloud', hex: '#F4F4F8', rgb: '244 244 248', swatch: 'bg-brand-mist', use: '浅色背景与留白' },
+  { name: '星光紫', en: 'Starlight', hex: '#8F72FF', rgb: '143 114 255', swatch: 'bg-brand-indigo', use: '品牌强调色，星夜渐变的起点' },
+  { name: '科技蓝', en: 'Tech Blue', hex: '#4F86FF', rgb: '79 134 255', swatch: 'bg-brand-violet', use: '品牌强调色，星夜渐变的终点' },
+  { name: '晨光蓝', en: 'Dawn Blue', hex: '#3C6BFF', rgb: '60 107 255', swatch: 'bg-brand-moon', use: '浅色版 Dream 起点、交互强调' },
+  { name: '星夜紫', en: 'Night Violet', hex: '#17123F', rgb: '23 18 63', swatch: 'bg-brand-night', use: '深色背景、主色应用图标底色' },
+  { name: '墨蓝', en: 'Ink Navy', hex: '#141B3E', rgb: '20 27 62', swatch: 'bg-brand-ink', use: '浅色版 SPACE 与标准正文' },
+  { name: '晨雾白', en: 'Mist', hex: '#EEF1FA', rgb: '238 241 250', swatch: 'bg-brand-mist', use: '浅色背景与分区留白' },
 ]
 
 const DONTS = [
@@ -78,9 +78,9 @@ export default function BrandPage() {
           </div>
           <div className="mx-auto max-w-5xl px-4 pt-20 pb-16 text-center sm:px-6 sm:pt-28 lg:px-8">
             <h1 id="brand-title" className="sr-only">{COMPANY_NAME}品牌标识</h1>
-            <Image src={`${B}/fmkj-logo-vertical-white.svg`} alt={`${APP_NAME}标识`} width={200} height={290} unoptimized priority className="mx-auto h-48 w-auto sm:h-60" />
+            <Image src={`${B}/fmkj-logo-vertical-white.svg`} alt={`${APP_NAME}标识`} width={258} height={264} unoptimized priority className="mx-auto h-48 w-auto sm:h-60" />
             <p className="mx-auto mt-8 max-w-2xl text-base text-pretty text-muted-foreground sm:text-lg">
-              {COMPANY_NAME}的品牌标识由「家、新月、繁星」三个元素构成：为每一个家，编织安心入梦的智能空间。
+              {COMPANY_NAME}的品牌标识由手写体 Dream、定制几何字 SPACE、倾斜光环与四角星芒构成：让每一个梦想，都有智能的空间。
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <Button asChild size="lg" className="rounded-full">
@@ -101,7 +101,7 @@ export default function BrandPage() {
 
         <section aria-labelledby="concept-title" className="py-16 sm:py-24">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-            <SectionHeading id="concept-title" eyebrow="标志释义" title="一个家，一弯新月，一串繁星" description="简洁的几何造型保证在 16px 的浏览器图标到数米宽的展会背板上都清晰可辨。" />
+            <SectionHeading id="concept-title" eyebrow="标志释义" title="柔与刚、人与技术，相互成就" description="手写 Dream 与几何 SPACE 结合倾斜光环与星芒，从应用图标到大幅背板都清晰醒目。" />
             <div className="mt-12 grid gap-4 md:grid-cols-3">
               {CONCEPTS.map((c) => (
                 <div key={c.title} className="rounded-2xl border border-border bg-card/50 p-6">
@@ -183,7 +183,7 @@ export default function BrandPage() {
 
         <section aria-labelledby="color-title" className="py-16 sm:py-24">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-            <SectionHeading id="color-title" eyebrow="品牌色" title="繁梦蓝紫，月光点睛" description="主色负责识别，月光金只做点缀，大面积使用深空黑与云白保持克制。" />
+            <SectionHeading id="color-title" eyebrow="品牌色" title="星夜蓝紫，晨光破晓" description="深色场景使用星光紫至科技蓝渐变，浅色场景使用晨光蓝至梦境紫与墨蓝。" />
             <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {COLORS.map((c) => (
                 <div key={c.hex} className="overflow-hidden rounded-2xl border border-border bg-card/50">
@@ -202,7 +202,7 @@ export default function BrandPage() {
               ))}
             </div>
             <div className="mt-4 h-16 rounded-2xl bg-linear-to-r from-brand-indigo to-brand-violet" aria-label="标准渐变：繁梦蓝到星夜紫，135°" />
-            <p className="mt-2 text-xs text-muted-foreground">标准渐变：繁梦蓝 #4F46E5 → 星夜紫 #7C3AED，左上到右下 135°</p>
+            <p className="mt-2 text-xs text-muted-foreground">星夜渐变：星光紫 #8F72FF → 科技蓝 #4F86FF</p>
           </div>
         </section>
 
@@ -217,10 +217,10 @@ export default function BrandPage() {
                 <p className="mt-4 text-xs text-muted-foreground">标识用 Bold（字距 +8%），标题用 Bold / Medium，正文用 Regular。</p>
               </div>
               <div className="rounded-2xl border border-border bg-card/50 p-6">
-                <p className="text-xs text-muted-foreground">英文 · Space Grotesk</p>
+                <p className="text-xs text-muted-foreground">英文 · Dream Space 定制字标与 Space Grotesk</p>
                 <Image src={`${B}/fmkj-logo-white.svg`} alt="" width={436} height={120} unoptimized className="mt-4 h-12 w-auto" />
-                <p className="mt-4 text-lg tracking-widest text-muted-foreground uppercase">Fanmeng Space · 0123456789</p>
-                <p className="mt-4 text-xs text-muted-foreground">英文名全大写，字距 +32%；也适用于数字、编号与英文副标。</p>
+                <p className="mt-4 text-lg tracking-widest text-muted-foreground uppercase">Dream Space · 0123456789</p>
+                <p className="mt-4 text-xs text-muted-foreground">正文中英文品牌名写作 Dream Space（首字母大写，中间留空格）。</p>
               </div>
             </div>
           </div>
