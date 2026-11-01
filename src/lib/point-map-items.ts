@@ -10,7 +10,8 @@ import { autoSelectProducts, type SelectableProduct, type SelectionTier } from '
  * 旧点位只有 productId、没有 deviceType 时，设备类型取自产品。
  */
 
-export type PointCustomData = { deviceType?: unknown; productId?: unknown; pointCode?: unknown; categorySlug?: unknown }
+/** 点位 customData；symbolId / sizeCm / real 是画板新增的可选字段（灯光款式、真实尺寸、按比例落图），报价不使用 */
+export type PointCustomData = { deviceType?: unknown; productId?: unknown; pointCode?: unknown; categorySlug?: unknown; symbolId?: unknown; sizeCm?: unknown; real?: unknown }
 export type ResolvableProduct = { id: string; deviceType: string | null; status?: string; price?: number; image?: unknown }
 export type ProjectDefaults = Record<string, string>
 

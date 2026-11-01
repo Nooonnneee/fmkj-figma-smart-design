@@ -24,7 +24,7 @@ export default async function PointMapPage({
   // 点位图、报价列表、产品库并行读取
   const [scene, deals, catalog, flags] = await Promise.all([
     payload
-      .findByID({ collection: 'projects', id: project.id, depth: 0, user, overrideAccess: false, select: { pointMap: true, defaultProducts: true } })
+      .findByID({ collection: 'projects', id: project.id, depth: 0, user, overrideAccess: false, select: { pointMap: true, defaultProducts: true, updatedAt: true } })
       .catch(() => null),
     getProjectDeals(id),
     getCatalog(),
@@ -55,6 +55,7 @@ export default async function PointMapPage({
       projectName={project.name}
       platform={project.platform ?? null}
       initialScene={initialScene}
+      serverUpdatedAt={typeof scene.updatedAt === 'string' ? scene.updatedAt : null}
       warnings={warnings}
       needsSave={repaired > 0 && !readOnly}
       products={products}
