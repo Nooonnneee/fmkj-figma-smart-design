@@ -1,3 +1,4 @@
+import { FilterTabs } from '@/components/filter-tabs'
 import { PageHeader } from '@/components/page-header'
 import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
@@ -37,8 +38,24 @@ export default async function PluginsPage({ searchParams }: { searchParams: Prom
   })
 
   return (
-    <section className="mx-auto flex w-full max-w-3xl flex-col gap-5">
-      <PageHeader title="插件市场" />
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-5">
+      <PageHeader
+        title="插件市场"
+        actions={
+          <FilterTabs
+            label="插件阶段"
+            items={[
+              { key: 'all', label: '全部', href: '/plugins', active: !stage },
+              ...PLUGIN_STAGES.map((s) => ({
+                key: s.key,
+                label: s.label,
+                href: `/plugins?stage=${s.key}`,
+                active: stage === s.key,
+              })),
+            ]}
+          />
+        }
+      />
       <PluginList
         items={stage ? items.filter((p) => p.stage === stage) : items}
         stages={[]}

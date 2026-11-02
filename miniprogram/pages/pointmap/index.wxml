@@ -1,113 +1,208 @@
-<view class="pm {{readOnly ? '' : 'page-pad-bottom'}}">
-  <view class="toolbar">
-    <scroll-view scroll-x class="sheet-tabs" enable-flex>
-      <view wx:for="{{sheets}}" wx:key="id" class="chip {{sheetIndex === index ? 'active' : ''}}" data-index="{{index}}" bindtap="onSheetTab">
-        {{item.name}} <text class="small">{{item.pointCount}}</text>
-      </view>
-    </scroll-view>
-    <picker range="{{scopes}}" range-key="label" value="{{scopeIndex}}" bindchange="onScope">
-      <view class="chip shrink-0">{{scopes[scopeIndex].label || '全部'}}<image class="icon-sm" src="/assets/icons/chevron-down.svg" /></view>
-    </picker>
-  </view>
-
-  <view wx:if="{{mode !== 'view'}}" class="mode-banner">
-    <block wx:if="{{mode === 'place'}}">
-      <image class="mode-icon" src="{{placeType.icon}}" />
-      <text class="grow">点击图纸放置「{{placeType.name}}」，可连续放置</text>
-    </block>
-    <text wx:else class="grow">点击图纸上的新位置</text>
-    <button class="btn btn-sm btn-primary" bindtap="exitMode">{{mode === 'place' ? '完成' : '取消'}}</button>
-  </view>
-
-  <view class="canvas-wrap">
-    <scroll-view wx:if="{{sheets.length}}" scroll-x scroll-y class="canvas" style="height: {{viewH}}px">
-      <view id="sheet" class="sheet" style="width: {{sheetW}}px; height: {{sheetH}}px" bindtap="onCanvasTap">
-        <image class="sheet-img" src="{{sheetUrl}}" mode="aspectFit" />
-        <view wx:for="{{areasOnSheet}}" wx:key="id" class="area" style="left: {{item.left}}%; top: {{item.top}}%; width: {{item.width}}%; height: {{item.height}}%">
-          <text class="area-name">{{item.name}}</text>
-        </view>
+<view class="pm {{isLandscape ? 'pm-landscape' : ''}} {{fullscreen ? 'pm-fullscreen' : ''}}">
+  <view class="pm-main">
+    <view wx:if="{{!fullscreen}}" class="pm-toolbar">
+      <scroll-view scroll-x class="pm-sheet-tabs" enable-flex>
         <view
-          wx:for="{{pointsOnSheet}}"
+          wx:for="{{sheets}}"
           wx:key="id"
-          class="marker {{item.id === selectedId ? 'sel' : ''}} {{item.pending ? 'pending' : ''}}"
-          style="left: {{item.left}}%; top: {{item.top}}%"
-          data-id="{{item.id}}"
-          catchtap="onMarkerTap"
+          class="pm-chip {{sheetIndex === index ? 'active' : ''}}"
+          data-index="{{index}}"
+          bindtap="onSheetTab"
         >
-          <image class="marker-icon" src="{{item.icon}}" style="width: {{markerSize}}px; height: {{markerSize}}px; left: -{{markerSize / 2}}px; top: -{{markerSize / 2}}px" />
-          <text wx:if="{{showLabels}}" class="marker-label" style="top: {{markerSize / 2 + 1}}px; color: {{item.color}}">{{item.name}}</text>
+          {{item.name}} <text class="pm-chip-count">{{item.pointCount}}</text>
+        </view>
+      </scroll-view>
+      <picker range="{{scopes}}" range-key="label" value="{{scopeIndex}}" bindchange="onScope">
+        <view class="pm-chip">
+          {{scopes[scopeIndex].label || '全部'}}
+          <image class="pm-icon-xs" src="/assets/icons/chevron-down.svg" />
+        </view>
+      </picker>
+    </view>
+
+    <view wx:if="{{mode !== 'view'}}" class="pm-mode-banner">
+      <block wx:if="{{mode === 'place'}}">
+        <image class="pm-mode-icon" src="{{placeType.icon}}" />
+        <text class="pm-mode-text">点击图纸放置「{{placeType.name}}」（双指可随时缩放图纸）</text>
+      </block>
+      <text wx:else class="pm-mode-text">点击图纸上的新位置完成移动</text>
+      <button class="pm-mode-btn" bindtap="exitMode">{{mode === 'place' ? '完成' : '取消'}}</button>
+    </view>
+
+    <view class="pm-canvas-wrap">
+      <view
+        wx:if="{{sheets.length}}"
+        id="canvas-viewport"
+        class="pm-canvas"
+        style="height: {{viewH}}px"
+        catchtouchstart="onTouchStart"
+        catchtouchmove="onTouchMove"
+        catchtouchend="onTouchEnd"
+        catchtouchcancel="onTouchEnd"
+      >
+        <view
+          id="plan-sheet"
+          class="plan-sheet"
+          style="width: {{sheetW}}px; height: {{sheetH}}px; transform: translate3d({{panX}}px, {{panY}}px, 0) scale({{scale}})"
+          bindtap="onCanvasTap"
+        >
+          <image class="plan-sheet-img" src="{{sheetUrl}}" mode="aspectFit" />
+          <view
+            wx:for="{{areasOnSheet}}"
+            wx:key="id"
+            class="plan-area"
+            style="left: {{item.left}}%; top: {{item.top}}%; width: {{item.width}}%; height: {{item.height}}%"
+          >
+            <text class="plan-area-name">{{item.name}}</text>
+          </view>
+          <view
+            wx:for="{{pointsOnSheet}}"
+            wx:key="id"
+            class="plan-marker {{item.id === selectedId ? 'sel' : ''}} {{item.pending ? 'pending' : ''}}"
+            style="left: {{item.left}}%; top: {{item.top}}%"
+            data-id="{{item.id}}"
+            catchtap="onMarkerTap"
+          >
+            <image
+              class="plan-marker-icon"
+              src="{{item.icon}}"
+              style="width: {{markerSize}}px; height: {{markerSize}}px; left: -{{markerSize / 2}}px; top: -{{markerSize / 2}}px"
+            />
+            <text wx:if="{{showLabels}}" class="plan-marker-label" style="top: {{markerSize / 2 + 1}}px; color: {{item.color}}">
+              {{item.name}}
+            </text>
+          </view>
+        </view>
+
+        <!-- 全屏时左上角悬浮图纸切换 -->
+        <view wx:if="{{fullscreen && sheets.length > 1}}" class="pm-float-top">
+          <scroll-view scroll-x class="pm-float-sheets" enable-flex>
+            <view
+              wx:for="{{sheets}}"
+              wx:key="id"
+              class="pm-chip pm-chip-sm {{sheetIndex === index ? 'active' : ''}}"
+              data-index="{{index}}"
+              catchtap="onSheetTab"
+            >
+              {{item.name}}
+            </view>
+          </scroll-view>
+        </view>
+
+        <!-- 右下角悬浮缩放、全屏与快捷放置工具条 -->
+        <view class="pm-zoom-bar">
+          <view wx:if="{{!readOnly}}" class="pm-zoom-btn pm-zoom-primary" catchtap="openTypeSheet">
+            <image class="pm-icon-xs" src="/assets/icons/plus-white.svg" />
+            <text class="pm-zoom-text">放置设备</text>
+          </view>
+          <view class="pm-zoom-btn" catchtap="zoomOut"><image class="pm-icon-xs" src="/assets/icons/zoom-out.svg" /></view>
+          <view class="pm-zoom-btn" catchtap="zoomFit"><text class="pm-zoom-text">{{scaleText}}</text></view>
+          <view class="pm-zoom-btn" catchtap="zoomIn"><image class="pm-icon-xs" src="/assets/icons/zoom-in.svg" /></view>
+          <view class="pm-zoom-btn {{showLabels ? 'on' : ''}}" catchtap="toggleLabels">
+            <text class="pm-zoom-text">名称</text>
+          </view>
+          <view class="pm-zoom-btn {{fullscreen ? 'on' : ''}}" catchtap="toggleFullscreen">
+            <image class="pm-icon-xs" src="/assets/icons/{{fullscreen ? 'maximize-white' : 'maximize'}}.svg" />
+            <text class="pm-zoom-text">{{fullscreen ? '退出全屏' : '全屏'}}</text>
+          </view>
         </view>
       </view>
+
+      <view wx:elif="{{!loading}}" class="pm-empty">
+        <image class="pm-icon-lg" src="/assets/icons/image-plus-muted.svg" />
+        <text class="pm-empty-title">还没有户型图</text>
+        <text class="pm-empty-sub">上传后自动裁掉图框和标题栏，支持双指缩放与全屏点选布点</text>
+        <button wx:if="{{!readOnly}}" class="pm-btn pm-btn-primary" bindtap="onUpload">上传户型图</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- 侧栏 / 底部面板（全屏时隐藏，释放全部画布空间） -->
+  <view wx:if="{{!fullscreen}}" class="pm-side">
+    <view class="pm-side-head">
+      <view wx:if="{{summary}}" class="pm-summary-num">
+        <text class="pm-num-strong">{{summary.points}}</text>
+        <text class="pm-muted"> 个点位</text>
+      </view>
+      <view wx:if="{{!readOnly && summary.points}}" class="pm-quote-link" bindtap="generateQuote">
+        <image class="pm-icon-xs" src="/assets/icons/receipt.svg" />
+        <text>生成报价</text>
+      </view>
+    </view>
+
+    <view class="pm-seg">
+      <view class="pm-seg-item {{tab === 'legend' ? 'active' : ''}}" data-tab="legend" bindtap="onTab">图例 {{legend.length}}</view>
+      <view class="pm-seg-item {{tab === 'rooms' ? 'active' : ''}}" data-tab="rooms" bindtap="onTab">房间 {{rooms.length}}</view>
+    </view>
+
+    <scroll-view scroll-y class="pm-side-list">
+      <block wx:if="{{tab === 'legend'}}">
+        <view
+          wx:for="{{legend}}"
+          wx:key="value"
+          class="pm-list-item"
+          hover-class="list-item-hover"
+          data-index="{{index}}"
+          bindtap="onLegendTap"
+        >
+          <image class="pm-legend-icon" src="{{item.icon}}" />
+          <text class="pm-list-name">{{item.name}}</text>
+          <text class="pm-list-count">× {{item.count}}</text>
+        </view>
+        <view wx:if="{{!legend.length}}" class="pm-empty-hint">
+          还没有点位{{readOnly ? '' : '，点「放置设备」开始布置'}}
+        </view>
+      </block>
+      <block wx:else>
+        <view wx:for="{{rooms}}" wx:key="id" class="pm-list-item pm-room-item">
+          <view class="pm-room-row">
+            <text class="pm-list-name">{{item.name}}</text>
+            <text class="pm-muted">{{item.points}} 点</text>
+          </view>
+          <text class="pm-room-sub">{{item.linesText || '暂无设备'}}</text>
+        </view>
+        <view wx:if="{{!rooms.length}}" class="pm-empty-hint">还没有划分房间区域</view>
+      </block>
     </scroll-view>
-    <view wx:elif="{{!loading}}" class="empty sheet-empty">
-      <image class="icon-lg" src="/assets/icons/image-plus-muted.svg" />
-      <text>还没有户型图</text>
-      <text class="small">上传后自动裁掉图框和标题栏，放进标准图纸</text>
-      <button wx:if="{{!readOnly}}" class="btn btn-primary btn-sm" bindtap="onUpload">上传户型图</button>
-    </view>
-    <view wx:if="{{sheets.length}}" class="zoom">
-      <view class="zoom-btn" bindtap="zoomOut"><image class="icon-sm" src="/assets/icons/zoom-out.svg" /></view>
-      <view class="zoom-btn" bindtap="zoomFit"><image class="icon-sm" src="/assets/icons/maximize.svg" /></view>
-      <view class="zoom-btn" bindtap="zoomIn"><image class="icon-sm" src="/assets/icons/zoom-in.svg" /></view>
-      <view class="zoom-btn {{showLabels ? 'on' : ''}}" bindtap="toggleLabels"><text class="small">名称</text></view>
+
+    <view wx:if="{{!readOnly}}" class="pm-actions">
+      <button class="pm-btn pm-btn-outline" bindtap="onUpload">
+        <image class="pm-icon-xs" src="/assets/icons/image-plus.svg" />户型图
+      </button>
+      <button class="pm-btn pm-btn-primary" bindtap="openTypeSheet">
+        <image class="pm-icon-xs" src="/assets/icons/plus-white.svg" />放置设备
+      </button>
     </view>
   </view>
 
-  <view class="panel">
-    <view wx:if="{{summary}}" class="row between">
-      <view>
-        <text class="num">{{summary.points}}</text><text class="small muted"> 个点位</text>
-      </view>
-      <view wx:if="{{!readOnly && summary.points}}" class="row gap-8 small" hover-class="btn-hover" bindtap="generateQuote">
-        <image class="icon-sm" src="/assets/icons/receipt.svg" />生成报价
-      </view>
-    </view>
-    <view class="seg mt-24">
-      <view class="seg-item {{tab === 'legend' ? 'active' : ''}}" data-tab="legend" bindtap="onTab">图例 {{legend.length}}</view>
-      <view class="seg-item {{tab === 'rooms' ? 'active' : ''}}" data-tab="rooms" bindtap="onTab">房间 {{rooms.length}}</view>
-    </view>
-
-    <view wx:if="{{tab === 'legend'}}" class="card card-flush mt-24">
-      <view wx:for="{{legend}}" wx:key="value" class="list-item" hover-class="list-item-hover" data-index="{{index}}" bindtap="onLegendTap">
-        <image class="legend-icon" src="{{item.icon}}" />
-        <view class="grow">
-          <view class="row gap-8"><text>{{item.name}}</text></view>
-        </view>
-        <text class="num shrink-0">× {{item.count}}</text>
-      </view>
-      <view wx:if="{{!legend.length}}" class="empty small">还没有点位{{readOnly ? '' : '，点「放置设备」开始布置'}}</view>
-    </view>
-
-    <view wx:else class="card card-flush mt-24">
-      <view wx:for="{{rooms}}" wx:key="id" class="list-item">
-        <view class="grow">
-          <view class="row gap-8"><text>{{item.name}}</text><text class="small muted">{{item.typeLabel}} · {{item.points}} 点</text></view>
-          <view class="small muted clamp-2 mt-8">{{item.linesText || '暂无设备'}}</view>
-        </view>
-      </view>
-      <view wx:if="{{!rooms.length}}" class="empty small">还没有划分房间区域（在网页版点位图里划分）</view>
-    </view>
-  </view>
-
-  <view wx:if="{{!readOnly}}" class="bottom-bar">
-    <button class="btn btn-outline" hover-class="btn-hover" bindtap="onUpload"><image class="icon-sm" src="/assets/icons/image-plus.svg" />户型图</button>
-    <button class="btn btn-primary" hover-class="btn-hover" bindtap="openTypeSheet"><image class="icon-sm" src="/assets/icons/plus-white.svg" />放置设备</button>
-  </view>
-
+  <!-- 放置 / 更换设备弹层：独立类名，彻底避免与图纸 .sheet 样式冲突，并适配横竖屏 -->
   <block wx:if="{{typeSheet}}">
-    <view class="mask" bindtap="closeTypeSheet" />
-    <view class="sheet">
-      <view class="sheet-head">
-        <text class="title">{{typeSheetFor === 'place' ? '选择要放置的设备' : '更换为'}}</text>
-        <image class="icon" src="/assets/icons/x-muted.svg" bindtap="closeTypeSheet" />
+    <view class="type-mask" catchtap="closeTypeSheet" />
+    <view class="type-modal">
+      <view class="type-modal-head">
+        <text class="type-modal-title">{{typeSheetFor === 'place' ? '选择要放置的设备' : '更换设备类型'}}</text>
+        <view class="type-modal-close" bindtap="closeTypeSheet">
+          <image class="pm-icon-sm" src="/assets/icons/x-muted.svg" />
+        </view>
       </view>
-      <scroll-view scroll-y class="sheet-body type-scroll">
+      <scroll-view scroll-y class="type-modal-body">
         <view wx:for="{{groups}}" wx:key="slug" wx:for-item="g" class="type-group">
-          <view class="row gap-8 label"><view class="dot" style="background: {{g.color}}" />{{g.name}}</view>
+          <view class="type-group-label">
+            <view class="type-dot" style="background: {{g.color}}" />
+            <text>{{g.name}}</text>
+          </view>
           <view class="type-grid">
-            <view wx:for="{{g.types}}" wx:key="value" wx:for-item="t" class="type-cell" hover-class="list-item-hover" data-type="{{t}}" bindtap="onPickType">
-              <image class="type-icon" src="{{t.icon}}" />
-              <text class="small">{{t.name}}</text>
+            <view
+              wx:for="{{g.types}}"
+              wx:key="value"
+              wx:for-item="t"
+              class="type-cell"
+              hover-class="list-item-hover"
+              data-type="{{t}}"
+              bindtap="onPickType"
+            >
+              <image class="type-icon" src="{{t.icon}}" mode="aspectFit" />
+              <text class="type-name">{{t.name}}</text>
             </view>
           </view>
         </view>

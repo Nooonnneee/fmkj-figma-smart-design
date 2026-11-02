@@ -1,4 +1,5 @@
 const { getToken } = require('./utils/request')
+const { captureLaunchTicket, consumePendingWebLogin } = require('./utils/web-login')
 
 App({
   globalData: {
@@ -7,8 +8,11 @@ App({
     dataVersion: 0,
     /** 跨页面传递的一次性参数（例如工作台点「上传户型图」后跳到项目页） */
     pending: null,
+    /** 微信扫一扫电脑端登录小程序码进入时携带的待确认票据 */
+    pendingLoginTicket: '',
   },
-  onLaunch() {
+  onLaunch(options) {
+    captureLaunchTicket(options, this)
     this.setupPrivacyAuthorization()
     if (!getToken()) wx.reLaunch({ url: '/pages/login/index' })
     const update = wx.getUpdateManager && wx.getUpdateManager()
@@ -16,6 +20,12 @@ App({
       update.onUpdateReady(() => {
         wx.showModal({ title: '发现新版本', content: '新版本已准备好，是否重启使用？', success: (r) => r.confirm && update.applyUpdate() })
       })
+    }
+  },
+  onShow(options) {
+    const ticket = captureLaunchTicket(options, this)
+    if (ticket && getToken()) {
+      setTimeout(() => consumePendingWebLogin(), 300)
     }
   },
   /**

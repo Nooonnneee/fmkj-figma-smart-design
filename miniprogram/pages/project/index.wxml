@@ -23,20 +23,6 @@
     <view wx:if="{{p.notes}}" class="notice mt-16">{{p.notes}}</view>
   </view>
 
-  <view class="card">
-    <view class="row between">
-      <text class="title">进度</text>
-      <text class="small muted">{{p.progress.detail}}</text>
-    </view>
-    <view class="steps mt-24">
-      <view wx:for="{{p.steps}}" wx:for-item="done" wx:for-index="i" wx:key="i" class="step {{done ? 'done' : ''}}" />
-    </view>
-    <view class="row between mt-16 small muted">
-      <text wx:for="{{stepLabels}}" wx:key="*this">{{item}}</text>
-    </view>
-    <button wx:if="{{p.progress.next && !archived}}" class="btn btn-primary btn-block mt-24" hover-class="btn-hover" bindtap="nextStep">下一步：{{p.progress.next.label}}</button>
-  </view>
-
   <view class="section-title"><text class="title">点位与预算</text></view>
   <view class="card">
     <view class="mini-stats">

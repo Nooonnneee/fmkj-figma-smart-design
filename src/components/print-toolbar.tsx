@@ -3,16 +3,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ChevronDown, ChevronLeft, FileDown, ImageDown, Loader2, Lock } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, Copy, ExternalLink, FileDown, FolderDown, ImageDown, Loader2, Lock, SlidersHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { COLLECT_MESSAGE, type CollectResult } from '@/lib/doc-collect'
-import { exportPagesAsPdf, renderPagesToJpegs, waitForPageAssets } from '@/lib/export-pdf'
+import { downloadBlob, exportPagesAsPdfBundle, renderPagesToJpegs, waitForPageAssets } from '@/lib/export-pdf'
 import { cn } from '@/lib/utils'
 
 type Option = { value: string; label: string; href: string }
+type ExportResultState = {
+  kind: 'pdf' | 'img'
+  fileName: string
+  pageCount: number
+  sizeKb: number
+  blob: Blob | null
+  downloadUrl: string | null
+  previewUrl: string | null
+  previewImages: string[]
+}
 
 /**
  * 打印页顶部工具条：切换模板 / 选项、直接导出 PDF、导出图片。
@@ -37,6 +49,8 @@ export function PrintToolbar({
   note?: string
 }) {
   const [busy, setBusy] = useState<'pdf' | 'img' | null>(null)
+  const [exportResult, setExportResult] = useState<ExportResultState | null>(null)
+  const [copied, setCopied] = useState(false)
   const searchParams = useSearchParams()
   const autoTriggered = useRef(false)
 
@@ -45,8 +59,36 @@ export function PrintToolbar({
     try {
       const pages = [...document.querySelectorAll<HTMLElement>('[data-export-page]')]
       if (!pages.length) return
-      const count = await exportPagesAsPdf(pages, exportName)
-      toast.success(`已导出 PDF（共 ${count} 页）`)
+      const bundle = await exportPagesAsPdfBundle(pages, exportName)
+      const fullFileName = `${exportName}.pdf`
+      let downloadUrl: string | null = null
+      let previewUrl: string | null = null
+      try {
+        const res = await fetch(`/print/export-file?name=${encodeURIComponent(fullFileName)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/pdf' },
+          body: bundle.blob,
+        })
+        const data = (await res.json().catch(() => null)) as { ok?: boolean; url?: string; previewUrl?: string } | null
+        if (res.ok && data?.ok && data.url) {
+          downloadUrl = new URL(data.url, window.location.origin).toString()
+          previewUrl = data.previewUrl ? new URL(data.previewUrl, window.location.origin).toString() : downloadUrl
+        }
+      } catch {
+        // ignore upload fallback error
+      }
+      setCopied(false)
+      setExportResult({
+        kind: 'pdf',
+        fileName: fullFileName,
+        pageCount: bundle.pageCount,
+        sizeKb: Math.max(1, Math.round(bundle.blob.size / 1024)),
+        blob: bundle.blob,
+        downloadUrl,
+        previewUrl,
+        previewImages: bundle.previewDataUrls,
+      })
+      toast.success(`已生成 PDF（共 ${bundle.pageCount} 页）`)
     } catch {
       toast.error('PDF 导出失败，请稍后重试')
     } finally {
@@ -86,6 +128,7 @@ export function PrintToolbar({
     try {
       const { toPng } = await import('html-to-image')
       const pages = [...document.querySelectorAll<HTMLElement>('[data-export-page]')]
+      const urls: string[] = []
       for (const [i, el] of pages.entries()) {
         const url = await toPng(el, {
           pixelRatio: 2,
@@ -93,6 +136,7 @@ export function PrintToolbar({
           cacheBust: false,
           style: { margin: '0', boxShadow: 'none' },
         })
+        urls.push(url)
         const a = document.createElement('a')
         a.href = url
         a.download = pages.length > 1 ? `${exportName}-${String(i + 1).padStart(2, '0')}.png` : `${exportName}.png`
@@ -102,6 +146,17 @@ export function PrintToolbar({
         a.remove()
         await new Promise((r) => setTimeout(r, 250))
       }
+      setCopied(false)
+      setExportResult({
+        kind: 'img',
+        fileName: `${exportName}.png`,
+        pageCount: urls.length,
+        sizeKb: 0,
+        blob: null,
+        downloadUrl: null,
+        previewUrl: null,
+        previewImages: urls,
+      })
       toast.success(pages.length > 1 ? `已导出 ${pages.length} 张图片` : '已导出图片')
     } catch {
       toast.error('导出失败，请稍后重试')
@@ -109,40 +164,116 @@ export function PrintToolbar({
       setBusy(null)
     }
   }
+
+  const savePdfWithPicker = async () => {
+    if (!exportResult?.blob) return
+    const picker = (window as unknown as { showSaveFilePicker?: (opts: unknown) => Promise<{ createWritable: () => Promise<{ write: (b: Blob) => Promise<void>; close: () => Promise<void> }> }> }).showSaveFilePicker
+    if (typeof picker === 'function') {
+      try {
+        const handle = await picker({
+          suggestedName: exportResult.fileName,
+          types: [{ description: 'PDF 文档', accept: { 'application/pdf': ['.pdf'] } }],
+        })
+        const writable = await handle.createWritable()
+        await writable.write(exportResult.blob)
+        await writable.close()
+        toast.success('已保存到您选择的文件夹')
+        return
+      } catch (e) {
+        if (e instanceof Error && e.name === 'AbortError') return
+      }
+    }
+    if (exportResult.downloadUrl) {
+      window.location.assign(exportResult.downloadUrl)
+    } else {
+      downloadBlob(exportResult.blob, exportResult.fileName)
+    }
+  }
+
+  const copyDownloadUrl = async () => {
+    if (!exportResult?.downloadUrl) return
+    try {
+      await navigator.clipboard.writeText(exportResult.downloadUrl)
+      setCopied(true)
+      toast.success('已复制 PDF 下载链接，可粘贴到微信或手机浏览器打开保存')
+    } catch {
+      toast.error('复制失败，请手动长按链接复制')
+    }
+  }
+
+  // 提取当前选中项摘要（例如「栖序雅致 · 整装」），避免顶栏铺满几十个按钮
+  const summaryParts = groups
+    .filter((g) => g.label !== '项目')
+    .map((g) => g.options.find((o) => o.value === g.value)?.label)
+    .filter(Boolean)
+    .slice(0, 2)
+
   return (
-    <div className="sticky top-0 z-20 border-b bg-background/95 print:hidden">
-      <div className={cn('mx-auto flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2', wide ? 'max-w-[1440px]' : 'max-w-[297mm]')}>
-        <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
+    <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur-xs print:hidden">
+      <div className={cn('mx-auto flex h-11 items-center justify-between gap-2 px-3 sm:px-4', wide ? 'max-w-[1440px]' : 'max-w-[297mm]')}>
+        <Button asChild variant="ghost" size="sm" className="-ml-2 shrink-0 text-muted-foreground">
           <Link href={back.href}><ChevronLeft className="size-4" />{back.label}</Link>
         </Button>
-        {groups.map((g) => (
-          <div key={g.label} className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">{g.label}</span>
-            <div className="flex rounded-lg bg-muted p-0.5">
-              {g.options.map((o) => (
-                <Button key={o.value} asChild size="xs" variant="ghost" className={cn('h-7 rounded-md px-2.5', o.value === g.value && 'bg-background shadow-sm')}>
-                  <Link href={o.href} replace scroll={false}>{o.label}</Link>
-                </Button>
-              ))}
-            </div>
-          </div>
-        ))}
-        <div className="ml-auto flex items-center gap-2">
-          {note && !locked ? <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">{note}</span> : null}
+
+        <div className="flex min-w-0 items-center gap-2">
+          {note && !locked ? <span className="hidden rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground sm:inline-block">{note}</span> : null}
           {locked ? (
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
               <Lock className="size-3.5" />
-              {locked.message}
+              <span className="hidden sm:inline">{locked.message}</span>
               <Link href={locked.href} className="font-medium text-primary underline-offset-4 hover:underline">
                 升级
               </Link>
             </span>
           ) : null}
+
+          {groups.length > 0 ? (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+                  <SlidersHorizontal className="size-3.5" />
+                  <span>版式与选项</span>
+                  {summaryParts.length > 0 ? (
+                    <span className="hidden max-w-36 truncate text-muted-foreground sm:inline">
+                      · {summaryParts.join(' / ')}
+                    </span>
+                  ) : null}
+                  <ChevronDown className="size-3.5 text-muted-foreground" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80 space-y-3.5 p-4">
+                {groups.map((g) => (
+                  <div key={g.label} className="space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground">{g.label}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {g.options.map((o) => {
+                        const active = o.value === g.value
+                        return (
+                          <Button
+                            key={o.value}
+                            asChild
+                            size="xs"
+                            variant={active ? 'default' : 'outline'}
+                            className="h-7 rounded-md px-2.5 text-xs"
+                          >
+                            <Link href={o.href} replace scroll={false}>
+                              {o.label}
+                            </Link>
+                          </Button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </PopoverContent>
+            </Popover>
+          ) : null}
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" disabled={busy !== null || Boolean(locked)}>
+              <Button size="sm" className="h-8" disabled={busy !== null || Boolean(locked)}>
                 {busy !== null ? <Loader2 className="size-4 animate-spin" /> : <FileDown className="size-4" />}
-                导出
+                {busy === 'pdf' ? '生成 PDF 中…' : busy === 'img' ? '生成图片中…' : '导出 PDF'}
                 <ChevronDown className="size-3.5" />
               </Button>
             </DropdownMenuTrigger>
@@ -159,6 +290,73 @@ export function PrintToolbar({
           </DropdownMenu>
         </div>
       </div>
+
+      <Dialog open={exportResult !== null} onOpenChange={(open) => !open && setExportResult(null)}>
+        <DialogContent className="max-h-[88vh] max-w-lg gap-4 overflow-y-auto p-5 sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold">
+              {exportResult?.kind === 'img' ? '高清图片已生成' : 'PDF 文档已生成'}
+            </DialogTitle>
+            <DialogDescription className="text-xs leading-relaxed">
+              {exportResult?.fileName}（共 {exportResult?.pageCount} 页{exportResult?.sizeKb ? ` · 约 ${exportResult.sizeKb} KB` : ''}）
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2.5 rounded-xl border bg-muted/35 p-3.5 text-xs leading-relaxed">
+            <p className="font-medium text-foreground">文件导出到哪里了？</p>
+            <ul className="list-disc space-y-1.5 pl-4 text-muted-foreground">
+              <li>
+                <strong className="text-foreground">电脑浏览器</strong>：已自动下载到系统默认的
+                <strong className="text-foreground">「下载 (Downloads)」文件夹</strong>（可在浏览器右上角下载图标中查看，或点击下方「选择位置另存为」指定目录）。
+              </li>
+              <li>
+                <strong className="text-foreground">微信小程序 / 手机端</strong>：受微信内置浏览器限制无法直接静默写入系统文件夹。您可以点击下方
+                <strong className="text-foreground">「复制 PDF 下载链接」</strong>发到微信聊天/手机浏览器打开保存，或直接
+                <strong className="text-foreground">长按下方预览图</strong>保存到手机相册、转发给客户。
+              </li>
+            </ul>
+          </div>
+
+          {exportResult?.kind === 'pdf' ? (
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" onClick={() => void savePdfWithPicker()}>
+                <FolderDown className="size-4" />
+                下载 / 选择位置另存为
+              </Button>
+              {exportResult.downloadUrl ? (
+                <Button type="button" variant="secondary" size="sm" onClick={() => void copyDownloadUrl()}>
+                  {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                  {copied ? '已复制下载链接' : '复制 PDF 下载链接'}
+                </Button>
+              ) : null}
+              {exportResult.previewUrl ? (
+                <Button asChild variant="outline" size="sm">
+                  <a href={exportResult.previewUrl} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="size-4" />
+                    新窗口打开 PDF
+                  </a>
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+
+          {exportResult?.previewImages.length ? (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">
+                页面高清预览（手机 / 小程序内可直接长按下方图片保存到相册或转发给微信好友）：
+              </p>
+              <div className="max-h-64 space-y-2.5 overflow-y-auto rounded-xl border bg-muted/20 p-2.5">
+                {exportResult.previewImages.map((src, idx) => (
+                  <div key={idx} className="overflow-hidden rounded-lg border bg-white shadow-2xs">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt={`第 ${idx + 1} 页预览`} className="block h-auto w-full" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

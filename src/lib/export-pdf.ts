@@ -298,10 +298,38 @@ export function downloadBlob(blob: Blob, fileName: string) {
   setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
+export type ExportedPdfBundle = {
+  blob: Blob
+  pageCount: number
+  previewDataUrls: string[]
+}
+
+function bytesToDataUrl(bytes: Uint8Array, mime = 'image/jpeg'): string {
+  let bin = ''
+  const chunkSize = 0x8000
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+  }
+  return `data:${mime};base64,${btoa(bin)}`
+}
+
 export async function exportPagesAsPdf(elements: HTMLElement[], fileName: string) {
   const pdfPages = await renderPagesToJpegs(elements)
   downloadBlob(buildPdfFromJpegs(pdfPages), `${fileName}.pdf`)
   return pdfPages.length
+}
+
+export async function exportPagesAsPdfBundle(elements: HTMLElement[], fileName: string): Promise<ExportedPdfBundle> {
+  await waitForPageAssets()
+  const pdfPages = await renderPagesToJpegs(elements)
+  const blob = buildPdfFromJpegs(pdfPages)
+  downloadBlob(blob, `${fileName}.pdf`)
+  const previewDataUrls = pdfPages.slice(0, 12).map((p) => bytesToDataUrl(p.bytes))
+  return {
+    blob,
+    pageCount: pdfPages.length,
+    previewDataUrls,
+  }
 }
 
 /** 等页面里的字体和图片都加载完（导出前调用，避免缺字、缺图） */

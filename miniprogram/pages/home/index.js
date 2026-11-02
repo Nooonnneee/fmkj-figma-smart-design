@@ -1,13 +1,18 @@
 const { api } = require('../../utils/request')
 const { requireLogin } = require('../../utils/auth')
+const { captureLaunchTicket, consumePendingWebLogin, scanAndConfirmWebLogin } = require('../../utils/web-login')
 const decorate = require('../../utils/decorate')
 
 Page({
   data: { me: {}, stats: {}, recentProjects: [], recentQuotes: [], loading: true, greeting: '' },
 
+  onLoad(options) {
+    captureLaunchTicket(options)
+  },
   onShow() {
     if (!requireLogin()) return
     this.load()
+    consumePendingWebLogin()
   },
   onPullDownRefresh() {
     this.load().finally(() => wx.stopPullDownRefresh())
@@ -47,5 +52,8 @@ Page({
   aiFloorPlan() {
     getApp().globalData.pending = { action: 'pick-image' }
     wx.switchTab({ url: '/pages/ai/index' })
+  },
+  scanWebLogin() {
+    scanAndConfirmWebLogin()
   },
 })

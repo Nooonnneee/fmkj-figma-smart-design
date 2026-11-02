@@ -1,97 +1,50 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Blocks, Coins, Crown, Gift, Loader2 } from 'lucide-react'
+import { ArrowRight, Check, Coins, Crown, Gift, Loader2, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { PLUGIN_ICONS } from '@/app/(frontend)/(workspace)/plugins/plugin-icons'
-import type { SidebarPlugin } from '@/components/app-sidebar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Switch } from '@/components/ui/switch'
+import { MEMBERSHIP_TIERS } from '@/lib/membership'
 import { cn } from '@/lib/utils'
-import type { PluginId } from '@/plugins/types'
 
-export function PluginsDialog({
-  open,
-  onOpenChange,
-  plugins,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  plugins: SidebarPlugin[]
-}) {
-  const router = useRouter()
-  const [busyId, setBusyId] = useState<string | null>(null)
-  const [optimistic, setOptimistic] = useState<Record<string, boolean>>({})
-  const readyPlugins = plugins.filter((p) => p.status === 'ready')
-
-  async function toggle(item: SidebarPlugin, next: boolean) {
-    if (busyId) return
-    setBusyId(item.id)
-    setOptimistic((prev) => ({ ...prev, [item.id]: next }))
-    try {
-      const res = await fetch('/plugins/toggle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: item.id, enabled: next }),
-      })
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
-      if (!res.ok || !data.ok) {
-        setOptimistic((prev) => ({ ...prev, [item.id]: item.enabled }))
-        toast.error(data.error ?? '操作失败，请稍后重试')
-        return
-      }
-      toast.success(next ? `已开启「${item.name}」` : `已关闭「${item.name}」`)
-      router.refresh()
-    } catch {
-      setOptimistic((prev) => ({ ...prev, [item.id]: item.enabled }))
-      toast.error('网络错误，请稍后重试')
-    } finally {
-      setBusyId(null)
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl gap-4 p-5 sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle className="text-base font-semibold">插件市场</DialogTitle>
-          <DialogDescription className="sr-only">按需开启或关闭扩展插件</DialogDescription>
-        </DialogHeader>
-        <ul className="grid gap-2 sm:grid-cols-2">
-          {readyPlugins.map((p) => {
-            const enabled = optimistic[p.id] ?? p.enabled
-            const Icon = PLUGIN_ICONS[p.id as PluginId] ?? Blocks
-            return (
-              <li key={p.id} className="flex items-center justify-between gap-2.5 rounded-xl border px-3 py-2.5">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <span
-                    className={cn(
-                      'flex size-8 shrink-0 items-center justify-center rounded-lg border',
-                      enabled ? 'border-primary/20 bg-primary/10 text-primary' : 'bg-muted/60 text-muted-foreground',
-                    )}
-                  >
-                    <Icon className="size-4" />
-                  </span>
-                  <span className="truncate text-sm font-medium">{p.name.replace(/（.*?）/, '')}</span>
-                </div>
-                <Switch
-                  checked={enabled}
-                  disabled={busyId === p.id}
-                  onCheckedChange={(next) => void toggle(p, next)}
-                  aria-label={`切换${p.name}`}
-                />
-              </li>
-            )
-          })}
-        </ul>
-      </DialogContent>
-    </Dialog>
-  )
+const TIER_HIGHLIGHTS: Record<string, { subtitle: string; tag?: string; perks: string[] }> = {
+  free: {
+    subtitle: '适合个人设计师快速上手体验',
+    perks: [
+      '10 个进行中项目（归档不占额度）',
+      '每个项目最多 2 位成员协作',
+      '基础横版方案模板与核心流程',
+      '点位图、报价单、合同 PDF 导出',
+    ],
+  },
+  pro: {
+    subtitle: '适合独立设计师与工作室高定交付',
+    tag: '推荐订阅',
+    perks: [
+      '每月免费赠送 300 AI 积分（识图布点 / 方案生成）',
+      '50 个进行中项目 + 每项目 5 人协同',
+      '解锁全部高定方案模板（栖序雅致 / 东方雅韵 / 墨金臻选）',
+      '解锁全部施工与算量插件（布线表 / 备货单 / 勘测单 / DWG）',
+      '业主交付资料包一键合并 PDF 与 ZIP 打包',
+    ],
+  },
+  team: {
+    subtitle: '适合全屋智能集成商与工程交付团队',
+    tag: '团队尊享',
+    perks: [
+      '每月免费赠送 1,000 AI 积分（高频识图与全案生成）',
+      '不限进行中项目数量，大型团队无忧扩容',
+      '不限项目协作成员（支持可编辑 / 仅查看分级）',
+      '包含专业版全部高定方案模板与施工交付插件',
+      '包含业主交付资料包一键打包与专属技术支持',
+    ],
+  },
 }
 
 export function MembershipDialog({
@@ -106,8 +59,10 @@ export function MembershipDialog({
   credits: number
 }) {
   const router = useRouter()
+  const inputRef = useRef<HTMLInputElement>(null)
   const [code, setCode] = useState('')
   const [pending, setPending] = useState(false)
+  const currentBadge = membershipBadge || '体验版'
 
   async function handleRedeem(e: React.FormEvent) {
     e.preventDefault()
@@ -140,52 +95,133 @@ export function MembershipDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md gap-5 p-5 sm:max-w-md">
+      <DialogContent className="max-h-[90vh] max-w-4xl gap-5 overflow-y-auto p-6 sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle className="text-base font-semibold">会员与积分</DialogTitle>
-          <DialogDescription className="sr-only">查看当前会员等级、AI 积分余额与兑换码激活</DialogDescription>
+          <div className="flex flex-wrap items-center justify-between gap-3 pr-6">
+            <div>
+              <DialogTitle className="text-lg font-semibold">会员订阅与 AI 积分</DialogTitle>
+              <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
+                升级专业版或旗舰版，解锁全套高定方案模板、施工算量插件、一键交付资料包与每月赠送 AI 积分
+              </DialogDescription>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl border bg-muted/40 px-3 py-1.5 text-xs">
+              <span className="flex items-center gap-1 font-medium">
+                <Crown className="size-3.5 text-primary" />
+                当前：{currentBadge}
+              </span>
+              <span className="text-border">|</span>
+              <span className="flex items-center gap-1 font-medium tabular-nums">
+                <Coins className="size-3.5 text-primary" />
+                {credits.toLocaleString('zh-CN')} 积分
+              </span>
+            </div>
+          </div>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-xl border bg-muted/30 p-3.5">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Crown className="size-3.5" />
-              当前等级
-            </div>
-            <div className="mt-1.5 flex items-center gap-2">
-              <span className="text-base font-semibold">{membershipBadge || '体验版'}</span>
-              <Badge variant="secondary" className="text-xs">
-                生效中
-              </Badge>
-            </div>
-          </div>
-          <div className="rounded-xl border bg-muted/30 p-3.5">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Coins className="size-3.5" />
-              AI 积分
-            </div>
-            <div className="mt-1.5 text-xl font-semibold tabular-nums">{credits.toLocaleString('zh-CN')}</div>
-          </div>
+        <div className="grid gap-3.5 md:grid-cols-3">
+          {MEMBERSHIP_TIERS.map((tier) => {
+            const isCurrent = tier.badge === currentBadge
+            const isPro = tier.value === 'pro'
+            const info = TIER_HIGHLIGHTS[tier.value] ?? { subtitle: tier.description, perks: [...tier.features] }
+            return (
+              <div
+                key={tier.value}
+                className={cn(
+                  'relative flex flex-col justify-between rounded-2xl border p-4 transition-all',
+                  isPro ? 'border-primary bg-primary/[0.03] shadow-sm ring-1 ring-primary/25' : 'bg-card',
+                )}
+              >
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="text-base font-semibold">{tier.label}</h3>
+                      </div>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{info.subtitle}</p>
+                    </div>
+                    {isCurrent ? (
+                      <Badge variant="secondary" className="shrink-0">
+                        当前方案
+                      </Badge>
+                    ) : info.tag ? (
+                      <Badge variant={isPro ? 'default' : 'outline'} className="shrink-0">
+                        {info.tag}
+                      </Badge>
+                    ) : null}
+                  </div>
+
+                  <div className="flex items-baseline justify-between border-y py-2.5">
+                    <div>
+                      <span className="text-xs text-muted-foreground">项目上限 </span>
+                      <span className="text-sm font-semibold tabular-nums">
+                        {tier.activeProjectLimit === null ? '不限' : `${tier.activeProjectLimit} 个`}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-xs text-muted-foreground">每月赠 </span>
+                      <span className="text-sm font-semibold text-primary tabular-nums">
+                        {tier.monthlyCredits ? `${tier.monthlyCredits} 积分` : '—'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <ul className="space-y-2 text-xs leading-relaxed">
+                    {info.perks.map((perk) => (
+                      <li key={perk} className="flex items-start gap-2">
+                        <Check className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                        <span>{perk}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="mt-4 pt-2">
+                  {isCurrent ? (
+                    <Button variant="outline" size="sm" className="w-full" disabled>
+                      当前正在使用
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant={isPro ? 'default' : 'secondary'}
+                      size="sm"
+                      className="w-full"
+                      onClick={() => inputRef.current?.focus()}
+                    >
+                      <Sparkles className="size-3.5" />
+                      使用兑换码开通{tier.badge}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
 
-        <form onSubmit={handleRedeem} className="space-y-2.5">
-          <p className="text-xs font-medium text-muted-foreground">使用兑换码升级会员或充值积分</p>
-          <div className="flex gap-2">
+        <div className="flex flex-col gap-3 rounded-2xl border bg-muted/25 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <form onSubmit={handleRedeem} className="flex flex-1 items-center gap-2">
             <Input
+              ref={inputRef}
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="FMKJ-XXXX-XXXX"
+              placeholder="输入会员或积分兑换码（如 FMKJ-XXXX-XXXX）"
               aria-label="兑换码"
               maxLength={40}
               disabled={pending}
-              className="font-mono tracking-wider uppercase"
+              className="bg-background font-mono tracking-wider uppercase"
             />
             <Button type="submit" disabled={pending} className="shrink-0">
               {pending ? <Loader2 className="size-4 animate-spin" /> : <Gift className="size-4" />}
-              兑换
+              立即兑换
             </Button>
-          </div>
-        </form>
+          </form>
+          <Button asChild variant="ghost" size="sm" className="shrink-0 text-xs text-muted-foreground hover:text-foreground">
+            <Link href="/membership" onClick={() => onOpenChange(false)}>
+              查看完整对比与积分明细
+              <ArrowRight className="size-3.5" />
+            </Link>
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   )
