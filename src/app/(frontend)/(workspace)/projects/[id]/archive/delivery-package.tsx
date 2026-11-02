@@ -19,7 +19,7 @@ import { zipFiles } from '@/lib/zip'
 import { setDeliverables } from './actions'
 
 export type DeliveryDoc = {
-  key: 'plans' | 'checklist' | 'quote' | 'proposal' | 'contract' | 'construction'
+  key: 'plans' | 'checklist' | 'quote' | 'proposal' | 'contract' | 'construction' | 'wiring' | 'procurement' | 'survey' | 'handover'
   title: string
   note: string
   /** 打印页地址；null = 还不能生成（例如没有点位、没有合同） */
@@ -148,12 +148,9 @@ export function DeliveryPackage({
   return (
     <section aria-labelledby="package-title" className="rounded-xl bg-card shadow-sm ring-1 ring-foreground/5 dark:ring-foreground/10">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4">
-        <div className="min-w-0 space-y-1">
-          <div className="flex items-center gap-2">
-            <h3 id="package-title" className="text-base font-semibold">交付资料包</h3>
-            {!access.meets ? <Badge variant="outline">{access.badge}功能</Badge> : null}
-          </div>
-          <p className="text-xs text-muted-foreground">交给业主的一整套资料：每类只放一份定稿，历史版本不进资料包。勾选后打包下载，或合并为一份 PDF。</p>
+        <div className="flex min-w-0 items-center gap-2">
+          <h3 id="package-title" className="text-base font-semibold">交付资料包</h3>
+          {!access.meets ? <Badge variant="outline">{access.badge}功能</Badge> : null}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" disabled={!access.allowed || busy || !chosen.length} onClick={() => void build('zip')}>
@@ -201,8 +198,8 @@ export function DeliveryPackage({
               aria-label={`资料包包含${d.title}`}
             />
             <label htmlFor={`pkg-${d.key}`} className={cn('min-w-44 flex-1', !d.url && 'text-muted-foreground')}>
-              <span className="block text-sm font-medium">{d.title}</span>
-              <span className="block truncate text-xs text-muted-foreground">{d.note}</span>
+              <span className="text-sm font-medium">{d.title}</span>
+              {d.note ? <span className="ml-2 text-xs text-muted-foreground tabular-nums">{d.note}</span> : null}
             </label>
             {d.key === 'quote' && quotes.length > 1 ? (
               <Select
@@ -247,7 +244,6 @@ export function DeliveryPackage({
           </li>
         ))}
       </ul>
-      {finalQuote.locked ? <p className="border-t px-5 py-2.5 text-xs text-muted-foreground">已签订或起草合同，定稿报价固定为合同依据的报价。</p> : null}
 
       {/* 封面与目录（导出时才渲染，放在屏幕外，只用于生成 PDF） */}
       {toc ? (

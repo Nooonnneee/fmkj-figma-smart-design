@@ -59,6 +59,40 @@ type TopoApRoom = { room: string; codes: string; sub: string; count: number }
 
 const byCode = (a: string, b: string) => a.localeCompare(b, 'en', { numeric: true })
 
+/** 主平台对应的联动协议（与方案模型 deck/model.ts 保持一致） */
+const PROTOCOL: Record<string, string> = {
+  米家: 'Zigbee / 蓝牙 Mesh',
+  'Aqara Home': 'Zigbee 3.0',
+  'Apple Home': 'Thread / Matter',
+  华为鸿蒙智家: 'PLC / 星闪',
+  KNX: 'KNX 总线',
+  Control4: 'Zigbee Pro / IP',
+  '网络/弱电': 'PoE / 以太网',
+}
+const SWITCH_TYPES = ['switch-1', 'switch-2', 'switch-3', 'switch-4']
+const AP_TYPES = ['ap-node', 'ceiling-ap']
+
+/** 示例项目的点位事实：所有方案页的文字都只从这里推导，不写死设备 */
+function useDemoFacts(data: LandingShowcase) {
+  return useMemo(() => {
+    const points = data.sheets.flatMap((sh) =>
+      sh.points.map((pt) => ({ ...pt, floor: sh.floor, displayRoom: pt.room ? `${sh.floor} · ${pt.room}` : `${sh.floor} · 公共区域` })),
+    )
+    const types = new Set(points.map((p) => p.type))
+    const count = (list: string[]) => points.filter((p) => list.includes(p.type)).length
+    const has = (...list: string[]) => list.some((t) => types.has(t))
+    const bedrooms = new Set(points.filter((p) => p.room?.includes('卧')).map((p) => p.displayRoom)).size
+    const protocol = PROTOCOL[data.project.platform] ?? '无线协议'
+    return { points, count, has, bedrooms, protocol }
+  }, [data.sheets, data.project.platform])
+}
+
+/** 「客厅、餐厅等 3 处」 */
+const joinRooms = (rooms: string[], max = 2) => {
+  const list = [...new Set(rooms)]
+  return list.length > max ? `${list.slice(0, max).join('、')}等${list.length}处` : list.join('、')
+}
+
 function codeRange(codes: string[]) {
   const c = [...new Set(codes.filter(Boolean))].sort(byCode)
   if (c.length <= 2) return c.join(' / ')
@@ -189,28 +223,13 @@ export function ProposalShowcase({
       </div>
 
       <div className="relative min-w-0 rounded-2xl bg-muted/60 p-3 sm:p-8 lg:col-span-7 lg:p-10 xl:col-span-8">
-        <div className="mb-3 flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">
-            {activeFramework.label} · {theme.label}
-          </span>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => setZoomOpen(true)}
-            className="h-7 gap-1.5 rounded-full px-3 text-xs"
-          >
-            <Maximize2 className="size-3.5" />
-            放大查看
-          </Button>
-        </div>
         <div
           id="proposal-slide-preview"
           ref={viewportRef}
           role="region"
           aria-label={`方案演示样张（${activeFramework.label} · ${theme.label}）`}
         >
-          <DocRoot style={theme.style} className="space-y-5 overflow-hidden sm:space-y-6">
+          <DocRoot style={theme.style} className="space-y-4 overflow-hidden sm:space-y-6">
             {activeFramework.chapters.map((chapterId, index) => {
               const pageNo = String(index + 1).padStart(2, '0')
               const pageTotal = String(activeFramework.chapters.length).padStart(2, '0')
@@ -219,7 +238,11 @@ export function ProposalShowcase({
                   key={chapterId}
                   onClick={() => setZoomOpen(true)}
                   title="点击放大查看"
-                  className="relative aspect-3/2 w-full cursor-zoom-in overflow-hidden rounded-md shadow-sm ring-1 ring-foreground/10"
+                  className={cn(
+                    'relative aspect-3/2 w-full cursor-zoom-in overflow-hidden rounded-md shadow-sm ring-1 ring-foreground/10',
+                    // 手机上只预览前 3 页，其余在「放大查看」里看
+                    index >= 3 && 'max-sm:hidden',
+                  )}
                 >
                   <div
                     style={{
@@ -340,27 +363,24 @@ function ShowcaseSlide({
   pageNo: string
   pageTotal: string
 }) {
-  const allPoints = useMemo(
-    () =>
-      data.sheets.flatMap((sh) =>
-        sh.points.map((pt) => ({
-          ...pt,
-          floor: sh.floor,
-          displayRoom: pt.room ? `${sh.floor} · ${pt.room}` : `${sh.floor} · 公共区域`,
-        })),
-      ),
-    [data.sheets],
-  )
+  const facts = useDemoFacts(data)
+  const { points: allPoints, protocol } = facts
 
   const topology = useMemo(() => {
     const acPts = allPoints.filter((p) => p.type === 'ac-router')
-    const apPts = allPoints.filter((p) => p.type === 'ap-node' || p.type === 'ceiling-ap')
+    const apPts = allPoints.filter((p) => AP_TYPES.includes(p.type))
     const acLine = data.quote?.lines.find((l) => l.type === 'ac-router')
-    const ac: TopoBox = {
-      title: `${acPts.length ? codeRange(acPts.map((p) => p.code)) : 'N3'} AC 控制器 / PoE 核心交换`,
-      badge: `AC 控制 · ${acPts.length || 1}台`,
-      sub: `统一管控 ${apPts.length} 台 AP 漫游与千兆 PoE 供电 · ${acPts[0]?.displayRoom ?? '1F · 客厅'}${acLine?.name ? ` · ${acLine.name}` : ''}`,
-    }
+    const ac: TopoBox = acPts.length
+      ? {
+          title: `${codeRange(acPts.map((p) => p.code))} AC 控制器 / PoE 核心交换`,
+          badge: `AC 控制 · ${acPts.length}台`,
+          sub: `统一管控 ${apPts.length} 台 AP 漫游与千兆 PoE 供电 · ${joinRooms(acPts.map((p) => p.displayRoom))}${acLine?.name ? ` · ${acLine.name}` : ''}`,
+        }
+      : {
+          title: 'AC 控制器 / PoE 核心交换机',
+          badge: '弱电箱核心',
+          sub: apPts.length ? `统一管控全屋 ${apPts.length} 台 AP 漫游与 PoE 供电` : '宽带光猫 → AC 路由 / PoE 交换机',
+        }
 
     const roomBuckets = new Map<string, typeof apPts>()
     for (const p of apPts) {
@@ -380,19 +400,26 @@ function ShowcaseSlide({
     })
 
     const gwPts = allPoints.filter((p) => p.type === 'gateway')
+    const tp = allPoints.filter((p) => p.type === 'touch-panel').length
+    const sp = allPoints.filter((p) => p.type === 'speaker').length
+    const vrf = allPoints.filter((p) => p.type === 'vrf-controller').length
     const ctrlPts = allPoints.filter((p) => p.type === 'touch-panel' || p.type === 'speaker' || p.type === 'vrf-controller')
-    const hubs: TopoBox[] = [
-      {
-        title: `${codeRange(gwPts.map((p) => p.code)) || 'G1～G7'} 智能中枢网关`,
-        badge: `网关 ×${gwPts.length || 4}`,
-        sub: '各楼层居中部署 · LAN 有线接入 · Zigbee / 蓝牙 Mesh',
-      },
-      {
-        title: `${codeRange(ctrlPts.map((p) => p.code)) || 'G2～G6'} 中控与语音交互`,
-        badge: `中控屏 / 音箱 ×${ctrlPts.length || 3}`,
-        sub: '玄关、客厅与主卧 · 场景触控与语音控制',
-      },
-    ]
+    const hubs: TopoBox[] = []
+    if (gwPts.length) {
+      hubs.push({
+        title: `${codeRange(gwPts.map((p) => p.code))} 智能中枢网关`,
+        badge: `网关 ×${gwPts.length}`,
+        sub: `${joinRooms(gwPts.map((p) => p.displayRoom))} · LAN 接入 · ${protocol}`,
+      })
+    }
+    if (ctrlPts.length) {
+      hubs.push({
+        title: `${codeRange(ctrlPts.map((p) => p.code))} 中控与语音交互`,
+        badge: [tp ? `中控屏×${tp}` : '', sp ? `音箱×${sp}` : '', vrf ? `空调网关×${vrf}` : ''].filter(Boolean).join(' / '),
+        sub: `${joinRooms(ctrlPts.map((p) => p.displayRoom))} · 场景触控与语音控制`,
+      })
+    }
+    if (!hubs.length) hubs.push({ title: '手机 App / 语音中控', badge: '直连控制', sub: 'Wi-Fi 设备直连局域网 · 无独立网关' })
 
     const leaves: TopoBox[] = DEVICE_CATEGORIES.filter((c) => c.slug !== 'gateway' && c.slug !== 'network')
       .map((c) => {
@@ -414,13 +441,25 @@ function ShowcaseSlide({
       apLink: `PoE 供电 + AC 漫游 · ${apRooms.length} 房间（${apPts.length} 台 AP）`,
       hubs,
       leaves,
-      link: 'Zigbee / 蓝牙 Mesh · 中控联动总线',
+      link: `${protocol} · 中控联动总线`,
     }
-  }, [allPoints, data.quote?.lines])
+  }, [allPoints, data.quote?.lines, protocol])
 
-  const totalAmount = data.quote?.total ?? 51820
+  const systemNotes = [
+    `同为${protocol}不代表必然兼容；设备接入、场景指令与状态回传均以清单及联调结果确认。`,
+    [
+      facts.has(...SWITCH_TYPES) ? '开关仅开关灯，不默认支持调光调色' : '',
+      facts.has('curtain-track') ? '电动窗帘须复核轨道匹配、行程与窗帘盒供电' : '',
+      facts.has(...AP_TYPES) ? 'AP 漫游与无线覆盖须到场实测调优' : '',
+    ]
+      .filter(Boolean)
+      .join('；'),
+    '全部设备位置与供电条件以现场勘测复核为准。',
+  ].filter(Boolean)
+
+  const totalAmount = data.quote?.total ?? 0
   const place = [data.project.community, data.project.address].filter(Boolean).join('') || data.project.name
-  const customer = data.project.customer || '林先生'
+  const customer = data.project.customer || '业主'
   const layoutText = `${data.sheets.length}层 · ${data.roomCount}个空间`
   const tagline = [brandLatin(company.name), theme.tagline].filter(Boolean).join('  /  ')
 
@@ -516,9 +555,11 @@ function ShowcaseSlide({
               </div>
               <p className="doc-display mt-[4px] text-[18px]">实施前，逐项确认</p>
               <ol className="doc-body flex flex-col gap-[8px] text-[13.5px] leading-[1.6] text-doc-muted">
-                <li>① 同为 Zigbee / 蓝牙 Mesh 不代表必然兼容；设备接入、场景指令与状态回传均以清单及联调结果确认。</li>
-                <li>② AP 漫游与无线覆盖须到场实测调优；电动窗帘须复核轨道匹配、行程与窗帘盒供电。</li>
-                <li>③ 全部设备位置、零火线供电条件及弱电箱六类网线汇聚以现场勘测复核为准。</li>
+                {systemNotes.map((n, i) => (
+                  <li key={n}>
+                    {'①②③'[i]} {n.endsWith('。') ? n : `${n}。`}
+                  </li>
+                ))}
               </ol>
             </div>
           </div>
@@ -897,7 +938,17 @@ function CoverSlide({
 }
 
 function PlanSlide({ data, theme, no }: { data: LandingShowcase; theme: DeckTheme; no: string }) {
+  const facts = useDemoFacts(data)
   const sheet = data.sheets[0]
+  const needs: [string, string][] = [
+    [
+      '生活需求',
+      facts.has('smart-lock', 'contact-sensor', 'doorbell') ? '回家有光，离家少牵挂' : facts.has('curtain-track') ? '灯光窗帘，一键随心' : '常用灯光，触手可及',
+    ],
+    ['休息需求', facts.bedrooms ? `${facts.bedrooms > 1 ? `${facts.bedrooms} 间卧室` : '卧室'}一键关灯入睡` : '夜间起居更安心'],
+    ['网络底座', facts.has(...AP_TYPES) ? 'AC 管控 + 全屋 AP 漫游' : '路由覆盖，按需扩展 AP'],
+    ['配置原则', '够用、可维护、边界清楚'],
+  ]
   const roomSummary = useMemo(() => {
     if (!sheet) return []
     const map = new Map<string, { name: string; codes: string[]; types: Set<string>; count: number }>()
@@ -923,12 +974,7 @@ function PlanSlide({ data, theme, no }: { data: LandingShowcase; theme: DeckThem
         tag="RESIDENTIAL PLAN"
       />
       <div className="grid h-[74px] w-full shrink-0 grid-cols-4 overflow-hidden rounded-(--deck-radius-sm) border border-(--deck-panel-border) bg-linear-to-r from-doc-soft to-doc-soft-to">
-        {[
-          ['生活需求', '回家有光，离家少牵挂'],
-          ['休息需求', '多层卧室一键关灯入睡'],
-          ['网络底座', 'AC 核心管控 + 全屋 AP 漫游'],
-          ['配置原则', '够用、可维护、边界清楚'],
-        ].map(([k, v]) => (
+        {needs.map(([k, v]) => (
           <div key={k} className="flex flex-col justify-center gap-[4px] px-[22px]">
             <p className="doc-body text-[12px] text-doc-muted">{k}</p>
             <p className="doc-strong truncate text-[17px]">{v}</p>
@@ -982,64 +1028,89 @@ function PlanSlide({ data, theme, no }: { data: LandingShowcase; theme: DeckThem
   )
 }
 
+/** 进门章节：一层玄关 / 客厅 / 餐厅里点位最多的两间，只列真实设备与报价型号 */
 function ZoneSlide({ data, theme, no }: { data: LandingShowcase; theme: DeckTheme; no: string }) {
+  const sheet = data.sheets[0]
+  const rooms = useMemo(() => {
+    const byRoom = new Map<string, NonNullable<typeof sheet>['points']>()
+    for (const p of sheet?.points ?? []) if (p.room) byRoom.set(p.room, [...(byRoom.get(p.room) ?? []), p])
+    const prefer = ['玄关', '客厅', '餐厅']
+    const rank = (name: string) => {
+      const i = prefer.findIndex((k) => name.includes(k))
+      return i === -1 ? prefer.length : i
+    }
+    return [...byRoom.entries()]
+      .sort((a, b) => rank(a[0]) - rank(b[0]) || b[1].length - a[1].length)
+      .slice(0, 2)
+      .map(([name, pts]) => ({ name, pts }))
+  }, [sheet])
+  const lineByType = useMemo(() => new Map((data.quote?.lines ?? []).map((l) => [l.type, l])), [data.quote?.lines])
+  const composition = useMemo(() => {
+    const byType = new Map<string, string[]>()
+    for (const r of rooms) for (const p of r.pts) byType.set(p.type, [...(byType.get(p.type) ?? []), p.code])
+    return [...byType.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 6)
+  }, [rooms])
+  if (!sheet || !rooms.length) return null
+  const floor = sheet.floor
   return (
     <>
       <SlideChapter
         theme={theme}
         no={no}
         title="进门的那一刻，生活开始切换。"
-        subtitle="以明确的触发方式，连接玄关、客厅与餐厅的照明、窗帘与全屋网络"
+        subtitle={`${floor} · ${rooms.map((r) => r.name).join('、')} / 共 ${rooms.reduce((s, r) => s + r.pts.length, 0)} 个点位`}
         tag="ARRIVE & LIVING"
       />
       <div className="grid min-h-0 flex-1 grid-cols-12 gap-[28px] overflow-hidden">
         <div className="col-span-7 flex flex-col gap-[16px]">
-          <div className="relative h-[380px] overflow-hidden rounded-(--deck-radius)">
+          <div className="relative h-[440px] shrink-0 overflow-hidden rounded-(--deck-radius)">
             <img src="/proposal/photos/living.jpg" alt="" className="size-full object-cover" />
-            <span className="doc-body absolute bottom-4 left-4 bg-white/90 px-3 py-1 text-[11px] text-[#252523]">
-              氛围意向图 · 客餐厅与玄关场景示意
-            </span>
+            <span className="doc-body absolute bottom-4 left-4 bg-white/90 px-3 py-1 text-[11px] text-[#252523]">{theme.photoNote}</span>
           </div>
-          <div className="grid flex-1 grid-cols-2 gap-[16px]">
-            {['客厅', '餐厅'].map((roomName) => {
-              const pts = data.sheets[0]?.points.filter((p) => p.room === roomName) ?? []
+          <div className="grid grid-cols-2 items-start gap-[16px]">
+            {rooms.map((r) => {
+              const types = new Map<string, number>()
+              for (const p of r.pts) types.set(p.type, (types.get(p.type) ?? 0) + 1)
               return (
-                <div key={roomName} className="flex flex-col justify-between rounded-(--deck-radius-sm) border border-doc-rule bg-(--deck-card) p-[18px]">
+                <div key={r.name} className="flex flex-col gap-[12px] rounded-(--deck-radius-sm) border border-doc-rule bg-(--deck-card) p-[18px]">
                   <div className="flex items-baseline justify-between border-b border-doc-rule pb-2">
-                    <span className="doc-strong text-[16px]">1F · {roomName}</span>
-                    <span className="doc-latin text-[12px] text-doc-accent">{pts.length} 个点位</span>
+                    <span className="doc-strong text-[16px]">
+                      {floor} · {r.name}
+                    </span>
+                    <span className="doc-latin text-[12px] text-doc-accent">{r.pts.length} 个点位</span>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-2 text-[12px] text-doc-muted">
-                    {pts.slice(0, 6).map((p) => (
-                      <span key={p.id} className="inline-flex items-center gap-1 rounded bg-(--deck-box) px-2 py-0.5">
-                        <PointMarker type={p.type} className="size-3.5" />
-                        <span>{deviceTypeOf(p.type)?.name}</span>
-                        <span className="doc-latin text-doc-accent">{p.code}</span>
+                  <div className="flex flex-wrap gap-2 text-[12px] text-doc-muted">
+                    {[...types.entries()].map(([type, n]) => (
+                      <span key={type} className="inline-flex items-center gap-1 rounded bg-(--deck-box) px-2 py-0.5">
+                        <PointMarker type={type} className="size-3.5" />
+                        <span>{deviceTypeOf(type)?.name ?? '设备'}</span>
+                        <span className="doc-latin text-doc-accent">×{n}</span>
                       </span>
                     ))}
                   </div>
-                  <p className="mt-2 text-[11px] text-doc-muted">点位代号：{codeRange(pts.map((p) => p.code))}</p>
+                  <p className="text-[11px] text-doc-muted">点位代号：{codeRange(r.pts.map((p) => p.code))}</p>
                 </div>
               )
             })}
           </div>
         </div>
         <div className="col-span-5 flex flex-col gap-[16px]">
-          <p className="doc-display text-[20px]">本空间预设联动场景</p>
-          {[
-            ['回家迎宾模式', '玄关智能门锁验证通过或轻触玄关四键场景开关 → 玄关筒灯与客厅灯带渐亮至 80%、电动窗帘缓缓开启、背景音乐轻柔播放。'],
-            ['会客明亮模式', '中控屏一键触发或语音指令 → 客厅磁吸轨道灯、筒灯与餐厅吊灯全开，空调自动调节至舒适温度。'],
-            ['观影沉浸模式', '关闭客餐厅主灯与射灯，仅保留 20% 柔光灯带，电动窗帘自动闭合，减少屏幕反光。'],
-            ['安心离家模式', '一键关闭全屋照明、空调与非必要插座电源，门窗传感器与烟雾/水浸守护自动进入布防状态。'],
-          ].map(([name, desc], idx) => (
-            <div key={name} className="flex flex-col gap-[6px] rounded-(--deck-radius-sm) border border-(--deck-panel-border) bg-(--deck-panel) p-[18px]">
-              <div className="flex items-center justify-between">
-                <span className="doc-strong text-[15px]">{name}</span>
-                <span className="doc-latin text-[11px] text-doc-accent">SCENE 0{idx + 1}</span>
+          <p className="doc-display text-[20px]">本空间设备与型号</p>
+          {composition.map(([type, codes]) => {
+            const line = lineByType.get(type)
+            return (
+              <div key={type} className="flex items-center gap-[14px] rounded-(--deck-radius-sm) border border-(--deck-panel-border) bg-(--deck-panel) px-[18px] py-[14px]">
+                <PointMarker type={type} className="size-[28px] shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="doc-strong truncate text-[15px]">
+                    {deviceTypeOf(type)?.name ?? '设备'} ×{codes.length}
+                  </p>
+                  <p className="doc-body truncate text-[12.5px] text-doc-muted">{line?.name ?? '待选型'}</p>
+                </div>
+                <span className="doc-latin shrink-0 text-[12px] text-doc-accent">{codeRange(codes)}</span>
               </div>
-              <p className="doc-body text-[12.5px] leading-[1.6] text-doc-muted">{desc}</p>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </>
@@ -1059,7 +1130,31 @@ function ServiceSlide({
   totalAmount: number
   no: string
 }) {
+  const facts = useDemoFacts(data)
   const amounts = paymentAmounts(totalAmount, DEFAULT_PAYMENTS)
+  // 共同验收清单：与方案「服务交付」页同一套规则（lib/project-docs acceptanceChecks），按示例项目实际设备生成
+  const switches = facts.count(SWITCH_TYPES)
+  const curtains = facts.count(['curtain-track'])
+  const tests = [
+    switches ? `${switches}只开关` : null,
+    curtains ? `${curtains}处窗帘行程` : null,
+    facts.count(['contact-sensor']) ? '门磁开合状态' : null,
+    facts.count(['smart-lock']) ? '门锁开锁与告警' : null,
+  ].filter(Boolean)
+  const checks = [
+    `核对${data.pointCount}台/只设备的编号、型号、位置与数量。`,
+    tests.length ? `测试${tests.join('、')}。` : '测试全部设备的手动与手机控制。',
+    facts.has(...AP_TYPES) ? '实测 AC 控制器与各房间 AP 的漫游切换。' : null,
+    facts.count(['water-sensor'])
+      ? '模拟水浸、复位及手机通知，记录网络依赖。'
+      : facts.count(['smoke-sensor'])
+        ? '模拟烟雾报警、复位及手机通知，记录网络依赖。'
+        : facts.count(['motion-sensor'])
+          ? '模拟人体传感器触发、复位及手机通知。'
+          : null,
+    '测试网络覆盖与断网表现，明确本地可用范围。',
+    '账号绑定业主，移交清单、配置备份与维护说明。',
+  ].filter((v): v is string => Boolean(v))
   return (
     <>
       <SlideChapter
@@ -1085,25 +1180,17 @@ function ServiceSlide({
       </div>
       <div className="grid min-h-0 flex-1 grid-cols-12 gap-[28px]">
         <div className="col-span-6 flex flex-col gap-[12px]">
-          <p className="doc-display text-[19px]">共同验收清单（现场逐项打勾）</p>
-          <div className="flex flex-1 flex-col justify-between rounded-(--deck-radius-sm) border border-doc-rule bg-(--deck-card) p-[20px] text-[13px]">
-            {[
-              `核对全屋 ${data.pointCount} 台/只智能设备的编号、型号、安装位置与数量。`,
-              '测试全部智能开关面板、调光灯具与电动窗帘开合行程。',
-              '实测 AC 控制器与各房间 AP 节点漫游切换、中控网关信号覆盖。',
-              '演示回家、离家、观影、睡眠等预设联动场景及手动应急操作。',
-              '测试水浸、烟感、人体与门磁传感器触发告警及手机 App 推送。',
-              '主账号移交业主绑定，交付竣工点位图、设备清单与售后服务卡。',
-            ].map((line) => (
-              <div key={line} className="flex items-center gap-3">
+          <p className="doc-display text-[19px]">共同验收清单</p>
+          <div className="flex flex-col gap-[16px] rounded-(--deck-radius-sm) border border-doc-rule bg-(--deck-card) p-[20px] text-[13px]">
+            {checks.map((line) => (
+              <div key={line} className="flex items-start gap-3">
                 <DocCheckbox className="text-doc-accent" />
                 <span>{line}</span>
               </div>
             ))}
           </div>
         </div>
-        <div className="col-span-6 flex flex-col justify-between">
-          <div className="space-y-[12px]">
+        <div className="col-span-6 flex flex-col gap-[12px]">
             <div className="flex items-baseline justify-between">
               <p className="doc-display text-[19px]">付款节点</p>
               <p className="doc-body text-[13px] text-doc-accent">方案总计 {yuan(totalAmount)}</p>
@@ -1128,13 +1215,12 @@ function ServiceSlide({
                 </tbody>
               </table>
             </div>
-          </div>
-          <div className="rounded-(--deck-radius-sm) bg-linear-to-r from-doc-soft to-doc-soft-to p-[20px]">
-            <p className="doc-strong text-[15px]">{company.name} · 交付服务承诺</p>
-            <p className="doc-body mt-1 text-[12.5px] text-doc-muted">
-              报价单确认后一键生成正式合同，全屋智能硬件享受原厂标准质保与现场安装调试保障。
-            </p>
-          </div>
+          {company.phone || company.address ? (
+            <div className="rounded-(--deck-radius-sm) bg-linear-to-r from-doc-soft to-doc-soft-to p-[20px]">
+              <p className="doc-strong text-[15px]">{company.name}</p>
+              <p className="doc-body mt-1 text-[12.5px] text-doc-muted">{[company.phone, company.address].filter(Boolean).join('　·　')}</p>
+            </div>
+          ) : null}
         </div>
       </div>
     </>

@@ -63,7 +63,7 @@ export const Users: CollectionConfig = {
         { label: '停用', value: 'disabled' },
       ],
       admin: { description: '停用后无法登录，已有项目保留' },
-      access: { update: fieldCmsAdminOnly },
+      access: { create: fieldCmsAdminOnly, update: fieldCmsAdminOnly },
     },
     {
       name: 'membershipTier',
@@ -73,14 +73,14 @@ export const Users: CollectionConfig = {
       defaultValue: 'free',
       options: MEMBERSHIP_TIERS.map((t) => ({ label: t.label, value: t.value })),
       admin: { position: 'sidebar', description: '可通过「兑换码」激活升级，或由管理员在后台直接调整' },
-      access: { update: fieldCmsAdminOnly },
+      access: { create: fieldCmsAdminOnly, update: fieldCmsAdminOnly },
     },
     {
       name: 'membershipExpiresAt',
       label: '会员到期时间',
       type: 'date',
       admin: { position: 'sidebar', description: '留空表示长期有效；过期后自动恢复为标准体验版' },
-      access: { update: fieldCmsAdminOnly },
+      access: { create: fieldCmsAdminOnly, update: fieldCmsAdminOnly },
     },
     {
       // 只能通过「积分流水」变动（发放 / 扣减时由服务端写回），任何人都不能直接改

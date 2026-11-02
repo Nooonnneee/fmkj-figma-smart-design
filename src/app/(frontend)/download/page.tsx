@@ -13,6 +13,7 @@ import { APP_NAME, pageTitle } from '@/lib/brand'
 export const metadata: Metadata = {
   title: pageTitle('下载桌面客户端'),
   description: `${APP_NAME} Windows / macOS 桌面客户端：独立窗口、快捷键、打印导出和自动更新，登录一次长期有效。`,
+  alternates: { canonical: '/download' },
 }
 
 const SHORTCUTS = [

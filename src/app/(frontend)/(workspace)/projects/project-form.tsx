@@ -136,9 +136,11 @@ export function ProjectForm({
       ) : null}
 
       <Card className="gap-0">
-        <CardHeader className="pb-5">
-          <CardTitle className="text-base">{isNew ? '客户和地址' : '项目信息'}</CardTitle>
-        </CardHeader>
+        {isNew ? null : (
+          <CardHeader className="pb-5">
+            <CardTitle className="text-base">项目信息</CardTitle>
+          </CardHeader>
+        )}
         <CardContent className="flex flex-col gap-6">
           {group(
             UserRound,

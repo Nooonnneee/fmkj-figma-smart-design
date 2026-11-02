@@ -1,9 +1,8 @@
 import Form from 'next/form'
 import Link from 'next/link'
-import { ArrowRight, CircleCheck, FolderKanban, Plus, Search, Sparkles } from 'lucide-react'
+import { FolderKanban, Plus, Search, Sparkles } from 'lucide-react'
 import type { Where } from 'payload'
 
-import { BrandMark } from '@/components/brand/brand-mark'
 import { FilterTabs } from '@/components/filter-tabs'
 import { PageHeader } from '@/components/page-header'
 import { SearchSubmit } from '@/components/search-submit'
@@ -15,12 +14,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { relId } from '@/lib/access'
 import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
-import { getCompanyInfo } from '@/lib/cached-data'
 import { getPayloadClient } from '@/lib/payload'
 import { countScenePoints } from '@/lib/point-count'
-import { fmtDate, PROJECT_SECTIONS, projectProgress } from '@/lib/projects'
+import { fmtDate } from '@/lib/projects'
 import { yuan } from '@/lib/quotes'
-import { cn } from '@/lib/utils'
 import { isDemoProjectName, projectDisplayName } from '@/lib/project-name'
 
 import { claimDemoProject } from './actions'
@@ -32,8 +29,6 @@ type Amount = { value: number; caption: string }
 
 /** 系统为新成员发放的示例项目，名称带「【示例】」前缀 */
 const isDemo = isDemoProjectName
-
-const compactYuan = (n: number) => `¥${Math.round(n).toLocaleString('zh-CN')}`
 
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ q?: string; view?: string }> }) {
   const user = await appAuth.getCurrentUser()
@@ -138,20 +133,6 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
     return s ? `/projects?${s}` : '/projects'
   }
 
-  // 概览数字：只在「进行中、未搜索」时展示，口径与下方列表一致
-  const overview = !archived && !keyword && projects.length > 0
-  const totals = { amount: 0, points: 0, signed: 0 }
-  if (overview) {
-    for (const p of projects) {
-      const pid = String(p.id)
-      totals.amount += amountOf(pid)?.value ?? 0
-      totals.points += p.pointCount ?? 0
-      if (contractOf.get(pid)?.status === 'signed') totals.signed++
-    }
-  }
-
-  // 新成员上手引导：还没有自己的项目时显示，建好第一个项目后自动消失
-  const demo = !archived && !keyword ? projects.find((p) => isDemo(p.name)) : undefined
   // 账号名下（含已归档）没有示例项目时，提供「领取示例项目」
   const demoCount = await payload.count({ collection: 'projects', where: { and: [{ owner: { equals: user.id } }, { name: { like: '【示例】' } }] }, overrideAccess: false, user })
   const canClaimDemo = demoCount.totalDocs === 0
@@ -163,71 +144,26 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
       </Button>
     </form>
   ) : null
-  const isNewMember = !archived && !keyword && archivedCount.totalDocs === 0 && projects.every((p) => isDemo(p.name))
-  const company = isNewMember ? await getCompanyInfo(user.id) : null
-  const steps = [
-    ...(demo
-      ? [{ title: '浏览示例项目', description: '查看三层别墅点位与报价', href: `/projects/${demo.id}/point-map`, done: false }]
-      : []),
-    { title: '完善公司抬头', description: '用于报价单与合同页眉', href: '/settings', done: Boolean(company?.isCustom) },
-    { title: '新建首个项目', description: '录入客户信息并布置点位', href: '/projects/new', done: false },
-  ]
 
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-col gap-5">
       <PageHeader
         title="项目"
         description={
-          overview ? (
-            <span className="tabular-nums">
-              共 {totals.points.toLocaleString('zh-CN')} 个点位 · 已签合同 {totals.signed} 份 · 合计 <span className="font-medium text-foreground">{compactYuan(totals.amount)}</span>
-            </span>
-          ) : keyword ? (
+          keyword ? (
             <>匹配「{keyword}」共 <span className="font-medium text-foreground tabular-nums">{projects.length}</span> 个</>
           ) : undefined
         }
         actions={
           <div className="flex items-center gap-2">
             {claimButton}
-            <Button asChild>
+            {/* 桌面端侧栏已有「新建项目」，这里只在手机上显示 */}
+            <Button asChild className="md:hidden">
               <Link href="/projects/new"><Plus className="size-4" />新建项目</Link>
             </Button>
           </div>
         }
       />
-
-      {isNewMember ? (
-        <Card className="gap-3 px-5 py-4 ring-primary/20">
-          <div className="flex items-center gap-2.5">
-            <BrandMark decorative className="size-6" />
-            <p className="text-sm font-semibold">快速上手</p>
-          </div>
-          {/* 一个容器里用发丝线分格，不在卡片里再套卡片 */}
-          <ol className={cn('grid gap-px overflow-hidden rounded-lg border bg-border', steps.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2')}>
-            {steps.map((s, i) => (
-              <li key={s.title} className="bg-card">
-                <Link
-                  href={s.href}
-                  className="group flex h-full items-start gap-3 p-3 transition-colors hover:bg-accent/50 focus-visible:ring-inset"
-                >
-                  {s.done ? (
-                    <CircleCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-label="已完成" />
-                  ) : (
-                    <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-primary/40 text-xs font-medium text-primary">
-                      {i + 1}
-                    </span>
-                  )}
-                  <span className="min-w-0 flex-1">
-                    <span className={cn('block text-sm font-medium', s.done && 'text-muted-foreground line-through')}>{s.title}</span>
-                    <span className="block text-xs text-muted-foreground">{s.description}</span>
-                  </span>
-                  <ArrowRight className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
-                </Link>
-              </li>
-            ))}
-          </ol>
-        </Card>
-      ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <FilterTabs
@@ -269,7 +205,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
             <TableHeader>
               <TableRow>
                 <TableHead className="pl-4 sm:pl-6">项目</TableHead>
-                <TableHead>进度</TableHead>
+                <TableHead className="w-24 text-right">点位</TableHead>
                 <TableHead className="hidden text-right sm:table-cell">金额</TableHead>
                 <TableHead className="hidden pr-6 text-right md:table-cell">更新</TableHead>
               </TableRow>
@@ -277,8 +213,6 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
             <TableBody>
               {projects.map((p) => {
                 const pid = String(p.id)
-                const stat = quoteStats.get(pid)
-                const progress = projectProgress({ status: p.status, pointCount: p.pointCount, quoteCount: stat?.count ?? 0, contractStatus: contractOf.get(pid)?.status })
                 const amount = amountOf(pid)
                 return (
                   <TableRow key={pid} className="relative">
@@ -293,26 +227,12 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                         {[p.customerName, p.community].filter(Boolean).join(' · ') || '未填写客户'}
                       </div>
                     </TableCell>
-                    <TableCell className="w-44">
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-sm">
-                          {progress.label}
-                          <span className="ml-1.5 text-xs text-muted-foreground">{progress.detail}</span>
-                        </span>
-                        {/* 五个板块的迷你进度，由数据自动推算 */}
-                        <span className="flex w-28 gap-0.5" aria-hidden="true">
-                          {PROJECT_SECTIONS.map((s, i) => (
-                            <span key={s.key} className={cn('h-1 flex-1 rounded-full', i <= progress.index ? 'bg-primary' : 'bg-muted')} />
-                          ))}
-                        </span>
-                      </div>
+                    <TableCell className="w-24 text-right text-sm text-muted-foreground tabular-nums">
+                      {p.pointCount ? `${p.pointCount}` : '—'}
                     </TableCell>
                     <TableCell className="hidden w-36 text-right sm:table-cell">
                       {amount ? (
-                        <>
-                          <div className="text-sm font-semibold tabular-nums">{yuan(amount.value)}</div>
-                          <div className="text-xs text-muted-foreground">{amount.caption}</div>
-                        </>
+                        <span className="text-sm font-semibold tabular-nums">{yuan(amount.value)}</span>
                       ) : (
                         <span className="text-sm text-muted-foreground">—</span>
                       )}

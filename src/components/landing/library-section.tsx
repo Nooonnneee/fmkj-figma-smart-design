@@ -13,7 +13,7 @@ export function LibrarySection({ products, brands }: { products: number; brands:
   return (
     <Section id="library" labelledBy="library-title">
       <SectionHeader id="library-title" title={`${products} 款在售产品，一键选好型号`}>
-        产品库和点位图共用同一套设备类型。布好点位后，按主平台（米家、Apple Home、华为、涂鸦、Matter、KNX）和「经济 / 标准 / 高端」档次一键配好默认型号，报价里再逐行调整。
+        布好点位后，按主平台和「经济 / 标准 / 高端」档次一键配好默认型号，报价里再逐行调整。
       </SectionHeader>
       <ul aria-label="产品库中的部分品牌" className="mt-14 grid grid-cols-3 border-t border-l border-border sm:grid-cols-5 lg:grid-cols-7">
         {LANDING_BRANDS.map((b, i) => (
@@ -33,7 +33,6 @@ export function LibrarySection({ products, brands }: { products: number; brands:
           共 {brands} 个品牌、{products} 款在售产品
         </li>
       </ul>
-      <p className="mt-4 text-xs text-muted-foreground">品牌名称与标识归各自权利人所有，仅用于说明产品库覆盖的品牌范围。</p>
     </Section>
   )
 }

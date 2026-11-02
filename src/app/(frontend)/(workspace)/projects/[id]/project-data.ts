@@ -39,6 +39,7 @@ export const getProject = cache(async (id: string) => {
         updatedAt: true,
         finalQuote: true,
         proposalTemplate: true,
+        shareConfig: true,
       },
     })
     .catch(() => null)

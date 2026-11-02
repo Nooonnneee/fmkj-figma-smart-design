@@ -17,7 +17,7 @@ export function DeliverySection({ total, styles }: { total: number | null; style
   return (
     <Section id="delivery" labelledBy="delivery-title">
       <SectionHeader id="delivery-title" title="合同和交付文档，跟着报价走">
-        客户确认报价后一键生成合同，金额、付款节点、工期和质保自动带入。方案演示、点位图和交底清单也从同一份数据生成，不用再抄一遍。
+        客户确认报价后一键生成合同，金额、付款节点、工期和质保自动带入。
       </SectionHeader>
       <div className="mt-14 grid gap-6 lg:grid-cols-5">
         {total != null ? <PaymentSchedule total={total} /> : null}
@@ -37,7 +37,6 @@ export function DeliverySection({ total, styles }: { total: number | null; style
               </li>
             ))}
           </ul>
-          <p className="border-t border-border px-6 py-4 text-xs text-muted-foreground sm:px-8">每份文档都能 A4 打印、另存 PDF 或导出长图。</p>
         </div>
       </div>
     </Section>

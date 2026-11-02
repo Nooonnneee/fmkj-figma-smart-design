@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Blocks, ChevronRight, Lock } from 'lucide-react'
+import { Blocks, Lock } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { featureAccess, tierBadge, type MembershipState } from '@/lib/membership'
@@ -16,14 +16,10 @@ import { PLUGIN_ICONS } from '../../plugins/plugin-icons'
 export function ProjectToolbox({ projectId, flags, membership, strict }: { projectId: string; flags: PluginFlags; membership: Pick<MembershipState, 'effectiveTier'>; strict: boolean }) {
   const ready = PLUGINS.filter((p) => p.status === 'ready')
   const groups = PLUGIN_STAGES.map((s, i) => ({ ...s, step: s.key === 'global' ? null : i + 1, plugins: ready.filter((p) => p.stage === s.key) })).filter((g) => g.plugins.length)
-  const planned = PLUGINS.length - ready.length
   return (
     <section aria-labelledby="toolbox-title" className="rounded-xl bg-card shadow-sm ring-1 ring-foreground/5 dark:ring-foreground/10">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-3.5">
-        <div className="min-w-0">
-          <h2 id="toolbox-title" className="text-base font-semibold">项目工具箱</h2>
-          <p className="text-xs text-muted-foreground">按项目流程接入的插件，点一下直接在本项目里使用</p>
-        </div>
+        <h2 id="toolbox-title" className="text-base font-semibold">项目工具箱</h2>
         <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
           <Link href="/plugins">
             <Blocks className="size-4" />
@@ -70,12 +66,6 @@ export function ProjectToolbox({ projectId, flags, membership, strict }: { proje
           </li>
         ))}
       </ul>
-      {planned ? (
-        <Link href="/plugins" className="flex items-center justify-between border-t px-5 py-2.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
-          还有 {planned} 个插件在规划中：现场勘测、布线表、采购备货、交付移交、售后维保
-          <ChevronRight className="size-3.5" />
-        </Link>
-      ) : null}
     </section>
   )
 }

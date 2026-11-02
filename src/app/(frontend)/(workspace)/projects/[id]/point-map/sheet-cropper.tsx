@@ -193,7 +193,7 @@ export function SheetCropper({ file, onCancel, onConfirm }: { file: File; onCanc
         <div className="space-y-4 overflow-y-auto p-4">
           <div className="space-y-1">
             <h2 className="flex items-center gap-2 text-sm font-semibold"><Crop className="size-4" />裁切图纸</h2>
-            <p className="text-xs text-muted-foreground">已自动去掉图框、标题栏和图名。拖动边框可以微调；确认后放进 3:2 标准图纸（{SHEET.pixelWidth}×{SHEET.pixelHeight}），在点位图里缩放 100% 正好铺满画布。</p>
+            <p className="text-xs text-muted-foreground">已自动去掉图框和标题栏，可拖动边框微调。</p>
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="sheet-name">图纸名称</Label>

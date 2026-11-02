@@ -11,7 +11,7 @@ const NAV = [
   { label: '方案演示', href: '/#proposal' },
   { label: '报价单', href: '/#quote' },
   { label: '合同与文档', href: '/#delivery' },
-  { label: '产品库', href: '/#library' },
+  { label: '图例与产品库', href: '/catalog' },
   { label: '下载', href: '/download' },
 ]
 

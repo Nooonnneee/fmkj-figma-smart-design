@@ -11,6 +11,12 @@ const SIGNED_OUT_SENTINEL = 'signed-out'
 const MP_WEB_COOKIE = 'mp-web-session'
 
 /**
+ * 只在 Figma Make 的开发预览（next dev）里启用：跨站 iframe 拦截 Cookie 时自动以演示账号进入，避免卡在登录页。
+ * 正式发布（next build 后 NODE_ENV=production）和自托管服务器一律不启用。
+ */
+export const previewDemoEnabled = () => process.env.FIGMA === '1' && process.env.NODE_ENV !== 'production'
+
+/**
  * Cookie 策略：
  * - Figma Make 预览运行在跨站 HTTPS iframe 中，使用 SameSite=None + Secure + Partitioned（本地 localhost 调试回退为 Lax）；
  * - 自托管服务器与本地开发根据当前请求的真实协议（x-forwarded-proto / origin）决定 Secure，避免 .env 写了 https:// 但用 HTTP 访问时 Cookie 被浏览器拒收。
@@ -37,7 +43,7 @@ async function sessionCookieOptions() {
  * 当预览环境未携带 Cookie（且未主动点击退出登录）时，自动回退到内置演示管理员账号（demo@fmkj.dev），避免卡在登录页死循环。
  */
 async function resolvePreviewFallbackUser(): Promise<User | null> {
-  if (process.env.FIGMA !== '1') return null
+  if (!previewDemoEnabled()) return null
   const payload = await getPayloadClient()
   const preferred = await payload
     .find({
@@ -125,7 +131,7 @@ export function createAppAuth(appUserCollection: 'users') {
   async function logout() {
     const jar = await cookies()
     const opts = await sessionCookieOptions()
-    if (process.env.FIGMA === '1') {
+    if (previewDemoEnabled()) {
       jar.set(APP_SESSION_COOKIE, SIGNED_OUT_SENTINEL, { ...opts, maxAge: 60 * 60 * 12 })
     } else {
       jar.set(APP_SESSION_COOKIE, '', { ...opts, maxAge: 0 })
@@ -139,7 +145,59 @@ export function createAppAuth(appUserCollection: 'users') {
     ;(await cookies()).set(MP_WEB_COOKIE, token, { ...opts, expires: new Date(expiresAt) })
   }
 
-  return { getCurrentUser, login, logout, startMpWebSession }
+  async function register(input: {
+    name: string
+    email: string
+    password: string
+    phone?: string
+  }): Promise<{ ok: true; user: User } | { ok: false; error: string }> {
+    const name = input.name.trim().slice(0, 40)
+    const email = input.email.trim().toLowerCase()
+    const password = input.password
+    const phone = input.phone?.trim().slice(0, 30) || undefined
+
+    if (!name) return { ok: false, error: '请输入姓名或团队称呼' }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: '请输入有效的邮箱地址' }
+    if (!password || password.length < 8) return { ok: false, error: '密码长度至少为 8 位' }
+
+    const payload = await getPayloadClient()
+    const existing = await payload
+      .find({
+        collection: appUserCollection,
+        where: { email: { equals: email } },
+        limit: 1,
+        depth: 0,
+        overrideAccess: true,
+      })
+      .catch(() => null)
+    if (existing?.docs.length) {
+      return { ok: false, error: '该邮箱已注册，请直接登录' }
+    }
+
+    try {
+      const created = (await payload.create({
+        collection: appUserCollection,
+        data: {
+          name,
+          email,
+          password,
+          ...(phone ? { phone } : {}),
+          status: 'active',
+          membershipTier: 'free',
+        } as never,
+        overrideAccess: true,
+        depth: 0,
+      })) as User
+
+      const loginRes = await login(email, password)
+      if (!loginRes.ok) return loginRes
+      return { ok: true, user: created }
+    } catch {
+      return { ok: false, error: '注册失败，请检查输入信息后重试' }
+    }
+  }
+
+  return { getCurrentUser, login, register, logout, startMpWebSession }
 }
 
 export const appAuth = createAppAuth('users')

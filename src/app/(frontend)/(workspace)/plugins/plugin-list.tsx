@@ -131,24 +131,12 @@ export function PluginList({ items, stages, selectedId, upgradeHint }: { items: 
           </div>
         </CardHeader>
 
-        <CardContent className="flex flex-1 flex-col justify-between gap-3 py-0">
-          <div className="space-y-1">
-            <p className="text-sm leading-snug">{p.tagline}</p>
-            <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{p.description}</p>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {p.provides.map((x) => (
-              <span key={x} className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                {x}
-              </span>
-            ))}
-          </div>
+        <CardContent className="flex-1 py-0">
+          <p className="text-sm leading-relaxed text-muted-foreground">{p.tagline}</p>
         </CardContent>
 
         <CardFooter className="flex items-center justify-between gap-2 border-t pt-3 pb-0 text-xs text-muted-foreground">
-          <span className="truncate" title={p.entry ?? '规划中'}>
-            {p.entry ? `入口：${p.entry}` : '规划中，开发完成后在这里启用'}
-          </span>
+          <span className="truncate">{p.entry ? `入口：${p.entry}` : null}</span>
           <Button asChild variant="ghost" size="xs" className="-mr-2 shrink-0 text-muted-foreground hover:text-foreground">
             <Link href={`/plugins/${p.id}`}>
               详情
@@ -160,26 +148,5 @@ export function PluginList({ items, stages, selectedId, upgradeHint }: { items: 
     )
   }
 
-  return (
-    <div className="flex flex-col gap-8">
-      {stages.map((g) => {
-        const list = items.filter((p) => p.stage === g.key).sort((a, b) => (a.status === b.status ? 0 : a.status === 'ready' ? -1 : 1))
-        if (!list.length) return null
-        return (
-          <section key={g.key} aria-labelledby={`stage-${g.key}`} className="space-y-3">
-            <div className="flex items-baseline gap-2">
-              {g.step ? (
-                <span className="flex size-5 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary tabular-nums">{g.step}</span>
-              ) : null}
-              <h2 id={`stage-${g.key}`} className="text-sm font-semibold">
-                {g.label}
-              </h2>
-              <span className="text-xs text-muted-foreground">{g.hint}</span>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{list.map(renderCard)}</div>
-          </section>
-        )
-      })}
-    </div>
-  )
+  return <div className="grid gap-3 sm:grid-cols-2">{items.map(renderCard)}</div>
 }

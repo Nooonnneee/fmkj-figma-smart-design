@@ -17,12 +17,19 @@ import { getPluginFlags } from '@/plugins/state'
 
 import { getProject, getProjectDeals } from '../project-data'
 import { ArchiveButton } from './archive-button'
+import { CopyClientLinkButton } from './copy-client-link'
 import { DeliveryPackage, type DeliveryDoc } from './delivery-package'
+import { parseShareConfig } from '@/lib/project-access'
 
 /** 归档：核对资料 → 确认定稿（一份报价、一份方案）→ 打包交付资料 → 归档（项目转为只读）。 */
 export default async function ProjectArchivePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const [{ user, project, archived, role, readOnly }, { quotes, contract }] = await Promise.all([getProject(id), getProjectDeals(id)])
+  const [{ user, payload, project, archived, role, readOnly }, { quotes, contract }] = await Promise.all([getProject(id), getProjectDeals(id)])
+  const rawShare = (project as unknown as { shareConfig?: unknown }).shareConfig
+  const shareConfig = parseShareConfig(rawShare)
+  if (!rawShare || typeof (rawShare as { token?: unknown })?.token !== 'string') {
+    await payload.update({ collection: 'projects', id: project.id, data: { shareConfig } as never, overrideAccess: true, depth: 0 }).catch(() => null)
+  }
   const ownerId = relId(project.owner) || user.id
   const [flags, templates, company, access] = await Promise.all([getPluginFlags(ownerId), loadProposalTemplates(user), getCompanyInfo(ownerId), getMembershipContext(user)])
   const pid = String(project.id)
@@ -76,12 +83,12 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
         }).toString()}`
       : null
   const docs: DeliveryDoc[] = [
-    { key: 'plans', title: '点位图', note: points ? '每张图纸一页，附设备图例和统计' : '还没有布置点位', url: points ? `/print/projects/${pid}/plans` : null, defaultOn: true },
-    { key: 'checklist', title: '点位交底清单', note: points ? `${points} 个点位，给安装团队逐点核对` : '还没有布置点位', url: points ? `/print/projects/${pid}/checklist` : null, defaultOn: true },
+    { key: 'plans', title: '点位图', note: points ? `${points} 个点位` : '未布置点位', url: points ? `/print/projects/${pid}/plans` : null, defaultOn: true },
+    { key: 'checklist', title: '点位交底清单', note: points ? '' : '未布置点位', url: points ? `/print/projects/${pid}/checklist` : null, defaultOn: true },
     {
       key: 'quote',
       title: '定稿报价单',
-      note: finalQuote ? `${qTitle(finalQuote)} · ${FINAL_QUOTE_SOURCE_LABEL[final.source!]} · ${yuan(finalQuote.total)}` : '还没有报价',
+      note: finalQuote ? yuan(finalQuote.total) : '未生成报价',
       url: finalQuote ? `/print/quotes/${finalQuote.id}` : null,
       defaultOn: true,
     },
@@ -90,20 +97,64 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
           {
             key: 'proposal' as const,
             title: tpl ? `方案（${tpl.label}）` : '方案',
-            note: !points ? '还没有布置点位' : tpl ? `${tpl.description}${finalQuote ? ' · 金额按定稿报价' : ''}` : '没有可用的方案模板',
+            note: points ? '' : '未布置点位',
             url: proposalUrl,
             defaultOn: true,
           },
         ]
       : []),
-    { key: 'contract', title: '合同', note: contract ? `${contract.number}（含报价明细附件）` : '还没有合同', url: contract ? `/print/contracts/${contract.id}` : null, defaultOn: true },
+    { key: 'contract', title: '合同', note: contract ? contract.number : '未生成合同', url: contract ? `/print/contracts/${contract.id}` : null, defaultOn: true },
     ...(flags.proposal && construction
       ? [
           {
             key: 'construction' as const,
             title: '施工交底',
-            note: points ? '点位代号与清单，不含价格，给安装团队（默认不放进业主资料包）' : '还没有布置点位',
+            note: points ? '' : '未布置点位',
             url: points ? `/print/projects/${pid}/proposal?template=${construction.value}` : null,
+            defaultOn: false,
+          },
+        ]
+      : []),
+    ...(flags['wiring-schedule']
+      ? [
+          {
+            key: 'wiring' as const,
+            title: '强弱电布线表',
+            note: points ? '' : '未布置点位',
+            url: points ? `/print/projects/${pid}/wiring` : null,
+            defaultOn: false,
+          },
+        ]
+      : []),
+    ...(flags.procurement
+      ? [
+          {
+            key: 'procurement' as const,
+            title: '采购与备货单',
+            note: points ? '' : '未布置点位',
+            url: points ? `/print/projects/${pid}/procurement?cost=0` : null,
+            defaultOn: false,
+          },
+        ]
+      : []),
+    ...(flags['scene-handover']
+      ? [
+          {
+            key: 'handover' as const,
+            title: '场景与账号移交单',
+            note: points ? '' : '未布置点位',
+            url: points ? `/print/projects/${pid}/handover` : null,
+            defaultOn: true,
+          },
+        ]
+      : []),
+    ...(flags['site-survey']
+      ? [
+          {
+            key: 'survey' as const,
+            title: '现场勘测确认单',
+            note: '',
+            url: `/print/projects/${pid}/survey`,
             defaultOn: false,
           },
         ]
@@ -115,28 +166,13 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-      <header className="space-y-1">
-        <h2 className="text-xl font-semibold tracking-tight">归档</h2>
-        <p className="text-sm text-muted-foreground">
-          {archived ? `已于 ${fmtLongDate(project.archivedAt)} 归档（只读）` : '核对资料、确认定稿、打包交付资料，然后归档'}
-        </p>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-1">
+          <h2 className="text-xl font-semibold tracking-tight">归档</h2>
+          {archived ? <p className="text-sm text-muted-foreground">已于 {fmtLongDate(project.archivedAt)} 归档（只读）</p> : null}
+        </div>
+        {shareConfig.enabled ? <CopyClientLinkButton token={shareConfig.token} /> : null}
       </header>
-
-      <section aria-labelledby="checks-title" className="rounded-xl bg-card shadow-sm ring-1 ring-foreground/5 dark:ring-foreground/10">
-        <h3 id="checks-title" className="border-b px-5 py-3.5 text-base font-semibold">资料核对</h3>
-        <ul className="divide-y">
-          {checks.map((c) => (
-            <li key={c.label}>
-              <Link href={c.href} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-muted/40">
-                {c.done ? <Check className="size-4 shrink-0 text-success" aria-label="已完成" /> : <Circle className="size-4 shrink-0 text-muted-foreground" aria-label="未完成" />}
-                <span className={cn('w-20 shrink-0 text-sm font-medium', !c.done && 'text-muted-foreground')}>{c.label}</span>
-                <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{c.note}</span>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground/60" />
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
 
       <DeliveryPackage
         projectId={pid}
@@ -155,56 +191,6 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
         }}
         access={{ meets: pkg.meets, allowed: pkg.allowed, badge: tierBadge(FEATURE_TIERS.package), hint: access.upgradeHint }}
       />
-
-      {otherQuotes.length || otherTemplates.length ? (
-        <details className="group rounded-xl bg-card shadow-sm ring-1 ring-foreground/5 dark:ring-foreground/10">
-          <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
-            <History className="size-4 shrink-0 text-muted-foreground" />
-            <span className="shrink-0">其他版本</span>
-            <span className="min-w-0 text-xs font-normal text-muted-foreground">
-              {[otherQuotes.length ? `${otherQuotes.length} 份历史报价` : '', otherTemplates.length ? `${otherTemplates.length} 个其他模板` : ''].filter(Boolean).join(' · ')}，只供查看，不进资料包
-            </span>
-            <ChevronRight className="ml-auto size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
-          </summary>
-          <div className="space-y-4 border-t px-5 py-4">
-            {otherQuotes.length ? (
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-muted-foreground">历史报价</p>
-                <ul className="divide-y rounded-lg border">
-                  {otherQuotes.map((q) => (
-                    <li key={String(q.id)}>
-                      <Link href={`/print/quotes/${q.id}`} className="flex items-center justify-between gap-3 px-3 py-2 text-sm transition-colors hover:bg-muted/40">
-                        <span className="min-w-0 truncate">{qTitle(q)}</span>
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          {quoteStatusLabel(q.status)} · {yuan(q.total)}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            {otherTemplates.length ? (
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium text-muted-foreground">用其他模板预览方案</p>
-                <div className="flex flex-wrap gap-2">
-                  {otherTemplates.map((t) => (
-                    <Link
-                      key={t.value}
-                      href={`/print/projects/${pid}/proposal?template=${t.value}`}
-                      className="rounded-md border px-2.5 py-1 text-xs transition-colors hover:bg-muted/50"
-                      title={t.description}
-                    >
-                      {t.label}
-                      {t.tier !== 'free' ? <span className="ml-1 text-muted-foreground">· {tierBadge(t.tier)}</span> : null}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </details>
-      ) : null}
 
       {role !== 'read' ? (
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed px-5 py-4">

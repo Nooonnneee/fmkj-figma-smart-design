@@ -107,21 +107,6 @@ export function QuoteShowcase({
       </div>
 
       <div className="min-w-0 rounded-2xl bg-muted/60 p-3 sm:p-8 lg:col-span-7 lg:p-10 xl:col-span-8">
-        <div className="mb-3 flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">
-            {activeLayout?.label ?? '标准版'} · {active.name}
-          </span>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => setZoomOpen(true)}
-            className="h-7 gap-1.5 rounded-full px-3 text-xs"
-          >
-            <Maximize2 className="size-3.5" />
-            放大查看
-          </Button>
-        </div>
         <div
           id="quote-preview"
           role="region"
@@ -346,16 +331,16 @@ function QuoteSheet({
                     }
                     note={`${g.rows.length} 行 · 小计 ${yuan(g.subtotal)}`}
                   />
-                  <table className="w-full border-collapse text-[11.5px]">
+                  <table className="w-full table-fixed border-collapse text-[11.5px]">
                     <thead>
                       <tr className={t.head}>
-                        <th className={cn(t.th, 'hidden w-9 sm:table-cell')}>序号</th>
-                        {showImages ? <th className={cn(t.th, 'hidden w-12 sm:table-cell')}>图片</th> : null}
+                        <th className={cn(t.th, 'hidden w-11 whitespace-nowrap sm:table-cell')}>序号</th>
+                        {showImages ? <th className={cn(t.th, 'hidden w-12 whitespace-nowrap sm:table-cell')}>图片</th> : null}
                         <th className={t.th}>产品</th>
-                        <th className={cn(t.th, 'hidden md:table-cell')}>型号</th>
-                        <th className={cn(t.th, 'w-20 text-right')}>单价</th>
-                        <th className={cn(t.th, 'w-14 text-right')}>数量</th>
-                        <th className={cn(t.th, 'w-22 text-right')}>金额</th>
+                        {expanded ? <th className={cn(t.th, 'w-36 whitespace-nowrap')}>型号</th> : null}
+                        <th className={cn(t.th, 'w-20 text-right whitespace-nowrap')}>单价</th>
+                        <th className={cn(t.th, 'w-16 text-right whitespace-nowrap')}>数量</th>
+                        <th className={cn(t.th, 'w-24 text-right whitespace-nowrap')}>金额</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -368,12 +353,12 @@ function QuoteSheet({
                             </td>
                           ) : null}
                           <td className={cn(t.td, 'py-1.5')}>
-                            <span className="flex items-center gap-1.5">
+                            <span className={cn('flex min-w-0 gap-1.5', expanded ? 'items-start' : 'items-center')}>
                               <PointMarker type={item.type} className="size-3.5 shrink-0" />
-                              <span className="truncate">{item.name}</span>
+                              <span className={expanded ? undefined : 'truncate'}>{item.name}</span>
                             </span>
                           </td>
-                          <td className={cn(t.td, 'hidden py-1.5 text-doc-muted md:table-cell')}>{item.sku}</td>
+                          {expanded ? <td className={cn(t.td, 'py-1.5 break-all text-doc-muted')}>{item.sku}</td> : null}
                           <td className={cn(t.td, 'py-1.5 text-right whitespace-nowrap tabular-nums')}>{yuan(item.price)}</td>
                           <td className={cn(t.td, 'py-1.5 text-right whitespace-nowrap tabular-nums')}>
                             {item.qty} {item.unit}
@@ -573,16 +558,16 @@ function QuoteSheet({
               ) : null}
             </div>
           ) : (
-            <table className={cn('w-full border-collapse', layout === 'compact' ? 'text-[11px]' : 'text-[11.5px]')}>
+            <table className={cn('w-full table-fixed border-collapse', layout === 'compact' ? 'text-[11px]' : 'text-[11.5px]')}>
               <thead>
                 <tr className={t.head}>
-                  <th className={cn(t.th, 'hidden w-9 sm:table-cell')}>序号</th>
-                  {showImages ? <th className={cn(t.th, 'hidden w-12 sm:table-cell')}>图片</th> : null}
+                  <th className={cn(t.th, 'hidden w-11 whitespace-nowrap sm:table-cell')}>序号</th>
+                  {showImages ? <th className={cn(t.th, 'hidden w-12 whitespace-nowrap sm:table-cell')}>图片</th> : null}
                   <th className={t.th}>产品</th>
-                  <th className={cn(t.th, 'hidden md:table-cell')}>型号</th>
-                  <th className={cn(t.th, 'text-right')}>单价</th>
-                  <th className={cn(t.th, 'text-right')}>数量</th>
-                  <th className={cn(t.th, 'text-right')}>金额</th>
+                  {expanded ? <th className={cn(t.th, 'w-36 whitespace-nowrap')}>型号</th> : null}
+                  <th className={cn(t.th, 'w-20 text-right whitespace-nowrap')}>单价</th>
+                  <th className={cn(t.th, 'w-16 text-right whitespace-nowrap')}>数量</th>
+                  <th className={cn(t.th, 'w-24 text-right whitespace-nowrap')}>金额</th>
                 </tr>
               </thead>
               <tbody>
@@ -595,12 +580,12 @@ function QuoteSheet({
                       </td>
                     ) : null}
                     <td className={cn(t.td, layout === 'compact' ? 'py-1' : 'py-2')}>
-                      <span className="flex items-center gap-2">
+                      <span className={cn('flex min-w-0 gap-2', expanded ? 'items-start' : 'items-center')}>
                         <PointMarker type={item.type} className="size-4 shrink-0" />
-                        {item.name}
+                        <span className={expanded ? undefined : 'truncate'}>{item.name}</span>
                       </span>
                     </td>
-                    <td className={cn(t.td, 'hidden text-doc-muted md:table-cell')}>{item.sku}</td>
+                    {expanded ? <td className={cn(t.td, 'break-all text-doc-muted')}>{item.sku}</td> : null}
                     <td className={cn(t.td, 'text-right whitespace-nowrap tabular-nums')}>{yuan(item.price)}</td>
                     <td className={cn(t.td, 'text-right whitespace-nowrap tabular-nums')}>
                       {item.qty} {item.unit}
