@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation'
 
 import { PageHeader } from '@/components/page-header'
 import { allStyles, availableStyles, DOC_KIND_LIST, DOC_KINDS } from '@/documents/registry'
@@ -10,12 +9,13 @@ import { getPluginFlags } from '@/plugins/state'
 
 import { AppearanceSettings } from './appearance-settings'
 import { CompanyForm } from './company-form'
+import { redirectToLogin } from '@/lib/login-redirect'
 
 export const metadata = { title: pageTitle('设置') }
 
 export default async function SettingsPage() {
   const user = await appAuth.getCurrentUser()
-  if (!user) redirect('/login')
+  if (!user) return redirectToLogin()
   const [company, flags] = await Promise.all([getCompanyInfo(user.id), getPluginFlags(user.id)])
   const enabledStyles = new Set(availableStyles(flags).map((s) => s.id))
 

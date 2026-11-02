@@ -7,6 +7,7 @@ import type { SystemPack } from '../core/pack'
 import { fittingScale, formatMm, PAPERS } from '../core/paper'
 import { LABEL_SIZE, symbolGeom } from '../core/symbols'
 import type { BoardDoc, BoardFile, SheetObj, ViewSettings } from '../core/types'
+import { downloadBlob } from '@/lib/export-pdf'
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 
@@ -135,9 +136,5 @@ export async function exportSheetPng(opts: { doc: BoardDoc; files: Record<string
 }
 
 export function download(blob: Blob, name: string) {
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = name
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  downloadBlob(blob, name)
 }

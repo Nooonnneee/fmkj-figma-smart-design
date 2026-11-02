@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import { ChevronRight } from 'lucide-react'
 
 import { PageHeader } from '@/components/page-header'
@@ -12,6 +11,7 @@ import { PLUGIN_STAGES, PLUGINS, type PluginStage } from '@/plugins'
 import { getPluginFlags } from '@/plugins/state'
 
 import { PluginList, type PluginViewItem } from './plugin-list'
+import { redirectToLogin } from '@/lib/login-redirect'
 
 export const metadata = { title: pageTitle('插件市场') }
 
@@ -20,7 +20,7 @@ const isStage = (v: unknown): v is PluginStage => PLUGIN_STAGES.some((s) => s.ke
 /** 插件市场：插件按项目流程分组——在哪个阶段用、入口在哪、需要什么会员，一眼看清。 */
 export default async function PluginsPage({ searchParams }: { searchParams: Promise<{ stage?: string; plugin?: string }> }) {
   const user = await appAuth.getCurrentUser()
-  if (!user) redirect('/login')
+  if (!user) return redirectToLogin()
   const [sp, flags, access] = await Promise.all([searchParams, getPluginFlags(user.id), getMembershipContext(user)])
   const stage = isStage(sp.stage) ? sp.stage : null
 
@@ -42,7 +42,7 @@ export default async function PluginsPage({ searchParams }: { searchParams: Prom
   })
   const stats = PLUGIN_STAGES.map((s, i) => {
     const list = items.filter((p) => p.stage === s.key)
-    return { ...s, step: s.key === 'global' ? null : i, total: list.length, on: list.filter((p) => p.status === 'ready' && p.enabled).length }
+    return { ...s, step: s.key === 'global' ? null : i + 1, total: list.length, on: list.filter((p) => p.status === 'ready' && p.enabled).length }
   })
 
   return (

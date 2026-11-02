@@ -47,7 +47,11 @@ export function LightingPanel({ armedId, onArm, disabled, calibrated }: { armedI
                       e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(variantTemplate(f, defaultVariant(f).id, real)))
                       e.dataTransfer.effectAllowed = 'copy'
                     }}
-                    onClick={() => setFamId(f.id)}
+                    onClick={() => {
+                      setFamId(f.id)
+                      const inFam = f.variants.some((v) => v.id === armedId)
+                      onArm(inFam && f.id === famId ? null : variantTemplate(f, defaultVariant(f).id, real))
+                    }}
                     aria-pressed={f.id === famId}
                     className={cn('h-auto flex-col gap-1 px-1 py-2 text-xs font-normal', f.id === famId && 'border-primary bg-primary/5')}
                   >
@@ -65,7 +69,16 @@ export function LightingPanel({ armedId, onArm, disabled, calibrated }: { armedI
           <span className="font-semibold">{fam.name} · 尺寸</span>
           <label className="flex items-center gap-1.5 text-muted-foreground">
             按比例
-            <Switch checked={real} onCheckedChange={setReal} aria-label="按真实尺寸落图" />
+            <Switch
+              checked={real}
+              onCheckedChange={(next) => {
+                setReal(next)
+                if (armedId && fam.variants.some((v) => v.id === armedId)) {
+                  onArm(variantTemplate(fam, armedId, next))
+                }
+              }}
+              aria-label="按真实尺寸落图"
+            />
           </label>
         </div>
         <div className="flex flex-wrap gap-1">

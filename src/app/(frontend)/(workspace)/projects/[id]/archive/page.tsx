@@ -159,12 +159,12 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
       {otherQuotes.length || otherTemplates.length ? (
         <details className="group rounded-xl bg-card shadow-sm ring-1 ring-foreground/5 dark:ring-foreground/10">
           <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
-            <History className="size-4 text-muted-foreground" />
-            其他版本
-            <span className="text-xs font-normal text-muted-foreground">
+            <History className="size-4 shrink-0 text-muted-foreground" />
+            <span className="shrink-0">其他版本</span>
+            <span className="min-w-0 text-xs font-normal text-muted-foreground">
               {[otherQuotes.length ? `${otherQuotes.length} 份历史报价` : '', otherTemplates.length ? `${otherTemplates.length} 个其他模板` : ''].filter(Boolean).join(' · ')}，只供查看，不进资料包
             </span>
-            <ChevronRight className="ml-auto size-4 text-muted-foreground transition-transform group-open:rotate-90" />
+            <ChevronRight className="ml-auto size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
           </summary>
           <div className="space-y-4 border-t px-5 py-4">
             {otherQuotes.length ? (

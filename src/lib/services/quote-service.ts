@@ -28,6 +28,12 @@ export function quoteFailure(error: unknown, fallback: string) {
 const mediaId = (v: unknown) => (v && typeof v === 'object' ? String((v as Media).id) : typeof v === 'string' ? v : null)
 const scopeSuffix = (scope: PointScope) => (scope === 'all' ? '' : `（${POINT_SCOPES.find((s) => s.value === scope)!.label}）`)
 
+/** 新报价的默认名称：「项目名 智能家居报价」，第二份起加「第 N 版」（打印报价单的标题直接用它） */
+function defaultQuoteTitle(projectName: string | null | undefined, n: number) {
+  const name = (projectName ?? '').replace(/^【[^】]*】/, '').trim().slice(0, 80) || '项目'
+  return `${name}${/智能/.test(name) ? '' : ' 智能家居'}报价${n > 1 ? ` · 第${n}版` : ''}`
+}
+
 function scopedPoints(pointMap: unknown, scope: PointScope, byId: Map<string, { id: string; deviceType: string | null; status?: string }>) {
   const elements = ((pointMap as { elements?: unknown[] } | null)?.elements ?? []) as { isDeleted?: boolean; customData?: PointCustomData }[]
   return elements
@@ -75,7 +81,7 @@ export async function createQuoteForProject(
   try {
     const quote = await payload.create({
       collection: 'quotes',
-      data: { title: `报价 ${existing.totalDocs + 1}${scopeSuffix(scope)}`, project: project.id, status: 'draft', items, fees: [], discount: 0, notes: company.quoteNotes ?? null },
+      data: { title: `${defaultQuoteTitle(project.name, existing.totalDocs + 1)}${scopeSuffix(scope)}`, project: project.id, status: 'draft', items, fees: [], discount: 0, notes: company.quoteNotes ?? null },
       user,
       overrideAccess: false,
       depth: 0,

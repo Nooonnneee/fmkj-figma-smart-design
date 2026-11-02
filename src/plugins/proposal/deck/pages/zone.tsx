@@ -12,7 +12,7 @@ import { amountFont, Chapter, Panel, PlanCard, PlanView, Photo, roomCrop, Sectio
 const CN = ['一', '二', '三', '四']
 const SENSOR_TYPES = ['water-sensor', 'smoke-sensor', 'contact-sensor', 'motion-sensor']
 /** 照片标注优先展示的设备 */
-const CALLOUT_ORDER = ['smart-lock', 'gateway', 'water-sensor', 'smoke-sensor', 'curtain-track', 'touch-panel', 'contact-sensor', 'switch-2', 'switch-3', 'switch-1', 'switch-4', 'ap-node', 'camera', 'motion-sensor', 'speaker']
+const CALLOUT_ORDER = ['smart-lock', 'gateway', 'water-sensor', 'smoke-sensor', 'curtain-track', 'touch-panel', 'contact-sensor', 'switch-2', 'switch-3', 'switch-1', 'switch-4', 'ceiling-ap', 'ap-node', 'ac-router', 'camera', 'motion-sensor', 'speaker']
 
 const unitOf = (l: Room['lines'][number]) => l.product?.unit || '个'
 const lineText = (l: Room['lines'][number]) => `${l.typeName} ×${l.count}${unitOf(l)}`

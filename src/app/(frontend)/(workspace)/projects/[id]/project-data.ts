@@ -1,10 +1,11 @@
 import { cache } from 'react'
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 
 import { appAuth } from '@/lib/app-auth'
 import { countScenePoints } from '@/lib/point-count'
 import { getPayloadClient } from '@/lib/payload'
 import { getProjectRole, type CollaboratorItem } from '@/lib/project-access'
+import { redirectToLogin } from '@/lib/login-redirect'
 
 /**
  * 项目板块共用的数据读取。用 React cache 去重：同一次请求里布局和页面只查一次。
@@ -12,7 +13,7 @@ import { getProjectRole, type CollaboratorItem } from '@/lib/project-access'
  */
 export const getProject = cache(async (id: string) => {
   const user = await appAuth.getCurrentUser()
-  if (!user) redirect('/login')
+  if (!user) return redirectToLogin()
   const payload = await getPayloadClient()
   const project = await payload
     .findByID({

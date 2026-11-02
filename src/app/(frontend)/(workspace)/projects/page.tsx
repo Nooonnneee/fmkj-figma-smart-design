@@ -1,6 +1,5 @@
 import Form from 'next/form'
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import { ArrowRight, CircleCheck, FolderKanban, Plus, Search, Sparkles } from 'lucide-react'
 import type { Where } from 'payload'
 
@@ -25,6 +24,7 @@ import { cn } from '@/lib/utils'
 import { isDemoProjectName, projectDisplayName } from '@/lib/project-name'
 
 import { claimDemoProject } from './actions'
+import { redirectToLogin } from '@/lib/login-redirect'
 
 export const metadata = { title: pageTitle('项目') }
 
@@ -37,7 +37,7 @@ const compactYuan = (n: number) => `¥${Math.round(n).toLocaleString('zh-CN')}`
 
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ q?: string; view?: string }> }) {
   const user = await appAuth.getCurrentUser()
-  if (!user) redirect('/login')
+  if (!user) return redirectToLogin()
   const { q = '', view = '' } = await searchParams
   const archived = view === 'archived'
   const keyword = q.trim()

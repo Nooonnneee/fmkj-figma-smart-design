@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation'
 
 import { AppSidebar } from '@/components/app-sidebar'
 import { SiteHeader } from '@/components/site-header'
@@ -10,11 +9,12 @@ import { getPayloadClient } from '@/lib/payload'
 import { PLUGINS } from '@/plugins'
 import { aiConfigured } from '@/plugins/ai-copilot/server'
 import { enabledAiModels } from '@/plugins/ai-copilot/templates'
+import { redirectToLogin } from '@/lib/login-redirect'
 
 /** 需要成员登录的系统页面。 */
 export default async function WorkspaceLayout({ children }: { children: React.ReactNode }) {
   const user = await appAuth.getCurrentUser()
-  if (!user) redirect('/login')
+  if (!user) return redirectToLogin()
   const payload = await getPayloadClient()
   const [company, projectsRes] = await Promise.all([
     getCompanyInfo(user.id),

@@ -27,7 +27,7 @@ export const PROPOSAL_FRAMEWORKS = [
     value: 'story',
     label: '场景故事',
     description: '先讲生活场景，再落到空间、平面与预算，适合首次沟通打动业主',
-    sections: ['cover', 'scenes', 'zones', 'plans', 'investment', 'service'],
+    sections: ['cover', 'scenes', 'zones', 'plans', 'system', 'investment', 'service'],
   },
   {
     value: 'budget',

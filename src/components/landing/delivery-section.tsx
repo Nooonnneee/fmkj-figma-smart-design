@@ -8,8 +8,8 @@ import { money, Section, SectionHeader } from './section'
 /** 合同与交付文档：付款节点按已确认报价算好；文档目录全部来自文档模板登记表。 */
 export function DeliverySection({ total, styles }: { total: number | null; styles: DocStyle[] }) {
   const docs = [
-    { name: DOC_KINDS.quote.label, items: DOC_KINDS.quote.layouts.map((l) => l.label), note: `${styles.length} 套风格可换` },
-    { name: '方案演示', items: PROPOSAL_TEMPLATES.map((t) => t.label), note: 'A4 横版，含封面、点位图、场景与预算' },
+    { name: DOC_KINDS.quote.label, items: DOC_KINDS.quote.layouts.map((l) => l.label), note: `${DOC_KINDS.quote.layouts.length} 种版式 × ${styles.length} 套风格可换` },
+    { name: '方案演示', items: PROPOSAL_TEMPLATES.map((t) => t.label), note: 'A4 横版，含封面、点位图、网络与中控拓扑、空间场景与预算' },
     { name: DOC_KINDS.contract.label, items: DOC_KINDS.contract.layouts.map((l) => l.label), note: '签订后锁定，只能登记收款' },
     { name: DOC_KINDS.plans.label, items: DOC_KINDS.plans.layouts.map((l) => l.label), note: '附设备图例与统计' },
     { name: DOC_KINDS.checklist.label, items: DOC_KINDS.checklist.layouts.map((l) => l.label), note: '给安装团队，不含价格' },

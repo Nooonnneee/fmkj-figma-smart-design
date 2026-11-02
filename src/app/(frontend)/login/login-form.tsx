@@ -32,9 +32,11 @@ const rememberMethod = (method: 'wechat' | 'password') => {
 export function LoginForm({
   redirectTo,
   qrAvailable,
+  previewDemo = false,
 }: {
   redirectTo: string
   qrAvailable: boolean
+  previewDemo?: boolean
 }) {
   const [loginTab, setLoginTab] = useState<'wechat' | 'password'>(
     qrAvailable ? 'wechat' : 'password',
@@ -46,8 +48,8 @@ export function LoginForm({
       if (window.localStorage.getItem(LOGIN_METHOD_KEY) === 'password') setLoginTab('password')
     } catch {}
   }, [qrAvailable])
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [email, setEmail] = useState(previewDemo ? 'demo@fmkj.dev' : '')
+  const [password, setPassword] = useState(previewDemo ? 'demo1234' : '')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -119,19 +121,21 @@ export function LoginForm({
     return () => clearInterval(timer)
   }, [loginTab, qrStatus, qrTicket, redirectTo])
 
-  async function submit(event: React.FormEvent) {
-    event.preventDefault()
-    if (!email.trim() || !password) {
+  async function doLogin(targetEmail: string, targetPassword: string) {
+    if (!targetEmail.trim() || !targetPassword) {
       setError('请输入邮箱和密码')
       return
     }
     setLoading(true)
     setError('')
     try {
+      if (typeof document !== 'undefined' && window.self !== window.top && 'requestStorageAccess' in document) {
+        await (document as Document & { requestStorageAccess?: () => Promise<void> }).requestStorageAccess?.().catch(() => {})
+      }
       const response = await fetch('/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({ email: targetEmail.trim(), password: targetPassword }),
       })
       const data = (await response.json().catch(() => ({}))) as { error?: string }
       if (!response.ok) {
@@ -145,6 +149,11 @@ export function LoginForm({
       setError('网络错误，请稍后重试')
       setLoading(false)
     }
+  }
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault()
+    await doLogin(email, password)
   }
 
   const errorAlert = error ? (
@@ -205,6 +214,44 @@ export function LoginForm({
         {loading ? <Loader2 className="size-4 animate-spin" /> : <LogIn className="size-4" />}
         {loading ? '登录中' : '登录'}
       </Button>
+      {previewDemo ? (
+        <div className="space-y-2 rounded-xl border border-border/80 bg-muted/40 p-3 text-xs">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span>预览环境快捷体验账号</span>
+            <span className="font-mono text-[11px]">密码：demo1234</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={loading}
+              onClick={() => {
+                setEmail('demo@fmkj.dev')
+                setPassword('demo1234')
+                void doLogin('demo@fmkj.dev', 'demo1234')
+              }}
+              className="h-8 text-xs"
+            >
+              演示管理员登录
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={loading}
+              onClick={() => {
+                setEmail('sales@fmkj.dev')
+                setPassword('demo1234')
+                void doLogin('sales@fmkj.dev', 'demo1234')
+              }}
+              className="h-8 text-xs"
+            >
+              销售小王登录
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </form>
   )
 

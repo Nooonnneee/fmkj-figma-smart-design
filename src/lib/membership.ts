@@ -52,27 +52,6 @@ const TIER_RANK: Record<MembershipTier, number> = {
   team: 2,
 }
 
-/** 等级是否达到要求（插件、模板等按最低等级解锁） */
-export const tierAllows = (tier: MembershipTier, min: MembershipTier) => TIER_RANK[tier] >= TIER_RANK[min]
-
-/**
- * 权益对照表：会员页的对比表和各处的解锁判断都以这里为准。
- * 值为 true/false 显示勾/叉，字符串原样显示。
- */
-export const ENTITLEMENTS: { group: string; label: string; values: Record<MembershipTier, string | boolean> }[] = [
-  { group: '项目', label: '进行中项目', values: { free: '10 个', pro: '50 个', team: '不限' } },
-  { group: '项目', label: '点位图、报价单、合同、交底清单', values: { free: true, pro: true, team: true } },
-  { group: '项目', label: '多人协作（可编辑 / 仅查看）', values: { free: false, pro: false, team: true } },
-  { group: '方案', label: '方案演示（完整提案 / 预算速览）', values: { free: true, pro: true, team: true } },
-  { group: '方案', label: '全部视觉风格与场景故事框架', values: { free: '3 套基础风格', pro: true, team: true } },
-  { group: '方案', label: '公司抬头、Logo 与默认条款', values: { free: false, pro: true, team: true } },
-  { group: '资料', label: '项目资料包（全部文件一次打包）', values: { free: '单份导出', pro: true, team: true } },
-  { group: '插件', label: '点位设计插件（智能选型、房间分析、AI 识别）', values: { free: true, pro: true, team: true } },
-  { group: '插件', label: '专业插件（文档风格包、DWG 导入、AI 对话侧栏）', values: { free: false, pro: true, team: true } },
-  { group: '插件', label: '团队插件（采购备货、售后维保）', values: { free: false, pro: false, team: true } },
-  { group: 'AI', label: '开通赠送 AI 积分', values: { free: '—', pro: '每月 2,000', team: '每月 10,000' } },
-]
-
 export function isMembershipTier(v: unknown): v is MembershipTier {
   return v === 'free' || v === 'pro' || v === 'team'
 }

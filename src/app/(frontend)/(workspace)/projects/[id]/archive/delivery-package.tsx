@@ -200,7 +200,7 @@ export function DeliveryPackage({
               onCheckedChange={(v) => setSelected((s) => ({ ...s, [d.key]: v === true }))}
               aria-label={`资料包包含${d.title}`}
             />
-            <label htmlFor={`pkg-${d.key}`} className={cn('min-w-0 flex-1', !d.url && 'text-muted-foreground')}>
+            <label htmlFor={`pkg-${d.key}`} className={cn('min-w-44 flex-1', !d.url && 'text-muted-foreground')}>
               <span className="block text-sm font-medium">{d.title}</span>
               <span className="block truncate text-xs text-muted-foreground">{d.note}</span>
             </label>
@@ -210,7 +210,7 @@ export function DeliveryPackage({
                 disabled={!editable || finalQuote.locked || saving || busy}
                 onValueChange={(v) => save({ finalQuote: v }, '已设为定稿报价')}
               >
-                <SelectTrigger size="sm" className="max-w-56" aria-label="选择定稿报价">
+                <SelectTrigger size="sm" className="ml-7 max-w-56 sm:ml-0" aria-label="选择定稿报价">
                   <SelectValue placeholder="选择定稿报价" />
                 </SelectTrigger>
                 <SelectContent>
@@ -224,7 +224,7 @@ export function DeliveryPackage({
             ) : null}
             {d.key === 'proposal' && templates.length > 1 ? (
               <Select value={template} disabled={!editable || saving || busy} onValueChange={(v) => save({ proposalTemplate: v }, '已设为交付方案模板')}>
-                <SelectTrigger size="sm" className="max-w-44" aria-label="选择交付方案模板">
+                <SelectTrigger size="sm" className="ml-7 max-w-44 sm:ml-0" aria-label="选择交付方案模板">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

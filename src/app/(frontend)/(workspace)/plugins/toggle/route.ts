@@ -5,10 +5,7 @@ import { getCompanyInfo } from '@/lib/cached-data'
 import { featureAccess, tierBadge } from '@/lib/membership'
 import { getMembershipContext } from '@/lib/membership-policy'
 import { getPayloadClient } from '@/lib/payload'
-import { tierMeta } from '@/lib/membership'
 import { isPluginId, PLUGINS } from '@/plugins'
-import { userTier } from '@/plugins/state'
-import { tierAllows } from '@/lib/membership'
 
 const fail = (status: number, error: string) => Response.json({ ok: false, error }, { status })
 
@@ -33,8 +30,12 @@ export async function POST(request: Request) {
     return fail(400, '该插件尚在待开发阶段，暂不可开启')
   }
 
-  if (body.enabled && !tierAllows(await userTier(user.id), plugin.tier)) {
-    return fail(403, `「${plugin.name}」需要${tierMeta(plugin.tier).label}，请先在「会员与积分」升级`)
+  // 严格模式下，会员等级不够的插件不能开启；提示模式只提示不拦截
+  if (body.enabled) {
+    const access = await getMembershipContext(user)
+    if (!featureAccess(access.membership, plugin.tier, access.strict).allowed) {
+      return fail(403, `「${plugin.name}」需要${tierBadge(plugin.tier)}。${access.upgradeHint}`)
+    }
   }
 
   const company = await getCompanyInfo(user.id)

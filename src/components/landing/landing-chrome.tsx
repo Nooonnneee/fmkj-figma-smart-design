@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 // 带上首页路径，品牌页、下载页也能直接跳到首页对应分区
 const NAV = [
   { label: '点位图', href: '/#plan' },
+  { label: '方案演示', href: '/#proposal' },
   { label: '报价单', href: '/#quote' },
   { label: '合同与文档', href: '/#delivery' },
   { label: '产品库', href: '/#library' },

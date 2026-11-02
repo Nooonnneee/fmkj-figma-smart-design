@@ -28,6 +28,7 @@ export const Users: CollectionConfig = {
   },
   auth: {
     tokenExpiration: 60 * 60 * 24 * 7,
+    maxLoginAttempts: 0,
   },
   access: {
     admin: () => false,

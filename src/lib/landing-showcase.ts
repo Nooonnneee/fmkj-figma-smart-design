@@ -4,7 +4,7 @@
  * 首页是按小时重新生成的静态页；这里再缓存 10 分钟，避免同一次生成里重复查询。
  */
 import { floorTagFromSheetName } from '@/lib/area-analysis'
-import { resolveMediaUrl } from '@/lib/cached-data'
+import { getCatalog, resolveMediaUrl } from '@/lib/cached-data'
 import { memoize } from '@/lib/memo-cache'
 import { getPayloadClient } from '@/lib/payload'
 import { normalizeScene, sceneAreas, scenePoints, sceneSheets, planAreaOf, type PlanAreaShape } from '@/lib/point-scene'
@@ -13,7 +13,17 @@ import type { Media } from '@/payload-types'
 export type ShowcasePoint = { id: string; type: string; code: string; rx: number; ry: number; room: string | null }
 export type ShowcaseArea = PlanAreaShape
 export type ShowcaseSheet = { id: string; name: string; floor: string; url: string; points: ShowcasePoint[]; areas: ShowcaseArea[] }
-export type ShowcaseLine = { type: string; name: string; sku: string; unit: string; price: number; qty: number; image: string | null }
+export type ShowcaseLine = {
+  type: string
+  name: string
+  sku: string
+  unit: string
+  price: number
+  qty: number
+  image: string | null
+  brandName?: string | null
+  brandLogo?: string | null
+}
 export type ShowcaseQuote = {
   title: string
   lines: ShowcaseLine[]
@@ -35,7 +45,7 @@ export type LandingShowcase = {
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
 const text = (v: unknown) => (typeof v === 'string' ? v : '')
 
-export const getLandingShowcase = memoize<LandingShowcase | null>('landing-showcase-v1', [], 10 * 60_000, async () => {
+export const getLandingShowcase = memoize<LandingShowcase | null>('landing-showcase-v2', [], 10 * 60_000, async () => {
   const payload = await getPayloadClient()
   const res = await payload.find({
     collection: 'projects',
@@ -69,7 +79,7 @@ export const getLandingShowcase = memoize<LandingShowcase | null>('landing-showc
         .map((a) => planAreaOf(a, s)),
     }))
 
-  const [quotes, products, brands] = await Promise.all([
+  const [quotes, products, brands, catalog] = await Promise.all([
     payload.find({
       collection: 'quotes',
       where: { project: { equals: project.id as string } },
@@ -80,7 +90,9 @@ export const getLandingShowcase = memoize<LandingShowcase | null>('landing-showc
     }),
     payload.count({ collection: 'products', where: { status: { equals: 'active' } }, overrideAccess: true }),
     payload.count({ collection: 'brands', overrideAccess: true }),
+    getCatalog().catch(() => []),
   ])
+  const catalogById = new Map(catalog.map((p) => [p.id, p]))
 
   // 首页只展示已确认的那一份报价；没有已确认的就取金额最高的一份
   const docs = quotes.docs as unknown as Record<string, unknown>[]
@@ -95,15 +107,22 @@ export const getLandingShowcase = memoize<LandingShowcase | null>('landing-showc
     const imageUrl = new Map(media.docs.map((m) => [String(m.id), resolveMediaUrl(m)]))
     quote = {
       title: text(main.title),
-      lines: items.map((i) => ({
-        type: text(i.deviceType) || 'other',
-        name: text(i.name),
-        sku: text(i.sku),
-        unit: text(i.unit) || '个',
-        price: num(i.price),
-        qty: num(i.quantity),
-        image: typeof i.image === 'string' ? (imageUrl.get(i.image) ?? null) : null,
-      })),
+      lines: items.map((i) => {
+        const pid = typeof i.product === 'string' ? i.product : i.product && typeof i.product === 'object' ? String((i.product as { id?: unknown }).id ?? '') : ''
+        const catProd = pid ? catalogById.get(pid) : undefined
+        const customImg = typeof i.image === 'string' ? (imageUrl.get(i.image) ?? null) : null
+        return {
+          type: text(i.deviceType) || catProd?.deviceType || 'other',
+          name: text(i.name) || catProd?.name || '',
+          sku: text(i.sku) || catProd?.sku || '',
+          unit: text(i.unit) || catProd?.unit || '个',
+          price: num(i.price),
+          qty: num(i.quantity),
+          image: customImg ?? catProd?.image?.url ?? null,
+          brandName: catProd?.brand?.name ?? null,
+          brandLogo: catProd?.brand?.logo ?? null,
+        }
+      }),
       fees: ((Array.isArray(main.fees) ? main.fees : []) as Record<string, unknown>[]).map((f) => ({ name: text(f.name), amount: num(f.amount) })),
       discount: num(main.discount),
       productTotal: num(main.productTotal),

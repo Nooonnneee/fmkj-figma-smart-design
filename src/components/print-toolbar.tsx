@@ -96,7 +96,10 @@ export function PrintToolbar({
         const a = document.createElement('a')
         a.href = url
         a.download = pages.length > 1 ? `${exportName}-${String(i + 1).padStart(2, '0')}.png` : `${exportName}.png`
+        a.style.display = 'none'
+        document.body.appendChild(a)
         a.click()
+        a.remove()
         await new Promise((r) => setTimeout(r, 250))
       }
       toast.success(pages.length > 1 ? `已导出 ${pages.length} 张图片` : '已导出图片')

@@ -7,6 +7,7 @@ import { DeliverySection } from '@/components/landing/delivery-section'
 import { LandingFooter, LandingNav } from '@/components/landing/landing-chrome'
 import { LibrarySection } from '@/components/landing/library-section'
 import { PlanDemo } from '@/components/landing/plan-demo'
+import { ProposalShowcase } from '@/components/landing/proposal-showcase'
 import { QuoteShowcase } from '@/components/landing/quote-showcase'
 import { Section } from '@/components/landing/section'
 import { Button } from '@/components/ui/button'
@@ -56,7 +57,7 @@ export default async function HomePage() {
               </Button>
               {data?.quote ? (
                 <Button asChild size="lg" variant="outline" className="h-11 rounded-full px-6 text-base">
-                  <Link href="#quote">看报价单样张</Link>
+                  <Link href="#proposal">看方案与报价样张</Link>
                 </Button>
               ) : null}
             </div>
@@ -72,6 +73,12 @@ export default async function HomePage() {
             </div>
           ) : null}
         </section>
+
+        {data && company ? (
+          <Section id="proposal" labelledBy="proposal-title" className="pt-28 sm:pt-36">
+            <ProposalShowcase data={data} company={company} />
+          </Section>
+        ) : null}
 
         {data?.quote && company ? (
           <Section id="quote" labelledBy="quote-title" className="pt-28 sm:pt-36">

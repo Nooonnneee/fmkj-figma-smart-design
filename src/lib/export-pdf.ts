@@ -281,13 +281,21 @@ export async function renderPagesToJpegs(elements: HTMLElement[]): Promise<PageJ
   return pdfPages
 }
 
+/**
+ * 下载生成好的文件。链接先挂到页面上再点击（部分浏览器不处理未挂载的链接），
+ * 释放地址的时间留足，避免大文件还没写完就被回收。
+ */
 export function downloadBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
   a.download = fileName
+  a.rel = 'noopener'
+  a.style.display = 'none'
+  document.body.appendChild(a)
   a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 2000)
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
 export async function exportPagesAsPdf(elements: HTMLElement[], fileName: string) {

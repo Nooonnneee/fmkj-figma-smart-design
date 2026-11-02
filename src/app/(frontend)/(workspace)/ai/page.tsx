@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import { Bot } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -13,6 +12,7 @@ import { enabledAiModels } from '@/plugins/ai-copilot/templates'
 import { getPluginFlags } from '@/plugins/state'
 
 import { AiSidebarDock } from '@/components/ai/ai-sidebar-dock'
+import { redirectToLogin } from '@/lib/login-redirect'
 
 export const metadata = { title: pageTitle('AI 对话') }
 
@@ -22,7 +22,7 @@ export default async function AiPage({
   searchParams: Promise<{ plugin?: string }>
 }) {
   const user = await appAuth.getCurrentUser()
-  if (!user) redirect('/login')
+  if (!user) return redirectToLogin()
 
   const payload = await getPayloadClient()
   const [sp, flags, company, projectsRes] = await Promise.all([

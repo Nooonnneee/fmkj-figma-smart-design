@@ -15,7 +15,7 @@ import { PLUGIN_ICONS } from '../../plugins/plugin-icons'
  */
 export function ProjectToolbox({ projectId, flags, membership, strict }: { projectId: string; flags: PluginFlags; membership: Pick<MembershipState, 'effectiveTier'>; strict: boolean }) {
   const ready = PLUGINS.filter((p) => p.status === 'ready')
-  const groups = PLUGIN_STAGES.map((s, i) => ({ ...s, step: s.key === 'global' ? null : i, plugins: ready.filter((p) => p.stage === s.key) })).filter((g) => g.plugins.length)
+  const groups = PLUGIN_STAGES.map((s, i) => ({ ...s, step: s.key === 'global' ? null : i + 1, plugins: ready.filter((p) => p.stage === s.key) })).filter((g) => g.plugins.length)
   const planned = PLUGINS.length - ready.length
   return (
     <section aria-labelledby="toolbox-title" className="rounded-xl bg-card shadow-sm ring-1 ring-foreground/5 dark:ring-foreground/10">
@@ -34,7 +34,7 @@ export function ProjectToolbox({ projectId, flags, membership, strict }: { proje
       <ul className="divide-y">
         {groups.map((g) => (
           <li key={g.key} className="flex flex-col gap-2 px-5 py-3 sm:flex-row sm:items-center sm:gap-4">
-            <span className="flex w-28 shrink-0 items-center gap-1.5 text-sm text-muted-foreground">
+            <span className="flex shrink-0 items-center gap-1.5 text-sm whitespace-nowrap text-muted-foreground sm:w-32">
               {g.step ? <span className="flex size-4.5 items-center justify-center rounded-full bg-muted text-xs tabular-nums">{g.step}</span> : null}
               {g.label}
             </span>

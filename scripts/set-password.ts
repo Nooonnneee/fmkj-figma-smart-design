@@ -17,8 +17,8 @@ if ((collection !== 'admins' && collection !== 'users') || !email || !password) 
   console.error('用法：NEW_PASSWORD=新密码 payload run scripts/set-password.ts <admins|users> <邮箱>')
   process.exit(1)
 }
-if (password.length < 10) {
-  console.error('密码至少 10 位')
+if (password.length < 6) {
+  console.error('密码至少 6 位')
   process.exit(1)
 }
 
@@ -31,13 +31,23 @@ if (payload.db.name !== 'postgres') {
 
 const found = await payload.find({ collection, where: { email: { equals: email } }, limit: 1, depth: 0, overrideAccess: true })
 if (found.docs.length) {
-  await payload.update({ collection, id: found.docs[0].id, data: { password } as never, overrideAccess: true })
+  await payload.update({
+    collection,
+    id: found.docs[0].id,
+    data: { password, lockUntil: null, loginAttempts: 0, ...(collection === 'users' ? { status: 'active' } : {}) } as never,
+    overrideAccess: true,
+  })
   console.log(`已更新 ${collection} 密码：${email}`)
 } else if (collection === 'admins') {
   await payload.create({ collection, data: { email, password } as never, overrideAccess: true })
   console.log(`已创建后台管理员：${email}`)
 } else {
-  console.error(`找不到员工 ${email}；新员工请在系统里由管理员创建。`)
-  process.exit(1)
+  const name = email.split('@')[0] || '成员'
+  await payload.create({
+    collection: 'users',
+    data: { name, email, password, status: 'active', membershipTier: 'enterprise' } as never,
+    overrideAccess: true,
+  })
+  console.log(`已创建并启用员工账号：${email}`)
 }
 process.exit(0)

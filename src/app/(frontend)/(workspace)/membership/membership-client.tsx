@@ -182,10 +182,11 @@ export function MembershipClient({
           <CardDescription>方案模板和插件的等级可在后台调整，这里按当前设置统计</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
+          {/* 窄屏横向滑动查看，权益名称不被挤成一字一行 */}
+          <Table className="min-w-[36rem]">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[34%] pl-6">权益</TableHead>
+                <TableHead className="w-[34%] min-w-40 pl-6">权益</TableHead>
                 {initial.tiers.map((t) => (
                   <TableHead key={t.value} className={cn('text-center', m.effectiveTier === t.value && 'bg-primary/5')}>
                     <div className="flex flex-col items-center gap-0.5 py-2">

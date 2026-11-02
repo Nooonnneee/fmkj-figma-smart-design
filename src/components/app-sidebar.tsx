@@ -130,7 +130,7 @@ export function AppSidebar({
     try {
       await fetch("/auth/logout", { method: "POST" })
     } finally {
-      window.location.assign("/login")
+      window.location.assign("/login?switch=1")
     }
   }
 
