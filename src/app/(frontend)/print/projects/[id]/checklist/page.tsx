@@ -10,6 +10,7 @@ import { appAuth } from '@/lib/app-auth'
 import { categoryOfType, deviceTypeOf, DEVICE_TYPE_ORDER } from '@/lib/device-types'
 import { acceptanceChecks, docNumber, isPointScope, loadProjectDocs, POINT_SCOPES, scopeTitle, type DocPoint, type ProjectDocsData } from '@/lib/project-docs'
 import { cn } from '@/lib/utils'
+import { planAreaOf } from '@/lib/point-scene'
 
 export const metadata = { title: '点位交底清单', robots: { index: false, follow: false } }
 
@@ -162,7 +163,7 @@ export default async function ChecklistPrintPage({
                         points={g.points}
                         areas={d.areas
                           .filter((a) => a.sheetId === sheet.id)
-                          .map((a) => ({ id: a.id, name: a.name, x0: (a.x - sheet.x) / sheet.width, y0: (a.y - sheet.y) / sheet.height, x1: (a.x + a.width - sheet.x) / sheet.width, y1: (a.y + a.height - sheet.y) / sheet.height }))}
+                          .map((a) => planAreaOf(a, sheet))}
                         className="w-full"
                       />
                     </div>
@@ -189,7 +190,7 @@ export default async function ChecklistPrintPage({
                         const product = p.productId ? d.productById.get(p.productId) : null
                         return (
                           <tr key={p.id} className={t.row(i)}>
-                            <td className={cn(t.td, 'doc-strong py-1.5 tabular-nums')} style={{ color: categoryOfType(p.deviceType)?.color }}>{p.code}</td>
+                            <td className={cn(t.td, 'doc-strong py-1.5 tabular-nums')} style={{ color: `color-mix(in oklch, ${categoryOfType(p.deviceType)?.color ?? '#525252'} 70%, black)` }}>{p.code}</td>
                             <td className={cn(t.td, 'py-1.5')}>{deviceTypeOf(p.deviceType)?.name}</td>
                             <td className={cn(t.td, 'max-w-0 truncate py-1.5', !product && 'text-doc-muted')}>{product ? `${product.name}（${product.sku}）` : '待选型'}</td>
                             <td className={cn(t.td, 'py-1.5 text-doc-muted')}>{location(p)}</td>

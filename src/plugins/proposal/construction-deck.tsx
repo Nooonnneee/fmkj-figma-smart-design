@@ -13,6 +13,7 @@ import { LEVEL_LABEL } from '@/lib/area-analysis'
 import { categoryOfType, deviceTypeOf, DEVICE_TYPE_ORDER } from '@/lib/device-types'
 import type { ProjectDocsData as ProposalData, Room } from '@/lib/project-docs'
 import { cn } from '@/lib/utils'
+import { planAreaOf } from '@/lib/point-scene'
 
 
 const chunk = <T,>(list: T[], n: number) => Array.from({ length: Math.ceil(list.length / n) }, (_, i) => list.slice(i * n, i * n + n))
@@ -156,7 +157,7 @@ function PlanPage({ ctx, no, sheetId }: { ctx: Ctx; no: number; sheetId: string 
   const { d, markers } = ctx
   const sheet = d.sheets.find((s) => s.id === sheetId)!
   const pts = d.points.filter((p) => p.sheetId === sheetId)
-  const areas = d.areas.filter((a) => a.sheetId === sheetId).map((a) => ({ id: a.id, name: a.name, x0: (a.x - sheet.x) / sheet.width, y0: (a.y - sheet.y) / sheet.height, x1: (a.x + a.width - sheet.x) / sheet.width, y1: (a.y + a.height - sheet.y) / sheet.height }))
+  const areas = d.areas.filter((a) => a.sheetId === sheetId).map((a) => planAreaOf(a, sheet))
   const types = DEVICE_TYPE_ORDER.filter((t) => pts.some((p) => p.deviceType === t))
   return (
     <Page ctx={ctx} no={no} title={`${sheet.name} · ${ctx.d.scope === 'switch' ? '开关布局图' : ctx.d.scope === 'switch-light' ? '灯光开关布局图' : '点位图'}`}>

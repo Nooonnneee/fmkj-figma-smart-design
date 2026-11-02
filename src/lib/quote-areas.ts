@@ -8,7 +8,7 @@ import type { PlanArea, PlanPoint } from '@/components/plan-figure'
 import { areaTypeLabel } from './area-types'
 import { DEVICE_TYPE_ORDER, deviceTypeOf } from './device-types'
 import { parseDefaults, resolvePoint, type ResolvableProduct } from './point-map-items'
-import { analyzeScene, type StoredScene } from './point-scene'
+import { analyzeScene, planAreaOf, type StoredScene } from './point-scene'
 
 export type QuoteLineRef = {
   key?: string
@@ -170,14 +170,7 @@ export function buildQuoteFloorGroups(
     if (!rooms.length) continue
     const planAreas: PlanArea[] = areas
       .filter((a) => a.sheetId === sheet.id)
-      .map((a) => ({
-        id: a.id,
-        name: a.name,
-        x0: (a.x - sheet.x) / sheet.width,
-        y0: (a.y - sheet.y) / sheet.height,
-        x1: (a.x + a.width - sheet.x) / sheet.width,
-        y1: (a.y + a.height - sheet.y) / sheet.height,
-      }))
+      .map((a) => planAreaOf(a, sheet))
     floors.push({
       sheetId: sheet.id,
       floorName: floorNameFromSheet(sheet.name, idx),

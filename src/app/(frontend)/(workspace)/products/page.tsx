@@ -109,7 +109,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
     }
   }
   const visibleBrands = brands.filter((b) => (brandCounts.get(b.slug) ?? 0) > 0 || brandSet.has(b.slug))
-  const activeGroup = DEVICE_GROUPS.find((g) => g.category.slug === f.cat)
 
   const href = (patch: Partial<Record<(typeof KEYS)[number], string>>) => {
     const params = new URLSearchParams()
@@ -155,7 +154,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   )
   const section = (title: string, children: React.ReactNode) => (
     <div className="flex flex-col gap-0.5">
-      <h3 className="px-2 pb-1 text-xs font-semibold tracking-wider text-muted-foreground/80">{title}</h3>
+      <h3 className="px-2 pb-1 text-xs font-semibold tracking-wider text-muted-foreground">{title}</h3>
       {children}
     </div>
   )
@@ -206,7 +205,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 
       <div className="grid gap-6 lg:grid-cols-[15rem_1fr]">
         {/* 窄屏下筛选栏默认收起（纯 CSS 开关，无需客户端脚本），避免类别和品牌列表占满首屏 */}
-        <input type="checkbox" id="product-filters" className="peer sr-only" />
+        <input type="checkbox" id="product-filters" aria-label="显示筛选" className="peer sr-only" />
         <label
           htmlFor="product-filters"
           className="flex h-9 cursor-pointer items-center justify-between rounded-lg border bg-background px-3 text-sm font-medium peer-focus-visible:ring-2 peer-focus-visible:ring-ring lg:hidden"
@@ -333,8 +332,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                       ) : (
                         <ImageIcon className="size-8 text-muted-foreground/40" aria-hidden="true" />
                       )}
-                      <span className="absolute top-2 left-2 flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-xs font-medium shadow-sm ring-1 ring-black/5" style={{ color }}>
-                        <span className="size-3.5"><DeviceSymbol type={p.deviceType} /></span>
+                      {/* 图标保留类别色，文字用加深的类别色，保证白底上的对比度 */}
+                      <span className="absolute top-2 left-2 flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-xs font-medium shadow-sm ring-1 ring-black/5" style={{ color: `color-mix(in oklch, ${color} 70%, black)` }}>
+                        <span className="size-3.5" style={{ color }}><DeviceSymbol type={p.deviceType} /></span>
                         {deviceTypeLabel(p.deviceType)}
                       </span>
                       {p.status === 'inactive' ? <Badge variant="secondary" className="absolute top-2 right-2">已下架</Badge> : null}

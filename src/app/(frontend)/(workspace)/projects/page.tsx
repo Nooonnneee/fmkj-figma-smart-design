@@ -1,7 +1,7 @@
 import Form from 'next/form'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowRight, CircleCheck, FolderKanban, Plus, Search } from 'lucide-react'
+import { ArrowRight, CircleCheck, FolderKanban, Plus, Search, Sparkles } from 'lucide-react'
 import type { Where } from 'payload'
 
 import { BrandMark } from '@/components/brand/brand-mark'
@@ -23,6 +23,8 @@ import { fmtDate, PROJECT_SECTIONS, projectProgress } from '@/lib/projects'
 import { yuan } from '@/lib/quotes'
 import { cn } from '@/lib/utils'
 import { isDemoProjectName, projectDisplayName } from '@/lib/project-name'
+
+import { claimDemoProject } from './actions'
 
 export const metadata = { title: pageTitle('项目') }
 
@@ -150,6 +152,17 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
 
   // 新成员上手引导：还没有自己的项目时显示，建好第一个项目后自动消失
   const demo = !archived && !keyword ? projects.find((p) => isDemo(p.name)) : undefined
+  // 账号名下（含已归档）没有示例项目时，提供「领取示例项目」
+  const demoCount = await payload.count({ collection: 'projects', where: { and: [{ owner: { equals: user.id } }, { name: { like: '【示例】' } }] }, overrideAccess: false, user })
+  const canClaimDemo = demoCount.totalDocs === 0
+  const claimButton = canClaimDemo ? (
+    <form action={claimDemoProject}>
+      <Button type="submit" variant="outline">
+        <Sparkles className="size-4" />
+        领取示例项目
+      </Button>
+    </form>
+  ) : null
   const isNewMember = !archived && !keyword && archivedCount.totalDocs === 0 && projects.every((p) => isDemo(p.name))
   const company = isNewMember ? await getCompanyInfo(user.id) : null
   const steps = [
@@ -174,9 +187,12 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
           ) : undefined
         }
         actions={
-          <Button asChild>
-            <Link href="/projects/new"><Plus className="size-4" />新建项目</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            {claimButton}
+            <Button asChild>
+              <Link href="/projects/new"><Plus className="size-4" />新建项目</Link>
+            </Button>
+          </div>
         }
       />
 
@@ -186,12 +202,13 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
             <BrandMark decorative className="size-6" />
             <p className="text-sm font-semibold">快速上手</p>
           </div>
-          <ol className={cn('grid gap-2', steps.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2')}>
+          {/* 一个容器里用发丝线分格，不在卡片里再套卡片 */}
+          <ol className={cn('grid gap-px overflow-hidden rounded-lg border bg-border', steps.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2')}>
             {steps.map((s, i) => (
-              <li key={s.title}>
+              <li key={s.title} className="bg-card">
                 <Link
                   href={s.href}
-                  className="group flex h-full items-start gap-3 rounded-lg border bg-background p-3 transition-colors hover:border-primary/40 hover:bg-accent/50"
+                  className="group flex h-full items-start gap-3 p-3 transition-colors hover:bg-accent/50 focus-visible:ring-inset"
                 >
                   {s.done ? (
                     <CircleCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-label="已完成" />
@@ -240,7 +257,10 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
             {keyword ? '请尝试其他关键词' : archived ? '交付完成的项目可在「归档」页移入此处' : '创建项目后即可上传户型图并布置点位'}
           </p>
           {!keyword && !archived ? (
-            <Button asChild size="sm" className="mt-2"><Link href="/projects/new"><Plus className="size-4" />新建项目</Link></Button>
+            <div className="mt-2 flex items-center gap-2">
+              <Button asChild size="sm"><Link href="/projects/new"><Plus className="size-4" />新建项目</Link></Button>
+              {claimButton}
+            </div>
           ) : null}
         </div>
       ) : (

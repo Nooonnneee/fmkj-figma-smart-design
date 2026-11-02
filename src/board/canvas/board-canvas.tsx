@@ -5,15 +5,15 @@ import { Ruler } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
-import { boxContains, boxInside, normBox, normAngle, snapAngle, toDeg } from '../core/geometry'
-import { moveObjects, rawBox, resizeArea, rotateSymbols, sheetAt } from '../core/ops'
+import { boxContains, boxInside, normBox, normAngle, polyBox, snapAngle, toDeg } from '../core/geometry'
+import { areaPoly, moveObjects, rawBox, rotateSymbols, setAreaPoly, sheetAt } from '../core/ops'
 import type { SystemPack } from '../core/pack'
 import { fittingScale, formatMm, gridSpec, niceStep, rulerStep } from '../core/paper'
 import { symbolGeom, type SymbolGeom } from '../core/symbols'
 import type { AreaObj, BoardDoc, BoardFile, BoardTool, Box, SheetObj, SymbolObj, SymbolTemplate, Vec, Viewport, ViewSettings } from '../core/types'
 import { panBy, toScene, visibleBox, zoomAt, type Size } from '../core/viewport'
-import { areaHandles, HANDLE_CURSOR, hitTest, resizeBox, rotateHandle, type Handle, type Hit } from './hit'
-import { AreaView, RawView, SheetView, SymbolView } from './layers'
+import { edgeMidpoints, HANDLE_CURSOR, hitTest, rotateHandle, type Hit } from './hit'
+import { AreaView, RawView, SheetView, SymbolLabel, SymbolView } from './layers'
 
 export type CanvasContext = { hit: Hit | null; scene: Vec; local: Vec; wrap: Size }
 
@@ -36,7 +36,8 @@ export type BoardCanvasProps = {
   activeSheetId?: string | null
   onCommit: (doc: BoardDoc) => void
   onPlace: (at: Vec) => void
-  onCreateArea: (box: Box) => void
+  /** 画完区域：box 是外接框；poly 有值时是多边形（点出来的轮廓），否则是拖出来的矩形 */
+  onCreateArea: (box: Box, poly?: Vec[]) => void
   onCalibrateLine: (sheet: SheetObj, a: Vec, b: Vec) => void
   onCalibrateRequest?: () => void
   onContextMenu: (ctx: CanvasContext) => void
@@ -50,9 +51,10 @@ type Gesture =
   | { t: 'pinch'; startDist: number; startZoom: number; anchor: Vec }
   | { t: 'move'; start: Vec; startLocal: Vec; ids: string[]; moved: boolean }
   | { t: 'marquee'; start: Vec; startLocal: Vec; additive: boolean }
-  | { t: 'resize'; id: string; handle: Handle; orig: Box; start: Vec }
+  | { t: 'vertex'; id: string; index: number; orig: Vec[]; start: Vec; startLocal: Vec; moved: boolean }
+  | { t: 'insert'; id: string; index: number; orig: Vec[]; start: Vec }
   | { t: 'rotate'; id: string; center: Vec; origAngle: number; startAngle: number }
-  | { t: 'area'; start: Vec }
+  | { t: 'area'; start: Vec; startLocal: Vec; drag: boolean }
   | { t: 'calibrate'; sheet: SheetObj; start: Vec }
 
 type Preview = { doc?: BoardDoc; marquee?: Box; draft?: Box; calib?: [Vec, Vec] }
@@ -60,6 +62,32 @@ type Preview = { doc?: BoardDoc; marquee?: Box; draft?: Box; calib?: [Vec, Vec] 
 const EMPTY = new Set<string>()
 /** 显示尺寸小于这个像素时用小图（线条预先加粗过） */
 const SMALL_PX = 44
+/** 画区域、拖顶点时吸附到相邻顶点横 / 纵坐标的距离（屏幕像素），让墙角保持直角 */
+const SNAP_PX = 8
+/** 点回起点多近算闭合（屏幕像素） */
+const CLOSE_PX = 10
+
+/** 把点吸附到相邻顶点的 x / y 上（各取最近的一个），返回吸附后的点 */
+function snapToNeighbors(q: Vec, neighbors: readonly Vec[], tol: number): Vec {
+  let { x, y } = q
+  let bx = tol
+  let by = tol
+  for (const n of neighbors) {
+    const dx = Math.abs(n.x - q.x)
+    if (dx < bx) {
+      bx = dx
+      x = n.x
+    }
+    const dy = Math.abs(n.y - q.y)
+    if (dy < by) {
+      by = dy
+      y = n.y
+    }
+  }
+  return { x, y }
+}
+
+const neighborsOf = (poly: readonly Vec[], i: number) => [poly[(i - 1 + poly.length) % poly.length], poly[(i + 1) % poly.length]]
 
 function isTyping() {
   const el = document.activeElement as HTMLElement | null
@@ -67,12 +95,19 @@ function isTyping() {
 }
 
 export function BoardCanvas(props: BoardCanvasProps) {
-  const { doc, files, pack, view, viewport, tool, armed, selection, hidden = EMPTY, readOnly = false, dark = false } = props
+  const { doc, files, pack, view, viewport, selection, hidden = EMPTY, readOnly = false, dark = false } = props
   const wrapRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState<Size>({ w: 0, h: 0 })
   const [preview, setPreviewState] = useState<Preview | null>(null)
   const [hover, setHover] = useState<{ cursor: string; pos: Vec | null }>({ cursor: 'default', pos: null })
   const [space, setSpace] = useState(false)
+  // 正在点出的区域轮廓（画区域工具）
+  const [polyDraft, setPolyDraftState] = useState<Vec[]>([])
+  const polyDraftRef = useRef<Vec[]>([])
+  const setPolyDraft = (pts: Vec[]) => {
+    polyDraftRef.current = pts
+    setPolyDraftState(pts)
+  }
   const gesture = useRef<Gesture | null>(null)
   const pointers = useRef(new Map<number, Vec>())
   const previewRef = useRef<Preview | null>(null)
@@ -115,6 +150,50 @@ export function BoardCanvas(props: BoardCanvasProps) {
     const c = latest.current
     return hitTest(p, { doc: c.doc, geoms: geomsRef.current, view: c.view, zoom: c.viewport.zoom, hidden: c.hidden ?? EMPTY, selection: c.selection, readOnly: !!c.readOnly })
   }, [])
+
+  /* ---------------- 点出区域轮廓 ---------------- */
+
+  const closeDraft = useCallback(() => {
+    const pts = polyDraftRef.current
+    if (pts.length >= 3) latest.current.onCreateArea(polyBox(pts), pts)
+    polyDraftRef.current = []
+    setPolyDraftState([])
+  }, [])
+
+  /** 加一个顶点：Shift 画水平 / 垂直线；靠近上一个点或起点的横纵坐标时自动对齐；点回起点闭合 */
+  const addDraftPoint = (p: Vec, shift: boolean) => {
+    const zoom = latest.current.viewport.zoom
+    const pts = polyDraftRef.current
+    if (!pts.length) return setPolyDraft([p])
+    const last = pts[pts.length - 1]
+    if (pts.length >= 3 && Math.hypot(p.x - pts[0].x, p.y - pts[0].y) * zoom <= CLOSE_PX) return closeDraft()
+    let q = p
+    if (shift) q = Math.abs(p.x - last.x) > Math.abs(p.y - last.y) ? { x: p.x, y: last.y } : { x: last.x, y: p.y }
+    else q = snapToNeighbors(p, [last, pts[0]], SNAP_PX / zoom)
+    // 双击时第二下落在同一位置：不重复加点
+    if (Math.hypot(q.x - last.x, q.y - last.y) * zoom < 3) return
+    setPolyDraft([...pts, q])
+  }
+
+  // 换工具时丢弃没画完的轮廓
+  useEffect(() => {
+    if (props.tool !== 'area' && polyDraftRef.current.length) setPolyDraft([])
+  }, [props.tool])
+
+  // 画轮廓时的快捷键：Enter 完成、Esc 取消、Backspace 撤回一个点（在编辑器的快捷键之前处理）
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!polyDraftRef.current.length || isTyping()) return
+      if (e.key === 'Enter') closeDraft()
+      else if (e.key === 'Escape') setPolyDraft([])
+      else if (e.key === 'Backspace' || e.key === 'Delete') setPolyDraft(polyDraftRef.current.slice(0, -1))
+      else return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [closeDraft])
 
   // 滚轮：平移；Ctrl / ⌘ + 滚轮（含触控板双指捏合）：缩放
   useEffect(() => {
@@ -186,7 +265,7 @@ export function BoardCanvas(props: BoardCanvasProps) {
       return
     }
     if (c.tool === 'area' && !c.readOnly) {
-      gesture.current = { t: 'area', start: p }
+      gesture.current = { t: 'area', start: p, startLocal: l, drag: false }
       return
     }
     if (c.tool === 'calibrate' && !c.readOnly) {
@@ -195,10 +274,17 @@ export function BoardCanvas(props: BoardCanvasProps) {
       return
     }
     const hit = hitAt(p)
+    if (hit?.kind === 'vertex' || hit?.kind === 'mid') {
+      const o = c.doc.objects.find((x) => x.id === hit.id)
+      if (o?.kind === 'area') {
+        const orig = areaPoly(o)
+        gesture.current = hit.kind === 'vertex' ? { t: 'vertex', id: o.id, index: hit.index, orig, start: p, startLocal: l, moved: false } : { t: 'insert', id: o.id, index: hit.index, orig, start: p }
+      }
+      return
+    }
     if (hit?.kind === 'handle') {
       const o = c.doc.objects.find((x) => x.id === hit.id)
-      if (o?.kind === 'area') gesture.current = { t: 'resize', id: o.id, handle: hit.handle, orig: { x: o.x, y: o.y, w: o.w, h: o.h }, start: p }
-      else if (o?.kind === 'symbol') gesture.current = { t: 'rotate', id: o.id, center: { x: o.x, y: o.y }, origAngle: o.angle, startAngle: Math.atan2(p.y - o.y, p.x - o.x) }
+      if (o?.kind === 'symbol') gesture.current = { t: 'rotate', id: o.id, center: { x: o.x, y: o.y }, origAngle: o.angle, startAngle: Math.atan2(p.y - o.y, p.x - o.x) }
       return
     }
     if (hit && hit.kind !== 'sheet') {
@@ -232,9 +318,11 @@ export function BoardCanvas(props: BoardCanvasProps) {
       else {
         const hit = hitAt(p)
         if (hit?.kind === 'handle') cursor = HANDLE_CURSOR[hit.handle]
+        else if (hit?.kind === 'vertex') cursor = 'move'
+        else if (hit?.kind === 'mid') cursor = 'copy'
         else if (hit && hit.kind !== 'sheet') cursor = c.readOnly ? 'pointer' : 'move'
       }
-      const pos = c.armed ? p : null
+      const pos = c.armed || (c.tool === 'area' && !c.readOnly) ? p : null
       if (cursor !== hover.cursor || pos || hover.pos) setHover({ cursor, pos })
       return
     }
@@ -273,9 +361,23 @@ export function BoardCanvas(props: BoardCanvasProps) {
       case 'marquee':
         setPreview({ marquee: normBox(g.start, p) })
         break
-      case 'resize':
-        setPreview({ doc: resizeArea(c.doc, g.id, resizeBox(g.orig, g.handle, p.x - g.start.x, p.y - g.start.y)) })
+      case 'vertex': {
+        if (!g.moved && Math.hypot(l.x - g.startLocal.x, l.y - g.startLocal.y) < 2) break
+        g.moved = true
+        const raw = { x: g.orig[g.index].x + p.x - g.start.x, y: g.orig[g.index].y + p.y - g.start.y }
+        const poly = g.orig.slice()
+        poly[g.index] = e.altKey ? raw : snapToNeighbors(raw, neighborsOf(g.orig, g.index), SNAP_PX / c.viewport.zoom)
+        setPreview({ doc: setAreaPoly(c.doc, g.id, poly) })
         break
+      }
+      case 'insert': {
+        const a = g.orig[g.index]
+        const b = g.orig[(g.index + 1) % g.orig.length]
+        const raw = { x: (a.x + b.x) / 2 + p.x - g.start.x, y: (a.y + b.y) / 2 + p.y - g.start.y }
+        const q = e.altKey ? raw : snapToNeighbors(raw, [a, b], SNAP_PX / c.viewport.zoom)
+        setPreview({ doc: setAreaPoly(c.doc, g.id, [...g.orig.slice(0, g.index + 1), q, ...g.orig.slice(g.index + 1)]) })
+        break
+      }
       case 'rotate': {
         let a = g.origAngle + Math.atan2(p.y - g.center.y, p.x - g.center.x) - g.startAngle
         a = e.altKey ? normAngle(a) : snapAngle(a)
@@ -283,7 +385,11 @@ export function BoardCanvas(props: BoardCanvasProps) {
         break
       }
       case 'area':
-        setPreview({ draft: normBox(g.start, p) })
+        // 还没开始点轮廓时按住拖动：画矩形
+        if (!polyDraftRef.current.length && (g.drag || Math.hypot(l.x - g.startLocal.x, l.y - g.startLocal.y) > 4)) {
+          g.drag = true
+          setPreview({ draft: normBox(g.start, p) })
+        }
         break
       case 'calibrate': {
         let q = p
@@ -308,14 +414,15 @@ export function BoardCanvas(props: BoardCanvasProps) {
     if (!g || cancel) return
     switch (g.t) {
       case 'move':
-      case 'resize':
+      case 'vertex':
+      case 'insert':
       case 'rotate':
         if (pv?.doc && pv.doc !== c.doc) c.onCommit(pv.doc)
         break
       case 'pan':
         if (!g.moved && g.clearOnTap) {
           const hit = hitAt(toScene(c.viewport, local(e).x, local(e).y))
-          c.onSelection(hit && hit.kind !== 'sheet' && hit.kind !== 'handle' ? new Set([hit.id]) : new Set())
+          c.onSelection(hit && (hit.kind === 'symbol' || hit.kind === 'area' || hit.kind === 'raw') ? new Set([hit.id]) : new Set())
         }
         break
       case 'marquee': {
@@ -334,9 +441,15 @@ export function BoardCanvas(props: BoardCanvasProps) {
         c.onSelection(sel)
         break
       }
-      case 'area':
-        if (pv?.draft && pv.draft.w >= 16 && pv.draft.h >= 16) c.onCreateArea(pv.draft)
+      case 'area': {
+        if (g.drag) {
+          if (pv?.draft && pv.draft.w >= 16 && pv.draft.h >= 16) c.onCreateArea(pv.draft)
+        } else {
+          const l = local(e)
+          addDraftPoint(toScene(c.viewport, l.x, l.y), e.shiftKey)
+        }
         break
+      }
       case 'calibrate':
         if (pv?.calib) {
           const [a, b] = pv.calib
@@ -352,9 +465,29 @@ export function BoardCanvas(props: BoardCanvasProps) {
     const l = local(e)
     const p = toScene(c.viewport, l.x, l.y)
     let hit = hitAt(p)
-    if (hit?.kind === 'handle') hit = { kind: c.doc.objects.find((o) => o.id === hit!.id)?.kind === 'area' ? 'area' : 'symbol', id: hit.id }
+    if (hit?.kind === 'handle') hit = { kind: 'symbol', id: hit.id }
+    else if (hit?.kind === 'vertex' || hit?.kind === 'mid') hit = { kind: 'area', id: hit.id }
     if (hit && hit.kind !== 'sheet' && !c.selection.has(hit.id)) c.onSelection(new Set([hit.id]))
     c.onContextMenu({ hit, scene: p, local: l, wrap: size })
+  }
+
+  /** 双击：画轮廓时完成；选中区域时双击顶点删除这个顶点（至少保留 3 个） */
+  const onDoubleClick = (e: React.MouseEvent) => {
+    const c = latest.current
+    if (c.readOnly) return
+    if (c.tool === 'area') {
+      if (polyDraftRef.current.length >= 3) closeDraft()
+      return
+    }
+    const l = local(e)
+    const hit = hitAt(toScene(c.viewport, l.x, l.y))
+    if (hit?.kind !== 'vertex') return
+    const o = c.doc.objects.find((x) => x.id === hit.id)
+    if (o?.kind !== 'area') return
+    const poly = areaPoly(o)
+    if (poly.length <= 3) return
+    const next = setAreaPoly(c.doc, o.id, poly.filter((_, i) => i !== hit.index))
+    if (next !== c.doc) c.onCommit(next)
   }
 
   const z = viewport.zoom
@@ -368,7 +501,7 @@ export function BoardCanvas(props: BoardCanvasProps) {
     const o: SymbolObj = { kind: 'symbol', id: '__ghost', x: hover.pos!.x, y: hover.pos!.y, code: '', angle: props.armed!.angle ?? 0, ...props.armed! }
     const look = pack.look(o)
     const g = symbolGeom(o, look, view, sheetAt(doc, o.x, o.y)?.mmPerUnit ?? null)
-    return <SymbolView o={o} g={g} look={look} small={Math.max(g.imgW, g.imgH) * z < SMALL_PX} showLabel={false} ghost />
+    return <SymbolView o={o} g={g} look={look} small={Math.max(g.imgW, g.imgH) * z < SMALL_PX} ghost />
   })() : null
 
   return (
@@ -385,6 +518,7 @@ export function BoardCanvas(props: BoardCanvasProps) {
       onPointerCancel={(e) => finish(e, true)}
       onPointerLeave={() => hover.pos && setHover((h) => ({ ...h, pos: null }))}
       onContextMenu={onContextMenu}
+      onDoubleClick={onDoubleClick}
       onDragOver={(e) => {
         if (props.dropType && e.dataTransfer.types.includes(props.dropType)) {
           e.preventDefault()
@@ -418,12 +552,17 @@ export function BoardCanvas(props: BoardCanvasProps) {
             ? objs.map((o) => {
                 if (o.kind !== 'symbol' || hidden.has(o.id)) return null
                 const g = geoms.get(o.id)!
-                return <SymbolView key={o.id} o={o} g={g} look={pack.look(o)} small={Math.max(g.imgW, g.imgH) * z < SMALL_PX} showLabel={view.labels} />
+                return <SymbolView key={o.id} o={o} g={g} look={pack.look(o)} small={Math.max(g.imgW, g.imgH) * z < SMALL_PX} />
               })
+            : null}
+          {/* 代号单独一层，画在所有图标之上 */}
+          {view.layers.symbol && view.labels
+            ? objs.map((o) => (o.kind === 'symbol' && o.code && !hidden.has(o.id) ? <SymbolLabel key={o.id} o={o} g={geoms.get(o.id)!} color={pack.look(o).color} /> : null))
             : null}
           <SelectionOverlay doc={shown} geoms={geoms} selection={selection} zoom={z} readOnly={readOnly} />
           {preview?.marquee ? <rect {...rectOf(preview.marquee)} fill="var(--board-accent-soft)" stroke="var(--board-accent)" strokeWidth={1} vectorEffect="non-scaling-stroke" /> : null}
           {preview?.draft ? <AreaDraft box={preview.draft} /> : null}
+          {polyDraft.length ? <PolyDraft pts={polyDraft} next={hover.pos} zoom={z} /> : null}
           {preview?.calib ? <CalibLine a={preview.calib[0]} b={preview.calib[1]} zoom={z} /> : null}
           {ghost}
         </g>
@@ -486,13 +625,20 @@ function SelectionOverlay({ doc, geoms, selection, zoom, readOnly }: { doc: Boar
           )
         }
         if (o.kind === 'area') {
-          return single && !readOnly ? (
+          if (!single || readOnly) return null
+          const poly = areaPoly(o as AreaObj)
+          return (
             <g key={o.id}>
-              {areaHandles(o as AreaObj).map(([h, q]) => (
-                <rect key={h} x={q.x - hs / 2} y={q.y - hs / 2} width={hs} height={hs} fill="#fff" stroke="var(--board-accent)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+              {/* 边中点：拖动加顶点 */}
+              {edgeMidpoints(poly).map((q, i) => (
+                <circle key={`m${i}`} cx={q.x} cy={q.y} r={3.2 / zoom} fill="#fff" fillOpacity={0.9} stroke="var(--board-accent)" strokeOpacity={0.7} strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
+              ))}
+              {/* 顶点：拖动改形状，双击删除 */}
+              {poly.map((q, i) => (
+                <rect key={`v${i}`} x={q.x - hs / 2} y={q.y - hs / 2} width={hs} height={hs} rx={1.5 / zoom} fill="#fff" stroke="var(--board-accent)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
               ))}
             </g>
-          ) : null
+          )
         }
         if (o.kind === 'raw') return <rect key={o.id} {...rectOf(rawBox(o.el))} fill="none" stroke="var(--board-accent)" strokeWidth={1.5} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
         return null
@@ -504,7 +650,26 @@ function SelectionOverlay({ doc, geoms, selection, zoom, readOnly }: { doc: Boar
 function AreaDraft({ box }: { box: Box }) {
   return (
     <g pointerEvents="none">
-      <rect {...rectOf(box)} fill="var(--board-accent-soft)" stroke="var(--board-accent)" strokeWidth={1.5} strokeDasharray="6 4" vectorEffect="non-scaling-stroke" />
+      <rect {...rectOf(box)} fill="var(--board-accent-soft)" stroke="var(--board-accent)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+    </g>
+  )
+}
+
+/** 正在点出的轮廓：已点的边是实线，跟随鼠标的下一条边是虚线；能闭合时起点放大提示 */
+function PolyDraft({ pts, next, zoom }: { pts: Vec[]; next: Vec | null; zoom: number }) {
+  const first = pts[0]
+  const last = pts[pts.length - 1]
+  const closable = pts.length >= 3 && !!next && Math.hypot(next.x - first.x, next.y - first.y) * zoom <= CLOSE_PX
+  const tip = next ? (closable ? first : snapToNeighbors(next, [last, first], SNAP_PX / zoom)) : null
+  const ring = [...pts, ...(tip ? [tip] : [])]
+  return (
+    <g pointerEvents="none">
+      {ring.length >= 3 ? <polygon points={ring.map((q) => `${q.x},${q.y}`).join(' ')} fill="var(--board-accent-soft)" stroke="none" /> : null}
+      <polyline points={pts.map((q) => `${q.x},${q.y}`).join(' ')} fill="none" stroke="var(--board-accent)" strokeWidth={2} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+      {tip ? <line x1={last.x} y1={last.y} x2={tip.x} y2={tip.y} stroke="var(--board-accent)" strokeWidth={1.5} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" /> : null}
+      {pts.map((q, i) => (
+        <circle key={i} cx={q.x} cy={q.y} r={(i === 0 && closable ? 6 : 3.5) / zoom} fill={i === 0 ? 'var(--board-accent)' : '#fff'} stroke="var(--board-accent)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+      ))}
     </g>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { AlertTriangle, Copy, Hand, Layers, Maximize2, MousePointerClick, Plus, Search, Trash2 } from 'lucide-react'
+import { AlertTriangle, Copy, Hand, Layers, Maximize2, MousePointerClick, Plus, Search, Trash2, X } from 'lucide-react'
 
 import { BrandLogo } from '@/components/brand-logo'
 import { PointMarker } from '@/components/point-marker'
@@ -208,7 +208,7 @@ export function AreasPanel({
   )
 }
 
-export function SelectedArea({ area, analysis, onChange, onDelete, readOnly }: { area: AreaInfo; analysis: AreaAnalysis | undefined; onChange: (patch: { name?: string; areaType?: string }) => void; onDelete: () => void; readOnly: boolean }) {
+export function SelectedArea({ area, analysis, onChange, onDelete, onClose, readOnly }: { area: AreaInfo; analysis: AreaAnalysis | undefined; onChange: (patch: { name?: string; areaType?: string }) => void; onDelete: () => void; onClose: () => void; readOnly: boolean }) {
   const [name, setName] = useState(area.name)
   const [key, setKey] = useState(area.id)
   if (key !== area.id) {
@@ -224,7 +224,13 @@ export function SelectedArea({ area, analysis, onChange, onDelete, readOnly }: {
     <div className="space-y-3 border-b bg-muted/40 p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><MousePointerClick className="size-3.5" />选中的区域</div>
-        {analysis ? <ScoreBadge score={analysis.score} /> : null}
+        <div className="flex items-center gap-1">
+          {analysis ? <ScoreBadge score={analysis.score} /> : null}
+          {/* 取消选中，回到下方的放置 / 区域列表（也可以按 Esc 或点画布空白处） */}
+          <Button variant="ghost" size="icon-xs" aria-label="取消选中区域" title="取消选中" onClick={onClose}>
+            <X />
+          </Button>
+        </div>
       </div>
       <div className="grid grid-cols-[1fr_7rem] gap-2">
         <Input value={name} disabled={readOnly} maxLength={30} aria-label="区域名称" onChange={(e) => setName(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()} className="bg-background" />
@@ -233,6 +239,7 @@ export function SelectedArea({ area, analysis, onChange, onDelete, readOnly }: {
           <SelectContent>{AREA_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
         </Select>
       </div>
+      {readOnly ? null : <p className="text-xs text-muted-foreground">拖动顶点改形状 · 拖动边的中点加顶点 · 双击顶点删除</p>}
       {analysis ? (
         <div className="space-y-1.5 text-xs">
           {analysis.devices.length ? (

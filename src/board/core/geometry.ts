@@ -63,6 +63,59 @@ export function nearBoxEdge(b: Box, p: Vec, band: number) {
   return p.x <= b.x + band || p.x >= b.x + b.w - band || p.y <= b.y + band || p.y >= b.y + b.h - band
 }
 
+/* ---------------- 多边形（区域轮廓） ---------------- */
+
+/** 点是否在多边形内（射线法，边界上的点按在内处理不保证） */
+export function pointInPolygon(p: Vec, poly: readonly Vec[]) {
+  let inside = false
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i]
+    const b = poly[j]
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside
+  }
+  return inside
+}
+
+/** 点到多边形边界的最短距离 */
+export function distToPolygon(p: Vec, poly: readonly Vec[]) {
+  let d = Infinity
+  for (let i = 0; i < poly.length; i++) d = Math.min(d, distToSegment(p, poly[i], poly[(i + 1) % poly.length]))
+  return d
+}
+
+export function polyBox(poly: readonly Vec[]): Box {
+  let x0 = Infinity
+  let y0 = Infinity
+  let x1 = -Infinity
+  let y1 = -Infinity
+  for (const q of poly) {
+    x0 = Math.min(x0, q.x)
+    y0 = Math.min(y0, q.y)
+    x1 = Math.max(x1, q.x)
+    y1 = Math.max(y1, q.y)
+  }
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
+}
+
+/** 多边形面积（鞋带公式，取绝对值） */
+export function polyArea(poly: readonly Vec[]) {
+  let s = 0
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]
+    const b = poly[(i + 1) % poly.length]
+    s += a.x * b.y - b.x * a.y
+  }
+  return Math.abs(s) / 2
+}
+
+/** 矩形的四个角（左上起顺时针） */
+export const boxCorners = (b: Box): Vec[] => [
+  { x: b.x, y: b.y },
+  { x: b.x + b.w, y: b.y },
+  { x: b.x + b.w, y: b.y + b.h },
+  { x: b.x, y: b.y + b.h },
+]
+
 const TAU = Math.PI * 2
 export const normAngle = (a: number) => ((a % TAU) + TAU) % TAU
 export const snapAngle = (a: number, step = Math.PI / 12) => normAngle(Math.round(a / step) * step)

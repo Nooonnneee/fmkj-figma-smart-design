@@ -417,7 +417,7 @@ export function QuoteEditor({
       <Card className="gap-0 py-0">
         <CardHeader className="flex flex-wrap items-center justify-between gap-2 border-b py-4">
           <div className="flex items-center gap-3">
-            <CardTitle className="text-base">产品明细</CardTitle>
+            <CardTitle className="shrink-0 text-base whitespace-nowrap">产品明细</CardTitle>
             {floorGroups.length > 0 ? (
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex rounded-lg bg-muted p-0.5" role="tablist" aria-label="明细视图">

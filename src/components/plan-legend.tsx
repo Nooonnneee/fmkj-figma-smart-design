@@ -1,5 +1,5 @@
 import { categoryOfType, DEVICE_CATEGORIES, deviceTypeOf } from '@/lib/device-types'
-import { markerDataUrl } from '@/lib/point-marker-data'
+import { markerSrc } from '@/lib/point-marker-data'
 import { cn } from '@/lib/utils'
 
 type LegendPoint = { deviceType: string }
@@ -37,7 +37,7 @@ export function PlanLegend({ points, variant = 'table', columns = 3, className }
           g.rows.map((r) => (
             <span key={r.type} className="inline-flex items-center gap-[5px]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={markerDataUrl(r.type)} alt="" className="size-[16px]" />
+              <img src={markerSrc(r.type)} alt="" className="size-[16px]" />
               <span>{r.name}</span>
               <span className="doc-latin opacity-60">×{r.count}</span>
             </span>
@@ -69,7 +69,7 @@ export function PlanLegend({ points, variant = 'table', columns = 3, className }
               <div key={r.type} className={cn('flex items-center', i > 0 && 'border-t border-doc-rule/70')}>
                 <div className="flex w-8 shrink-0 items-center justify-center self-stretch border-r border-doc-rule/70 py-1">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={markerDataUrl(r.type)} alt="" className="size-[18px]" />
+                  <img src={markerSrc(r.type)} alt="" className="size-[18px]" />
                 </div>
                 <span className="min-w-0 flex-1 truncate px-2">{r.name}</span>
                 <span className="pr-2 tabular-nums text-neutral-500">×{r.count}</span>

@@ -1,5 +1,5 @@
 /** 点位图的业务操作（代号、设备类型、灯光款式、图纸、区域）。都是纯函数，返回新文档。 */
-import { removeObjects, sheetsOf, updateObject } from '@/board/core/ops'
+import { removeObjects, sheetsOf, updateObject, withPoly } from '@/board/core/ops'
 import type { AreaObj, BoardDoc, BoardObj, Box, SheetObj, SymbolObj, SymbolTemplate, Vec } from '@/board/core/types'
 import { areaTypeLabel, inferAreaType, isAreaType } from '@/lib/area-types'
 import { categoryOfType } from '@/lib/device-types'
@@ -64,7 +64,8 @@ export function cloneObjects(doc: BoardDoc, src: BoardObj[], offset: Vec): { doc
     if (o.kind === 'symbol') {
       const codes = objects.flatMap((x) => (x.kind === 'symbol' ? [x.code] : []))
       n = { ...o, id, x: o.x + offset.x, y: o.y + offset.y, code: nextPointCode(String(o.data.deviceType ?? 'other'), codes), meta: { group: randomId('pt-'), labelId: randomId() } }
-    } else if (o.kind === 'area') n = { ...o, id, x: o.x + offset.x, y: o.y + offset.y, meta: { group: randomId('ar-'), labelId: randomId() } }
+    } else if (o.kind === 'area')
+      n = { ...o, id, x: o.x + offset.x, y: o.y + offset.y, ...(o.poly ? { poly: o.poly.map((q) => ({ x: q.x + offset.x, y: q.y + offset.y })) } : {}), meta: { group: randomId('ar-'), labelId: randomId() } }
     else if (o.kind === 'raw') n = { kind: 'raw', id, el: { ...o.el, id, x: o.el.x + offset.x, y: o.el.y + offset.y, groupIds: [] } }
     if (n) {
       objects.push(n)
@@ -74,9 +75,11 @@ export function cloneObjects(doc: BoardDoc, src: BoardObj[], offset: Vec): { doc
   return { doc: { objects }, ids }
 }
 
-export function createArea(doc: BoardDoc, box: Box, areaType = 'living', name?: string): { doc: BoardDoc; obj: AreaObj } {
+/** 新建区域：传 poly 时是多边形（外接框按顶点算），否则是 box 这个矩形 */
+export function createArea(doc: BoardDoc, box: Box, areaType = 'living', name?: string, poly?: Vec[]): { doc: BoardDoc; obj: AreaObj } {
   const t = isAreaType(areaType) ? areaType : 'living'
-  const obj: AreaObj = { kind: 'area', id: randomId(), x: box.x, y: box.y, w: box.w, h: box.h, name: name ?? areaTypeLabel(t), areaType: t, meta: { group: randomId('ar-'), labelId: randomId() } }
+  const base: AreaObj = { kind: 'area', id: randomId(), x: box.x, y: box.y, w: box.w, h: box.h, name: name ?? areaTypeLabel(t), areaType: t, meta: { group: randomId('ar-'), labelId: randomId() } }
+  const obj = (poly ? withPoly(base, poly) : null) ?? base
   // 区域放在其他区域之上、点位之下（绘制按图层，数组里放最后即可）
   return { doc: { objects: [...doc.objects, obj] }, obj }
 }

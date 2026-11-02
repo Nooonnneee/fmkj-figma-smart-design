@@ -1,5 +1,5 @@
-import { normAngle } from './geometry'
-import type { AreaObj, BoardDoc, BoardObj, Box, RawEl } from './types'
+import { boxCorners, normAngle, polyArea, polyBox } from './geometry'
+import type { AreaObj, BoardDoc, BoardObj, Box, RawEl, Vec } from './types'
 
 /** 通用对象操作（与业务无关）。都返回新文档；没有变化时返回原文档。 */
 
@@ -26,7 +26,7 @@ export function moveObjects(doc: BoardDoc, ids: ReadonlySet<string> | string[], 
       case 'symbol':
         return { ...o, x: o.x + dx, y: o.y + dy }
       case 'area':
-        return { ...o, x: o.x + dx, y: o.y + dy }
+        return { ...o, x: o.x + dx, y: o.y + dy, ...(o.poly ? { poly: o.poly.map((q) => ({ x: q.x + dx, y: q.y + dy })) } : {}) }
       case 'raw':
         return o.el.locked ? o : { ...o, el: moveRaw(o.el, dx, dy) }
       default:
@@ -60,6 +60,20 @@ export const MIN_AREA = 16
 /** 调整区域范围（最小 16 × 16） */
 export function resizeArea(doc: BoardDoc, id: string, box: Box): BoardDoc {
   return updateObject<AreaObj>(doc, id, (o) => ({ ...o, x: box.x, y: box.y, w: Math.max(MIN_AREA, box.w), h: Math.max(MIN_AREA, box.h) }))
+}
+
+/** 区域轮廓：多边形区域取顶点，旧的矩形区域取四个角 */
+export const areaPoly = (a: Pick<AreaObj, 'x' | 'y' | 'w' | 'h' | 'poly'>): Vec[] => (a.poly && a.poly.length >= 3 ? a.poly : boxCorners(a))
+
+/** 设置区域轮廓：外接框跟着更新；顶点少于 3 个或面积太小时不改 */
+export function withPoly<T extends AreaObj>(a: T, poly: Vec[]): T | null {
+  if (poly.length < 3 || polyArea(poly) < MIN_AREA * MIN_AREA * 0.5) return null
+  const b = polyBox(poly)
+  return { ...a, poly: poly.map((q) => ({ x: Math.round(q.x * 10) / 10, y: Math.round(q.y * 10) / 10 })), x: b.x, y: b.y, w: b.w, h: b.h }
+}
+
+export function setAreaPoly(doc: BoardDoc, id: string, poly: Vec[]): BoardDoc {
+  return updateObject<AreaObj>(doc, id, (o) => withPoly(o, poly))
 }
 
 /** 原始元素的外接框（考虑旋转） */

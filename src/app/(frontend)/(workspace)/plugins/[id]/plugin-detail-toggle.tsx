@@ -13,11 +13,14 @@ export function PluginDetailToggle({
   name,
   status,
   initialEnabled,
+  locked,
 }: {
   id: string
   name: string
   status: 'ready' | 'coming-soon'
   initialEnabled: boolean
+  /** 严格模式下会员等级不够：不能开启（可以关闭） */
+  locked?: string
 }) {
   const router = useRouter()
   const [enabled, setEnabled] = useState(initialEnabled)
@@ -27,7 +30,7 @@ export function PluginDetailToggle({
     return (
       <div className="flex items-center gap-2">
         <Badge variant="outline" className="text-muted-foreground">
-          待开发
+          规划中
         </Badge>
       </div>
     )
@@ -69,10 +72,11 @@ export function PluginDetailToggle({
         <Switch
           id="plugin-detail-switch"
           checked={enabled}
-          disabled={busy}
+          disabled={busy || (Boolean(locked) && !enabled)}
           onCheckedChange={(next) => void handleChange(next)}
         />
       </div>
+      {locked && !enabled ? <span className="text-xs text-muted-foreground">{locked}</span> : null}
     </div>
   )
 }

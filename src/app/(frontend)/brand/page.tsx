@@ -3,7 +3,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Check, Download, X } from 'lucide-react'
 
-import { LandingFooter, LandingNav } from '@/components/landing/landing-chrome'
+import { BrandLogo, LandingFooter, LandingNav } from '@/components/landing/landing-chrome'
 import { SectionHeading } from '@/components/landing/section-heading'
 import { Button } from '@/components/ui/button'
 import { APP_NAME, COMPANY_NAME } from '@/lib/brand'
@@ -68,28 +68,25 @@ function Surface({ dark, className, children }: { dark: boolean; className?: str
 /** 品牌规范页：标志释义、组合、应用图标、品牌色、字体与使用规范，所有资源可下载。 */
 export default function BrandPage() {
   return (
-    <div data-landing data-accent="fanmeng" className="dark relative min-h-svh overflow-x-clip bg-background text-foreground">
+    <div data-landing data-accent="fanmeng" className="min-h-svh overflow-x-clip bg-background text-foreground">
       <LandingNav />
       <main>
-        <section aria-labelledby="brand-title" className="relative isolate overflow-hidden">
-          <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-            <div className="absolute inset-0 landing-grid landing-mask-radial opacity-60" />
-            <div className="absolute -top-40 left-1/2 size-160 -translate-x-1/2 rounded-full bg-brand-indigo/25 blur-3xl" />
-          </div>
+        <section aria-labelledby="brand-title">
           <div className="mx-auto max-w-5xl px-4 pt-20 pb-16 text-center sm:px-6 sm:pt-28 lg:px-8">
             <h1 id="brand-title" className="sr-only">{COMPANY_NAME}品牌标识</h1>
-            <Image src={`${B}/fmkj-logo-vertical-white.svg`} alt={`${APP_NAME}标识`} width={258} height={264} unoptimized priority className="mx-auto h-48 w-auto sm:h-60" />
-            <p className="mx-auto mt-8 max-w-2xl text-base text-pretty text-muted-foreground sm:text-lg">
+            <Image src={`${B}/fmkj-logo-vertical.svg`} alt={`${APP_NAME}标识`} width={258} height={264} unoptimized priority className="mx-auto h-48 w-auto sm:h-60 dark:hidden" />
+            <Image src={`${B}/fmkj-logo-vertical-white.svg`} alt={`${APP_NAME}标识`} width={258} height={264} unoptimized className="mx-auto hidden h-48 w-auto sm:h-60 dark:block" />
+            <p className="mx-auto mt-8 max-w-2xl text-lead text-pretty text-muted-foreground">
               {COMPANY_NAME}的品牌标识由手写体 Dream、定制几何字 SPACE、倾斜光环与四角星芒构成：让每一个梦想，都有智能的空间。
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <Button asChild size="lg" className="rounded-full">
+              <Button asChild size="lg" className="h-11 rounded-full bg-foreground px-6 text-base text-background hover:bg-foreground/85">
                 <Link href={`${B}/fmkj-logo.svg`} download>
                   <Download data-icon="inline-start" />
                   下载横版标识
                 </Link>
               </Button>
-              <Button asChild size="lg" variant="outline" className="rounded-full">
+              <Button asChild size="lg" variant="outline" className="h-11 rounded-full px-6 text-base">
                 <Link href={`${B}/fmkj-app-icon-1024.png`} download>
                   <Download data-icon="inline-start" />
                   下载应用图标
@@ -201,14 +198,14 @@ export default function BrandPage() {
                 </div>
               ))}
             </div>
-            <div className="mt-4 h-16 rounded-2xl bg-linear-to-r from-brand-indigo to-brand-violet" aria-label="标准渐变：繁梦蓝到星夜紫，135°" />
+            <div role="img" className="mt-4 h-16 rounded-2xl bg-linear-to-r from-brand-indigo to-brand-violet" aria-label="标准渐变：繁梦蓝到星夜紫，135°" />
             <p className="mt-2 text-xs text-muted-foreground">星夜渐变：星光紫 #8F72FF → 科技蓝 #4F86FF</p>
           </div>
         </section>
 
         <section aria-labelledby="type-title" className="py-16 sm:py-24">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-            <SectionHeading id="type-title" eyebrow="品牌字体" title="中文思源黑体，英文 Space Grotesk" description="两款均为免费商用开源字体（SIL OFL），可放心用于宣传物料与产品界面。" />
+            <SectionHeading id="type-title" eyebrow="品牌字体" title="中文思源黑体，英文 Inter" description="两款均为免费商用开源字体（SIL OFL）。网站和产品界面用 Inter 配系统中文字体（苹方 / 微软雅黑），宣传物料用思源黑体。" />
             <div className="mt-12 grid gap-4 md:grid-cols-2">
               <div className="rounded-2xl border border-border bg-card/50 p-6">
                 <p className="text-xs text-muted-foreground">中文 · 思源黑体 / Noto Sans SC</p>
@@ -217,10 +214,10 @@ export default function BrandPage() {
                 <p className="mt-4 text-xs text-muted-foreground">标识用 Bold（字距 +8%），标题用 Bold / Medium，正文用 Regular。</p>
               </div>
               <div className="rounded-2xl border border-border bg-card/50 p-6">
-                <p className="text-xs text-muted-foreground">英文 · Dream Space 定制字标与 Space Grotesk</p>
-                <Image src={`${B}/fmkj-logo-white.svg`} alt="" width={436} height={120} unoptimized className="mt-4 h-12 w-auto" />
-                <p className="mt-4 text-lg tracking-widest text-muted-foreground uppercase">Dream Space · 0123456789</p>
-                <p className="mt-4 text-xs text-muted-foreground">正文中英文品牌名写作 Dream Space（首字母大写，中间留空格）。</p>
+                <p className="text-xs text-muted-foreground">英文 · Dream Space 定制字标与 Inter</p>
+                <BrandLogo className="mt-4 h-12 w-auto" />
+                <p className="mt-4 text-3xl font-semibold tracking-tight">Dream Space 0123456789</p>
+                <p className="mt-4 text-xs text-muted-foreground">大标题用 Semibold（字距 -2%，自动切换 Display 字形），正文用 Regular；数字一律等宽对齐。正文中英文品牌名写作 Dream Space（首字母大写，中间留空格）。</p>
               </div>
             </div>
           </div>

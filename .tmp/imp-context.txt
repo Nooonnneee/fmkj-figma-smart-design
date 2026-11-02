@@ -1,0 +1,300 @@
+# PRODUCT.md
+
+# Product
+
+<!-- impeccable:product-schema 1 -->
+
+## Platform
+
+web
+
+## Users
+
+个人设计师或小团队（全屋智能方案设计与安装）。系统只有一种成员角色，所有成员权限相同；账号在后台（/admin）开通，不开放自助注册。产品库由后台维护，成员都可以查看（含成本）。
+
+主要在办公室电脑上使用；也会在客户现场用手机或平板查看项目、产品和报价。
+
+## Product Purpose
+
+FMKJ 是做全屋智能家居方案设计与安装的公司。这是面向个人和团队的智能家居设计报价平台，核心是让方案报价又快又准，并顺手出合同、归档。
+
+成功的标准：设计师布好点位图后，几分钟内就能得到一份可以直接打印给客户的报价单，不用再手工数设备、算清单。
+
+## Positioning
+
+**点位图直接出报价。** 在户型图上摆放设备点位后，系统按设备类型自动统计数量、匹配产品库里的具体型号，生成报价；报价里可以逐行换型号，再一键打印成带公司抬头的报价单。点位图、产品库和报价共用同一套设备类型字典，所以三者始终对得上。
+
+## Operating Context
+
+- **项目板块**：信息 → 点位 → 报价 → 合同 → 归档。没有手动阶段，进度由数据自动得出（有点位、有报价、合同已签、已归档）。项目名称留空时按「小区 + 房号」或客户姓名自动生成。
+- **合同**：每个项目一份，由报价生成（金额、甲方信息、付款方式、工期、质保、条款带默认值）；签订后合同和依据的报价锁定，只能登记收款。
+- **归档**：核对资料、打印留档；归档后项目、报价、合同只读。
+- **点位图**：基于户型图（可导入 DWG）布置设备符号，每个符号对应一种设备类型；项目可以预设各类型的默认产品。
+- **产品库**：728 个在售产品，覆盖 27 个品牌（易来、领普、苏米、小米、Aqara 等），按 11 个类别、30 多种设备类型组织；716 个有产品图。
+- **图纸 → 方案流程**：上传户型图（或 DWG）→ 自动裁切成标准图纸 → 手动放置或导入 AI 识别结果（`fmkj-points` JSON，坐标是标准图纸上的比例，格式见 `src/lib/point-import.ts`）→ 划分房间区域 → 智能选型（按主平台和经济 / 标准 / 高端档次设置默认型号）→ 生成报价 → 生成方案。
+- **方案**：三个模板（现代简约、高端提案、施工交底），A4 横版，含封面、概览、每张图纸的点位图（设备图标或产品图）、房间智能分析、设备清单、预算或点位清单；可打印 / 另存 PDF / 导出图片。
+- **报价**：状态为草稿 → 已发送 → 已确认；打印版有标准版、图文版、精简版、分区版四个模板，带公司 Logo、联系方式、二维码和报价说明，可导出长图。
+
+## Capabilities and Constraints
+
+- 技术栈：Next.js + Payload CMS + Tailwind CSS，运行在 Figma Make 中。
+- 员工登录（`users` 集合）与 Payload 后台的 CMS 登录完全分开。
+- **设备类型字典是固定的**（`src/lib/device-types.ts`），点位图、产品、报价都依赖它。新增类型需要业务确认，不要为单个产品临时添加（例如不单独设“USB 面板”“调光”“场景”“电视点位”“排气扇”“吊扇”“新风口”“热水器”）。归不进现有类型的产品放进“其他设备”，配件加“配件”标签。
+- **AI 点位设计规范**（`src/lib/design-rules.ts`）：开关、插座、灯具只「照图识别」——仅当户型图上已有准确的开关 / 灯光点位符号时，才按原图位置生成；没有准确点位的图纸默认不生成，AI 不得凭经验推测。AI 默认只设计弱电与智能设备：全屋 WiFi（AP、网络面板）、窗帘电轨、智能网关、VRF 控制器、人体传感器、智能音箱、摄像头。AI 返回的点位用 `source` 区分 `drawing`（照图）与 `design`（设计），标为 `design` 的开关 / 插座 / 灯具在导入时会被丢弃。数量规范：VRF 控制器每层只放 1 个，放在客厅；智能音箱与中控屏每个区域只放其中一种、只放 1 个，不共存；中控屏要对照开关点位布置，没有开关点位时不加入设计；智能音箱一般只考虑客厅和书房；摄像头一般只放 2 个——客厅 1 个、入户门口 1 个。
+- 产品平台：Apple Home、米家、华为、涂鸦、Matter、KNX、通用。
+- 界面语言为简体中文。
+
+## Brand Commitments
+
+- 公司名 **FMKJ**，侧边栏字标为 “FM”。
+- 公司 Logo、二维码、联系方式由管理员在“公司信息”中维护，只出现在报价单上。
+
+## Evidence on Hand
+
+- 产品数据来自《产品库总表-728个产品-20261029.xlsx》，产品图来自同名网盘图库（按 SKU 命名）。
+- 品牌 Logo 已导入媒体库。
+- 尚缺 12 个产品的图片（鹿客 5 款门锁、H3C 3 款、今闪 2 款、Somfy 1 款、Aqara 梦幻帘 1 款）。
+- 没有客户案例、客户评价或对外宣传素材，不要编造。
+
+## Product Principles
+
+1. **点位图是唯一的数据源头。** 报价从点位图派生，不让员工在两处重复录入同一件事。
+2. **一套设备字典贯穿始终。** 点位符号、产品分类、报价分组用同一个类型体系，宁可归入“其他”，也不随意新增类型。
+3. **报价单是交给客户的成品。** 打印版必须准确、整洁、可以直接交付。
+4. **简单优先。** 单一角色、默认值优先、功能放在它所属的板块里。
+
+---
+
+# DESIGN.md
+
+---
+name: FMKJ 项目管理
+description: 全屋智能家居公司的内部项目运营后台：点位图、产品库、报价
+colors:
+  ink: "oklch(0.145 0 0)"
+  ink-primary: "oklch(0.205 0 0)"
+  paper: "oklch(1 0 0)"
+  paper-muted: "oklch(0.97 0 0)"
+  pencil: "oklch(0.53 0 0)"
+  rule-line: "oklch(0.922 0 0)"
+  focus-ring: "oklch(0.708 0 0)"
+  sidebar-paper: "oklch(0.985 0 0)"
+  alert-red: "oklch(0.577 0.245 27.325)"
+  alert-red-strong: "oklch(0.47 0.2 27.325)"
+  confirmed-green: "oklch(0.49 0.12 155)"
+  pending-amber: "oklch(0.52 0.11 75)"
+  cat-switch: "#2563eb"
+  cat-socket: "#0d9488"
+  cat-lighting: "#d97706"
+  cat-sensor: "#059669"
+  cat-lock: "#475569"
+  cat-security: "#dc2626"
+  cat-curtain: "#db2777"
+  cat-gateway: "#7c3aed"
+  cat-network: "#0891b2"
+  cat-vrf: "#ea580c"
+  cat-other: "#525252"
+  site-field: "oklch(0.29 0.1 274)"
+  site-field-deep: "oklch(0.235 0.085 274)"
+  site-ink: "oklch(0.97 0.012 274)"
+  site-muted: "oklch(0.83 0.045 274)"
+  site-line: "oklch(0.42 0.09 274)"
+  board: "oklch(0.992 0.003 274)"
+  board-sunken: "oklch(0.965 0.008 274)"
+  board-ink: "oklch(0.21 0.03 274)"
+  board-muted: "oklch(0.47 0.03 274)"
+  board-rule: "oklch(0.9 0.012 274)"
+  band: "oklch(0.37 0.14 274)"
+  signal: "oklch(0.87 0.165 95)"
+  signal-ink: "oklch(0.24 0.045 274)"
+  seal: "oklch(0.55 0.2 27)"
+typography:
+  headline:
+    fontFamily: "Inter, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Noto Sans SC, sans-serif"
+    fontSize: "1.5rem"
+    fontWeight: 700
+    letterSpacing: "-0.025em"
+  title:
+    fontFamily: "Inter, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Noto Sans SC, sans-serif"
+    fontSize: "1rem"
+    fontWeight: 600
+  body:
+    fontFamily: "Inter, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Noto Sans SC, sans-serif"
+    fontSize: "0.875rem"
+    fontWeight: 400
+    lineHeight: 1.5
+  label:
+    fontFamily: "Inter, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Noto Sans SC, sans-serif"
+    fontSize: "0.75rem"
+    fontWeight: 500
+  data:
+    fontFamily: "Inter, PingFang SC, Microsoft YaHei, sans-serif"
+    fontSize: "0.875rem"
+    fontWeight: 600
+    fontFeature: "tnum"
+  landing-display:
+    fontFamily: "Space Grotesk, Noto Sans SC (Black subset), PingFang SC, Microsoft YaHei, sans-serif"
+    fontSize: "3.5rem"
+    fontWeight: 900
+    letterSpacing: "-0.02em"
+  landing-board-title:
+    fontFamily: "Space Grotesk, Noto Sans SC (Black subset), PingFang SC, Microsoft YaHei, sans-serif"
+    fontSize: "1.5rem"
+    fontWeight: 900
+  landing-figure:
+    fontFamily: "Space Grotesk, PingFang SC, Microsoft YaHei, sans-serif"
+    fontSize: "1.875rem"
+    fontWeight: 700
+    fontFeature: "tnum"
+rounded:
+  sm: "6px"
+  md: "8px"
+  lg: "10px"
+  xl: "14px"
+  full: "9999px"
+spacing:
+  xs: "4px"
+  sm: "8px"
+  md: "16px"
+  lg: "24px"
+  xl: "32px"
+components:
+  button-primary:
+    backgroundColor: "{colors.ink-primary}"
+    textColor: "{colors.paper}"
+    rounded: "{rounded.md}"
+    height: "32px"
+    padding: "0 12px"
+  button-outline:
+    backgroundColor: "{colors.paper}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.md}"
+    height: "32px"
+  input:
+    backgroundColor: "{colors.paper-muted}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.md}"
+    height: "32px"
+  card:
+    backgroundColor: "{colors.paper}"
+    rounded: "{rounded.xl}"
+    padding: "20px"
+  filter-tabs:
+    backgroundColor: "{colors.paper-muted}"
+    rounded: "{rounded.lg}"
+    height: "36px"
+  filter-tab-active:
+    backgroundColor: "{colors.paper}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.md}"
+  badge-success:
+    textColor: "{colors.confirmed-green}"
+    rounded: "{rounded.full}"
+  badge-warning:
+    textColor: "{colors.pending-amber}"
+    rounded: "{rounded.full}"
+---
+
+# Design System: FMKJ 项目管理
+
+## Overview
+
+**Creative North Star: "施工图纸"**
+
+整个界面像一张干净的施工图纸：黑、白、灰是纸和墨，只有两类颜色承载信息。一是**设备类别色**，每一类设备有一个固定颜色，和点位图画布上的符号颜色一致；二是**状态色**，表示确认、待处理、警示。除此之外不用颜色装饰。
+
+这是员工每天干活的工具，不是展示页面。可扫读、一致、可信，比表现力更重要。熟悉的后台模式（侧边导航、表格、标签页式筛选）是优点，不要为了“设计感”去改造标准控件。品牌感体现在精确的细节上：对齐的数字、统一的控件、克制的层级。
+
+支持浅色和深色两套主题，两套用同一组语义变量（见 `src/app/(frontend)/styles.css`）。
+
+**Key Characteristics:**
+- 中性色为底，颜色只用来表达类别和状态
+- 一个字族（Inter 加中文字体链），靠字号和字重分层级
+- 平面为主，卡片只用很轻的阴影加 1px 描边
+- 表格和金额一律使用等宽数字
+- 中等信息密度，桌面优先，移动端可用
+
+## Colors
+
+中性灰阶为主体，设备类别色和状态色是唯一的彩色。
+
+### Primary
+- **墨黑 Ink Primary** (oklch(0.205 0 0))：主按钮、当前选中项、进度条已完成段。深色主题下反转为浅色。
+
+### Neutral
+- **正文墨 Ink** (oklch(0.145 0 0))：正文和标题。
+- **铅笔灰 Pencil** (oklch(0.53 0 0))：次要文字、说明、占位符。这是对比度下限：在白底上 5.25:1，在浅灰底上 4.82:1，不要再调浅。
+- **图纸白 Paper** (oklch(1 0 0))：页面和卡片底色。
+- **浅灰底 Paper Muted** (oklch(0.97 0 0))：输入框底、筛选条底、悬停底。
+- **侧栏底 Sidebar Paper** (oklch(0.985 0 0))：侧边栏，比内容区略深一点，作为第二层中性面。
+- **格线 Rule Line** (oklch(0.922 0 0))：描边、分隔线、表格线。
+
+### 状态色
+- **确认绿 Confirmed Green** (oklch(0.49 0.12 155))：已确认的报价，以及其他成功状态。
+- **待办琥珀 Pending Amber** (oklch(0.52 0.11 75))：已发送、等客户回复，以及其他需要关注的状态。
+- **警示红 Alert Red** (oklch(0.577 0.245 27.325))：错误和破坏性操作。浅红底上的文字改用 **Alert Red Strong** (oklch(0.47 0.2 27.325))，保证对比度不低于 4.5:1。
+
+### 设备类别色
+定义在 `src/lib/device-types.ts`，是点位图符号、产品库类别圆点、设备类型标签共用的颜色：开关 #2563eb、插座 #0d9488、灯具 #d97706、传感器 #059669、门锁 #475569、监控 #dc2626、窗帘 #db2777、网关中控 #7c3aed、全屋 WiFi #0891b2、VRF #ea580c、其他 #525252。
+
+### Named Rules
+**颜色即信息。** 彩色只出现在设备类别和业务状态上。按钮、标题、背景、装饰都不用彩色。
+
+**未激活不着色。** 无库存、草稿、未选中等常态或空状态用灰色文字，不用红色或高饱和底色。红色只留给真正的错误和破坏性操作。
+
+**类别色只有一份。** 设备类别色只从 `device-types.ts` 读取，不在组件里另写一份。
+
+## Typography
+
+**字体：** Inter 负责拉丁字符和数字，中文依次回落到 PingFang SC、Hiragino Sans GB、Microsoft YaHei、Noto Sans SC。字体链写在 `styles.css` 里，保证换一台电脑界面也一样。
+
+**风格：** 全站只用一个字族，相邻层级的字号比约 1.125–1.2，用固定的 rem 字号，不用随视口缩放的字号。
+
+### Hierarchy
+- **页面标题 Headline**（700，1.5rem，字距 -0.025em）：每页一个 h1。
+- **区块标题 Title**（600，1rem）：卡片标题、分组标题。
+- **正文 Body**（400，0.875rem，行高 1.5）：表格、表单、说明文字。
+- **标签 Label**（500，0.75rem）：表单标签、徽章、计数、侧栏分组名。
+- **数据 Data**（600，等宽数字）：金额、数量、日期，右对齐。
+
+### Named Rules
+**数字对齐。** 金额、数量、日期一律使用 `tabular-nums`；表格默认已开启。
+
+**标题上方不加小标签。** 页面标题本身就够了，不要在它上面再加一行小号的分类说明（kicker / eyebrow）。
+
+## Layout
+
+- **整体框架**：左侧可折叠侧边栏，加 48px 高的顶栏（只放侧栏开关和主题切换），内容区边距 16px（手机）/ 32px（桌面）。
+- **页面头部**：左侧是 h1 和一行计数或说明，右侧是主操作或搜索。
+- **列表页**：搜索框、筛选条（FilterTabs）、表格或网格，筛选状态记录在网址参数里。
+- **表单和详情页**：最大宽度 3xl（768px），居中。
+- **产品库**：240px 的左侧筛选栏（桌面端随页面固定）加产品网格（2 / 3 / 4 / 5 列）；窄屏下筛选栏收进“筛选”按钮。
+- **间距**：组内 4–8px，组间 16–24px；标题上方的留白大于下方。
+- **响应式**：靠结构变化适配（侧栏折叠、隐藏次要列、筛选条横向滚动），不靠缩放字号。
+
+## Elevation & Depth
+
+以平面为主，靠颜色深浅分层：页面白、侧栏浅灰、输入框浅灰。卡片用 `shadow-sm` 加一圈 5% 不透明度的描边；产品卡悬停时上浮 2px 并加深阴影。阴影必须有偏移和柔和的模糊，不用硬边的偏移阴影，也不用无偏移的彩色光晕。顶栏是实色底加底部分隔线，不用毛玻璃。
+
+## Shapes
+
+基础圆角 10px（`--radius`）。按钮、输入框、筛选项用 8px；卡片用 14px；徽章和计数用全圆角。描边统一 1px，不在卡片或列表项侧边加粗彩色边线。
+
+## Components
+
+- **按钮**：默认高 32px。主按钮墨黑底，次按钮白底描边，幽灵按钮无底色。键盘聚焦时显示 3px 的环形焦点框，按下时下沉 1px，禁用时 50% 不透明度。
+- **筛选条 FilterTabs**（`src/components/filter-tabs.tsx`）：单选筛选（阶段、状态、排序）统一用它。外层是浅灰底的分段容器，选中项是白底加轻阴影，基于链接实现，窄屏下可横向滚动。多选筛选（品牌）用侧栏复选列表。
+- **输入框**：高 32px，浅灰填充底，聚焦时显示环形焦点框，出错时红色描边。文件上传隐藏原生控件，用中文按钮加文件名代替。
+- **徽章 Badge**：报价状态统一用 `quoteStatusVariant()`：草稿 outline、已发送 warning、已确认 success。
+- **表格**：卡片包裹，首列左内边距 16px（手机）/ 24px（桌面），整行可点击，次要列在窄屏隐藏。
+- **设备符号 DeviceSymbol**：384×384 画布的单色 SVG（`public/point-symbols`），用 CSS mask 按类别色着色；新增符号保持同样的风格：浅色填充（约 19% 不透明度）加实心描边和细节。
+- **点位标记 PointMarker**（`public/point-markers`，由 `scripts/build-point-markers.mjs` 生成）：点位图画布、方案图、图例共用的设备图标。64×64，白色外圈 + 类别色底 + 白色线性图形；墙面设备（开关、插座、面板、门锁）用圆角方形，其余用圆形；开关直接画出 1–4 个按键。改设计时修改脚本重新生成，并把 `MARKER_VERSION` 加一。
+- **标准图纸**（`src/lib/sheet-spec.ts`）：户型图裁掉图框、标题栏和图名后，放进 3:2 白底画布，存储 2400×1600 PNG，在点位图里占 1200×800；打开或切换图纸时铺满画布即为 100%。点位标记直径 24、代号字号 9（相对 1200 宽）。底图 60% 不透明度，让彩色点位更醒目。
+- **产品图 ProductThumb**：正方形白底、细描边、图片占 84% 等比居中，任何原图比例看起来都一样大。上传规范：800×800 白底方图，产品主体约占 80%。方案图里的产品点位为浅灰底圆框 + 类别色描边。
+- **空状态**：虚线框内放图标、一句说明和下一步操作，告诉用户怎么开始，不只写“暂无数据”。
+- **加载**：用骨架屏（`page-skeletons.tsx`），不在内容中间放转圈；链接跳转时显示 `LinkPending` 小指示。
+
+## Do's and Don'ts
+
+**Do**
+- 颜色只用于设备类别和业务状态。

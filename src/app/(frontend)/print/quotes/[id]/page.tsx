@@ -12,6 +12,7 @@ import { docToolbarGroups, resolveDocSetup } from '@/documents/registry'
 import { relId } from '@/lib/access'
 import { appAuth } from '@/lib/app-auth'
 import { getCatalog, resolveMediaUrl } from '@/lib/cached-data'
+import { DEFAULT_PAYMENTS, paymentAmounts, rmbUpper } from '@/lib/contracts'
 import { categoryOfType, DEVICE_CATEGORIES } from '@/lib/device-types'
 import { getPayloadClient } from '@/lib/payload'
 import type { StoredScene } from '@/lib/point-scene'
@@ -25,7 +26,7 @@ export const metadata = { title: '报价单', robots: { index: false, follow: fa
 
 type Search = { layout?: string; template?: string; style?: string; markers?: string; plans?: string }
 
-/** 给客户的报价单：A4 纵向，版式（分区 / 标准 / 图文 / 精简）× 风格，可打印、导出 PDF 或图片。 */
+/** 给客户的报价单：A4 纵向，版式（分区 / 标准 / 图文 / 精简 / 按系统 / 预算概览）× 风格，可打印、导出 PDF 或图片。 */
 export default async function PrintQuotePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Search> }) {
   const { id } = await params
   const sp = await searchParams
@@ -96,9 +97,17 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
   const hasPlans = floors.some((f) => Boolean(f.sheetUrl))
   const markers: 'symbol' | 'product' = sp.markers === 'product' ? 'product' : 'symbol'
   const showPlans = sp.plans !== '0' && hasPlans
-  const showImages = layout !== 'compact' && company.printProductImages && items.some((i) => imageOf(i))
+  const showImages = layout !== 'compact' && layout !== 'budget' && company.printProductImages && items.some((i) => imageOf(i))
   const groups = DEVICE_CATEGORIES.map((c) => ({ c, rows: items.map((item, i) => ({ item, i })).filter(({ item }) => categoryOfType(item.deviceType)?.slug === c.slug) })).filter((g) => g.rows.length)
   const ungrouped = items.map((item, i) => ({ item, i })).filter(({ item }) => !categoryOfType(item.deviceType))
+  // 按系统版、预算概览：各系统（设备类别）的小计与占比
+  const systems = [...groups.map((g) => ({ key: g.c.slug, name: g.c.name, color: g.c.color as string, rows: g.rows })), ...(ungrouped.length ? [{ key: 'none', name: '其他', color: '#525252', rows: ungrouped }] : [])].map((g) => ({
+    ...g,
+    subtotal: g.rows.reduce((s, { item }) => s + item.price * item.quantity, 0),
+    quantity: g.rows.reduce((s, { item }) => s + item.quantity, 0),
+  }))
+  const productSum = systems.reduce((s, g) => s + g.subtotal, 0) || 1
+  const share = (n: number) => `${Math.round((n / productSum) * 100)}%`
   const date = new Date(quote.updatedAt).toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: 'long', day: 'numeric' })
   const contact = [company.phone && `电话：${company.phone}`, company.email && `邮箱：${company.email}`, company.address && `地址：${company.address}`].filter(Boolean) as string[]
   const t = docTable(style)
@@ -173,7 +182,195 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
           />
 
           <div className="mt-6">
-            {layout === 'detailed' ? (
+            {layout === 'system' ? (
+              <div className="space-y-5">
+                <section data-pdf-block className="break-inside-avoid">
+                  <DocSectionHeading style={style} className="mb-2" title="系统汇总" note={`${systems.length} 个系统 · ${items.length} 行设备`} />
+                  <table className="w-full border-collapse text-[12px]">
+                    <thead>
+                      <tr className={t.head}>
+                        <th className={t.th}>系统</th>
+                        <th className={cn(t.th, 'w-20 text-right')}>设备行数</th>
+                        <th className={cn(t.th, 'w-20 text-right')}>数量</th>
+                        <th className={cn(t.th, 'w-28 text-right')}>小计</th>
+                        <th className={cn(t.th, 'w-36')}>占比</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {systems.map((g, i) => (
+                        <tr key={g.key} className={t.row(i)}>
+                          <td className={cn(t.td, 'py-1.5')}>
+                            <span className="flex items-center gap-2">
+                              <span className="size-2 rounded-full" style={{ backgroundColor: g.color }} />
+                              {g.name}
+                            </span>
+                          </td>
+                          <td className={cn(t.td, 'py-1.5 text-right tabular-nums')}>{g.rows.length}</td>
+                          <td className={cn(t.td, 'py-1.5 text-right tabular-nums')}>{g.quantity}</td>
+                          <td className={cn(t.td, 'py-1.5 text-right tabular-nums')}>{yuan(g.subtotal)}</td>
+                          <td className={cn(t.td, 'py-1.5')}>
+                            <span className="flex items-center gap-2">
+                              <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-doc-stripe">
+                                <span className="block h-full rounded-full" style={{ width: share(g.subtotal), backgroundColor: g.color }} />
+                              </span>
+                              <span className="w-9 text-right text-[11px] text-doc-muted tabular-nums">{share(g.subtotal)}</span>
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+                {systems.map((g) => (
+                  <section key={g.key}>
+                    <DocSectionHeading
+                      style={style}
+                      className="mb-2"
+                      title={
+                        <span className="flex items-center gap-2">
+                          <span className="size-2 rounded-full" style={{ backgroundColor: g.color }} />
+                          {g.name}系统
+                        </span>
+                      }
+                      note={`${g.rows.length} 行 · 小计 ${yuan(g.subtotal)}`}
+                    />
+                    {/* 各系统的表格列宽一致，上下对齐 */}
+                    <table className="w-full table-fixed border-collapse text-[12px]">
+                      <thead>
+                        <tr className={t.head}>
+                          <th className={cn(t.th, 'w-10')}>序号</th>
+                          {showImages ? <th className={cn(t.th, 'w-14')}>图片</th> : null}
+                          <th className={t.th}>产品</th>
+                          <th className={cn(t.th, 'w-36')}>型号</th>
+                          <th className={cn(t.th, 'w-20 text-right')}>单价</th>
+                          <th className={cn(t.th, 'w-16 text-right')}>数量</th>
+                          <th className={cn(t.th, 'w-24 text-right')}>金额</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {g.rows.map(({ item, i }, k) => (
+                          <tr key={item.id ?? i} className={t.row(k)}>
+                            <td className={cn(t.td, 'py-1.5 tabular-nums')}>{i + 1}</td>
+                            {showImages ? (
+                              <td className={cn(t.td, 'py-1')}>
+                                <ProductThumb src={imageOf(item)} alt={item.name} className="size-9" />
+                              </td>
+                            ) : null}
+                            <td className={cn(t.td, 'py-1.5')}>{item.name}</td>
+                            <td className={cn(t.td, 'py-1.5 break-all text-doc-muted')}>{item.sku}</td>
+                            <td className={cn(t.td, 'py-1.5 text-right whitespace-nowrap tabular-nums')}>{yuan(item.price)}</td>
+                            <td className={cn(t.td, 'py-1.5 text-right whitespace-nowrap tabular-nums')}>{item.quantity}{item.unit ? ` ${item.unit}` : ''}</td>
+                            <td className={cn(t.td, 'py-1.5 text-right whitespace-nowrap tabular-nums')}>{yuan(item.price * item.quantity)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </section>
+                ))}
+                {fees.length ? (
+                  <section className="break-inside-avoid">
+                    <DocSectionHeading style={style} className="mb-2" title="服务与附加费用" />
+                    <table className="w-full border-collapse text-[12px]">
+                      <tbody>
+                        {fees.map((fee, i) => (
+                          <tr key={fee.id ?? i} className={t.row(i)}>
+                            <td className={cn(t.td, 'py-1.5')}>{fee.name}</td>
+                            <td className={cn(t.td, 'py-1.5 text-right tabular-nums')}>{yuan(fee.amount)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </section>
+                ) : null}
+              </div>
+            ) : layout === 'budget' ? (
+              <div className="space-y-6">
+                <section data-pdf-block className="grid grid-cols-[1fr_auto] items-end gap-6 rounded-doc border border-doc-rule p-5 break-inside-avoid">
+                  <div>
+                    <div className="text-[12px] text-doc-muted">报价合计</div>
+                    <div className="doc-numeral mt-1 text-[34px] leading-none text-doc-accent">{yuan(quote.total)}</div>
+                    <div className="mt-2 text-[12px] text-doc-muted">大写：{rmbUpper(quote.total ?? 0)}</div>
+                  </div>
+                  <div className="space-y-1 text-right text-[12px]">
+                    <div>
+                      <span className="text-doc-muted">设备 </span>
+                      <span className="tabular-nums">{yuan(quote.productTotal)}</span>
+                    </div>
+                    {quote.feeTotal ? (
+                      <div>
+                        <span className="text-doc-muted">服务与附加 </span>
+                        <span className="tabular-nums">{yuan(quote.feeTotal)}</span>
+                      </div>
+                    ) : null}
+                    {quote.discount ? (
+                      <div>
+                        <span className="text-doc-muted">优惠 </span>
+                        <span className="tabular-nums">-{yuan(quote.discount)}</span>
+                      </div>
+                    ) : null}
+                    <div className="text-doc-muted">{items.length} 行设备 · 共 {items.reduce((s, i) => s + i.quantity, 0)} 件</div>
+                  </div>
+                </section>
+                <section data-pdf-block className="break-inside-avoid">
+                  <DocSectionHeading style={style} className="mb-2" title="各系统预算" note="按设备类别汇总" />
+                  <div className="space-y-2 text-[12px]">
+                    {systems.map((g) => (
+                      <div key={g.key} className="grid grid-cols-[7rem_1fr_6rem_3rem] items-center gap-3">
+                        <span className="flex items-center gap-2">
+                          <span className="size-2 rounded-full" style={{ backgroundColor: g.color }} />
+                          {g.name}
+                        </span>
+                        <span className="h-2 overflow-hidden rounded-full bg-doc-stripe">
+                          <span className="block h-full rounded-full" style={{ width: share(g.subtotal), backgroundColor: g.color }} />
+                        </span>
+                        <span className="text-right tabular-nums">{yuan(g.subtotal)}</span>
+                        <span className="text-right text-doc-muted tabular-nums">{share(g.subtotal)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+                {floors.length ? (
+                  <section data-pdf-block className="break-inside-avoid">
+                    <DocSectionHeading style={style} className="mb-2" title="各楼层设备" note="按点位图统计" />
+                    <table className="w-full border-collapse text-[12px]">
+                      <thead>
+                        <tr className={t.head}>
+                          <th className={t.th}>楼层</th>
+                          <th className={cn(t.th, 'text-right')}>房间</th>
+                          <th className={cn(t.th, 'text-right')}>点位</th>
+                          <th className={cn(t.th, 'text-right')}>设备金额</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {floors.map((f, i) => (
+                          <tr key={f.sheetId} className={t.row(i)}>
+                            <td className={cn(t.td, 'py-1.5')}>{f.floorName}</td>
+                            <td className={cn(t.td, 'py-1.5 text-right tabular-nums')}>{f.rooms.length}</td>
+                            <td className={cn(t.td, 'py-1.5 text-right tabular-nums')}>{f.pointCount}</td>
+                            <td className={cn(t.td, 'py-1.5 text-right tabular-nums')}>{yuan(f.subtotal)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </section>
+                ) : null}
+                <section data-pdf-block className="break-inside-avoid">
+                  <DocSectionHeading style={style} className="mb-2" title="参考付款节点" note="签订合同后以合同约定为准" />
+                  <table className="w-full border-collapse text-[12px]">
+                    <tbody>
+                      {DEFAULT_PAYMENTS.map((p, i) => (
+                        <tr key={p.name} className={t.row(i)}>
+                          <td className={cn(t.td, 'w-10 py-1.5 tabular-nums')}>{i + 1}</td>
+                          <td className={cn(t.td, 'py-1.5')}>{p.name}</td>
+                          <td className={cn(t.td, 'w-16 py-1.5 text-right tabular-nums')}>{p.percent}%</td>
+                          <td className={cn(t.td, 'w-32 py-1.5 text-right tabular-nums')}>{yuan(paymentAmounts(quote.total ?? 0, DEFAULT_PAYMENTS)[i] ?? 0)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+              </div>
+            ) : layout === 'detailed' ? (
               <div className="space-y-5">
                 {[...groups.map((g) => ({ key: g.c.slug, name: g.c.name, color: g.c.color as string, rows: g.rows })), ...(ungrouped.length ? [{ key: 'none', name: '其他', color: '#525252', rows: ungrouped }] : [])].map((g) => (
                   <section key={g.key} className="break-inside-avoid-page">
@@ -318,6 +515,7 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
             )}
           </div>
 
+          {layout !== 'budget' ? (
           <section data-pdf-block className="mt-4 ml-auto w-64 space-y-1 text-[12px] break-inside-avoid">
             <div className="flex justify-between"><span className="text-doc-muted">产品小计</span><span className="tabular-nums">{yuan(quote.productTotal)}</span></div>
             {quote.feeTotal ? <div className="flex justify-between"><span className="text-doc-muted">附加费用</span><span className="tabular-nums">{yuan(quote.feeTotal)}</span></div> : null}
@@ -327,8 +525,9 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
               <span className="doc-numeral text-[20px] text-doc-accent">{yuan(quote.total)}</span>
             </div>
           </section>
+          ) : null}
 
-          {layout !== 'area' && showPlans ? (
+          {layout !== 'area' && layout !== 'budget' && showPlans ? (
             <section className="mt-6 space-y-4">
               <DocSectionHeading style={style} title="附：各层点位布置图" />
               {floors.filter((f) => f.sheetUrl).map((floor) => (

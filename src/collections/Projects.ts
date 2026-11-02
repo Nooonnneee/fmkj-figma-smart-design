@@ -1,4 +1,4 @@
-import { APIError, type Access, type CollectionConfig, type Where } from 'payload'
+import { APIError, type Access, type CollectionConfig, type RelationshipFieldSingleValidation, type Where } from 'payload'
 
 import { cmsAdminOrMember, fieldCmsAdminOnly, isCmsAdmin, isMember, relId } from '@/lib/access'
 import { resolveMembership } from '@/lib/membership'
@@ -20,6 +20,16 @@ export const readProjectAccess: Access = ({ req }) => {
     ],
   }
   return where
+}
+
+/** 定稿报价只能选本项目的报价单 */
+const validateFinalQuote: RelationshipFieldSingleValidation = async (value, { req, id }) => {
+  const qid = relId(value)
+  if (!qid) return true
+  const quote = await req.payload.findByID({ collection: 'quotes', id: qid, depth: 0, overrideAccess: true, select: { project: true } }).catch(() => null)
+  if (!quote) return '报价单不存在'
+  if (id !== undefined && relId(quote.project) !== String(id)) return '只能选择本项目的报价单'
+  return true
 }
 
 /** 只有 CMS 管理员或项目创建者可以删除项目。 */
@@ -207,6 +217,22 @@ export const Projects: CollectionConfig = {
       },
     },
     { name: 'notes', label: '备注', type: 'textarea', maxLength: 2000 },
+    {
+      type: 'collapsible',
+      label: '交付资料',
+      admin: { initCollapsed: true, description: '交付资料包使用的定稿报价和方案模板；留空时自动选择（合同依据的报价 → 已接受的报价 → 最新报价）' },
+      fields: [
+        {
+          name: 'finalQuote',
+          label: '定稿报价',
+          type: 'relationship',
+          relationTo: 'quotes',
+          filterOptions: ({ id }) => (id ? { project: { equals: id } } : true),
+          validate: validateFinalQuote,
+        },
+        { name: 'proposalTemplate', label: '交付方案模板', type: 'text', maxLength: 60, admin: { description: '方案模板的标识，如 qixu、noir；留空使用默认模板' } },
+      ],
+    },
     {
       // Excalidraw 场景（elements / appState / files），在前台点位图页面编辑。
       name: 'pointMap',

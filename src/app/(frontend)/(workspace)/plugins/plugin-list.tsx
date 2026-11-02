@@ -3,64 +3,46 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  Blocks,
-  Bot,
-  Cable,
-  ChevronRight,
-  ClipboardList,
-  FileUp,
-  KeyRound,
-  PackageCheck,
-  Palette,
-  Presentation,
-  ScanSearch,
-  Sparkles,
-  Wand2,
-  Wrench,
-  type LucideIcon,
-} from 'lucide-react'
+import { Blocks, ChevronRight, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import type { PluginId } from '@/plugins/types'
+
+import { PLUGIN_ICONS } from './plugin-icons'
 
 export type PluginViewItem = {
   id: string
   name: string
+  tagline: string
   description: string
   status: 'ready' | 'coming-soon'
-  where: string
+  stage: string
+  /** 在项目里的入口说明（待开发插件为 null） */
+  entry: string | null
   provides: string[]
   enabled: boolean
+  /** 所需会员（免费为 null） */
+  tierBadge: string | null
+  /** 严格模式下会员等级不够，不能启用 */
+  locked: boolean
 }
 
-const PLUGIN_ICONS: Record<PluginId, LucideIcon> = {
-  'ai-copilot': Bot,
-  'doc-styles': Palette,
-  proposal: Presentation,
-  'room-insights': Sparkles,
-  'smart-select': Wand2,
-  'ai-import': ScanSearch,
-  'dwg-import': FileUp,
-  'site-survey': ClipboardList,
-  'wiring-schedule': Cable,
-  procurement: PackageCheck,
-  'scene-handover': KeyRound,
-  'after-sales': Wrench,
-}
+type StageGroup = { key: string; label: string; hint: string; step: number | null }
 
-export function PluginList({ items, selectedId }: { items: PluginViewItem[]; selectedId: string | null }) {
+
+export function PluginList({ items, stages, selectedId, upgradeHint }: { items: PluginViewItem[]; stages: StageGroup[]; selectedId: string | null; upgradeHint: string }) {
   const router = useRouter()
   const [busyId, setBusyId] = useState<string | null>(null)
   const [optimistic, setOptimistic] = useState<Record<string, boolean>>({})
 
   async function toggle(item: PluginViewItem, next: boolean) {
-    if (item.status !== 'ready' || busyId) return
+    if (item.status !== 'ready' || busyId || (next && item.locked)) return
     setBusyId(item.id)
     setOptimistic((prev) => ({ ...prev, [item.id]: next }))
     try {
@@ -85,8 +67,6 @@ export function PluginList({ items, selectedId }: { items: PluginViewItem[]; sel
     }
   }
 
-  const ready = items.filter((p) => p.status === 'ready')
-  const comingSoon = items.filter((p) => p.status === 'coming-soon')
 
   const renderCard = (p: PluginViewItem) => {
     const enabled = optimistic[p.id] ?? p.enabled
@@ -99,7 +79,7 @@ export function PluginList({ items, selectedId }: { items: PluginViewItem[]; sel
         id={p.id}
         className={cn(
           'flex flex-col justify-between gap-4 py-4 transition-shadow hover:shadow-md',
-          pending && 'bg-muted/25 opacity-85',
+          pending && 'bg-muted/25',
           selected && 'ring-2 ring-primary',
         )}
       >
@@ -126,9 +106,19 @@ export function PluginList({ items, selectedId }: { items: PluginViewItem[]; sel
               </Link>
             </CardTitle>
           </div>
-          <div className="shrink-0 pt-0.5">
+          <div className="flex shrink-0 items-center gap-2 pt-0.5">
+            {p.tierBadge ? <Badge variant="outline" className="text-xs">{p.tierBadge}</Badge> : null}
             {pending ? (
-              <Badge variant="outline" className="text-xs text-muted-foreground">待开发</Badge>
+              <Badge variant="outline" className="text-xs text-muted-foreground">规划中</Badge>
+            ) : p.locked && !enabled ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex size-6 items-center justify-center rounded-md bg-muted text-muted-foreground" aria-label={`${p.name}需要${p.tierBadge}`}>
+                    <Lock className="size-3.5" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-60">需要{p.tierBadge}。{upgradeHint}</TooltipContent>
+              </Tooltip>
             ) : (
               <Switch
                 id={`plugin-${p.id}`}
@@ -142,7 +132,10 @@ export function PluginList({ items, selectedId }: { items: PluginViewItem[]; sel
         </CardHeader>
 
         <CardContent className="flex flex-1 flex-col justify-between gap-3 py-0">
-          <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{p.description}</p>
+          <div className="space-y-1">
+            <p className="text-sm leading-snug">{p.tagline}</p>
+            <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{p.description}</p>
+          </div>
           <div className="flex flex-wrap gap-1.5">
             {p.provides.map((x) => (
               <span key={x} className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">
@@ -153,8 +146,8 @@ export function PluginList({ items, selectedId }: { items: PluginViewItem[]; sel
         </CardContent>
 
         <CardFooter className="flex items-center justify-between gap-2 border-t pt-3 pb-0 text-xs text-muted-foreground">
-          <span className="truncate" title={p.where}>
-            {p.where}
+          <span className="truncate" title={p.entry ?? '规划中'}>
+            {p.entry ? `入口：${p.entry}` : '规划中，开发完成后在这里启用'}
           </span>
           <Button asChild variant="ghost" size="xs" className="-mr-2 shrink-0 text-muted-foreground hover:text-foreground">
             <Link href={`/plugins/${p.id}`}>
@@ -168,19 +161,25 @@ export function PluginList({ items, selectedId }: { items: PluginViewItem[]; sel
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {ready.length ? (
-        <div className="space-y-3">
-          {comingSoon.length ? <h2 className="text-sm font-semibold text-muted-foreground">已开发</h2> : null}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{ready.map(renderCard)}</div>
-        </div>
-      ) : null}
-      {comingSoon.length ? (
-        <div className="space-y-3">
-          {ready.length ? <h2 className="text-sm font-semibold text-muted-foreground">待开发</h2> : null}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{comingSoon.map(renderCard)}</div>
-        </div>
-      ) : null}
+    <div className="flex flex-col gap-8">
+      {stages.map((g) => {
+        const list = items.filter((p) => p.stage === g.key).sort((a, b) => (a.status === b.status ? 0 : a.status === 'ready' ? -1 : 1))
+        if (!list.length) return null
+        return (
+          <section key={g.key} aria-labelledby={`stage-${g.key}`} className="space-y-3">
+            <div className="flex items-baseline gap-2">
+              {g.step ? (
+                <span className="flex size-5 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary tabular-nums">{g.step}</span>
+              ) : null}
+              <h2 id={`stage-${g.key}`} className="text-sm font-semibold">
+                {g.label}
+              </h2>
+              <span className="text-xs text-muted-foreground">{g.hint}</span>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{list.map(renderCard)}</div>
+          </section>
+        )
+      })}
     </div>
   )
 }

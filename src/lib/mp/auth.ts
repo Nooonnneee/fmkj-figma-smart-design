@@ -118,6 +118,13 @@ export const getMpUser = (request: Request) => userFromToken(bearerToken(request
 export const wechatConfigured = () => Boolean(process.env.WECHAT_MP_APPID && process.env.WECHAT_MP_SECRET)
 export const wechatOpenConfigured = () => Boolean(process.env.WECHAT_OPEN_APPID && process.env.WECHAT_OPEN_SECRET)
 
+/**
+ * 电脑网页的「小程序扫码登录」只能在小程序连接的那台服务器上完成：自托管部署（docker-compose 要求设置 PUBLIC_URL）。
+ * Figma Make 预览和 Figma 托管站点用的不是小程序那边的数据库，扫码后这里永远等不到确认，
+ * 所以这些环境的登录页只给邮箱密码登录，不再默认显示一张扫不通的二维码。
+ */
+export const qrLoginAvailable = () => process.env.FIGMA !== '1' && Boolean(process.env.PUBLIC_URL)
+
 const WECHAT_ERRORS: Record<number, string> = {
   40029: '微信登录凭证无效，请重试',
   40163: '微信登录凭证已使用，请重试',

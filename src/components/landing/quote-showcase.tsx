@@ -1,145 +1,98 @@
 'use client'
 
 import { useState } from 'react'
-import { FileDown, FileSignature, LayoutGrid, Palette, ShieldCheck } from 'lucide-react'
 
 import { PointMarker } from '@/components/point-marker'
-import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DocFacts, DocHeader, DocRoot, DocSignatures, DocTitle, docTable } from '@/documents/parts'
 import { docVars } from '@/documents/theme'
 import type { DocLayout, DocStyle } from '@/documents/types'
 import type { CompanyInfo } from '@/lib/cached-data'
+import type { LandingShowcase, ShowcaseQuote } from '@/lib/landing-showcase'
 import { yuan } from '@/lib/quotes'
 import { cn } from '@/lib/utils'
 
-import { DEMO_QUOTE, DEMO_QUOTE_TOTALS } from './demo-data'
+import { money } from './section'
 
-/** 首页样张用的示例抬头 */
-const DEMO_COMPANY: CompanyInfo = {
-  name: 'FMKJ 智能家居',
-  slogan: '全屋智能方案 · 设计 · 安装 · 售后',
-  phone: null,
-  email: null,
-  address: null,
-  qrCaption: null,
-  quoteNotes: null,
-  contractTerms: null,
-  printProductImages: true,
-  documentDefaults: {},
-  disabledPlugins: [],
-  aiModels: [],
-  logo: null,
-  qrCode: null,
-}
-
-/** 报价单展示：用真实的文档模板部件渲染样张，切换风格即时换装。 */
-export function QuoteShowcase({ styles, layouts }: { styles: DocStyle[]; layouts: DocLayout[] }) {
-  const [value, setValue] = useState(() => (styles.some((s) => s.id === 'qixu') ? 'qixu' : (styles[0]?.id ?? '')))
-  const activeStyle = styles.find((s) => s.id === value) ?? styles[0]!
-  const features = [
-    { icon: LayoutGrid, text: '按楼层、房间分区报价，客户一眼看懂每个空间花了多少' },
-    { icon: Palette, text: `${styles.map((s) => s.name).join('、')}，一键换装` },
-    { icon: FileDown, text: '导出 A4 PDF 与图片，打印不跑版' },
-    { icon: FileSignature, text: '确认后一键生成合同，金额与付款节点自动带入' },
-  ]
-
+/**
+ * 报价单：用真实的文档模板部件渲染示例项目已确认的报价，切换风格即时换装。
+ * 默认「简约」：它走站点自托管的字体链，不额外下载字体；其他风格（如栖序雅致的思源黑体可变字体，十几 MB）
+ * 只在访客点选时才加载。
+ */
+export function QuoteShowcase({
+  data,
+  quote,
+  styles,
+  layouts,
+  company,
+}: {
+  data: LandingShowcase
+  quote: ShowcaseQuote
+  styles: DocStyle[]
+  layouts: DocLayout[]
+  company: CompanyInfo
+}) {
+  const [value, setValue] = useState(() => (styles.some((s) => s.id === 'minimal') ? 'minimal' : (styles[0]?.id ?? '')))
+  const active = styles.find((s) => s.id === value) ?? styles[0]!
   return (
-    <section id="quote" aria-labelledby="quote-title" className="relative isolate scroll-mt-20 overflow-hidden py-20 sm:py-28">
-      <div aria-hidden className="pointer-events-none absolute top-1/4 right-0 -z-10 size-160 translate-x-1/3 rounded-full bg-chart-4/15 blur-3xl" />
-      <Tabs value={value} onValueChange={setValue} className="mx-auto grid max-w-7xl items-center gap-14 px-4 sm:px-6 lg:grid-cols-12 lg:gap-16 lg:px-8">
-        <div className="lg:col-span-5">
-          <h2 id="quote-title" className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl lg:text-5xl">
-            一份让客户眼前一亮的报价单
-          </h2>
-          <p className="mt-4 text-base text-balance text-muted-foreground sm:text-lg">
-            同一份数据，{layouts.length} 种版式、{styles.length} 套风格即时切换，金额自动核算。
-          </p>
-          <div className="mt-8">
-            <p className="text-sm font-medium">换一套风格看看</p>
-            <TabsList aria-label="报价单风格" className="mt-3 h-auto flex-wrap justify-start gap-1 p-1 group-data-horizontal/tabs:h-auto">
-              {styles.map((s) => (
-                <TabsTrigger key={s.id} value={s.id} className="h-8 flex-none rounded-xl px-3">
-                  <span aria-hidden style={docVars(s)} className="size-2.5 rounded-full bg-doc-accent ring-1 ring-foreground/25" />
-                  {s.name}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-          <ul className="mt-8 space-y-3.5">
-            {features.map(({ icon: Icon, text }) => (
-              <li key={text} className="flex gap-3 text-sm text-muted-foreground">
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-chart-1/15 text-chart-1">
-                  <Icon className="size-4" />
-                </span>
-                <span className="pt-1">{text}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-8 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted-foreground">版式</span>
-            {layouts.map((l) => (
-              <Badge key={l.value} variant="outline" title={l.description} className="h-7 rounded-full px-3">
-                {l.label}
-              </Badge>
-            ))}
-          </div>
-        </div>
-
-        <div className="relative isolate lg:col-span-7">
-          <div aria-hidden className="absolute inset-x-10 -top-5 bottom-6 -z-10 rotate-3 rounded-2xl border border-border bg-card/50" />
-          <div aria-hidden className="absolute inset-x-5 -top-2.5 bottom-3 -z-10 -rotate-2 rounded-2xl border border-border bg-card/70" />
-          <TabsContent
-            key={activeStyle.id}
-            value={activeStyle.id}
-            className="lg:perspective-distant data-[state=active]:animate-in data-[state=active]:duration-500 data-[state=active]:fade-in-0 data-[state=active]:zoom-in-95 motion-reduce:animate-none"
-          >
-            <div
-              role="img"
-              aria-label={`报价单样张（${activeStyle.name}风格）：${DEMO_QUOTE.title}，合计 ${yuan(DEMO_QUOTE_TOTALS.total)}`}
-              className="transition-transform duration-700 ease-out lg:rotate-x-2 lg:-rotate-y-6 lg:hover:rotate-x-0 lg:hover:rotate-y-0 motion-reduce:transform-none"
-            >
-              <QuoteSheet style={activeStyle} />
+    <Tabs value={value} onValueChange={setValue} className="grid gap-12 lg:grid-cols-12 lg:gap-16">
+      <div className="lg:sticky lg:top-28 lg:col-span-5 lg:self-start xl:col-span-4">
+        <h2 id="quote-title" className="text-headline font-medium">
+          报价单，
+          <br />
+          直接交给客户
+        </h2>
+        <p className="mt-5 text-lead text-muted-foreground">同一份报价，{styles.length} 套风格一键换装。产品小计、服务费和优惠自动核算，换型号后金额即时更新。</p>
+        <TabsList aria-label="报价单风格" className="mt-8 grid h-auto w-full grid-cols-2 gap-1 p-1 group-data-horizontal/tabs:h-auto">
+          {styles.map((s) => (
+            <TabsTrigger key={s.id} value={s.id} aria-controls="quote-preview" className="h-9 justify-start gap-2.5 px-3 font-normal data-[state=active]:font-medium data-[state=active]:shadow-sm">
+              <span aria-hidden style={docVars(s)} className="size-2.5 rounded-full bg-doc-accent ring-1 ring-foreground/15 dark:ring-foreground/40" />
+              {s.name}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        <dl className="mt-8 divide-y divide-border border-y border-border text-sm">
+          {[
+            ['版式', layouts.map((l) => l.label).join('、')],
+            ['导出', 'A4 打印、另存 PDF 或导出长图，带公司 Logo、联系方式与二维码'],
+            ['下一步', '客户确认后一键生成合同，金额与付款节点自动带入'],
+          ].map(([k, v]) => (
+            <div key={k} className="grid grid-cols-[3.5rem_minmax(0,1fr)] gap-4 py-3.5">
+              <dt className="text-muted-foreground">{k}</dt>
+              <dd className="leading-relaxed">{v}</dd>
             </div>
-          </TabsContent>
-          <div
-            aria-hidden
-            className="absolute -top-4 -left-2 z-10 hidden items-center gap-2 rounded-xl border border-border bg-card/90 px-3 py-2 text-xs shadow-xl backdrop-blur sm:flex motion-safe:animate-float"
-          >
-            <FileDown className="size-4 text-chart-1" />
-            导出 A4 PDF · 打印不跑版
-          </div>
-          <div
-            aria-hidden
-            className="absolute -right-2 bottom-16 z-10 hidden items-center gap-2 rounded-xl border border-border bg-card/90 px-3 py-2 text-xs shadow-xl backdrop-blur sm:flex motion-safe:animate-float [--landing-delay:-3.5s]"
-          >
-            <ShieldCheck className="size-4 text-chart-2" />
-            合计自动核算 · 不会算错
-          </div>
+          ))}
+        </dl>
+      </div>
+      <div className="min-w-0 rounded-2xl bg-muted/60 p-3 sm:p-8 lg:col-span-7 lg:p-10 xl:col-span-8">
+        {/* 只渲染当前风格的样张；各风格页签都指向这一块 */}
+        <div id="quote-preview" role="img" aria-label={`报价单样张（${active.name}风格）：${quote.title}，合计 ${money(quote.total)}`}>
+          <QuoteSheet style={active} quote={quote} data={data} company={company} />
         </div>
-      </Tabs>
-    </section>
+      </div>
+    </Tabs>
   )
 }
 
-function QuoteSheet({ style }: { style: DocStyle }) {
+function QuoteSheet({ style, quote, data, company }: { style: DocStyle; quote: ShowcaseQuote; data: LandingShowcase; company: CompanyInfo }) {
   const t = docTable(style)
-  const q = DEMO_QUOTE
-  const totals = DEMO_QUOTE_TOTALS
+  // 手机上只列前几行，其余折成一行说明，避免样张拉得过长
+  const mobileRows = 6
+  const folded = quote.lines.length - mobileRows
   return (
-    <DocRoot style={style} className="rounded-xl shadow-2xl ring-1 ring-foreground/10">
-      <div className="bg-doc-paper p-5 text-xs leading-relaxed sm:p-8">
-        <DocHeader style={style} company={DEMO_COMPANY} meta={`报价编号 ${q.number}`} />
+    <DocRoot style={style} className="mx-auto max-w-3xl overflow-hidden rounded-md shadow-sm ring-1 ring-foreground/10">
+      <div className="bg-doc-paper p-4 text-xs leading-relaxed sm:p-8">
+        <DocHeader style={style} company={company} meta="报价单" />
         <div className="mt-6">
-          <DocTitle style={style} no="01" title={q.title} subtitle={q.subtitle} tag="QUOTATION" />
+          <DocTitle style={style} no="01" title={quote.title} subtitle={`${data.sheets.length} 层 · ${data.pointCount} 个点位`} tag="QUOTATION" />
         </div>
         <DocFacts
           cols={2}
           className="mt-5 border-y border-doc-rule py-3"
           items={[
-            ['客户', q.customer],
-            ['项目', q.project],
-            ['主平台', q.platform],
+            ['客户', data.project.customer || '—'],
+            ['项目', [data.project.community, data.project.address].filter(Boolean).join(' ') || data.project.name],
+            ['主平台', data.project.platform || '—'],
             ['有效期', '30 天'],
           ]}
         />
@@ -148,15 +101,15 @@ function QuoteSheet({ style }: { style: DocStyle }) {
             <tr className={t.head}>
               <th className={cn(t.th, 'hidden w-8 sm:table-cell')}>#</th>
               <th className={t.th}>设备</th>
-              <th className={cn(t.th, 'hidden sm:table-cell')}>型号</th>
+              <th className={cn(t.th, 'hidden md:table-cell')}>型号</th>
               <th className={cn(t.th, 'text-right')}>单价</th>
               <th className={cn(t.th, 'text-right')}>数量</th>
               <th className={cn(t.th, 'text-right')}>小计</th>
             </tr>
           </thead>
           <tbody>
-            {q.items.map((item, i) => (
-              <tr key={item.sku} className={t.row(i)}>
+            {quote.lines.map((item, i) => (
+              <tr key={`${item.sku}-${i}`} className={cn(t.row(i), i >= mobileRows && 'max-sm:hidden')}>
                 <td className={cn(t.td, 'hidden py-2 text-doc-muted tabular-nums sm:table-cell')}>{i + 1}</td>
                 <td className={cn(t.td, 'py-2')}>
                   <span className="flex items-center gap-2">
@@ -164,7 +117,7 @@ function QuoteSheet({ style }: { style: DocStyle }) {
                     {item.name}
                   </span>
                 </td>
-                <td className={cn(t.td, 'hidden py-2 text-doc-muted sm:table-cell')}>{item.sku}</td>
+                <td className={cn(t.td, 'hidden py-2 text-doc-muted md:table-cell')}>{item.sku}</td>
                 <td className={cn(t.td, 'py-2 text-right whitespace-nowrap tabular-nums')}>{yuan(item.price)}</td>
                 <td className={cn(t.td, 'py-2 text-right whitespace-nowrap tabular-nums')}>
                   {item.qty} {item.unit}
@@ -172,20 +125,27 @@ function QuoteSheet({ style }: { style: DocStyle }) {
                 <td className={cn(t.td, 'py-2 text-right whitespace-nowrap tabular-nums')}>{yuan(item.price * item.qty)}</td>
               </tr>
             ))}
+            {folded > 0 ? (
+              <tr className="sm:hidden">
+                <td colSpan={4} className={cn(t.td, 'py-2 text-center text-doc-muted')}>
+                  …… 另有 {folded} 行设备
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
-        <div className="mt-4 ml-auto w-full max-w-60 space-y-1">
-          <SumRow label="产品小计" value={yuan(totals.productTotal)} />
-          {q.fees.map((fee) => (
+        <div className="mt-4 ml-auto w-full max-w-72 space-y-1">
+          <SumRow label="产品小计" value={yuan(quote.productTotal)} />
+          {quote.fees.map((fee) => (
             <SumRow key={fee.name} label={fee.name} value={yuan(fee.amount)} />
           ))}
-          <SumRow label="优惠" value={`-${yuan(totals.discount)}`} />
+          {quote.discount ? <SumRow label="优惠" value={`-${yuan(quote.discount)}`} /> : null}
           <div className="flex items-baseline justify-between border-t border-doc-ink/30 pt-2">
             <span className="doc-strong">合计</span>
-            <span className="doc-numeral text-xl text-doc-accent">{yuan(totals.total)}</span>
+            <span className="doc-numeral text-xl text-doc-accent">{yuan(quote.total)}</span>
           </div>
         </div>
-        <DocSignatures className="mt-8" parties={[{ label: '客户确认签字' }, { label: `${DEMO_COMPANY.name} 盖章` }]} />
+        <DocSignatures className="mt-8" parties={[{ label: '客户确认签字' }, { label: `${company.name} 盖章` }]} />
       </div>
     </DocRoot>
   )
@@ -193,7 +153,7 @@ function QuoteSheet({ style }: { style: DocStyle }) {
 
 function SumRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between">
+    <div className="flex justify-between gap-4">
       <span className="text-doc-muted">{label}</span>
       <span className="tabular-nums">{value}</span>
     </div>

@@ -47,12 +47,15 @@ export function AiSidebarDock({
   credits: initialCredits,
   configured,
   models: customModels,
+  initialInput,
 }: {
   plugins: AiConnectablePlugin[]
   projects: AiProjectContext[]
   credits: number
   configured: boolean
   models?: AiModelOption[]
+  /** 打开时预先填进输入框的内容（例如从插件页带过来的问题） */
+  initialInput?: string
 }) {
   const availableModels = customModels?.length ? customModels : AI_MODELS
   const pathname = usePathname()
@@ -78,7 +81,7 @@ export function AiSidebarDock({
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [streaming, setStreaming] = useState(false)
   const [thinking, setThinking] = useState(false)
-  const [input, setInput] = useState('')
+  const [input, setInput] = useState(initialInput ?? '')
   const [attachments, setAttachments] = useState<AiAttachment[]>([])
   const [dockDragging, setDockDragging] = useState(false)
   const scroller = useRef<HTMLDivElement>(null)

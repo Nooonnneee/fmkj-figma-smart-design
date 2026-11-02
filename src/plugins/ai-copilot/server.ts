@@ -3,7 +3,6 @@ import type { TokenUsage } from './billing'
  * AI 对话的服务端部分：调用 DeepSeek（OpenAI 兼容接口）、把系统全流程与插件包装成模型可调用的工具。
  * 只在服务端（路由处理函数）里使用，密钥只从 process.env.DEEPSEEK_API_KEY 读取。
  */
-import { relId } from '@/lib/access'
 import { inferAreaType, isAreaType } from '@/lib/area-types'
 import { getCatalog, getCompanyInfo } from '@/lib/cached-data'
 import {
@@ -16,7 +15,6 @@ import {
 } from '@/lib/contracts'
 import { DEVICE_TYPE_ORDER, deviceTypeOf, isDeviceType } from '@/lib/device-types'
 import { getPayloadClient } from '@/lib/payload'
-import { countScenePoints } from '@/lib/point-count'
 import { fillDefaultProducts, isPointData, parseDefaults, pointDeviceType, summarizePoints, type PointCustomData } from '@/lib/point-map-items'
 import {
   analyzeScene,
@@ -40,7 +38,6 @@ import type { Project, User } from '@/payload-types'
 
 import { AI_PROVIDER_CHANNELS, CUSTOM_KEY_ENV_RE, DEFAULT_AI_MODELS, enabledAiModels, isAiProviderChannelId, normalizeCustomBaseUrl, type AiModelConfig } from './templates'
 
-const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'
 
 function isPrivateOrLocalHost(hostname: string): boolean {
   const h = hostname.toLowerCase()

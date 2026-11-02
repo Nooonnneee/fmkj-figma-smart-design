@@ -1,7 +1,8 @@
 'use client'
 
 import { toDeg } from '../core/geometry'
-import { sheetAt } from '../core/ops'
+import { areaPoly, sheetAt } from '../core/ops'
+import { areaLabelAnchor } from './hit'
 import type { SystemPack } from '../core/pack'
 import { fittingScale, formatMm, PAPERS } from '../core/paper'
 import { LABEL_SIZE, symbolGeom } from '../core/symbols'
@@ -58,10 +59,13 @@ export async function exportSheetPng(opts: { doc: BoardDoc; files: Record<string
   if (view.layers.area)
     for (const o of doc.objects) {
       if (o.kind !== 'area' || !inside(o.x + o.w / 2, o.y + o.h / 2)) continue
-      parts.push(`<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" fill="none" stroke="#64748b" stroke-opacity="0.8" stroke-width="${1.2 / u}" stroke-dasharray="${6 / u} ${4 / u}"/>`)
-      parts.push(`<text x="${o.x + 4}" y="${o.y + 13}" font-size="11" font-weight="600" fill="#475569" stroke="#fff" stroke-width="3" paint-order="stroke" font-family="system-ui,sans-serif">${esc(o.name)}</text>`)
+      const pts = areaPoly(o).map((q) => `${q.x},${q.y}`).join(' ')
+      const a = areaLabelAnchor(o)
+      parts.push(`<polygon points="${pts}" fill="none" stroke="#64748b" stroke-opacity="0.85" stroke-width="${1.2 / u}" stroke-linejoin="round"/>`)
+      parts.push(`<text x="${a.x + 4}" y="${a.y + 13}" font-size="11" font-weight="600" fill="#475569" stroke="#fff" stroke-width="3" paint-order="stroke" font-family="system-ui,sans-serif">${esc(o.name)}</text>`)
     }
   const used = new Set<string>()
+  const labels: string[] = []
   for (const o of doc.objects) {
     if (o.kind !== 'symbol' || hidden.has(o.id) || !inside(o.x, o.y)) continue
     const look = pack.look(o)
@@ -74,8 +78,10 @@ export async function exportSheetPng(opts: { doc: BoardDoc; files: Record<string
       parts.push(`<image href="${await toDataUrl(look.art.src, cache)}" x="${o.x - g.imgW / 2}" y="${o.y - g.imgH / 2}" width="${g.imgW}" height="${g.imgH}" preserveAspectRatio="none"${rot}/>`)
     }
     if (view.labels && o.code)
-      parts.push(`<text x="${o.x}" y="${g.labelY}" text-anchor="middle" font-size="${LABEL_SIZE}" font-weight="700" fill="${look.color}" stroke="#fff" stroke-width="2.2" paint-order="stroke" font-family="system-ui,sans-serif">${esc(o.code)}</text>`)
+      labels.push(`<text x="${o.x}" y="${g.labelY}" text-anchor="middle" font-size="${LABEL_SIZE}" font-weight="700" fill="${look.color}" stroke="#fff" stroke-width="2.2" paint-order="stroke" font-family="system-ui,sans-serif">${esc(o.code)}</text>`)
   }
+  // 代号画在所有图标之上
+  parts.push(...labels)
   parts.push('</g>')
 
   // 图例

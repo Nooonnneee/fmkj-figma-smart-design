@@ -8,7 +8,7 @@
  *
  * 引擎只认识通用对象，不认识「开关」「筒灯」这些业务：
  * - symbol：系统包里的符号。固定显示尺寸（NTS），或有真实尺寸且图纸已标定时按比例落图；
- * - area：区域（矩形；点位按中心点归属到区域）；
+ * - area：区域（任意多边形，旧数据是矩形；点位按中心点归属到区域）；
  * - sheet：图纸底图（锁定在最底层，可标定比例）；
  * - raw：引擎不认识的元素（旧版本画布里的线、箭头、文字、图片……），原样保留，可移动、删除。
  * 业务含义放在 symbol.data，由系统包解释；持久化格式由系统包的编解码器决定。
@@ -48,10 +48,13 @@ export type SymbolObj = {
 export type AreaObj = {
   kind: 'area'
   id: string
+  /** 外接框：始终与轮廓一致（矩形区域就是它本身） */
   x: number
   y: number
   w: number
   h: number
+  /** 多边形轮廓（场景坐标，至少 3 个顶点）；没有时就是外接框这个矩形 */
+  poly?: Vec[]
   name: string
   areaType: string
   meta?: Record<string, unknown>

@@ -2,7 +2,8 @@
  * 智能家居包的编解码器：原有点位图场景 JSON（StoredScene）⇄ 画板文档（BoardDoc）。
  * 持久化格式不变（报价、点位清单、AI 导入、方案打印都照旧读取），新增字段都是可忽略的：
  * - 点位 customData：symbolId（灯光款式）、sizeCm（真实尺寸）、real（按比例落图）；元素 angle（旋转）；
- * - 图纸 customData：mmPerUnit（标定）。
+ * - 图纸 customData：mmPerUnit（标定）；
+ * - 区域 customData：polygon（多边形顶点，相对元素 x / y；元素本身保存外接框，旧代码按矩形读也不出错）。
  * 引擎不认识的元素原样保留；点位代号、区域名、图纸名这些附属文字由对象派生，始终与对象一致。
  */
 import { sheetAt } from '@/board/core/ops'
@@ -11,7 +12,7 @@ import type { AreaObj, BoardDoc, BoardFile, BoardObj, RawEl, SheetObj, SizeCm, S
 import { inferAreaType, isAreaType } from '@/lib/area-types'
 import { categoryOfType, isDeviceType } from '@/lib/device-types'
 import { markerFileId } from '@/lib/point-markers'
-import { AREA_STYLE, isPointElement, sceneAreas, scenePoints, sceneSheets, type SceneEl, type SceneFile } from '@/lib/point-scene'
+import { AREA_STYLE, areaLabelAnchor, areaPolygon, isPointElement, sceneAreas, scenePoints, sceneSheets, type SceneEl, type SceneFile } from '@/lib/point-scene'
 import { MARKER, SHEET } from '@/lib/sheet-spec'
 
 import { lookOf } from './look'
@@ -82,7 +83,19 @@ export function decodeScene(scene: { elements?: readonly SceneEl[] } | null | un
       sheetById.set(s.sheetId, s)
     } else if (k === 'area') {
       const name = str(cd.name) || '未命名区域'
-      const a: AreaObj = { kind: 'area', id: el.id, x: el.x, y: el.y, w: el.width, h: el.height, name, areaType: isAreaType(cd.areaType) ? cd.areaType : inferAreaType(name), meta: { el, group: el.groupIds?.[0] } }
+      const poly = areaPolygon(el)
+      const a: AreaObj = {
+        kind: 'area',
+        id: el.id,
+        x: el.x,
+        y: el.y,
+        w: el.width,
+        h: el.height,
+        ...(poly ? { poly: poly.map(([x, y]) => ({ x, y })) } : {}),
+        name,
+        areaType: isAreaType(cd.areaType) ? cd.areaType : inferAreaType(name),
+        meta: { el, group: el.groupIds?.[0] },
+      }
       objects.push(a)
       for (const g of el.groupIds ?? []) areaByGroup.set(g, a)
     } else objects.push({ kind: 'raw', id: el.id, el: el as RawEl })
@@ -152,23 +165,34 @@ function encodePoint(o: SymbolObj, doc: BoardDoc): SceneEl[] {
 function encodeArea(o: AreaObj): SceneEl[] {
   const m = metaOf(o)
   const group = m.group || m.el?.groupIds?.[0] || `ar-${o.id}`
+  const poly = o.poly && o.poly.length >= 3 ? o.poly : null
+  const { polygon: _old, ...cd } = (m.el?.customData ?? {}) as Record<string, unknown>
+  void _old
   const rect: SceneEl = {
-    ...(m.el ?? { strokeColor: AREA_STYLE.stroke, strokeWidth: 1, strokeStyle: 'dashed', roughness: 0, opacity: 70 }),
+    ...(m.el ?? { strokeColor: AREA_STYLE.stroke, strokeWidth: 1, roughness: 0, opacity: 70 }),
     id: o.id,
     type: 'rectangle',
     x: o.x,
     y: o.y,
     width: o.w,
     height: o.h,
+    strokeStyle: 'solid',
     groupIds: [group],
-    customData: { ...(m.el?.customData ?? {}), kind: 'area', name: o.name, areaType: o.areaType },
+    customData: {
+      ...cd,
+      kind: 'area',
+      name: o.name,
+      areaType: o.areaType,
+      ...(poly ? { polygon: poly.map((q) => [Math.round((q.x - o.x) * 10) / 10, Math.round((q.y - o.y) * 10) / 10]) } : {}),
+    },
   }
+  const [lx, ly] = areaLabelAnchor({ x: o.x, y: o.y, width: o.w, height: o.h, poly: poly ? poly.map((q) => [q.x, q.y] as [number, number]) : null })
   const label: SceneEl = {
     ...(m.label ?? { strokeColor: AREA_STYLE.label, fontFamily: 2, lineHeight: 1.25 }),
     id: m.labelId || m.label?.id || `${o.id}-lb`,
     type: 'text',
-    x: o.x + 4,
-    y: o.y + 3,
+    x: lx + 4,
+    y: ly + 3,
     width: textWidth(o.name, AREA_STYLE.labelSize),
     height: AREA_STYLE.labelSize * 1.25,
     groupIds: [group],

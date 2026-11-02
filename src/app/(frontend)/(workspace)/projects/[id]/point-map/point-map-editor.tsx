@@ -27,6 +27,7 @@ import {
   Save,
   Trash2,
   X,
+  ChevronLeft,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -213,7 +214,8 @@ export function PointMapEditor({
     [setViewport],
   )
 
-  const insets = useMemo(() => ({ top: view.rulers ? 28 : 8, left: view.rulers ? 28 : 8, right: 8, bottom: 8 }), [view.rulers])
+  // 顶部浮动工具条约 44px 高，适配视图时让图纸标题落在工具条下方
+  const insets = useMemo(() => ({ top: (view.rulers ? 28 : 8) + 48, left: view.rulers ? 28 : 8, right: 8, bottom: 8 }), [view.rulers])
   const fitSheet = useCallback(
     (sheetId: string | null, animate = true) => {
       const d = board.current.current.doc
@@ -543,7 +545,7 @@ export function PointMapEditor({
     commit((d) => updateSheet(d, calib.sheetId, { mmPerUnit }))
     setCalib(null)
     setTool('select')
-    view.grid || setView({ grid: true })
+    if (!view.grid) setView({ grid: true })
     toast.success(`已标定：1 米 ≈ ${Math.round(1000 / mmPerUnit)} 个单位，网格按 25cm 显示`)
   }, [calib, commit, view.grid, setView])
 
@@ -554,7 +556,7 @@ export function PointMapEditor({
       const r = createArea(board.current.current.doc, { x: cx - 110, y: cy - 75, w: 220, h: 150 }, areaType)
       commit(r.doc)
       setSelection(new Set([r.obj.id]))
-      toast.success('已添加区域，拖动边框调整到房间范围')
+      toast.success('已添加区域：拖动顶点调整形状，拖动边的中点可以加顶点')
     },
     [board, commit],
   )
@@ -567,8 +569,8 @@ export function PointMapEditor({
     [addAreaAt],
   )
   const createAreaBox = useCallback(
-    (box: Box) => {
-      const r = createArea(board.current.current.doc, box, 'living')
+    (box: Box, poly?: Vec[]) => {
+      const r = createArea(board.current.current.doc, box, 'living', undefined, poly)
       commit(r.doc)
       setSelection(new Set([r.obj.id]))
       setTool('select')
@@ -576,15 +578,27 @@ export function PointMapEditor({
     [board, commit],
   )
   const updateArea = useCallback((areaId: string, patch: { name?: string; areaType?: string }) => commit((d) => updateAreaOp(d, areaId, patch)), [commit])
+  // 从区域列表定位前的视角；关闭选中卡片时回到这里（连续切换区域时保留最早的那个视角）
+  const viewBeforeFocus = useRef<Viewport | null>(null)
   const focusArea = useCallback(
     (areaId: string) => {
       const a = board.current.current.doc.objects.find((o) => o.id === areaId)
       if (!a || a.kind !== 'area') return
+      if (!viewBeforeFocus.current) viewBeforeFocus.current = viewportRef.current
       setSelection(new Set([areaId]))
       animateTo(fitBox(a, sizeRef.current, 0.7, insets))
     },
     [board, animateTo, insets],
   )
+  const closeSelectedArea = useCallback(() => {
+    setSelection(new Set())
+    if (viewBeforeFocus.current) animateTo(viewBeforeFocus.current)
+    viewBeforeFocus.current = null
+  }, [animateTo])
+  // 用 Esc 或点空白处取消选中时不还原视角，但要清掉记录，下次定位重新记
+  useEffect(() => {
+    if (selection.size === 0) viewBeforeFocus.current = null
+  }, [selection])
   const focusTargets = useCallback(
     (ids: string[]) => {
       const d = board.current.current.doc
@@ -987,7 +1001,11 @@ export function PointMapEditor({
             />
             {armed || tool === 'area' || tool === 'calibrate' ? (
               <div className="absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-primary/30 bg-background/95 px-3 py-1.5 text-xs shadow-sm">
-                {armed ? `点击图纸放置「${armedLabel}」，右键或 Esc 结束` : tool === 'area' ? '在图纸上拖出房间范围' : '沿已知长度拖一条线（按住 Shift 水平 / 垂直）'}
+                {armed
+                  ? `点击图纸放置「${armedLabel}」，右键或 Esc 结束`
+                  : tool === 'area'
+                    ? '点击房间拐角描出轮廓，点回起点或双击完成；直接拖动画矩形'
+                    : '沿已知长度拖一条线（按住 Shift 水平 / 垂直）'}
                 <Button size="xs" variant="ghost" className="h-6 px-2" onClick={() => { setArmed(null); setTool('select') }}>结束</Button>
               </div>
             ) : null}
@@ -1095,7 +1113,7 @@ export function PointMapEditor({
               )}
             </>
           ) : selectedArea ? (
-            <SelectedArea area={selectedArea} analysis={analysis.get(selectedArea.id)} readOnly={readOnly} onChange={(patch) => updateArea(selectedArea.id, patch)} onDelete={() => removeIds([selectedArea.id])} />
+            <SelectedArea area={selectedArea} analysis={analysis.get(selectedArea.id)} readOnly={readOnly} onChange={(patch) => updateArea(selectedArea.id, patch)} onDelete={() => removeIds([selectedArea.id])} onClose={closeSelectedArea} />
           ) : selectedIds.length > 1 ? (
             <div className="flex items-center justify-between gap-2 border-b bg-muted/40 p-4 text-sm">
               <span>已选 {selectedIds.length} 个对象</span>
@@ -1109,11 +1127,18 @@ export function PointMapEditor({
           ) : null}
 
           <Tabs value={tab} onValueChange={setTab} className="min-h-0 flex-1 gap-0">
-            <TabsList className={cn('mx-4 mt-3 grid w-auto', readOnly ? 'grid-cols-2' : 'grid-cols-3')}>
-              {readOnly ? null : <TabsTrigger value="place" className="text-xs">放置</TabsTrigger>}
-              <TabsTrigger value="areas" className="text-xs">区域</TabsTrigger>
-              <TabsTrigger value="summary" className="text-xs">统计{issues.some((i) => i.level !== 'info') ? <span className="size-1.5 rounded-full bg-warning" /> : null}</TabsTrigger>
-            </TabsList>
+            {/* 放置是主要工作，独占侧栏；区域和统计不常用，收在放置面板底部，打开后可一键返回 */}
+            {readOnly ? (
+              <TabsList className="mx-4 mt-3 grid w-auto grid-cols-2">
+                <TabsTrigger value="areas" className="text-xs">区域</TabsTrigger>
+                <TabsTrigger value="summary" className="text-xs">统计</TabsTrigger>
+              </TabsList>
+            ) : tab !== 'place' ? (
+              <div className="mx-4 mt-3 flex items-center justify-between">
+                <Button variant="ghost" size="xs" onClick={() => setTab('place')}><ChevronLeft className="size-3.5" />返回放置</Button>
+                <span className="text-xs font-medium">{tab === 'areas' ? '区域' : '统计'}</span>
+              </div>
+            ) : null}
 
             {readOnly ? null : (
               <TabsContent value="place" className="flex min-h-0 flex-col">
@@ -1127,6 +1152,12 @@ export function PointMapEditor({
                 ) : (
                   <LightingPanel armedId={armed && !armedDevice ? armed.symbolId : null} onArm={(tpl) => { setTool('select'); setArmed(tpl) }} disabled={!snap.sheets.length} calibrated={!!activeSheet?.mmPerUnit} />
                 )}
+                <div className="mt-auto flex gap-1 border-t px-3 py-2">
+                  <Button variant="ghost" size="xs" className="flex-1 text-muted-foreground" onClick={() => setTab('areas')}>区域</Button>
+                  <Button variant="ghost" size="xs" className="flex-1 text-muted-foreground" onClick={() => setTab('summary')}>
+                    统计{issues.some((i) => i.level !== 'info') ? <span className="size-1.5 rounded-full bg-warning" /> : null}
+                  </Button>
+                </div>
               </TabsContent>
             )}
 

@@ -3,6 +3,8 @@ import { analyzeProject, floorTagFromSheetName, groupRooms, roomKey, type AreaAn
 import { getCatalog, getCompanyInfo, resolveMediaUrl, type CatalogProduct } from '@/lib/cached-data'
 import { categoryOfType, DEVICE_CATEGORIES, DEVICE_TYPE_ORDER, deviceTypeOf } from '@/lib/device-types'
 import { getPayloadClient } from '@/lib/payload'
+import { assignScenes, loadScenes } from '@/lib/scenes'
+import { resolveFinalQuote } from '@/lib/deliverables'
 import { fillDefaultProducts, parseDefaults, resolvePoint } from '@/lib/point-map-items'
 import { normalizeScene, sceneAreas, scenePoints, sceneSheets, type AreaInfo, type PointInfo, type SheetInfo } from '@/lib/point-scene'
 import { inferScopeFromTitle, inPointScope, isPointScope, POINT_SCOPES, type PointScope } from '@/lib/point-scopes'
@@ -44,48 +46,69 @@ export type FloorSummary = {
  */
 export async function loadProjectDocs(projectId: string, user: User, scope: PointScope = 'all', quoteId?: string | null) {
   const payload = await getPayloadClient()
+  // 只依赖项目编号的查询和项目本身同时发出，减少数据库往返（每次往返约 0.2 秒）
+  // 报价只取方案与文档用到的字段，不展开关联（条目里的产品只用编号，图片单独按需读取）
+  const quotesP = payload.find({
+    collection: 'quotes',
+    where: { project: { equals: projectId } },
+    sort: '-updatedAt',
+    limit: 50,
+    depth: 0,
+    user,
+    overrideAccess: false,
+    select: { title: true, status: true, total: true, items: true, fees: true, discount: true, updatedAt: true },
+  })
+  const contractsP = payload.find({ collection: 'contracts', where: { project: { equals: projectId } }, limit: 1, depth: 0, user, overrideAccess: false })
+  const projectsP = payload.find({
+    collection: 'projects',
+    sort: '-updatedAt',
+    limit: 30,
+    depth: 0,
+    user,
+    overrideAccess: false,
+    select: { name: true, community: true, customerName: true, pointCount: true, platform: true },
+  })
+  const scenesP = loadScenes(payload, user).catch(() => [])
+  const catalogP = getCatalog()
   const project = (await payload
     .findByID({ collection: 'projects', id: projectId, depth: 0, user, overrideAccess: false })
     .catch(() => null)) as Project | null
-  if (!project) return null
+  if (!project) {
+    void Promise.allSettled([quotesP, contractsP, projectsP, scenesP, catalogP])
+    return null
+  }
   const ownerId = relId(project.owner)
   const headerUserId = ownerId || String(user.id)
-  const [catalog, company, quotesRes, contracts, projectsRes] = await Promise.all([
-    getCatalog(),
+  const ownerP = ownerId
+    ? (payload.findByID({ collection: 'users', id: ownerId, depth: 0, overrideAccess: true, select: { name: true, phone: true } }).catch(() => null) as Promise<User | null>)
+    : Promise.resolve(null)
+  const [catalog, company, quotesRes, contracts, projectsRes, owner, sceneLibrary] = await Promise.all([
+    catalogP,
     getCompanyInfo(headerUserId),
-    payload.find({
-      collection: 'quotes',
-      where: { project: { equals: project.id } },
-      sort: '-updatedAt',
-      limit: 50,
-      depth: 1,
-      user,
-      overrideAccess: false,
-    }),
-    payload.find({ collection: 'contracts', where: { project: { equals: project.id } }, limit: 1, depth: 0, user, overrideAccess: false }),
-    payload.find({
-      collection: 'projects',
-      sort: '-updatedAt',
-      limit: 30,
-      depth: 0,
-      user,
-      overrideAccess: false,
-      select: { name: true, community: true, customerName: true, pointCount: true, platform: true },
-    }),
+    quotesP,
+    contractsP,
+    projectsP,
+    ownerP,
+    scenesP,
   ])
   const contract = contracts.docs[0] ?? null
   const allQuotes = quotesRes.docs as Quote[]
   const contractQuoteId = relId(contract?.quote)
+  // 交付用的定稿报价（合同 → 手动定稿 → 已接受 → 最新），方案和资料包默认用它
+  const final = resolveFinalQuote(allQuotes, { contractQuoteId, finalQuoteId: relId((project as { finalQuote?: unknown }).finalQuote) })
+  const finalQuoteId = final.quote ? String(final.quote.id) : null
 
   // 选择最匹配的报价单：指定 quoteId > 同范围已确认/合同报价 > 同范围最新报价 > 合同报价 > 最新报价
   const scopeQuotes = allQuotes.filter((q) => (q.items?.length ?? 0) > 0 && inferScopeFromTitle(q.title) === scope)
   const activeQuote: Quote | null =
     (quoteId ? allQuotes.find((q) => String(q.id) === quoteId) : undefined) ??
     scopeQuotes.find((q) => String(q.id) === contractQuoteId) ??
+    scopeQuotes.find((q) => String(q.id) === finalQuoteId) ??
     scopeQuotes.find((q) => q.status === 'accepted') ??
     scopeQuotes[0] ??
     (scope === 'all'
       ? (allQuotes.find((q) => String(q.id) === contractQuoteId && inferScopeFromTitle(q.title) === 'all') ??
+        allQuotes.find((q) => String(q.id) === finalQuoteId && inferScopeFromTitle(q.title) === 'all') ??
         allQuotes.find((q) => (q.items?.length ?? 0) > 0 && inferScopeFromTitle(q.title) === 'all') ??
         allQuotes.find((q) => String(q.id) === contractQuoteId) ??
         allQuotes[0] ??
@@ -97,10 +120,21 @@ export async function loadProjectDocs(projectId: string, user: User, scope: Poin
   const defaults = fillDefaultProducts(parseDefaults(project.defaultProducts), catalog, project.platform)
   const quoteTypeOverride = new Map<string, string>()
 
+  // 报价条目里单独换过的图片（很少）：只读当前报价用到的几张
+  const imageIds = [...new Set((activeQuote?.items ?? []).map((i) => (i.image && typeof i.image !== 'object' ? String(i.image) : null)).filter((v): v is string => Boolean(v)))]
+  const mediaById = new Map<string, Media>()
+  if (imageIds.length) {
+    const media = await payload
+      .find({ collection: 'media', where: { id: { in: imageIds } }, limit: imageIds.length, depth: 0, user, overrideAccess: false, select: { url: true, filename: true, alt: true } })
+      .catch(() => null)
+    for (const m of media?.docs ?? []) mediaById.set(String(m.id), m as Media)
+  }
+
   if (activeQuote?.items?.length) {
     for (const item of activeQuote.items) {
       const pid = relId(item.product)
-      const imgUrl = item.image && typeof item.image === 'object' ? resolveMediaUrl(item.image as Media) : null
+      const imgDoc = item.image ? (typeof item.image === 'object' ? (item.image as Media) : mediaById.get(String(item.image))) : null
+      const imgUrl = imgDoc ? resolveMediaUrl(imgDoc) : null
       if (pid) {
         const base = byId.get(pid)
         if (base) {
@@ -297,17 +331,6 @@ export async function loadProjectDocs(projectId: string, user: User, scope: Poin
     })
     .filter((f) => f.pointCount > 0 || scope === 'all')
 
-  const owner = ownerId
-    ? ((await payload
-        .findByID({
-          collection: 'users',
-          id: ownerId,
-          depth: 0,
-          overrideAccess: true,
-          select: { name: true, phone: true },
-        })
-        .catch(() => null)) as User | null)
-    : null
   const projectList = (projectsRes.docs as Project[])
     .filter((p) => (p.pointCount ?? 0) > 0 || String(p.id) === String(project.id))
     .map((p) => ({
@@ -318,10 +341,14 @@ export async function loadProjectDocs(projectId: string, user: User, scope: Poin
       pointCount: p.pointCount ?? 0,
     }))
 
+  // 场景库有启用的场景时，按项目真实的房间和设备重新分配场景（替换内置的按房间类型推荐）
+  if (sceneLibrary.length) assignScenes(sceneLibrary, rooms).forEach((s, i) => (rooms[i].scenes = s))
+
   return {
     project,
     owner,
     company,
+    sceneLibrary,
     sheets,
     areas,
     points,
@@ -345,6 +372,11 @@ export async function loadProjectDocs(projectId: string, user: User, scope: Poin
     contract,
     projectList,
     scope,
+    /** 定稿报价与来源（合同 / 手动定稿 / 已接受 / 最新） */
+    finalQuoteId,
+    finalQuoteSource: final.source,
+    /** 项目选定的交付方案模板（未选为 null） */
+    proposalTemplate: (project as { proposalTemplate?: string | null }).proposalTemplate ?? null,
   }
 }
 
