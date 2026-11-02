@@ -86,6 +86,8 @@ export interface Config {
     quotes: Quote;
     contracts: Contract;
     products: Product;
+    scenes: Scene;
+    'proposal-templates': ProposalTemplate;
     brands: Brand;
     categories: Category;
     media: Media;
@@ -111,6 +113,8 @@ export interface Config {
     quotes: QuotesSelect<false> | QuotesSelect<true>;
     contracts: ContractsSelect<false> | ContractsSelect<true>;
     products: ProductsSelect<false> | ProductsSelect<true>;
+    scenes: ScenesSelect<false> | ScenesSelect<true>;
+    'proposal-templates': ProposalTemplatesSelect<false> | ProposalTemplatesSelect<true>;
     brands: BrandsSelect<false> | BrandsSelect<true>;
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
@@ -135,10 +139,12 @@ export interface Config {
   globals: {
     'company-settings': CompanySetting;
     'ai-settings': AiSetting;
+    'membership-settings': MembershipSetting;
   };
   globalsSelect: {
     'company-settings': CompanySettingsSelect<false> | CompanySettingsSelect<true>;
     'ai-settings': AiSettingsSelect<false> | AiSettingsSelect<true>;
+    'membership-settings': MembershipSettingsSelect<false> | MembershipSettingsSelect<true>;
   };
   locale: 'en';
   widgets: {
@@ -463,6 +469,11 @@ export interface Project {
    */
   isDemoTemplate?: boolean | null;
   notes?: string | null;
+  finalQuote?: (string | null) | Quote;
+  /**
+   * 方案模板的标识，如 qixu、noir；留空使用默认模板
+   */
+  proposalTemplate?: string | null;
   pointMap?:
     | {
         [k: string]: unknown;
@@ -808,6 +819,240 @@ export interface Contract {
   createdAt: string;
 }
 /**
+ * 方案中的智能场景。生成方案时按房间类型和设备自动匹配，条件不满足的场景不会出现。
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "scenes".
+ */
+export interface Scene {
+  id: string;
+  /**
+   * 如：回家模式、起夜模式
+   */
+  name: string;
+  slug: string;
+  enabled?: boolean | null;
+  sortOrder?: number | null;
+  /**
+   * 方案里显示为「场景名称：一句话说明」
+   */
+  summary: string;
+  /**
+   * 场景页大标题，如：进门的那一刻，生活开始切换。
+   */
+  headline?: string | null;
+  subtitle?: string | null;
+  /**
+   * 如：ARRIVE & LEAVE
+   */
+  tagline?: string | null;
+  steps?:
+    | {
+        text: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * 请使用自有或已获授权的图片
+   */
+  image?: (string | null) | Media;
+  /**
+   * 按房间：在符合条件的每个房间里判断；全屋：按整套房子的设备判断，只出现一次
+   */
+  scope?: ('room' | 'house') | null;
+  chapter?: ('arrive' | 'rest' | 'care' | 'focus' | 'network') | null;
+  /**
+   * 留空表示任何房间都适用
+   */
+  roomTypes?:
+    | (
+        | 'entrance'
+        | 'living'
+        | 'dining'
+        | 'kitchen'
+        | 'bedroom'
+        | 'kids'
+        | 'study'
+        | 'bathroom'
+        | 'balcony'
+        | 'corridor'
+        | 'stairs'
+        | 'closet'
+        | 'theater'
+        | 'leisure'
+        | 'garage'
+        | 'utility'
+        | 'other'
+      )[]
+    | null;
+  /**
+   * 全部都有才显示
+   */
+  requiredDevices?:
+    | (
+        | 'switch-4'
+        | 'switch-3'
+        | 'switch-2'
+        | 'switch-1'
+        | 'socket-usb'
+        | 'socket-double'
+        | 'socket'
+        | 'spotlight'
+        | 'track-light'
+        | 'downlight'
+        | 'ceiling-light'
+        | 'pendant-light'
+        | 'wall-light'
+        | 'panel-light'
+        | 'light-strip'
+        | 'other-light'
+        | 'motion-sensor'
+        | 'smoke-sensor'
+        | 'water-sensor'
+        | 'temp-sensor'
+        | 'contact-sensor'
+        | 'smart-lock'
+        | 'doorbell'
+        | 'camera'
+        | 'curtain-track'
+        | 'speaker'
+        | 'touch-panel'
+        | 'gateway'
+        | 'ac-router'
+        | 'ceiling-ap'
+        | 'ap-node'
+        | 'network-panel'
+        | 'vrf-controller'
+        | 'other'
+      )[]
+    | null;
+  /**
+   * 其中任意一种即可；留空不限
+   */
+  anyDevices?:
+    | (
+        | 'switch-4'
+        | 'switch-3'
+        | 'switch-2'
+        | 'switch-1'
+        | 'socket-usb'
+        | 'socket-double'
+        | 'socket'
+        | 'spotlight'
+        | 'track-light'
+        | 'downlight'
+        | 'ceiling-light'
+        | 'pendant-light'
+        | 'wall-light'
+        | 'panel-light'
+        | 'light-strip'
+        | 'other-light'
+        | 'motion-sensor'
+        | 'smoke-sensor'
+        | 'water-sensor'
+        | 'temp-sensor'
+        | 'contact-sensor'
+        | 'smart-lock'
+        | 'doorbell'
+        | 'camera'
+        | 'curtain-track'
+        | 'speaker'
+        | 'touch-panel'
+        | 'gateway'
+        | 'ac-router'
+        | 'ceiling-ap'
+        | 'ap-node'
+        | 'network-panel'
+        | 'vrf-controller'
+        | 'other'
+      )[]
+    | null;
+  createdBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * 模板 = 版式框架（有哪些章节）+ 视觉主题（配色与版式），再换上自己的强调色、封面图和标语。
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "proposal-templates".
+ */
+export interface ProposalTemplate {
+  id: string;
+  name: string;
+  /**
+   * 只用英文、数字和短横线
+   */
+  slug: string;
+  /**
+   * 模板选择器里显示
+   */
+  description?: string | null;
+  framework: 'full' | 'story' | 'budget' | 'construction';
+  /**
+   * 施工交底不使用
+   */
+  theme?: ('qixu' | 'noir' | 'grove' | 'azure' | 'terra' | 'mono' | 'dawn' | 'jade') | null;
+  /**
+   * 留空使用版式框架的推荐章节；选择的顺序就是方案里的顺序
+   */
+  sections?: ('cover' | 'plans' | 'system' | 'zones' | 'scenes' | 'rooms' | 'investment' | 'service')[] | null;
+  markers?: ('number' | 'symbol') | null;
+  tier?: ('free' | 'pro' | 'team') | null;
+  /**
+   * 十六进制颜色，如 #7a5c22；留空沿用主题配色
+   */
+  accent?: string | null;
+  /**
+   * 留空沿用主题标语
+   */
+  headline?: string | null;
+  tagline?: string | null;
+  /**
+   * 请使用自有或已获授权的图片；留空沿用主题封面
+   */
+  coverImage?: (string | null) | Media;
+  enabled?: boolean | null;
+  sortOrder?: number | null;
+  createdBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "ai-conversations".
  */
@@ -1093,6 +1338,14 @@ export interface PayloadLockedDocument {
         value: string | Product;
       } | null)
     | ({
+        relationTo: 'scenes';
+        value: string | Scene;
+      } | null)
+    | ({
+        relationTo: 'proposal-templates';
+        value: string | ProposalTemplate;
+      } | null)
+    | ({
         relationTo: 'brands';
         value: string | Brand;
       } | null)
@@ -1301,6 +1554,8 @@ export interface ProjectsSelect<T extends boolean = true> {
   pointCount?: T;
   isDemoTemplate?: T;
   notes?: T;
+  finalQuote?: T;
+  proposalTemplate?: T;
   pointMap?: T;
   defaultProducts?: T;
   collaborators?:
@@ -1404,6 +1659,60 @@ export interface ProductsSelect<T extends boolean = true> {
   stock?: T;
   tags?: T;
   status?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "scenes_select".
+ */
+export interface ScenesSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  enabled?: T;
+  sortOrder?: T;
+  summary?: T;
+  headline?: T;
+  subtitle?: T;
+  tagline?: T;
+  steps?:
+    | T
+    | {
+        text?: T;
+        id?: T;
+      };
+  image?: T;
+  scope?: T;
+  chapter?: T;
+  roomTypes?: T;
+  requiredDevices?: T;
+  anyDevices?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "proposal-templates_select".
+ */
+export interface ProposalTemplatesSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  description?: T;
+  framework?: T;
+  theme?: T;
+  sections?: T;
+  markers?: T;
+  tier?: T;
+  accent?: T;
+  headline?: T;
+  tagline?: T;
+  coverImage?: T;
+  enabled?: T;
+  sortOrder?: T;
   createdBy?: T;
   updatedBy?: T;
   updatedAt?: T;
@@ -1808,6 +2117,40 @@ export interface AiSetting {
   createdAt?: string | null;
 }
 /**
+ * 会员等级与权益见「会员与积分」页；这里决定低于所需等级时是只提示还是直接限制。
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "membership-settings".
+ */
+export interface MembershipSetting {
+  id: string;
+  enforcement?: ('soft' | 'strict') | null;
+  /**
+   * 显示在会员页和各处「升级」提示里，例如客服微信、购买链接
+   */
+  upgradeHint?: string | null;
+  createdBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedAt?: string | null;
+  createdAt?: string | null;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "company-settings_select".
  */
@@ -1883,6 +2226,19 @@ export interface AiSettingsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "membership-settings_select".
+ */
+export interface MembershipSettingsSelect<T extends boolean = true> {
+  enforcement?: T;
+  upgradeHint?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "welcome_widget".
  */
 export interface WelcomeWidget {
@@ -1915,6 +2271,8 @@ export interface CollectionQueryWidget {
       | 'quotes'
       | 'contracts'
       | 'products'
+      | 'scenes'
+      | 'proposal-templates'
       | 'brands'
       | 'categories'
       | 'media'
@@ -1955,6 +2313,8 @@ export interface ActivityWidget {
           | 'quotes'
           | 'contracts'
           | 'products'
+          | 'scenes'
+          | 'proposal-templates'
           | 'brands'
           | 'categories'
           | 'media'

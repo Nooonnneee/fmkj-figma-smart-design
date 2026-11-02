@@ -1,6 +1,8 @@
-# 点位图图标资源（v1 匹配结果）
+# 点位图图标素材（v1 匹配结果）
 
 来源：`fast-409-matching.json` + 桌面 `00_资源整理`。
+
+`scripts/build-point-icons.mjs` 按 `mapping.json` 把这里的原图生成 `public/point-icons`：不改图形，只上色、加深加粗线条、加白边。
 
 ## 目录
 
@@ -18,4 +20,4 @@
 
 ## 后续
 
-下一步按 `mapping.json` 统一转 SVG（打印/点位图/画板共用），再替换现有 `point-markers` / board symbols。
+换图标：替换这里的原图或修改 `mapping.json`，再运行 `node scripts/build-point-icons.mjs`。

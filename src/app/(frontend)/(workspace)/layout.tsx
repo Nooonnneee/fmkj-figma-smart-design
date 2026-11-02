@@ -64,7 +64,10 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
       />
       <SidebarInset>
         <SiteHeader />
-        <main className="flex flex-1 flex-col gap-6 px-4 py-5 md:px-8 md:py-7">{children}</main>
+        {/* SidebarInset 本身就是 <main>，这里用 div，避免页面出现两个 main 区域 */}
+        <div data-slot="workspace-page" className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-5 md:px-8 md:py-7">
+          {children}
+        </div>
       </SidebarInset>
     </SidebarProvider>
   )

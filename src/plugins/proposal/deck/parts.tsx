@@ -4,8 +4,8 @@
  * 颜色字体来自风格变量（bg-doc-* / doc-display / --deck-*），版式差异由主题的 cover / chapter / table 字段决定。
  */
 import { brandLatin } from '@/documents/parts'
-import { markerDataUrl } from '@/lib/point-marker-data'
-import type { AreaInfo, SheetInfo } from '@/lib/point-scene'
+import { markerSrc } from '@/lib/point-marker-data'
+import { areaLabelAnchor, areaOutline, type AreaInfo, type SheetInfo } from '@/lib/point-scene'
 import { cn } from '@/lib/utils'
 
 import type { ProposalMarkers } from '../templates'
@@ -15,7 +15,7 @@ import type { DeckTheme } from './themes'
 export type DeckCtx = { m: DeckModel; theme: DeckTheme; markers: ProposalMarkers }
 
 /** 金额数字：栖序用 Inter，衬线风格用衬线数字 */
-export const amountFont = (ctx: DeckCtx) => (ctx.theme.id === 'qixu' ? 'doc-latin' : 'doc-numeral')
+export const amountFont = (ctx: DeckCtx) => (ctx.theme.amount === 'latin' ? 'doc-latin' : 'doc-numeral')
 
 /** 1440 × 960 方案页：页眉、内容、页脚（封面自己排版） */
 export function Slide({ ctx, no, total, name, cover = false, children }: { ctx: DeckCtx; no: number; total: number; name: string; cover?: boolean; children: React.ReactNode }) {
@@ -45,7 +45,7 @@ export function Slide({ ctx, no, total, name, cover = false, children }: { ctx: 
 /** 服务商品牌：有 Logo 用 Logo，否则用风格的品牌标记 */
 export function Brand({ ctx, large = false, className }: { ctx: DeckCtx; large?: boolean; className?: string }) {
   const c = ctx.m.d.company
-  const t = ctx.theme.id
+  const t = ctx.theme
   return (
     <div className={cn('flex shrink-0 items-center gap-[10px] overflow-hidden', className)}>
       {c.logo ? (
@@ -56,8 +56,8 @@ export function Brand({ ctx, large = false, className }: { ctx: DeckCtx; large?:
           className={cn(
             'shrink-0',
             large ? 'size-[26px]' : 'size-[22px]',
-            t === 'noir' ? 'border border-doc-accent' : 'bg-linear-to-r from-doc-soft to-doc-soft-to',
-            t === 'grove' && 'rounded-full',
+            t.brandMark === 'outline' ? 'border border-doc-accent' : 'bg-linear-to-r from-doc-soft to-doc-soft-to',
+            t.rounded && 'rounded-full',
           )}
         />
       )}
@@ -73,7 +73,7 @@ export function DeckHeader({ ctx }: { ctx: DeckCtx }) {
   return (
     <div className="flex h-[32px] w-full shrink-0 items-center justify-between overflow-hidden">
       <Brand ctx={ctx} />
-      <p className={cn('doc-latin text-[11px] leading-normal whitespace-pre text-doc-muted', ctx.theme.id !== 'qixu' && 'tracking-[0.18em]')}>{headerTagline(ctx)}</p>
+      <p className={cn('doc-latin text-[11px] leading-normal whitespace-pre text-doc-muted', ctx.theme.trackedTagline && 'tracking-[0.18em]')}>{headerTagline(ctx)}</p>
     </div>
   )
 }
@@ -331,7 +331,8 @@ export function PlanView({
   const vy = fit(box.y, box.h, vh, SH)
   const u = (px: number) => px / k
   const dense = points.length > 48
-  const showCodes = !dense
+  // 方案是给客户看的：图上只画设备图标和序号，不印施工代号（代号在施工交底里）
+  const showCodes = false
   const r = u(dense ? 8.5 : 10.5)
   const symbols = ctx.markers === 'symbol'
   const placed = points.filter((p) => p.rx != null && p.ry != null)
@@ -353,19 +354,27 @@ export function PlanView({
           loading="eager"
           decoding="sync"
           className="absolute max-w-none select-none"
-          style={{ left: -vx * k, top: -vy * k, width: SW * k, height: SH * k, opacity: ctx.theme.id === 'noir' ? 0.8 : 0.62 }}
+          style={{ left: -vx * k, top: -vy * k, width: SW * k, height: SH * k, opacity: ctx.theme.mood === 'dark' ? 0.8 : 0.62 }}
         />
       ) : null}
       <svg className="absolute inset-0" width={width} height={height} viewBox={`${vx} ${vy} ${vw} ${vh}`} aria-hidden>
         {areas.map((a) => {
-          const x = ((a.x - sheet.x) / sheet.width) * SW
-          const y = ((a.y - sheet.y) / sheet.height) * SH
-          const w = (a.width / sheet.width) * SW
-          const h = (a.height / sheet.height) * SH
+          const px = (x: number) => ((x - sheet.x) / sheet.width) * SW
+          const py = (y: number) => ((y - sheet.y) / sheet.height) * SH
+          const [lx, ly] = areaLabelAnchor(a)
           return (
             <g key={a.id}>
-              <rect x={x} y={y} width={w} height={h} fill="none" style={{ stroke: 'var(--deck-plan-code)' }} strokeOpacity={0.32} strokeWidth={u(1)} strokeDasharray={`${u(5)} ${u(4)}`} />
-              <text x={x + u(6)} y={y + u(15)} fontSize={u(11)} style={{ fill: 'var(--deck-plan-code)', fontFamily: 'var(--doc-font-body)' }} fillOpacity={0.85} stroke="#ffffff" strokeWidth={u(3)} paintOrder="stroke">
+              <polygon
+                points={areaOutline(a)
+                  .map(([x, y]) => `${px(x)},${py(y)}`)
+                  .join(' ')}
+                fill="none"
+                style={{ stroke: 'var(--deck-plan-code)' }}
+                strokeOpacity={0.4}
+                strokeWidth={u(1.1)}
+                strokeLinejoin="round"
+              />
+              <text x={px(lx) + u(6)} y={py(ly) + u(15)} fontSize={u(11)} style={{ fill: 'var(--deck-plan-code)', fontFamily: 'var(--doc-font-body)' }} fillOpacity={0.85} stroke="#ffffff" strokeWidth={u(3)} paintOrder="stroke">
                 {a.name}
               </text>
             </g>
@@ -379,7 +388,7 @@ export function PlanView({
             const s = u(dense ? 18 : 22)
             return (
               <g key={p.id}>
-                <image href={markerDataUrl(p.deviceType)} x={cx - s / 2} y={cy - s / 2} width={s} height={s} />
+                <image href={markerSrc(p.deviceType)} x={cx - s / 2} y={cy - s / 2} width={s} height={s} />
                 {p.no && labelFits(p, pad(p.no), s / 2 + u(2)) ? (
                   <text x={cx + s / 2 + u(2)} y={cy - s / 2 + u(8)} fontSize={u(10)} fontWeight={600} style={{ fill: 'var(--deck-plan-code)', fontFamily: 'var(--doc-font-latin)' }} stroke="#ffffff" strokeWidth={u(3)} paintOrder="stroke">
                     {pad(p.no)}

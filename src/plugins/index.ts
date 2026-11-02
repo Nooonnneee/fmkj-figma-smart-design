@@ -2,7 +2,8 @@ import { dwgConverterPlugin } from './dwg-converter'
 import { PLUGIN_DOC_STYLES } from './doc-styles/styles'
 import type { AppPlugin, PluginId } from './types'
 
-export type { AppPlugin, PluginId } from './types'
+export type { AppPlugin, PluginId, PluginStage } from './types'
+export { PLUGIN_STAGES } from './types'
 
 /**
  * 已安装的插件。新增插件：在 src/plugins/<id>/ 写好功能，再在这里登记清单。
@@ -11,6 +12,10 @@ export type { AppPlugin, PluginId } from './types'
 export const PLUGINS: AppPlugin[] = [
   {
     id: 'ai-copilot',
+    stage: 'global',
+    tier: 'pro',
+    entry: { label: '打开 AI 对话', href: () => '/ai' },
+    tagline: '在任何页面直接问 AI，让它帮你识图、选型、写说明',
     name: 'AI 对话侧栏（高级）',
     description: '侧边栏常驻 AI 助手，支持户型图识别、技能模板与跨插件自动执行。',
     status: 'ready',
@@ -19,6 +24,10 @@ export const PLUGINS: AppPlugin[] = [
   },
   {
     id: 'doc-styles',
+    stage: 'quote',
+    tier: 'pro',
+    entry: { label: '报价单换风格', href: (id) => `/projects/${id}/quotes` },
+    tagline: '报价单、合同换上更多高级排版风格',
     name: '文档风格包',
     description: `为报价单、点位图、合同和交底清单解锁 ${PLUGIN_DOC_STYLES.length} 套扩展视觉风格（与方案模板配套）。`,
     status: 'ready',
@@ -28,6 +37,10 @@ export const PLUGINS: AppPlugin[] = [
   },
   {
     id: 'proposal',
+    stage: 'quote',
+    tier: 'free',
+    entry: { label: '生成方案', href: (id) => `/print/projects/${id}/proposal` },
+    tagline: '点位和预算一键变成给业主看的横版方案',
     name: '方案演示',
     description: '将点位图、房间分析与预算一键生成 A4 横版提案并导出 PDF。',
     status: 'ready',
@@ -36,6 +49,10 @@ export const PLUGINS: AppPlugin[] = [
   },
   {
     id: 'room-insights',
+    stage: 'design',
+    tier: 'free',
+    entry: { label: '查看房间分析', href: (id) => `/projects/${id}/point-map` },
+    tagline: '逐个房间检查漏配，顺手推荐联动场景',
     name: '房间智能分析',
     description: '按房间类型评估点位完整度，提供缺失提醒与联动场景建议。',
     status: 'ready',
@@ -44,6 +61,10 @@ export const PLUGINS: AppPlugin[] = [
   },
   {
     id: 'smart-select',
+    stage: 'design',
+    tier: 'free',
+    entry: { label: '一键选型', href: (id) => `/projects/${id}/point-map` },
+    tagline: '按平台和预算档位，一键给全屋选好型号',
     name: '智能选型',
     description: '按生态平台与预算档位，一键匹配全屋各设备类型的默认型号。',
     status: 'ready',
@@ -52,6 +73,10 @@ export const PLUGINS: AppPlugin[] = [
   },
   {
     id: 'ai-import',
+    stage: 'design',
+    tier: 'free',
+    entry: { label: 'AI 识别图纸', href: (id) => `/projects/${id}/point-map` },
+    tagline: '让 AI 读图纸，自动生成点位',
     name: 'AI 识别导入',
     description: '识别标准图纸中的开关插座与点位符号，支持导入导出点位 JSON。',
     status: 'ready',
@@ -60,6 +85,10 @@ export const PLUGINS: AppPlugin[] = [
   },
   {
     id: 'dwg-import',
+    stage: 'design',
+    tier: 'pro',
+    entry: { label: '导入 DWG', href: (id) => `/projects/${id}/point-map` },
+    tagline: 'CAD 图纸直接导入成户型底图',
     name: 'DWG 导入',
     description: '上传 CAD DWG 图纸并自动转换为标准户型底图。',
     status: 'ready',
@@ -69,6 +98,9 @@ export const PLUGINS: AppPlugin[] = [
   },
   {
     id: 'site-survey',
+    stage: 'design',
+    tier: 'free',
+    tagline: '现场条件一次记全，出勘测确认单',
     name: '现场勘测表',
     description: '记录配电箱、弱电箱、零火线与窗帘盒尺寸，导出勘测确认单。',
     status: 'coming-soon',
@@ -77,6 +109,9 @@ export const PLUGINS: AppPlugin[] = [
   },
   {
     id: 'wiring-schedule',
+    stage: 'build',
+    tier: 'pro',
+    tagline: '自动汇总回路与预留线缆，出水电交底单',
     name: '强弱电布线表',
     description: '按点位图自动汇总开关回路、零火线与网线预留，生成水电交底单。',
     status: 'coming-soon',
@@ -85,6 +120,9 @@ export const PLUGINS: AppPlugin[] = [
   },
   {
     id: 'procurement',
+    stage: 'build',
+    tier: 'team',
+    tagline: '按确认报价出采购单，到货逐项核验',
     name: '采购与备货单',
     description: '按确认报价汇总采购清单，核对库存并生成到场核验单。',
     status: 'coming-soon',
@@ -93,6 +131,9 @@ export const PLUGINS: AppPlugin[] = [
   },
   {
     id: 'scene-handover',
+    stage: 'after',
+    tier: 'pro',
+    tagline: '交付时把场景、账号和设备绑定交给业主',
     name: '场景与账号移交',
     description: '生成全屋联动场景卡、网关设备绑定表与业主账号交接单。',
     status: 'coming-soon',
@@ -101,6 +142,9 @@ export const PLUGINS: AppPlugin[] = [
   },
   {
     id: 'after-sales',
+    stage: 'after',
+    tier: 'team',
+    tagline: '质保、检修与配置备份都有记录',
     name: '售后维保记录',
     description: '管理质保期、设备更换与上门检修记录，留存项目配置备份。',
     status: 'coming-soon',
@@ -111,3 +155,4 @@ export const PLUGINS: AppPlugin[] = [
 
 export const PLUGIN_IDS = PLUGINS.map((p) => p.id)
 export const isPluginId = (v: unknown): v is PluginId => PLUGIN_IDS.includes(v as PluginId)
+

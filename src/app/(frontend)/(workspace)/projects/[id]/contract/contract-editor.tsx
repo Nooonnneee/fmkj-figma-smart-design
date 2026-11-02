@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, FileSignature, Loader2, Lock, Plus, Printer, RotateCcw, Save, Trash2, Undo2 } from 'lucide-react'
+import { Check, FileSignature, Loader2, Lock, Plus, RotateCcw, Save, Trash2, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
@@ -236,7 +236,7 @@ export function ContractEditor({ initial, quotes, readOnly, archived }: { initia
       ) : null}
 
       <section className="rounded-xl bg-card shadow-sm ring-1 ring-foreground/5 dark:ring-foreground/10">
-        <div className="grid gap-x-4 gap-y-5 p-5 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-x-4 gap-y-5 p-5 md:grid-cols-2">
           <div className="grid gap-2 md:col-span-2">
             <Label htmlFor="amount">合同金额</Label>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -259,7 +259,7 @@ export function ContractEditor({ initial, quotes, readOnly, archived }: { initia
           </div>
           <div className="grid gap-2 md:col-span-2">
             <Label htmlFor="quote">依据报价</Label>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
               <Select
                 value={values.quoteId}
                 disabled={locked}
@@ -268,13 +268,17 @@ export function ContractEditor({ initial, quotes, readOnly, archived }: { initia
                   set({ quoteId: v, ...(q ? { amount: q.total } : {}) })
                 }}
               >
-                <SelectTrigger id="quote" className="w-full sm:w-80">
-                  <SelectValue />
+                <SelectTrigger id="quote" className="w-full min-w-0 sm:w-[28rem]">
+                  <SelectValue className="min-w-0" />
                 </SelectTrigger>
                 <SelectContent>
                   {quotes.map((q) => (
                     <SelectItem key={q.id} value={q.id}>
-                      {q.title} · {yuan(q.total)}
+                      {/* 名称过长时只截断名称，金额始终完整显示 */}
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate">{q.title}</span>
+                        <span className="shrink-0 text-muted-foreground tabular-nums">{yuan(q.total)}</span>
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>

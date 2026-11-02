@@ -12,7 +12,7 @@ colors:
   sidebar-paper: "oklch(0.985 0 0)"
   alert-red: "oklch(0.577 0.245 27.325)"
   alert-red-strong: "oklch(0.47 0.2 27.325)"
-  confirmed-green: "oklch(0.52 0.12 155)"
+  confirmed-green: "oklch(0.49 0.12 155)"
   pending-amber: "oklch(0.52 0.11 75)"
   cat-switch: "#2563eb"
   cat-socket: "#0d9488"
@@ -25,11 +25,12 @@ colors:
   cat-network: "#0891b2"
   cat-vrf: "#ea580c"
   cat-other: "#525252"
+  accent: "oklch(0.51 0.22 279)"
 typography:
   headline:
     fontFamily: "Inter, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Noto Sans SC, sans-serif"
     fontSize: "1.5rem"
-    fontWeight: 700
+    fontWeight: 600
     letterSpacing: "-0.025em"
   title:
     fontFamily: "Inter, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Noto Sans SC, sans-serif"
@@ -49,11 +50,29 @@ typography:
     fontSize: "0.875rem"
     fontWeight: 600
     fontFeature: "tnum"
+  public-display:
+    fontFamily: "Inter (opsz), PingFang SC, Hiragino Sans GB, Microsoft YaHei, Noto Sans SC, sans-serif"
+    fontSize: "clamp(2.5rem, 1.25rem + 4.2vw, 4.5rem)"
+    fontWeight: 500
+    lineHeight: 1.1
+    letterSpacing: "-0.022em"
+  public-headline:
+    fontFamily: "Inter (opsz), PingFang SC, Hiragino Sans GB, Microsoft YaHei, Noto Sans SC, sans-serif"
+    fontSize: "clamp(1.875rem, 1.2rem + 2vw, 3rem)"
+    fontWeight: 500
+    lineHeight: 1.15
+    letterSpacing: "-0.018em"
+  public-lead:
+    fontFamily: "Inter, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Noto Sans SC, sans-serif"
+    fontSize: "1.125rem"
+    fontWeight: 400
+    lineHeight: 1.75
 rounded:
   sm: "6px"
   md: "8px"
   lg: "10px"
   xl: "14px"
+  window: "18px"
   full: "9999px"
 spacing:
   xs: "4px"
@@ -96,6 +115,21 @@ components:
   badge-warning:
     textColor: "{colors.pending-amber}"
     rounded: "{rounded.full}"
+  button-public-primary:
+    backgroundColor: "{colors.ink}"
+    textColor: "{colors.paper}"
+    rounded: "{rounded.full}"
+    height: "44px"
+    padding: "0 24px"
+  button-public-secondary:
+    backgroundColor: "{colors.paper}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.full}"
+    height: "44px"
+    padding: "0 24px"
+  product-window:
+    backgroundColor: "{colors.paper}"
+    rounded: "{rounded.window}"
 ---
 
 # Design System: FMKJ 项目管理
@@ -124,6 +158,9 @@ components:
 ### Primary
 - **墨黑 Ink Primary** (oklch(0.205 0 0))：主按钮、当前选中项、进度条已完成段。深色主题下反转为浅色。
 
+### 主题强调色
+- **繁梦紫 Accent** (oklch(0.51 0.22 279))：默认主题风格（`data-accent="fanmeng"`，另有青碧、经典可选）的主色。工作台里是主按钮与当前项；公开页只用于选中态（清单固定行、付款节点进度），不用于大面积底色。
+
 ### Neutral
 - **正文墨 Ink** (oklch(0.145 0 0))：正文和标题。
 - **铅笔灰 Pencil** (oklch(0.53 0 0))：次要文字、说明、占位符。这是对比度下限：在白底上 5.25:1，在浅灰底上 4.82:1，不要再调浅。
@@ -133,7 +170,7 @@ components:
 - **格线 Rule Line** (oklch(0.922 0 0))：描边、分隔线、表格线。
 
 ### 状态色
-- **确认绿 Confirmed Green** (oklch(0.52 0.12 155))：已确认的报价，以及其他成功状态。
+- **确认绿 Confirmed Green** (oklch(0.49 0.12 155))：已确认的报价，以及其他成功状态。
 - **待办琥珀 Pending Amber** (oklch(0.52 0.11 75))：已发送、等客户回复，以及其他需要关注的状态。
 - **警示红 Alert Red** (oklch(0.577 0.245 27.325))：错误和破坏性操作。浅红底上的文字改用 **Alert Red Strong** (oklch(0.47 0.2 27.325))，保证对比度不低于 4.5:1。
 
@@ -149,12 +186,12 @@ components:
 
 ## Typography
 
-**字体：** Inter 负责拉丁字符和数字，中文依次回落到 PingFang SC、Hiragino Sans GB、Microsoft YaHei、Noto Sans SC。字体链写在 `styles.css` 里，保证换一台电脑界面也一样。
+**字体：** Inter 可变字体负责拉丁字符和数字（`src/lib/fonts.ts` 自托管 Google Fonts v20 拉丁子集，约 73 KB，带 opsz 光学尺寸轴：小字用 Text 字形，大标题自动切到 Display 字形，Linear 同款），中文依次回落到 PingFang SC、Hiragino Sans GB、Microsoft YaHei、Noto Sans SC。字体链写在 `styles.css` 的 `--font-sans`，保证换一台电脑界面也一样。字体变量名不能叫 `inter`：next/font 用变量名当字族名，会和文档模板引用的远程 "Inter" 撞名（字族名不区分大小写），导致两份一起下载。
 
 **风格：** 全站只用一个字族，相邻层级的字号比约 1.125–1.2，用固定的 rem 字号，不用随视口缩放的字号。
 
 ### Hierarchy
-- **页面标题 Headline**（700，1.5rem，字距 -0.025em）：每页一个 h1。
+- **页面标题 Headline**（600，1.5rem，字距 -0.025em）：每页一个 h1（`PageHeader`）。
 - **区块标题 Title**（600，1rem）：卡片标题、分组标题。
 - **正文 Body**（400，0.875rem，行高 1.5）：表格、表单、说明文字。
 - **标签 Label**（500，0.75rem）：表单标签、徽章、计数、侧栏分组名。
@@ -191,7 +228,7 @@ components:
 - **徽章 Badge**：报价状态统一用 `quoteStatusVariant()`：草稿 outline、已发送 warning、已确认 success。
 - **表格**：卡片包裹，首列左内边距 16px（手机）/ 24px（桌面），整行可点击，次要列在窄屏隐藏。
 - **设备符号 DeviceSymbol**：384×384 画布的单色 SVG（`public/point-symbols`），用 CSS mask 按类别色着色；新增符号保持同样的风格：浅色填充（约 19% 不透明度）加实心描边和细节。
-- **点位标记 PointMarker**（`public/point-markers`，由 `scripts/build-point-markers.mjs` 生成）：点位图画布、方案图、图例共用的设备图标。64×64，白色外圈 + 类别色底 + 白色线性图形；墙面设备（开关、插座、面板、门锁）用圆角方形，其余用圆形；开关直接画出 1–4 个按键。改设计时修改脚本重新生成，并把 `MARKER_VERSION` 加一。
+- **点位图标 PointMarker**：设备图标用 `scripts/point-icons/mapping.json` 选定的原图，由 `scripts/build-point-icons.mjs` 在原图基础上优化（不改图形）：灰色图标按类别色上色、线条加深加粗（细长灯具加粗更多）、外圈白边，输出高清图（`public/point-icons`）。没有选定图标的类型回退到 `scripts/build-point-markers.mjs` 生成的实心标记（`public/point-markers`）。改了素材或参数后把对应脚本里的版本号加一。
 - **标准图纸**（`src/lib/sheet-spec.ts`）：户型图裁掉图框、标题栏和图名后，放进 3:2 白底画布，存储 2400×1600 PNG，在点位图里占 1200×800；打开或切换图纸时铺满画布即为 100%。点位标记直径 24、代号字号 9（相对 1200 宽）。底图 60% 不透明度，让彩色点位更醒目。
 - **产品图 ProductThumb**：正方形白底、细描边、图片占 84% 等比居中，任何原图比例看起来都一样大。上传规范：800×800 白底方图，产品主体约占 80%。方案图里的产品点位为浅灰底圆框 + 类别色描边。
 - **空状态**：虚线框内放图标、一句说明和下一步操作，告诉用户怎么开始，不只写“暂无数据”。
@@ -213,3 +250,16 @@ components:
 - 不用 emoji 或 Unicode 符号代替图标，统一用 lucide 图标或自绘 SVG。
 - 不为单个产品新增设备类型或符号。
 - 能在页面内完成的任务不用弹窗。
+
+## 公开页：产品即展示（首页、品牌页、下载页、登录页）
+
+公开页是 Persuade 页面，按用户指定的 Linear / OpenAI 式产品官网执行：一张安静的画布（浅色白底，深色主题近黑，跟随用户主题），让示例项目的真实数据自己说话。方向记录在 `.impeccable/surfaces/src-app-frontend-page-tsx.md`。公用外框在 `src/components/landing/`：`landing-chrome.tsx`（导航、页脚、横版标识）、`section.tsx`（分区与分区标题）。
+
+- **颜色**：只用全站语义变量（`background` / `foreground` / `muted-foreground` / `border` / `card`），没有专用的公开页色板。主按钮是墨色胶囊（浅色主题黑底白字，深色主题反转）；主题强调色只给选中态；设备类别色只出现在点位与图例上；「已确认」用成功徽章。
+- **字体**：大标题 `text-display`、分区标题 `text-headline`、导语 `text-lead`（定义在 `styles.css` 的 `@theme`），标题一律 500 字重（Linear / OpenAI 的 Medium）加负字距；中文字形自带字面留白，字距只收一点。
+- **产品窗口**（`plan-demo.tsx`）：白色面板 + 浅灰抬头条 + 1px 描边 + 一道带偏移的柔和投影（`shadow-window`），圆角 18px。抬头放项目名、「示例项目」标记、楼层分段控件、报价状态与合计；窗口内是「图例 | 户型图与点位 | 实时清单」。户型图在深色主题下也保持白纸。
+- **分区**：左对齐大标题 + 一段导语，下面放真实部件（报价单样张、付款节点、交付文档目录、品牌墙）。容器 1152px（`max-w-6xl`），产品窗口 1280px；分区上下留白 80px / 112px（手机 / 桌面）。面板用 1px 描边 + 16px 圆角，不叠阴影；并列信息用发丝线网格（`gap-px` + 描边底）而不是一排浮起的卡片。
+- **首屏**：居中大标题「画完点位，报价就好了」、两行导语、主按钮「进入工作台」与次按钮「看报价单样张」，下方紧接产品窗口，首屏露出窗口上半部分。
+- **动效**：只有一处——设备从左到右落位、清单逐行出现（指数缓出）；系统开启「减少动态效果」时不播放。
+- **性能**：首页报价单样张默认「简约」风格（走自托管字体链）；栖序雅致、东方雅韵等风格引用的思源黑体 / 宋体可变字体有十几 MB，只在访客点选时才加载。
+- **不要**：渐变文字、毛玻璃、发光光晕、眉标小标签、彩色大底；不要编造客户、案例或业绩，演示数据只用示例项目里的真实内容并标明「示例项目」。

@@ -52,7 +52,7 @@ export function ProjectHeader({
           <div className="min-w-0 md:max-w-[16rem] xl:max-w-[22rem]">
             <div className="flex min-w-0 items-center gap-1.5">
               <h1 className="truncate text-sm leading-tight font-semibold" title={name}>{name}</h1>
-              {demo ? <Badge variant="secondary" className="h-4 shrink-0 px-1.5 text-[0.6875rem]">示例</Badge> : null}
+              {demo ? <Badge variant="secondary" className="h-4.5 shrink-0 px-1.5 text-xs">示例</Badge> : null}
             </div>
             {subtitle ? <p className="truncate text-xs leading-tight text-muted-foreground">{subtitle}</p> : null}
           </div>

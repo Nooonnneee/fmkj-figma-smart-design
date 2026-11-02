@@ -4,7 +4,8 @@
  * 场景是 Excalidraw 的 elements + files，元素按 customData 区分：
  * - 图纸   image  { kind: 'sheet', sheetId, name, mediaId }（锁定，最底层，标准尺寸见 sheet-spec）
  * - 图纸名 text   { kind: 'sheet-title', sheetId }
- * - 区域   rectangle { kind: 'area', name, areaType }（虚线框，点位按中心点落在哪个区域归类）
+ * - 区域   rectangle { kind: 'area', name, areaType, polygon? }（实线框；polygon 是相对元素 x / y 的顶点
+ *          [[dx, dy], …]，有它时区域是这个多边形，元素的 x / y / width / height 是外接框；点位按中心点落在哪个区域归类）
  * - 区域名 text   { kind: 'area-label' }
  * - 点位   image  { deviceType, productId?, pointCode }（只有它参与统计和报价）
  * - 代号   text   { kind: 'label', pointCode }
@@ -35,7 +36,19 @@ export type SceneFile = { id: string; dataURL: string; mimeType: string; created
 export type StoredScene = { elements: SceneEl[]; appState?: Record<string, unknown>; files: Record<string, SceneFile> }
 
 export type SheetInfo = { id: string; elementId: string; index: number; name: string; x: number; y: number; width: number; height: number; fileId: string | null; url: string | null; missing: boolean }
-export type AreaInfo = { id: string; name: string; areaType: AreaType; sheetId: string | null; x: number; y: number; width: number; height: number }
+export type AreaInfo = {
+  id: string
+  name: string
+  areaType: AreaType
+  sheetId: string | null
+  /** 外接框 */
+  x: number
+  y: number
+  width: number
+  height: number
+  /** 多边形轮廓（场景坐标）；null 时区域就是外接框这个矩形 */
+  poly: [number, number][] | null
+}
 export type PointInfo = {
   id: string
   deviceType: string
@@ -91,6 +104,94 @@ const rectDistSq = (r: { x: number; y: number; width: number; height: number }, 
   return dx * dx + dy * dy
 }
 
+/* ---------------- 区域轮廓（多边形） ---------------- */
+
+/** 读取区域元素里的多边形顶点（customData.polygon，相对元素 x / y），换成场景坐标；没有或无效时返回 null */
+export function areaPolygon(el: { x: number; y: number; customData?: Record<string, unknown> }): [number, number][] | null {
+  const raw = el.customData?.polygon
+  if (!Array.isArray(raw) || raw.length < 3) return null
+  const pts: [number, number][] = []
+  for (const q of raw) {
+    if (!Array.isArray(q) || typeof q[0] !== 'number' || typeof q[1] !== 'number' || !Number.isFinite(q[0]) || !Number.isFinite(q[1])) return null
+    pts.push([el.x + q[0], el.y + q[1]])
+  }
+  return pts
+}
+
+/** 区域轮廓顶点：多边形取顶点，矩形取四个角 */
+export const areaOutline = (a: Pick<AreaInfo, 'x' | 'y' | 'width' | 'height' | 'poly'>): [number, number][] =>
+  a.poly ?? [
+    [a.x, a.y],
+    [a.x + a.width, a.y],
+    [a.x + a.width, a.y + a.height],
+    [a.x, a.y + a.height],
+  ]
+
+function inPolygon(poly: [number, number][], x: number, y: number) {
+  let inside = false
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i]
+    const [xj, yj] = poly[j]
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside
+  }
+  return inside
+}
+
+function segDistSq(x: number, y: number, [ax, ay]: [number, number], [bx, by]: [number, number]) {
+  const dx = bx - ax
+  const dy = by - ay
+  const len = dx * dx + dy * dy
+  const t = len ? Math.min(1, Math.max(0, ((x - ax) * dx + (y - ay) * dy) / len)) : 0
+  const px = ax + t * dx - x
+  const py = ay + t * dy - y
+  return px * px + py * py
+}
+
+/** 点是否在区域内（多边形区域按轮廓判断） */
+export const areaContains = (a: AreaInfo, x: number, y: number) => contains(a, x, y) && (!a.poly || inPolygon(a.poly, x, y))
+
+/** 点在区域外时到区域边界的距离平方（在区域内为 0） */
+function areaDistSq(a: AreaInfo, x: number, y: number) {
+  if (!a.poly) return rectDistSq(a, x, y)
+  if (inPolygon(a.poly, x, y)) return 0
+  let d = Infinity
+  for (let i = 0; i < a.poly.length; i++) d = Math.min(d, segDistSq(x, y, a.poly[i], a.poly[(i + 1) % a.poly.length]))
+  return d
+}
+
+/** 区域面积（多边形按鞋带公式） */
+export function areaSize(a: Pick<AreaInfo, 'width' | 'height' | 'poly'>) {
+  if (!a.poly) return a.width * a.height
+  let s = 0
+  for (let i = 0; i < a.poly.length; i++) {
+    const [ax, ay] = a.poly[i]
+    const [bx, by] = a.poly[(i + 1) % a.poly.length]
+    s += ax * by - bx * ay
+  }
+  return Math.abs(s) / 2
+}
+
+/** 区域名的位置：轮廓最上方（同高取最左）的顶点，矩形就是左上角 */
+export function areaLabelAnchor(a: Pick<AreaInfo, 'x' | 'y' | 'width' | 'height' | 'poly'>): [number, number] {
+  return areaOutline(a).reduce((best, q) => (q[1] < best[1] - 0.5 || (Math.abs(q[1] - best[1]) <= 0.5 && q[0] < best[0]) ? q : best))
+}
+
+/** 打印图、方案图用的区域：相对所在图纸的比例坐标（0–1），多边形区域带轮廓 */
+export type PlanAreaShape = { id: string; name: string; x0: number; y0: number; x1: number; y1: number; poly?: [number, number][] }
+export function planAreaOf(a: AreaInfo, sheet: { x: number; y: number; width: number; height: number }): PlanAreaShape {
+  const fx = (x: number) => (x - sheet.x) / sheet.width
+  const fy = (y: number) => (y - sheet.y) / sheet.height
+  return {
+    id: a.id,
+    name: a.name,
+    x0: fx(a.x),
+    y0: fy(a.y),
+    x1: fx(a.x + a.width),
+    y1: fy(a.y + a.height),
+    ...(a.poly ? { poly: a.poly.map(([x, y]) => [fx(x), fy(y)] as [number, number]) } : {}),
+  }
+}
+
 export function sceneAreas(elements: readonly SceneEl[], sheets: SheetInfo[]): AreaInfo[] {
   return live(elements)
     .filter((e) => kindOf(e) === 'area')
@@ -108,6 +209,7 @@ export function sceneAreas(elements: readonly SceneEl[], sheets: SheetInfo[]): A
         y: e.y,
         width: e.width,
         height: e.height,
+        poly: areaPolygon(e),
       }
     })
 }
@@ -120,12 +222,12 @@ export function scenePoints(elements: readonly SceneEl[], sheets: SheetInfo[], a
       const cy = e.y + e.height / 2
       const sheet = sheets.find((s) => contains(s, cx, cy)) ?? null
       // 落在多个区域里时取面积最小的（例如套间里的卫生间）
-      let area = areas.filter((a) => contains(a, cx, cy)).sort((a, b) => a.width * a.height - b.width * b.height)[0] ?? null
+      let area = areas.filter((a) => areaContains(a, cx, cy)).sort((a, b) => areaSize(a) - areaSize(b))[0] ?? null
       // 贴墙放置的点位（如开关、插座、路由）中心点可能偏移区域边框几个像素，自动归入同图纸内距离 16px 以内的最近区域
       if (!area) {
         const candidates = areas
-          .filter((a) => (!sheet || a.sheetId === sheet.id) && rectDistSq(a, cx, cy) <= 16 * 16)
-          .sort((a, b) => rectDistSq(a, cx, cy) - rectDistSq(b, cx, cy) || a.width * a.height - b.width * b.height)
+          .filter((a) => (!sheet || a.sheetId === sheet.id) && areaDistSq(a, cx, cy) <= 16 * 16)
+          .sort((a, b) => areaDistSq(a, cx, cy) - areaDistSq(b, cx, cy) || areaSize(a) - areaSize(b))
         area = candidates[0] ?? null
       }
       const productId = typeof e.customData?.productId === 'string' && e.customData.productId ? (e.customData.productId as string) : null
@@ -244,7 +346,7 @@ export function buildSheetElements(opts: { index: number; name: string; fileId: 
 
 export const AREA_STYLE = { stroke: '#64748b', label: '#475569', labelSize: 11 } as const
 
-/** 区域：虚线框 + 左上角的区域名。 */
+/** 区域：实线框 + 左上角的区域名（矩形；多边形区域由点位图编辑器生成）。 */
 export function buildAreaElements(opts: { name: string; areaType?: string; x: number; y: number; width: number; height: number }): SceneEl[] {
   const areaType = isAreaType(opts.areaType) ? opts.areaType : inferAreaType(opts.name)
   const group = randomId('ar-')
@@ -259,7 +361,7 @@ export function buildAreaElements(opts: { name: string; areaType?: string; x: nu
       groupIds: [group],
       strokeColor: AREA_STYLE.stroke,
       strokeWidth: 1,
-      strokeStyle: 'dashed',
+      strokeStyle: 'solid',
       roughness: 0,
       opacity: 70,
       customData: { kind: 'area', name: opts.name, areaType },

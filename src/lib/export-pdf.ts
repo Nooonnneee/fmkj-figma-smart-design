@@ -5,7 +5,7 @@
  * - 报价单（纵向 A4 长文）：按 A4 比例自动分页，并在切页位置向上寻找空白行，避免把文字或图片截断。
  */
 
-type PageJpeg = { bytes: Uint8Array; widthPx: number; heightPx: number; widthPt: number; heightPt: number }
+export type PageJpeg = { bytes: Uint8Array; widthPx: number; heightPx: number; widthPt: number; heightPt: number }
 
 function dataUrlToBytes(dataUrl: string): Uint8Array {
   const b64 = dataUrl.split(',')[1] ?? ''
@@ -172,7 +172,7 @@ function slicePortraitCanvas(source: HTMLCanvasElement, domEl: HTMLElement, scal
 }
 
 /** 把多页 JPEG 组装成标准 PDF 1.4 二进制文件 */
-function buildPdfFromJpegs(pages: PageJpeg[]): Blob {
+export function buildPdfFromJpegs(pages: PageJpeg[]): Blob {
   const enc = new TextEncoder()
   const chunks: Uint8Array[] = []
   const offsets: number[] = [0]
@@ -245,7 +245,12 @@ function buildPdfFromJpegs(pages: PageJpeg[]): Blob {
   return new Blob(chunks as BlobPart[], { type: 'application/pdf' })
 }
 
-export async function exportPagesAsPdf(elements: HTMLElement[], fileName: string) {
+/**
+ * 把页面元素渲染成 PDF 页（JPEG）：
+ * - data-export-page="flow" 的纵向长文（报价单、合同、交底清单）按 A4 自动分页；
+ * - 其余元素（方案页、点位图页）每个一页，按自身比例成页；只有一个元素时按宽高比判断。
+ */
+export async function renderPagesToJpegs(elements: HTMLElement[]): Promise<PageJpeg[]> {
   const { toCanvas } = await import('html-to-image')
   const pdfPages: PageJpeg[] = []
   const pixelRatio = 2
@@ -257,7 +262,8 @@ export async function exportPagesAsPdf(elements: HTMLElement[], fileName: string
       cacheBust: false,
       style: { margin: '0', boxShadow: 'none' },
     })
-    const isLandscapeCard = elements.length > 1 || canvas.width > canvas.height * 1.15
+    const flow = el.dataset.exportPage === 'flow'
+    const isLandscapeCard = !flow && (elements.length > 1 || canvas.width > canvas.height * 1.15)
     if (isLandscapeCard) {
       // 横版卡片按自身比例成页（A4 比例的卡片仍是标准 A4；3:2 的方案页不会被压扁）
       pdfPages.push({
@@ -272,12 +278,48 @@ export async function exportPagesAsPdf(elements: HTMLElement[], fileName: string
       pdfPages.push(...slicePortraitCanvas(canvas, el, scale))
     }
   }
-  const blob = buildPdfFromJpegs(pdfPages)
+  return pdfPages
+}
+
+export function downloadBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${fileName}.pdf`
+  a.download = fileName
   a.click()
   setTimeout(() => URL.revokeObjectURL(url), 2000)
+}
+
+export async function exportPagesAsPdf(elements: HTMLElement[], fileName: string) {
+  const pdfPages = await renderPagesToJpegs(elements)
+  downloadBlob(buildPdfFromJpegs(pdfPages), `${fileName}.pdf`)
   return pdfPages.length
+}
+
+/** 等页面里的字体和图片都加载完（导出前调用，避免缺字、缺图） */
+export async function waitForPageAssets(timeoutMs = 15000) {
+  const imgs = [...document.images].filter((img) => !img.complete)
+  const svgImages = [...document.querySelectorAll('image')]
+  await Promise.race([
+    Promise.all([
+      document.fonts?.ready,
+      ...imgs.map(
+        (img) =>
+          new Promise((r) => {
+            img.addEventListener('load', r, { once: true })
+            img.addEventListener('error', r, { once: true })
+          }),
+      ),
+      ...svgImages.map((el) => {
+        const href = el.getAttribute('href')
+        if (!href || href.startsWith('data:')) return null
+        return new Promise((r) => {
+          const probe = new Image()
+          probe.onload = probe.onerror = r
+          probe.src = href
+        })
+      }),
+    ]),
+    new Promise((r) => setTimeout(r, timeoutMs)),
+  ])
 }

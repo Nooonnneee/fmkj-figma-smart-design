@@ -5,7 +5,7 @@
 import type { Room } from '@/lib/project-docs'
 import { cn } from '@/lib/utils'
 
-import { codeRange, yuanShort } from '../model'
+import { yuanShort } from '../model'
 import { amountFont, Chapter, Slide, type DeckCtx } from '../parts'
 
 const COMPACT_LINES = 3
@@ -31,12 +31,18 @@ export function paginateRooms(rooms: Room[]): RoomPage[] {
   return pages
 }
 
-export function RoomsPage({ ctx, no, total, page, part }: { ctx: DeckCtx; no: number; total: number; page: RoomPage; part: string }) {
+export function RoomsPage({ ctx, no, total, page, rooms: roomCount, part }: { ctx: DeckCtx; no: number; total: number; page: RoomPage; rooms: number; part: string }) {
   const { rooms, compact } = page
   const maxLines = compact ? COMPACT_LINES : FULL_LINES
   return (
     <Slide ctx={ctx} no={no} total={total} name={`其余空间${part}`}>
-      <Chapter ctx={ctx} no={no} title="其余空间，同样逐一落实。" subtitle={`${ctx.m.otherRooms.length}个空间${part} / 点位、设备与小计一览，编号见平面索引`} tag="OTHER SPACES" />
+      <Chapter
+        ctx={ctx}
+        no={no}
+        title={roomCount > ctx.m.otherRooms.length ? '每个空间，都逐一落实。' : '其余空间，同样逐一落实。'}
+        subtitle={`${roomCount}个空间${part} / 点位、设备与小计一览，编号见平面索引`}
+        tag={roomCount > ctx.m.otherRooms.length ? 'ALL SPACES' : 'OTHER SPACES'}
+      />
       <div
         className={cn(
           'grid min-h-0 w-full grid-cols-4 gap-[20px] overflow-hidden',
@@ -53,7 +59,7 @@ export function RoomsPage({ ctx, no, total, page, part }: { ctx: DeckCtx; no: nu
               <p className="doc-latin shrink-0 text-[12px] text-doc-accent">{r.total}点</p>
             </div>
             <p className="doc-body mt-[2px] truncate text-[12px] text-doc-muted">
-              {r.typeLabel} · {codeRange(r.points.map((p) => p.code))}
+              {r.typeLabel} · {[...new Set(r.lines.map((l) => l.typeName))].slice(0, 3).join('、')}
             </p>
             <div className={cn('flex min-h-0 flex-1 flex-col border-t border-doc-rule', compact ? 'mt-[10px] gap-[4px] pt-[8px]' : 'mt-[12px] gap-[6px] pt-[10px]')}>
               {r.lines.slice(0, maxLines).map((l) => (

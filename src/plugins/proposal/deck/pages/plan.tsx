@@ -68,7 +68,7 @@ export function PlanPage({ ctx, no, total, s, first }: { ctx: DeckCtx; no: numbe
                       <p className="doc-body truncate text-[14px]">
                         {p.room} · {p.typeName}
                       </p>
-                      <p className="doc-latin text-[11px] text-doc-muted">{p.code || '—'}</p>
+                      
                     </div>
                     <p className="doc-latin shrink-0 text-[12px] text-doc-muted">
                       {p.ref ?? '待选型'} / 1{m.itemOf.get(p.ref ?? '')?.unit ?? '个'}

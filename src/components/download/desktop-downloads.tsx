@@ -110,10 +110,10 @@ export function DesktopHeroActions() {
   if (bridge) {
     return (
       <div className="mt-8 flex flex-wrap items-center gap-3">
-        <Badge variant="outline" className="h-9 rounded-full bg-card/60 px-4 text-sm">
+        <Badge variant="outline" className="h-9 rounded-full bg-card px-4 text-sm">
           你正在使用桌面客户端 v{bridge.version}
         </Badge>
-        <Button size="lg" variant="outline" className="rounded-full" onClick={() => void bridge.checkForUpdates()}>
+        <Button size="lg" variant="outline" className="h-11 rounded-full px-6 text-base" onClick={() => void bridge.checkForUpdates()}>
           <RefreshCw data-icon="inline-start" />
           检查更新
         </Button>
@@ -124,7 +124,7 @@ export function DesktopHeroActions() {
   if (loading || !detected) {
     return (
       <div className="mt-8 flex flex-col gap-3" aria-hidden>
-        <Skeleton className="h-9 w-56 rounded-full" />
+        <Skeleton className="h-11 w-56 rounded-full" />
         <Skeleton className="h-4 w-72" />
       </div>
     )
@@ -138,13 +138,13 @@ export function DesktopHeroActions() {
     return (
       <div className="mt-8">
         <div className="flex flex-wrap items-center gap-3">
-          <Button asChild size="lg" className="rounded-full px-5">
+          <Button asChild size="lg" className="h-11 rounded-full bg-foreground px-6 text-base text-background hover:bg-foreground/85">
             <Link href={asset.url} prefetch={false} download>
               <Download data-icon="inline-start" />
               {target.cta}
             </Link>
           </Button>
-          <Button asChild size="lg" variant="ghost" className="rounded-full">
+          <Button asChild size="lg" variant="ghost" className="h-11 rounded-full px-5 text-base">
             <Link href="#platforms">其他平台</Link>
           </Button>
         </div>
@@ -158,13 +158,13 @@ export function DesktopHeroActions() {
   return (
     <div className="mt-8">
       <div className="flex flex-wrap items-center gap-3">
-        <Button asChild size="lg" className="rounded-full px-5">
+        <Button asChild size="lg" className="h-11 rounded-full bg-foreground px-6 text-base text-background hover:bg-foreground/85">
           <Link href="/projects">
             使用网页版
             <ArrowRight data-icon="inline-end" />
           </Link>
         </Button>
-        <Button asChild size="lg" variant="ghost" className="rounded-full">
+        <Button asChild size="lg" variant="ghost" className="h-11 rounded-full px-5 text-base">
           <Link href="#platforms">查看全部平台</Link>
         </Button>
       </div>
@@ -188,18 +188,16 @@ export function DesktopPlatformCards() {
         const isRecommended = recommended?.id === target.id
         const Icon = target.icon
         return (
-          <div key={target.id} className={cn('flex flex-col rounded-2xl border border-border bg-card/50 p-6', isRecommended && 'border-primary/60 ring-1 ring-primary/40')}>
+          <div key={target.id} className={cn('flex flex-col rounded-2xl border border-border bg-card p-6', isRecommended && 'border-primary/60 ring-1 ring-primary/40')}>
             <div className="flex items-center justify-between gap-3">
-              <span className="flex size-11 items-center justify-center rounded-xl bg-brand-indigo/15 text-primary">
-                <Icon className="size-5" />
-              </span>
+              <Icon aria-hidden className="size-5 text-muted-foreground" />
               {isRecommended ? (
                 <Badge variant="secondary" className="rounded-full">
                   推荐你的电脑
                 </Badge>
               ) : null}
             </div>
-            <h3 className="mt-5 text-lg font-semibold">{target.title}</h3>
+            <h3 className="mt-6 font-medium">{target.title}</h3>
             <p className="mt-1 text-sm text-muted-foreground">{target.note}</p>
 
             {loading ? (

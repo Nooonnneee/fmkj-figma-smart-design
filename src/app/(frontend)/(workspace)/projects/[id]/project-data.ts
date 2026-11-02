@@ -36,6 +36,8 @@ export const getProject = cache(async (id: string) => {
         pointCount: true,
         archivedAt: true,
         updatedAt: true,
+        finalQuote: true,
+        proposalTemplate: true,
       },
     })
     .catch(() => null)

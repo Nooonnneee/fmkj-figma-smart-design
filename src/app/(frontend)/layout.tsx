@@ -4,6 +4,7 @@ import Script from "next/script"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ACCENT_INIT_SCRIPT } from "@/lib/appearance"
 import { APP_DESCRIPTION, APP_NAME, APP_TAGLINE } from "@/lib/brand"
+import { siteSans } from "@/lib/fonts"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { BodyCustomCode, renderHeadCustomCode } from "@/lib/make-custom-code"
@@ -60,7 +61,7 @@ export default function RootLayout({
   const customScripts = makeSiteSettings.customScripts
 
   return (
-    <html lang={language} suppressHydrationWarning className="bg-background">
+    <html lang={language} suppressHydrationWarning className={`${siteSans.variable} bg-background`}>
       <head>
         {/* 恢复主题风格，避免首屏闪烁 */}
         <script dangerouslySetInnerHTML={{ __html: ACCENT_INIT_SCRIPT }} />

@@ -1,10 +1,26 @@
 import { categoryOfType, deviceTypeOf } from '@/lib/device-types'
-import { markerDataUrl } from '@/lib/point-marker-data'
+import { markerSrc } from '@/lib/point-marker-data'
+import type { PlanAreaShape } from '@/lib/point-scene'
 import { SHEET } from '@/lib/sheet-spec'
 import { cn } from '@/lib/utils'
 
 export type PlanPoint = { id: string; deviceType: string; code: string; rx: number | null; ry: number | null; image?: string | null }
-export type PlanArea = { id: string; name: string; x0: number; y0: number; x1: number; y1: number }
+/** 区域：比例坐标的外接框，多边形区域带 poly 轮廓（用 planAreaOf 生成） */
+export type PlanArea = PlanAreaShape
+
+/** 区域轮廓（比例坐标）与区域名位置：最上方（同高取最左）的顶点 */
+export function planAreaOutline(a: PlanArea): [number, number][] {
+  return (
+    a.poly ?? [
+      [a.x0, a.y0],
+      [a.x1, a.y0],
+      [a.x1, a.y1],
+      [a.x0, a.y1],
+    ]
+  )
+}
+export const planAreaLabelAt = (a: PlanArea): [number, number] =>
+  planAreaOutline(a).reduce((best, q) => (q[1] < best[1] - 1e-4 || (Math.abs(q[1] - best[1]) <= 1e-4 && q[0] < best[0]) ? q : best))
 
 /**
  * 方案图：标准图纸 + 点位（矢量，打印清晰）。
@@ -51,12 +67,26 @@ export function PlanFigure({
       ) : null}
       <svg viewBox={`0 0 ${W} ${H}`} className="pointer-events-none absolute inset-0 size-full" role="img" aria-label="点位方案图">
         {showAreas
-          ? areas.map((a) => (
-              <g key={a.id}>
-                <rect x={a.x0 * W} y={a.y0 * H} width={(a.x1 - a.x0) * W} height={(a.y1 - a.y0) * H} fill="#0f172a" fillOpacity={0.025} stroke="#64748b" strokeWidth={2} strokeDasharray="10 8" />
-                <text x={a.x0 * W + 12} y={a.y0 * H + 34} fontSize={26} fontWeight={600} fill="#475569" stroke="#fff" strokeWidth={6} paintOrder="stroke">{a.name}</text>
-              </g>
-            ))
+          ? areas.map((a) => {
+              const [lx, ly] = planAreaLabelAt(a)
+              return (
+                <g key={a.id}>
+                  <polygon
+                    points={planAreaOutline(a)
+                      .map(([x, y]) => `${x * W},${y * H}`)
+                      .join(' ')}
+                    fill="#0f172a"
+                    fillOpacity={0.025}
+                    stroke="#64748b"
+                    strokeWidth={2.4}
+                    strokeLinejoin="round"
+                  />
+                  <text x={lx * W + 12} y={ly * H + 34} fontSize={26} fontWeight={600} fill="#475569" stroke="#fff" strokeWidth={6} paintOrder="stroke">
+                    {a.name}
+                  </text>
+                </g>
+              )
+            })
           : null}
         {placed.map((p) => {
           const cx = p.rx! * W
@@ -69,7 +99,7 @@ export function PlanFigure({
               {isProd ? (
                 <circle cx={cx} cy={cy} r={S / 2} fill="#f1f1f1" stroke={color} strokeWidth={5} />
               ) : (
-                <image href={markerDataUrl(p.deviceType)} x={cx - S / 2} y={cy - S / 2} width={S} height={S} />
+                <image href={markerSrc(p.deviceType)} x={cx - S / 2} y={cy - S / 2} width={S} height={S} />
               )}
               {showCodes && typeLabel ? (
                 <text x={cx} y={cy + S / 2 + 24} textAnchor="middle" fontSize={22} fontWeight={700} fill={color} stroke="#fff" strokeWidth={6} paintOrder="stroke">

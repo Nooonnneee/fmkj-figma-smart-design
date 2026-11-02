@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element -- 导出 PDF / 图片需要同源普通 <img> */
 /**
- * 01 封面：栖序 = 顶部照片色带 + 下方标题（设计稿原样）；墨金 = 整幅照片 + 深色渐变；原木 = 左文右图。
+ * 01 封面（主题的 cover 决定版式）：band = 顶部照片色带 + 下方标题（栖序设计稿原样）；
+ * immersive = 整幅照片 + 纸色渐变；split = 左文右图；type = 纯文字大字封面（不用照片）。
  */
 import { pointScopeLabel } from '@/lib/point-scopes'
 
@@ -25,6 +26,7 @@ export function CoverPage({ ctx, no, total }: { ctx: DeckCtx; no: number; total:
   const t = ctx.theme
   if (t.cover === 'immersive') return <ImmersiveCover ctx={ctx} no={no} total={total} />
   if (t.cover === 'split') return <SplitCover ctx={ctx} no={no} total={total} />
+  if (t.cover === 'type') return <TypeCover ctx={ctx} no={no} total={total} />
   const f = facts(ctx)
   return (
     <Slide ctx={ctx} no={no} total={total} name="01 封面" cover>
@@ -72,8 +74,8 @@ function ImmersiveCover({ ctx, no, total }: { ctx: DeckCtx; no: number; total: n
   return (
     <Slide ctx={ctx} no={no} total={total} name="01 封面" cover>
       <img src={t.coverPhoto} alt="" loading="eager" decoding="sync" className="absolute inset-0 size-full object-cover" />
-      <div aria-hidden className="absolute inset-0 bg-linear-to-r from-[#0d0d0f] via-[#0d0d0f]/80 to-[#0d0d0f]/10" />
-      <div aria-hidden className="absolute inset-x-0 bottom-0 h-[420px] bg-linear-to-t from-[#0d0d0f] via-[#0d0d0f]/85 to-transparent" />
+      <div aria-hidden className="absolute inset-0 bg-linear-to-r from-doc-paper via-doc-paper/80 to-doc-paper/10" />
+      <div aria-hidden className="absolute inset-x-0 bottom-0 h-[420px] bg-linear-to-t from-doc-paper via-doc-paper/85 to-transparent" />
       <div className="absolute inset-x-[56px] top-[36px] flex h-[34px] items-center justify-between">
         <Brand ctx={ctx} large />
         <p className="doc-latin text-[11px] tracking-[0.28em] whitespace-nowrap text-doc-accent">{t.coverTagline}</p>
@@ -150,6 +152,51 @@ function SplitCover({ ctx, no, total }: { ctx: DeckCtx; no: number; total: numbe
         <p className="doc-latin text-[12px] text-doc-ink">{`${pad(no)} / ${pad(total)}`}</p>
       </div>
       <p className="doc-body absolute top-[836px] left-[56px] w-[640px] truncate text-[12px] text-doc-accent">{f.accent}</p>
+    </Slide>
+  )
+}
+
+/** 纯文字封面（素白极简）：大字标题 + 超大点位数字 + 底部四栏信息，不用照片 */
+function TypeCover({ ctx, no, total }: { ctx: DeckCtx; no: number; total: number }) {
+  const t = ctx.theme
+  const f = facts(ctx)
+  const d = ctx.m.d
+  const cols: [string, string][] = [
+    ['PROJECT', ctx.m.place],
+    ['CLIENT', f.who],
+    ['SCALE', `${d.rooms.length}个空间 · ${d.points.length}个点位`],
+    ['INVESTMENT', yuanShort(ctx.m.finalAmount)],
+  ]
+  return (
+    <Slide ctx={ctx} no={no} total={total} name="01 封面" cover>
+      <div className="absolute inset-x-[56px] top-[36px] flex h-[34px] items-center justify-between">
+        <Brand ctx={ctx} large />
+        <p className="doc-latin text-[11px] tracking-[0.32em] whitespace-nowrap text-doc-muted">{t.coverTagline}</p>
+      </div>
+      <div aria-hidden className="absolute inset-x-[56px] top-[96px] h-px bg-doc-ink" />
+      <div className="absolute top-[176px] left-[56px] w-[820px]">
+        <p className="doc-latin text-[12px] tracking-[0.36em] text-doc-muted">PROPOSAL · {f.year}</p>
+        <h1 className="doc-display mt-[28px] text-[84px] leading-[1.12]">{t.headline}</h1>
+        <p className="doc-body mt-[28px] text-[24px] leading-normal">{SUBTITLE}</p>
+        <p className="doc-body mt-[12px] text-[14px] whitespace-pre text-doc-muted">{f.tags.join('　/　')}</p>
+      </div>
+      <div className="absolute top-[176px] right-[56px] flex w-[420px] flex-col items-end text-right">
+        <p className="doc-numeral text-[200px] leading-[0.9] tracking-[-0.04em]">{d.points.length}</p>
+        <p className="doc-latin mt-[10px] text-[12px] tracking-[0.3em] text-doc-muted">SMART POINTS · 智能点位</p>
+        <p className="doc-body mt-[26px] max-w-[420px] truncate text-[14px] text-doc-muted">{f.accent}</p>
+      </div>
+      <div className="absolute inset-x-[56px] top-[730px] grid grid-cols-4 gap-[32px] border-t border-doc-ink pt-[22px]">
+        {cols.map(([k, v]) => (
+          <div key={k} className="min-w-0">
+            <p className="doc-latin text-[10.5px] tracking-[0.3em] text-doc-muted">{k}</p>
+            <p className={k === 'INVESTMENT' ? 'doc-numeral mt-[8px] truncate text-[30px]' : 'doc-body mt-[10px] truncate text-[17px]'}>{v}</p>
+          </div>
+        ))}
+      </div>
+      <div className="absolute inset-x-[56px] top-[906px] flex justify-between leading-normal">
+        <p className="doc-latin text-[11px] text-doc-muted">{f.doc}</p>
+        <p className="doc-latin text-[12px] text-doc-ink">{`${pad(no)} / ${pad(total)}`}</p>
+      </div>
     </Slide>
   )
 }

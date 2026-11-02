@@ -5,16 +5,15 @@ import { Button } from '@/components/ui/button'
 
 export default function NotFound() {
   return (
-    <main className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-6 py-16 text-center">
-      <BrandMark className="size-14" />
-      <p className="mt-6 text-sm font-semibold tracking-widest text-primary tabular-nums">404</p>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight">页面不存在或无权访问</h1>
-      <p className="mt-2 text-sm text-muted-foreground">你访问的项目、报价或页面可能已被删除，或当前账号没有访问权限。</p>
-      <div className="mt-6 flex items-center gap-3">
-        <Button asChild size="sm">
+    <main className="mx-auto flex min-h-[70vh] max-w-xl flex-col items-center justify-center px-6 py-16 text-center">
+      <BrandMark className="size-12" />
+      <h1 className="mt-8 text-3xl font-medium tracking-tight">页面不存在或无权访问</h1>
+      <p className="mt-4 text-base leading-relaxed text-muted-foreground">你访问的项目、报价或页面可能已被删除，或当前账号没有访问权限（错误代码 404）。</p>
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+        <Button asChild className="h-10 rounded-full bg-foreground px-5 text-background hover:bg-foreground/85">
           <Link href="/projects">返回项目列表</Link>
         </Button>
-        <Button asChild variant="outline" size="sm">
+        <Button asChild variant="outline" className="h-10 rounded-full px-5">
           <Link href="/">返回首页</Link>
         </Button>
       </div>

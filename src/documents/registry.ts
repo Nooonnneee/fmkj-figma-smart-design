@@ -15,6 +15,8 @@ export const DOC_KINDS: Record<DocKind, { label: string; orientation: 'portrait'
       { value: 'standard', label: '标准版', description: '一张明细表，附各层点位图' },
       { value: 'detailed', label: '图文版', description: '按类别排列产品卡片，带产品图和品牌' },
       { value: 'compact', label: '精简版', description: '紧凑表格，一两页打完' },
+      { value: 'system', label: '按系统版', description: '按照明、安防、网络等系统分组列设备，附各系统小计与占比' },
+      { value: 'budget', label: '预算概览', description: '一页看懂总价：楼层与系统小计、付款节点，不列型号' },
     ],
   },
   plans: {
@@ -32,6 +34,8 @@ export const DOC_KINDS: Record<DocKind, { label: string; orientation: 'portrait'
     layouts: [
       { value: 'full', label: '含报价附件', description: '合同正文 + 附件《报价明细》' },
       { value: 'brief', label: '仅正文', description: '只打印合同正文' },
+      { value: 'formal', label: '正式版', description: '封面 + 「第 X 条」正文 + 签署页 + 附件《报价明细》' },
+      { value: 'confirm', label: '订单确认书', description: '单页确认金额、付款与工期，适合小型项目' },
     ],
   },
   checklist: {

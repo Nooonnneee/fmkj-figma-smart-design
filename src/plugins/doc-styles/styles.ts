@@ -13,8 +13,8 @@ export const QIXU_STYLE: DocStyle = {
   colors: {
     paper: '#f8f7f4',
     ink: '#252523',
-    muted: '#787771',
-    accent: '#7773b8',
+    muted: '#6b6b65',
+    accent: '#6764a0',
     soft: '#e7dff4',
     softTo: '#d9e7f2',
     rule: '#dad8d1',
@@ -70,7 +70,7 @@ export const ORIENTAL_STYLE: DocStyle = {
   colors: {
     paper: '#fbf8f2',
     ink: '#2a2420',
-    muted: '#7f7467',
+    muted: '#766b5f',
     accent: '#9b2c2c',
     soft: '#f3e9dc',
     softTo: '#efe2cf',
@@ -120,7 +120,7 @@ export const NOIR_STYLE: DocStyle = {
   colors: {
     paper: '#fffdf8',
     ink: '#1c1b19',
-    muted: '#7a7466',
+    muted: '#736e60',
     accent: '#9c7a3c',
     soft: '#f4ecdc',
     softTo: '#efe4cd',
@@ -152,7 +152,7 @@ export const GROVE_STYLE: DocStyle = {
   colors: {
     paper: '#f6f2ea',
     ink: '#2e2b25',
-    muted: '#7d7668',
+    muted: '#6d675b',
     accent: '#5e6e4f',
     soft: '#e6eadb',
     softTo: '#f0e9da',

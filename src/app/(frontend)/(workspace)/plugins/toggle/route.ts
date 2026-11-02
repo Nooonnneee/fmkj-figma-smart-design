@@ -2,8 +2,13 @@ import { revalidatePath } from 'next/cache'
 
 import { appAuth } from '@/lib/app-auth'
 import { getCompanyInfo } from '@/lib/cached-data'
+import { featureAccess, tierBadge } from '@/lib/membership'
+import { getMembershipContext } from '@/lib/membership-policy'
 import { getPayloadClient } from '@/lib/payload'
+import { tierMeta } from '@/lib/membership'
 import { isPluginId, PLUGINS } from '@/plugins'
+import { userTier } from '@/plugins/state'
+import { tierAllows } from '@/lib/membership'
 
 const fail = (status: number, error: string) => Response.json({ ok: false, error }, { status })
 
@@ -26,6 +31,10 @@ export async function POST(request: Request) {
   const plugin = PLUGINS.find((p) => p.id === body.id)
   if (!plugin || plugin.status !== 'ready') {
     return fail(400, '该插件尚在待开发阶段，暂不可开启')
+  }
+
+  if (body.enabled && !tierAllows(await userTier(user.id), plugin.tier)) {
+    return fail(403, `「${plugin.name}」需要${tierMeta(plugin.tier).label}，请先在「会员与积分」升级`)
   }
 
   const company = await getCompanyInfo(user.id)

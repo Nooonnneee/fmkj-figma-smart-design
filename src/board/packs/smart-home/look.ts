@@ -14,11 +14,11 @@ export function artOf(key: string): SymbolArt | null {
   return { src: `${BASE}/${key}.png?v=${SYMBOL_ASSET_VERSION}`, srcSm: `${BASE}/${key}.sm.png?v=${SYMBOL_ASSET_VERSION}`, gw: a.gw, gh: a.gh, pad: SYMBOL_ASSET_PAD }
 }
 
-/** 最终确定的点位图标（scripts/point-icons/mapping.json）：画板、面板、导出共用 */
+/** 点位图标（平面符号样式，scripts/point-icons/mapping.json 选定的原图，build-point-icons.mjs 优化）：画板、面板、导出共用 */
 export function pointIconArt(type: string): SymbolArt | null {
   const g = POINT_ICON_GEOM[type]
   if (!g) return null
-  return { src: `/point-icons/${type}.png?v=${POINT_ICON_VERSION}`, srcSm: `/point-icons/${type}.sm.png?v=${POINT_ICON_VERSION}`, gw: g.gw, gh: g.gh, pad: SYMBOL_ASSET_PAD }
+  return { src: `/point-icons/${type}.png?v=${POINT_ICON_VERSION}`, srcSm: `/point-icons/${type}.png?v=${POINT_ICON_VERSION}`, gw: g.gw, gh: g.gh, pad: SYMBOL_ASSET_PAD }
 }
 
 export type LightingVariant = { id: string; art: string; sizeCm: SizeCm | null; label: string; family: LightingFamily }
@@ -57,7 +57,7 @@ export const defaultVariant = (f: LightingFamily) => f.variants[Math.floor((f.va
 
 export function deviceLook(deviceType: string): SymbolLook {
   const t = deviceTypeOf(deviceType) ?? deviceTypeOf('other')!
-  // 有按设备类型单独挑选的图形（如单开 / 双开 / 三开 / 四开）就用它，否则用共用的符号
+  // 平面符号用按设备类型生成的点位图标，没有时才回退到共用的符号；实心标记与它同一套图形
   const own = pointIconArt(t.value) ?? artOf(t.value)
   return {
     key: t.value,

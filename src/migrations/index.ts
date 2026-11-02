@@ -6,6 +6,7 @@ import * as migration_20261031_065532_ai_admin_sync from './20261031_065532_ai_a
 import * as migration_20261031_114930_personal_profile_demo from './20261031_114930_personal_profile_demo';
 import * as migration_20261031_161835_membership_codes from './20261031_161835_membership_codes';
 import * as migration_20261101_172228_ai_settings_sync from './20261101_172228_ai_settings_sync';
+import * as migration_20261102_081320_scenes_templates_delivery_sync from './20261102_081320_scenes_templates_delivery_sync';
 
 export const migrations = [
   {
@@ -46,6 +47,11 @@ export const migrations = [
   {
     up: migration_20261101_172228_ai_settings_sync.up,
     down: migration_20261101_172228_ai_settings_sync.down,
-    name: '20261101_172228_ai_settings_sync'
+    name: '20261101_172228_ai_settings_sync',
+  },
+  {
+    up: migration_20261102_081320_scenes_templates_delivery_sync.up,
+    down: migration_20261102_081320_scenes_templates_delivery_sync.down,
+    name: '20261102_081320_scenes_templates_delivery_sync'
   },
 ];

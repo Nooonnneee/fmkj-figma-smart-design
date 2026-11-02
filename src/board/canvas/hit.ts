@@ -1,10 +1,20 @@
-import { boxContains, distToSegment, inRotatedRect, nearBoxEdge, rotatePoint } from '../core/geometry'
-import { MIN_AREA, rawBox } from '../core/ops'
+import { boxContains, distToPolygon, distToSegment, inRotatedRect, nearBoxEdge, pointInPolygon, rotatePoint } from '../core/geometry'
+import { areaPoly, rawBox } from '../core/ops'
 import { labelBox, textWidth, type SymbolGeom } from '../core/symbols'
 import type { AreaObj, BoardDoc, Box, RawEl, Vec, ViewSettings } from '../core/types'
 
-export type Handle = 'rotate' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
-export type Hit = { kind: 'symbol' | 'area' | 'raw' | 'sheet'; id: string } | { kind: 'handle'; id: string; handle: Handle }
+export type Handle = 'rotate'
+/**
+ * 命中结果：
+ * - handle：选中符号的旋转手柄；
+ * - vertex：选中区域的顶点（拖动改形状，双击删除）；
+ * - mid：选中区域某条边的中点（拖动插入新顶点，index 是这条边起点的序号）。
+ */
+export type Hit =
+  | { kind: 'symbol' | 'area' | 'raw' | 'sheet'; id: string }
+  | { kind: 'handle'; id: string; handle: Handle }
+  | { kind: 'vertex'; id: string; index: number }
+  | { kind: 'mid'; id: string; index: number }
 
 export type HitCtx = {
   doc: BoardDoc
@@ -17,38 +27,27 @@ export type HitCtx = {
 }
 
 export const AREA_LABEL = 11
-export const areaLabelBox = (a: AreaObj): Box => ({ x: a.x + 2, y: a.y + 1, w: textWidth(a.name, AREA_LABEL) + 6, h: AREA_LABEL * 1.4 })
 
-export function areaHandles(b: Box): [Handle, Vec][] {
-  const { x, y, w, h } = b
-  return [
-    ['nw', { x, y }],
-    ['n', { x: x + w / 2, y }],
-    ['ne', { x: x + w, y }],
-    ['e', { x: x + w, y: y + h / 2 }],
-    ['se', { x: x + w, y: y + h }],
-    ['s', { x: x + w / 2, y: y + h }],
-    ['sw', { x, y: y + h }],
-    ['w', { x, y: y + h / 2 }],
-  ]
+/** 区域名的位置：轮廓最上方（同高取最左）的顶点；矩形区域就是左上角（与编解码器写入的区域名一致） */
+export function areaLabelAnchor(a: AreaObj): Vec {
+  return areaPoly(a).reduce((best, q) => (q.y < best.y - 0.5 || (Math.abs(q.y - best.y) <= 0.5 && q.x < best.x) ? q : best))
 }
+export const areaLabelBox = (a: AreaObj): Box => {
+  const p = areaLabelAnchor(a)
+  return { x: p.x + 2, y: p.y + 1, w: textWidth(a.name, AREA_LABEL) + 6, h: AREA_LABEL * 1.4 }
+}
+
+/** 每条边的中点（第 i 条边从顶点 i 到顶点 i + 1） */
+export const edgeMidpoints = (poly: readonly Vec[]): Vec[] =>
+  poly.map((q, i) => {
+    const n = poly[(i + 1) % poly.length]
+    return { x: (q.x + n.x) / 2, y: (q.y + n.y) / 2 }
+  })
 
 export const rotateHandle = (o: { x: number; y: number; angle: number }, g: SymbolGeom, zoom: number): Vec =>
   rotatePoint({ x: o.x, y: o.y - g.h / 2 - 18 / zoom }, { x: o.x, y: o.y }, o.angle)
 
-export const HANDLE_CURSOR: Record<Handle, string> = { rotate: 'grab', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', ne: 'nesw-resize', sw: 'nesw-resize', nw: 'nwse-resize', se: 'nwse-resize' }
-
-export function resizeBox(orig: Box, handle: Handle, dx: number, dy: number): Box {
-  let x0 = orig.x
-  let y0 = orig.y
-  let x1 = orig.x + orig.w
-  let y1 = orig.y + orig.h
-  if (handle.includes('w')) x0 = Math.min(x0 + dx, x1 - MIN_AREA)
-  if (handle.includes('e')) x1 = Math.max(x1 + dx, x0 + MIN_AREA)
-  if (handle.includes('n')) y0 = Math.min(y0 + dy, y1 - MIN_AREA)
-  if (handle.includes('s')) y1 = Math.max(y1 + dy, y0 + MIN_AREA)
-  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
-}
+export const HANDLE_CURSOR: Record<Handle, string> = { rotate: 'grab' }
 
 function rawHit(el: RawEl, p: Vec, tol: number) {
   const pts = Array.isArray(el.points) ? (el.points as [number, number][]) : null
@@ -73,7 +72,10 @@ export function hitTest(p: Vec, c: HitCtx): Hit | null {
     const id = [...selection][0]
     const o = objs.find((x) => x.id === id)
     if (o?.kind === 'area' && view.layers.area) {
-      for (const [h, q] of areaHandles(o)) if (Math.hypot(p.x - q.x, p.y - q.y) <= tol + 1 / zoom) return { kind: 'handle', id, handle: h }
+      const poly = areaPoly(o)
+      for (let i = 0; i < poly.length; i++) if (Math.hypot(p.x - poly[i].x, p.y - poly[i].y) <= tol + 2 / zoom) return { kind: 'vertex', id, index: i }
+      const mids = edgeMidpoints(poly)
+      for (let i = 0; i < mids.length; i++) if (Math.hypot(p.x - mids[i].x, p.y - mids[i].y) <= tol) return { kind: 'mid', id, index: i }
     }
     if (o?.kind === 'symbol' && view.layers.symbol) {
       const g = geoms.get(id)
@@ -103,9 +105,10 @@ export function hitTest(p: Vec, c: HitCtx): Hit | null {
     for (let i = objs.length - 1; i >= 0; i--) {
       const o = objs[i]
       if (o.kind !== 'area') continue
-      if (boxContains(areaLabelBox(o), p) || nearBoxEdge(o, p, tol)) return { kind: 'area', id: o.id }
+      const poly = areaPoly(o)
+      if (boxContains(areaLabelBox(o), p) || (boxContains(o, p, tol) && distToPolygon(p, poly) <= tol)) return { kind: 'area', id: o.id }
       // 已选中的区域：内部也能拖动
-      if (selection.has(o.id) && boxContains(o, p)) return { kind: 'area', id: o.id }
+      if (selection.has(o.id) && pointInPolygon(p, poly)) return { kind: 'area', id: o.id }
     }
   }
   for (let i = objs.length - 1; i >= 0; i--) {

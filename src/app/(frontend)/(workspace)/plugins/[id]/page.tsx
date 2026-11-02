@@ -13,7 +13,10 @@ import { getPayloadClient } from '@/lib/payload'
 import { isPluginId, PLUGINS } from '@/plugins'
 import { DEFAULT_AI_TEMPLATES, enabledAiModels } from '@/plugins/ai-copilot/templates'
 import { PLUGIN_DOC_STYLES } from '@/plugins/doc-styles/styles'
-import { PROPOSAL_TEMPLATES } from '@/plugins/proposal/templates'
+import { featureAccess, tierBadge } from '@/lib/membership'
+import { getMembershipContext } from '@/lib/membership-policy'
+import { PLUGIN_STAGES } from '@/plugins'
+import { loadProposalTemplates } from '@/plugins/proposal/registry'
 import { getPluginFlags } from '@/plugins/state'
 
 import { PluginDetailToggle } from './plugin-detail-toggle'
@@ -35,9 +38,11 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
   if (!plugin) notFound()
 
   const payload = await getPayloadClient()
-  const [flags, company, projectsRes] = await Promise.all([
+  const [flags, company, access, templates, projectsRes] = await Promise.all([
     getPluginFlags(user.id),
     getCompanyInfo(user.id),
+    getMembershipContext(user),
+    plugin.id === 'proposal' ? loadProposalTemplates(user) : Promise.resolve([]),
     payload.find({
       collection: 'projects',
       where: { status: { not_equals: 'archived' } },
@@ -52,6 +57,8 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
 
   const enabled = flags[plugin.id]
   const pending = plugin.status === 'coming-soon'
+  const stage = PLUGIN_STAGES.find((s) => s.key === plugin.stage)!
+  const tierOk = featureAccess(access.membership, plugin.tier, access.strict)
   const activeAiModels = enabledAiModels(company.aiModels)
   const projects = projectsRes.docs.map((p) => ({
     id: String(p.id),
@@ -81,14 +88,28 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
       <PageHeader
         title={plugin.name}
         description={plugin.description}
-        actions={<PluginDetailToggle id={plugin.id} name={plugin.name} status={plugin.status} initialEnabled={enabled} />}
+        actions={
+          <PluginDetailToggle
+            id={plugin.id}
+            name={plugin.name}
+            status={plugin.status}
+            initialEnabled={enabled}
+            locked={tierOk.allowed ? undefined : `需要${tierBadge(plugin.tier)}`}
+          />
+        }
       />
+
+      <div className="-mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <Badge variant="secondary">项目阶段 · {stage.label}</Badge>
+        <Badge variant={plugin.tier === 'free' ? 'outline' : 'default'}>{plugin.tier === 'free' ? '所有会员可用' : `${tierBadge(plugin.tier)}可用`}</Badge>
+        <span>{plugin.tagline}</span>
+      </div>
 
       <Card>
         <CardHeader>
           <CardTitle>插件能力与接入位置</CardTitle>
           <CardDescription>
-            {pending ? `规划接入位置：${plugin.where}` : `当前生效位置：${plugin.where}`}
+            {pending ? `规划接入：${stage.label}（${stage.hint}）` : `接入阶段：${stage.label}（${stage.hint}）${plugin.entry ? ` · 入口：${plugin.entry.label}` : ''}`}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -153,7 +174,7 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
           {plugin.id === 'doc-styles' ? (
             <div className="space-y-2 border-t pt-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">包含的 4 套扩展打印风格</span>
+                <span className="text-xs font-medium text-muted-foreground">包含的 {PLUGIN_DOC_STYLES.length} 套扩展打印风格</span>
                 <Button asChild variant="outline" size="xs">
                   <Link href="/settings">
                     <Settings className="size-3.5" />
@@ -181,11 +202,14 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
 
           {plugin.id === 'proposal' ? (
             <div className="space-y-2 border-t pt-4">
-              <div className="text-xs font-medium text-muted-foreground">包含的横版方案模板</div>
+              <div className="text-xs font-medium text-muted-foreground">可用的方案模板（{templates.length} 套，后台「方案 → 方案模板」可调整）</div>
               <div className="grid gap-2 sm:grid-cols-2">
-                {PROPOSAL_TEMPLATES.map((tpl) => (
+                {templates.map((tpl) => (
                   <div key={tpl.value} className="rounded-lg border p-3">
-                    <div className="text-sm font-medium">{tpl.label}</div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium">{tpl.label}</span>
+                      {tpl.tier !== 'free' ? <Badge variant="outline" className="h-4 px-1.5 text-xs">{tierBadge(tpl.tier)}</Badge> : null}
+                    </div>
                     <p className="mt-0.5 text-xs text-muted-foreground">{tpl.description}</p>
                   </div>
                 ))}
@@ -219,7 +243,7 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
             <CardTitle>在项目中使用</CardTitle>
             <CardDescription>
               {enabled
-                ? '选择下方项目，直接进入该插件对应的工作台或文档预览'
+                ? `选择下方项目，直接进入插件在该项目里的入口（${plugin.entry?.label ?? stage.hint}）`
                 : '当前插件已关闭；开启后即可在项目点位图、方案和打印页中使用'}
             </CardDescription>
           </CardHeader>
@@ -228,18 +252,8 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
               <p className="py-4 text-sm text-muted-foreground">还没有进行中的项目，请先在「项目」中创建。</p>
             ) : (
               projects.map((proj) => {
-                const targetHref =
-                  plugin.id === 'proposal'
-                    ? `/print/projects/${proj.id}/proposal?template=qixu`
-                    : plugin.id === 'doc-styles'
-                      ? `/print/projects/${proj.id}/plans?style=qixu`
-                      : `/projects/${proj.id}/point-map`
-                const targetLabel =
-                  plugin.id === 'proposal'
-                    ? '预览栖序提案'
-                    : plugin.id === 'doc-styles'
-                      ? '预览文档风格'
-                      : '打开点位图使用'
+                const targetHref = plugin.entry ? plugin.entry.href(proj.id) : `/projects/${proj.id}`
+                const targetLabel = plugin.id === 'proposal' ? '打开方案' : plugin.id === 'doc-styles' ? '预览风格' : plugin.id === 'ai-copilot' ? '打开 AI 对话' : '打开点位图'
                 return (
                   <div key={proj.id} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
                     <div className="min-w-0">

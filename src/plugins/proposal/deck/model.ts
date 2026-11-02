@@ -133,7 +133,6 @@ const CAT_DESC: Record<string, string> = {
 
 const SWITCHES = ['switch-1', 'switch-2', 'switch-3', 'switch-4']
 const LIGHTS = DEVICE_TYPE_ORDER.filter((t) => categoryOfType(t)?.slug === 'lighting')
-const SENSORS = ['water-sensor', 'smoke-sensor', 'motion-sensor', 'contact-sensor', 'temp-sensor']
 
 /** 安装复核要点：按出现的设备类型组合 */
 const INSTALL_NOTES: [string[], string][] = [

@@ -10,6 +10,7 @@ import { appAuth } from '@/lib/app-auth'
 import { deviceTypeOf, DEVICE_TYPE_ORDER } from '@/lib/device-types'
 import { docNumber, isPointScope, loadProjectDocs, POINT_SCOPES, scopeTitle } from '@/lib/project-docs'
 import { cn } from '@/lib/utils'
+import { planAreaOf } from '@/lib/point-scene'
 
 export const metadata = { title: '点位图', robots: { index: false, follow: false } }
 
@@ -77,7 +78,7 @@ export default async function PlansPrintPage({
             const pts = d.points.filter((p) => p.sheetId === sheet.id)
             const areas = d.areas
               .filter((a) => a.sheetId === sheet.id)
-              .map((a) => ({ id: a.id, name: a.name, x0: (a.x - sheet.x) / sheet.width, y0: (a.y - sheet.y) / sheet.height, x1: (a.x + a.width - sheet.x) / sheet.width, y1: (a.y + a.height - sheet.y) / sheet.height }))
+              .map((a) => planAreaOf(a, sheet))
             const types = DEVICE_TYPE_ORDER.filter((type) => pts.some((p) => p.deviceType === type))
             const rooms = new Set(pts.map((p) => p.areaId).filter(Boolean)).size
             const figure = (

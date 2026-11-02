@@ -27,7 +27,7 @@ export function DocRoot({ style, className, children }: { style: DocStyle; class
 export function DocArticle({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <article
-      data-export-page
+      data-export-page="flow"
       className={cn(
         'mx-auto mt-6 max-w-[210mm] bg-doc-paper px-[14mm] py-[14mm] text-[12.5px] leading-relaxed shadow-sm print:mt-0 print:max-w-none print:p-0 print:shadow-none',
         className,

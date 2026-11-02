@@ -6,7 +6,7 @@
 import type { Room } from '@/lib/project-docs'
 import { cn } from '@/lib/utils'
 
-import { codeRange, installNote, roomScenes, yuanShort, ZONE_COPY, type DeckZone, type SceneItem } from '../model'
+import { installNote, roomScenes, yuanShort, ZONE_COPY, type DeckZone, type SceneItem } from '../model'
 import { amountFont, Chapter, Panel, PlanCard, PlanView, Photo, roomCrop, SectionTitle, Slide, type DeckCtx } from '../parts'
 
 const CN = ['一', '二', '三', '四']
@@ -15,7 +15,7 @@ const SENSOR_TYPES = ['water-sensor', 'smoke-sensor', 'contact-sensor', 'motion-
 const CALLOUT_ORDER = ['smart-lock', 'gateway', 'water-sensor', 'smoke-sensor', 'curtain-track', 'touch-panel', 'contact-sensor', 'switch-2', 'switch-3', 'switch-1', 'switch-4', 'ap-node', 'camera', 'motion-sensor', 'speaker']
 
 const unitOf = (l: Room['lines'][number]) => l.product?.unit || '个'
-const lineText = (l: Room['lines'][number]) => `${codeRange(l.codes)} ${l.typeName} ×${l.count}${unitOf(l)}`
+const lineText = (l: Room['lines'][number]) => `${l.typeName} ×${l.count}${unitOf(l)}`
 
 function callouts(zone: DeckZone) {
   const pts = zone.points.slice().sort((a, b) => {
@@ -26,9 +26,9 @@ function callouts(zone: DeckZone) {
   const out: { no: number; code: string }[] = []
   for (const p of pts) {
     if (out.length >= 2) break
-    if (out.some((o) => o.code === p.code)) continue
-    if (out.length && pts.find((q) => q.code === out[0].code)?.deviceType === p.deviceType) continue
-    out.push({ no: p.no, code: p.code || p.typeName })
+    // 标注用设备名称（客户看得懂），不用施工代号；同类设备只标一个
+    if (out.some((o) => o.code === p.typeName)) continue
+    out.push({ no: p.no, code: p.typeName })
   }
   return out
 }
@@ -59,7 +59,7 @@ function SceneBlock({ ctx, scene, index }: { ctx: DeckCtx; scene: SceneItem; ind
   return (
     <div className="flex flex-col gap-[10px] border-b border-doc-rule py-[18px]">
       <p className="doc-display flex items-center gap-[10px] text-[20px] leading-normal">
-        <span aria-hidden className={cn('size-[8px] shrink-0 bg-doc-accent', ctx.theme.id === 'grove' && 'rounded-full')} />
+        <span aria-hidden className={cn('size-[8px] shrink-0 bg-doc-accent', ctx.theme.rounded && 'rounded-full')} />
         {name} / 场景{CN[index] ?? index + 1}
       </p>
       <p className="doc-body text-[14px] leading-[1.6] text-doc-muted">
@@ -86,7 +86,6 @@ function ConfigBlock({ r }: { r: Room }) {
             {l.typeName} ×{l.count}
             {unitOf(l)}　{l.product?.name ?? '待选型'}
           </span>
-          <span className="doc-latin shrink-0">{codeRange(l.codes)}</span>
         </p>
       ))}
     </div>
@@ -185,7 +184,7 @@ export function ZonePage({ ctx, no, total, zone, insights }: { ctx: DeckCtx; no:
                   <p className="doc-strong truncate text-[15px] leading-[1.7]">{rooms[0].displayName} / {rooms[0].typeLabel}</p>
                   {rooms[0].lines.slice(0, 3).map((l) => (
                     <p key={`${l.deviceType}-${l.product?.id ?? 'p'}`} className="doc-body truncate text-[14px] leading-[1.7]">
-                      {l.product?.sku || l.typeName} · {lineText(l)}
+                      {l.product?.name || l.typeName} · {lineText(l)}
                     </p>
                   ))}
                   <div className="mt-auto flex items-end justify-between border-t border-doc-rule pt-[12px]">
@@ -210,7 +209,7 @@ export function ZonePage({ ctx, no, total, zone, insights }: { ctx: DeckCtx; no:
             <>
               <SectionTitle title="报警逻辑" note="安全规则 / 非新增生活场景" className="pb-[6px]" />
               {[
-                ['01 / 发现', `${codeRange(sensors.map((p) => p.code))}${[...new Set(sensors.map((p) => p.typeName))].join('、')}检测到异常，向已配对网关上报状态。`],
+                ['01 / 发现', `${[...new Set(sensors.map((p) => p.typeName))].join('、')}检测到异常，向已配对网关上报状态。`],
                 ['02 / 通知', '兼容网关与配置支持且网络正常时，尝试远程通知；接收账号、权限与通知方式待联调确认。'],
                 [
                   '03 / 处置',
@@ -242,10 +241,10 @@ export function ZonePage({ ctx, no, total, zone, insights }: { ctx: DeckCtx; no:
                 <div key={r.areaId} className="mt-[14px] flex items-start justify-between gap-4 border-t border-doc-rule pt-[14px]">
                   <div className="min-w-0">
                     <p className="doc-body truncate text-[15px] leading-normal">
-                      {r.displayName} · {codeRange(r.points.map((p) => p.code))} ×{r.total}
+                      {r.displayName} · {r.total} 个点位
                     </p>
                     <p className="doc-body mt-[4px] truncate text-[12px] text-doc-muted">
-                      {r.lines.map((l) => l.product?.sku || l.typeName).slice(0, 2).join(' / ')} · 设备小计
+                      {r.lines.map((l) => l.product?.name || l.typeName).slice(0, 2).join(' / ')} · 设备小计
                     </p>
                   </div>
                   <p className={cn(amountFont(ctx), 'shrink-0 text-[26px] leading-none text-doc-accent')}>{yuanShort(r.subtotal)}</p>

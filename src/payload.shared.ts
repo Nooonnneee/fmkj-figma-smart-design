@@ -14,6 +14,8 @@ import { Media } from './collections/Media'
 import { Folders } from './collections/Folders'
 import { MpSessions } from './collections/MpSessions'
 import { Products } from './collections/Products'
+import { ProposalTemplates } from './collections/ProposalTemplates'
+import { Scenes } from './collections/Scenes'
 import { Projects } from './collections/Projects'
 import { Quotes } from './collections/Quotes'
 import { RedemptionCodes } from './collections/RedemptionCodes'
@@ -22,6 +24,7 @@ import { Users } from './collections/Users'
 import { WechatAccounts } from './collections/WechatAccounts'
 import { AiSettings } from './globals/AiSettings'
 import { CompanySettings } from './globals/CompanySettings'
+import { MembershipSettings } from './globals/MembershipSettings'
 import { PLUGINS } from './plugins'
 
 const filename = fileURLToPath(import.meta.url)
@@ -58,6 +61,8 @@ export const sharedConfig = {
     Quotes,
     Contracts,
     Products,
+    Scenes,
+    ProposalTemplates,
     Brands,
     Categories,
     Media,
@@ -70,7 +75,7 @@ export const sharedConfig = {
     WechatAccounts,
     MpSessions,
   ],
-  globals: [CompanySettings, AiSettings],
+  globals: [CompanySettings, AiSettings, MembershipSettings],
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },

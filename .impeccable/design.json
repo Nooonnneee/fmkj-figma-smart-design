@@ -1,0 +1,194 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-02T03:13:34.998185Z",
+  "title": "Design System: FMKJ 项目管理",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "neutral",
+        "displayName": "正文墨",
+        "canonical": "oklch(0.145 0 0)",
+        "tonalRamp": [
+          "oklch(0.145 0 0)",
+          "oklch(0.205 0 0)",
+          "oklch(0.32 0 0)",
+          "oklch(0.45 0 0)",
+          "oklch(0.6 0 0)",
+          "oklch(0.75 0 0)",
+          "oklch(0.88 0 0)",
+          "oklch(0.97 0 0)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "图纸白",
+        "canonical": "oklch(1 0 0)"
+      },
+      "pencil": {
+        "role": "neutral",
+        "displayName": "铅笔灰",
+        "canonical": "oklch(0.53 0 0)"
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "繁梦紫（默认主题强调色）",
+        "canonical": "oklch(0.51 0.22 279)",
+        "tonalRamp": [
+          "oklch(0.25 0.1 279)",
+          "oklch(0.33 0.14 279)",
+          "oklch(0.42 0.19 279)",
+          "oklch(0.51 0.22 279)",
+          "oklch(0.62 0.17 281)",
+          "oklch(0.74 0.11 282)",
+          "oklch(0.86 0.06 283)",
+          "oklch(0.955 0.02 285)"
+        ]
+      },
+      "confirmed-green": {
+        "role": "secondary",
+        "displayName": "确认绿",
+        "canonical": "oklch(0.49 0.12 155)"
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "页面标题",
+        "purpose": "工作台每页一个 h1（PageHeader）。"
+      },
+      "public-display": {
+        "displayName": "公开页大标题",
+        "purpose": "首页、下载页首屏标题；Inter Display 光学尺寸 + 500 字重。"
+      },
+      "public-headline": {
+        "displayName": "公开页分区标题",
+        "purpose": "首页各分区、收尾、品牌页 / 下载页分区标题。"
+      },
+      "public-lead": {
+        "displayName": "公开页导语",
+        "purpose": "大标题下的一段说明，次要文字色。"
+      }
+    },
+    "shadows": [
+      {
+        "name": "shadow-window",
+        "value": "0 1px 2px oklch(0.2 0.02 270 / 0.06), 0 24px 56px -28px oklch(0.2 0.03 270 / 0.28)",
+        "purpose": "公开页产品窗口（点位图演示、下载页客户端示意）浮在画布上的投影。"
+      },
+      {
+        "name": "shadow-sm",
+        "value": "0 1px 3px rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
+        "purpose": "工作台卡片与报价单样张。"
+      }
+    ],
+    "motion": [
+      {
+        "name": "marker-in",
+        "value": "520ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "首页点位图设备从左到右落位，错开 9ms；减少动态效果时不播放。"
+      },
+      {
+        "name": "ledger-in",
+        "value": "460ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "实时清单逐行出现。"
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "公开页主按钮（墨色胶囊）",
+      "kind": "button",
+      "refersTo": "button-public-primary",
+      "description": "公开页每屏唯一的主操作，深色主题下反转为浅底深字。",
+      "html": "<a class=\"ds-btn-ink\" href=\"#\">进入工作台 <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></a>",
+      "css": ".ds-btn-ink{display:inline-flex;align-items:center;gap:6px;height:44px;padding:0 24px;border-radius:9999px;background:var(--foreground,#111);color:var(--background,#fff);font-size:16px;font-weight:500;text-decoration:none;transition:background-color .15s,transform .15s}.ds-btn-ink:hover{background:color-mix(in oklch,var(--foreground,#111) 85%,transparent)}.ds-btn-ink:active{transform:translateY(1px)}.ds-btn-ink:focus-visible{outline:2px solid var(--ring,#999);outline-offset:2px}"
+    },
+    {
+      "name": "公开页次按钮（描边胶囊）",
+      "kind": "button",
+      "refersTo": "button-public-secondary",
+      "description": "与主按钮并排的次要操作（看报价单样张、登录）。",
+      "html": "<a class=\"ds-btn-line\" href=\"#\">看报价单样张</a>",
+      "css": ".ds-btn-line{display:inline-flex;align-items:center;height:44px;padding:0 24px;border-radius:9999px;border:1px solid var(--border,#e5e5e5);background:var(--background,#fff);color:var(--foreground,#111);font-size:16px;font-weight:500;text-decoration:none;transition:background-color .15s}.ds-btn-line:hover{background:var(--muted,#f5f5f5)}.ds-btn-line:focus-visible{outline:2px solid var(--ring,#999);outline-offset:2px}"
+    },
+    {
+      "name": "产品窗口",
+      "kind": "custom",
+      "refersTo": "product-window",
+      "description": "首页首屏的点位图演示外框：浅灰抬头条 + 白色窗体 + 柔和投影。",
+      "html": "<div class=\"ds-window\"><div class=\"ds-window-bar\"><b>湖山赋别墅全屋智能</b><span class=\"ds-tag\">示例项目</span><span class=\"ds-seg\"><i class=\"on\">一层 53</i><i>二层 47</i><i>三层 37</i></span><span class=\"ds-total\"><em>已确认</em> ¥51,820</span></div><div class=\"ds-window-body\">图例 · 户型图与点位 · 实时清单</div></div>",
+      "css": ".ds-window{border:1px solid var(--border,#e5e5e5);border-radius:18px;overflow:hidden;background:var(--card,#fff);box-shadow:0 1px 2px oklch(0.2 0.02 270/.06),0 24px 56px -28px oklch(0.2 0.03 270/.28);font-size:14px}.ds-window-bar{display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid var(--border,#e5e5e5);background:color-mix(in oklch,var(--muted,#f5f5f5) 50%,transparent)}.ds-tag{font-size:12px;padding:1px 8px;border-radius:9999px;background:var(--secondary,#f2f2f2)}.ds-seg{display:inline-flex;gap:2px;padding:3px;border-radius:16px;background:color-mix(in oklch,var(--background,#fff) 70%,transparent)}.ds-seg i{font-style:normal;font-size:12px;padding:4px 12px;border-radius:14px;color:var(--muted-foreground,#777)}.ds-seg i.on{background:var(--background,#fff);color:var(--foreground,#111)}.ds-total{margin-left:auto;font-weight:600;font-variant-numeric:tabular-nums}.ds-total em{font-style:normal;font-size:12px;font-weight:500;padding:1px 8px;border-radius:9999px;color:oklch(0.49 0.12 155);background:oklch(0.49 0.12 155/.12)}.ds-window-body{padding:48px 20px;color:var(--muted-foreground,#777);text-align:center}"
+    },
+    {
+      "name": "分区标题",
+      "kind": "custom",
+      "description": "公开页分区：左对齐 500 字重大标题 + 次要色导语。",
+      "html": "<div class=\"ds-section-head\"><h2>合同和交付文档，跟着报价走</h2><p>客户确认报价后一键生成合同，金额、付款节点、工期和质保自动带入。</p></div>",
+      "css": ".ds-section-head{max-width:42rem}.ds-section-head h2{margin:0;font-size:48px;line-height:1.15;font-weight:500;letter-spacing:-0.018em;color:var(--foreground,#111)}.ds-section-head p{margin:20px 0 0;font-size:18px;line-height:1.75;color:var(--muted-foreground,#777)}"
+    },
+    {
+      "name": "筛选条 FilterTabs",
+      "kind": "nav",
+      "refersTo": "filter-tabs",
+      "description": "工作台单选筛选（阶段、状态、排序）。",
+      "html": "<div class=\"ds-tabs\"><a class=\"on\" href=\"#\">进行中 <b>1</b></a><a href=\"#\">已归档 <b>0</b></a></div>",
+      "css": ".ds-tabs{display:inline-flex;gap:2px;padding:3px;border-radius:10px;background:var(--muted,#f5f5f5)}.ds-tabs a{font-size:14px;padding:6px 12px;border-radius:8px;color:var(--muted-foreground,#777);text-decoration:none}.ds-tabs a b{font-weight:500;font-size:12px}.ds-tabs a.on{background:var(--background,#fff);color:var(--foreground,#111);box-shadow:0 1px 2px rgb(0 0 0/.08)}.ds-tabs a:hover{color:var(--foreground,#111)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "工作台：施工图纸；公开页：产品即展示（Linear / OpenAI 式）",
+    "overview": "工作台像一张干净的施工图纸，颜色只表达设备类别和状态。公开页按 Linear / OpenAI 的克制来做：一张安静的画布，大标题之下直接是能操作的真实产品窗口，示例项目的数据自己说话。",
+    "keyCharacteristics": [
+      "颜色即信息",
+      "Inter 可变字体（大字号 Display 光学尺寸）+ 中文系统字体，标题 500–600 字重、负字距",
+      "公开页用真实示例项目演示并标明「示例项目」",
+      "墨色胶囊是公开页唯一的主操作样式"
+    ],
+    "rules": [
+      {
+        "name": "颜色即信息",
+        "body": "彩色只出现在设备类别和业务状态上。按钮、标题、背景、装饰都不用彩色。",
+        "section": "colors"
+      },
+      {
+        "name": "数字对齐",
+        "body": "金额、数量、日期一律使用 tabular-nums；表格默认已开启。",
+        "section": "typography"
+      },
+      {
+        "name": "标题上方不加小标签",
+        "body": "页面标题本身就够了，不要在它上面再加一行小号的分类说明（kicker / eyebrow）。",
+        "section": "typography"
+      }
+    ],
+    "dos": [
+      "颜色只用于设备类别和业务状态。",
+      "金额和数量使用等宽数字并右对齐。",
+      "公开页演示数据只用示例项目里的真实内容并标明「示例项目」。",
+      "每个控件都要处理默认、悬停、聚焦、禁用、加载、出错这几种状态。"
+    ],
+    "donts": [
+      "不用渐变文字、装饰性毛玻璃、硬边偏移阴影、发光光晕。",
+      "不在页面标题上方加小号分类标签。",
+      "不用红色表示常态或空状态（例如无库存、草稿）。",
+      "不编造客户、案例或业绩。"
+    ]
+  }
+}

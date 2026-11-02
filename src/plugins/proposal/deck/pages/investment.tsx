@@ -4,7 +4,7 @@
  */
 import { cn } from '@/lib/utils'
 
-import { codeRange, money, yuanShort, type DeckFee, type DeckItem } from '../model'
+import { money, yuanShort, type DeckFee, type DeckItem } from '../model'
 import { amountFont, Chapter, DeckTable, SectionTitle, Slide, type DeckCtx } from '../parts'
 
 export type InvestRow = { kind: 'item'; item: DeckItem } | { kind: 'fee'; fee: DeckFee }
@@ -35,7 +35,7 @@ function Summary({ ctx }: { ctx: DeckCtx }) {
     <div className="flex w-[300px] shrink-0 flex-col gap-[14px] overflow-hidden">
       <div className={cn('flex flex-col gap-[8px] rounded-(--deck-radius-sm) border border-(--deck-panel-border) bg-linear-to-br from-doc-soft to-doc-soft-to px-[24px] py-[22px]')}>
         <p className="doc-body text-[13px] text-doc-muted">方案总价 / 设备{m.fees.length ? ' + 服务' : ''}</p>
-        <p className={cn(amountFont(ctx), 'truncate text-[38px] leading-tight', ctx.theme.id === 'noir' && 'text-doc-accent')}>{`¥${money(m.finalAmount)}`}</p>
+        <p className={cn(amountFont(ctx), 'truncate text-[38px] leading-tight', ctx.theme.accentAmount && 'text-doc-accent')}>{`¥${money(m.finalAmount)}`}</p>
         <p className="doc-body truncate text-[11px] text-doc-muted">{m.d.quote ? `依据报价单「${m.d.quote.title}」` : '按当前选型售价核算，未含服务费用'}</p>
       </div>
       {[
@@ -83,7 +83,7 @@ export function InvestmentPage({
   rows: InvestRow[]
   part: string
   isLast: boolean
-  servicePage: number
+  servicePage: number | null
 }) {
   const { m } = ctx
   const pending = m.items.filter((i) => i.pending).reduce((s, i) => s + i.count, 0)
@@ -109,7 +109,7 @@ export function InvestmentPage({
                 r.kind === 'item'
                   ? [
                       <span key="r" className="doc-latin text-doc-accent">{r.item.ref}</span>,
-                      <span key="s" className="doc-body">{r.item.rooms.length === 1 ? r.item.rooms[0] : r.item.rooms.length ? `${r.item.rooms[0]}等${r.item.rooms.length}处` : codeRange(r.item.codes)}</span>,
+                      <span key="s" className="doc-body">{r.item.rooms.length === 1 ? r.item.rooms[0] : r.item.rooms.length ? `${r.item.rooms[0]}等${r.item.rooms.length}处` : '—'}</span>,
                       <span key="n" className="doc-body">{r.item.typeName}</span>,
                       <span key="m" className="doc-body">{r.item.pending ? '待选型' : [r.item.brand, r.item.sku || r.item.name].filter(Boolean).join(' · ')}</span>,
                       <span key="q" className="doc-body">{r.item.count}{r.item.unit}</span>,
@@ -149,7 +149,7 @@ export function InvestmentPage({
             <p className="doc-body mt-[8px] text-[13px] leading-[1.65] text-doc-muted">
               出具之日起15日。
               <br />
-              付款与验收约定见第{String(servicePage).padStart(2, '0')}页。
+              {servicePage ? `付款与验收约定见第${String(servicePage).padStart(2, '0')}页。` : '付款与验收以合同约定为准。'}
             </p>
           </div>
         </div>

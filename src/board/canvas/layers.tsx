@@ -3,9 +3,10 @@
 import { memo } from 'react'
 
 import { toDeg } from '../core/geometry'
+import { areaPoly } from '../core/ops'
 import { LABEL_SIZE, type SymbolGeom, type SymbolLook } from '../core/symbols'
 import type { AreaObj, RawEl, SheetObj, SymbolObj } from '../core/types'
-import { AREA_LABEL } from './hit'
+import { AREA_LABEL, areaLabelAnchor } from './hit'
 
 export const SheetView = memo(function SheetView({ s, href, opacity, titleColor }: { s: SheetObj; href: string | null; opacity: number; titleColor: string }) {
   return (
@@ -21,29 +22,30 @@ export const SheetView = memo(function SheetView({ s, href, opacity, titleColor 
   )
 })
 
+/** 区域：实线轮廓（多边形或矩形）+ 最上方顶点处的区域名；选中时描边加粗并带浅色底 */
 export const AreaView = memo(function AreaView({ a, selected }: { a: AreaObj; selected: boolean }) {
+  const label = areaLabelAnchor(a)
   return (
     <g>
-      <rect
-        x={a.x}
-        y={a.y}
-        width={a.w}
-        height={a.h}
-        fill={selected ? 'var(--board-accent-soft)' : 'transparent'}
+      <polygon
+        points={areaPoly(a)
+          .map((q) => `${q.x},${q.y}`)
+          .join(' ')}
+        fill={selected ? 'var(--board-accent-soft)' : 'rgba(100,116,139,0.035)'}
         stroke={selected ? 'var(--board-accent)' : '#64748b'}
-        strokeOpacity={selected ? 1 : 0.75}
-        strokeWidth={selected ? 1.6 : 1.2}
-        strokeDasharray={selected ? undefined : '6 4'}
+        strokeOpacity={selected ? 1 : 0.85}
+        strokeWidth={selected ? 2 : 1.4}
+        strokeLinejoin="round"
         vectorEffect="non-scaling-stroke"
       />
-      <text x={a.x + 4} y={a.y + 3 + AREA_LABEL * 0.95} fontSize={AREA_LABEL} fontWeight={600} fill="#475569" stroke="#ffffff" strokeWidth={3} paintOrder="stroke" strokeLinejoin="round">
+      <text x={label.x + 4} y={label.y + 3 + AREA_LABEL * 0.95} fontSize={AREA_LABEL} fontWeight={600} fill="#475569" stroke="#ffffff" strokeWidth={3} paintOrder="stroke" strokeLinejoin="round">
         {a.name}
       </text>
     </g>
   )
 })
 
-export const SymbolView = memo(function SymbolView({ o, g, look, small, showLabel, ghost }: { o: SymbolObj; g: SymbolGeom; look: SymbolLook; small: boolean; showLabel: boolean; ghost?: boolean }) {
+export const SymbolView = memo(function SymbolView({ o, g, look, small, ghost }: { o: SymbolObj; g: SymbolGeom; look: SymbolLook; small: boolean; ghost?: boolean }) {
   const art = look.art
   return (
     <g opacity={ghost ? 0.55 : undefined} pointerEvents="none">
@@ -65,12 +67,16 @@ export const SymbolView = memo(function SymbolView({ o, g, look, small, showLabe
           {look.badge}
         </text>
       ) : null}
-      {showLabel && o.code ? (
-        <text x={o.x} y={g.labelY} textAnchor="middle" fontSize={LABEL_SIZE} fontWeight={700} fill={look.color} stroke="#ffffff" strokeWidth={2.2} paintOrder="stroke" strokeLinejoin="round">
-          {o.code}
-        </text>
-      ) : null}
     </g>
+  )
+})
+
+/** 点位代号：所有图标画完后统一画在最上层，点位密集时也不会被相邻图标盖住 */
+export const SymbolLabel = memo(function SymbolLabel({ o, g, color }: { o: SymbolObj; g: SymbolGeom; color: string }) {
+  return (
+    <text x={o.x} y={g.labelY} textAnchor="middle" fontSize={LABEL_SIZE} fontWeight={700} fill={color} stroke="#ffffff" strokeWidth={2.2} paintOrder="stroke" strokeLinejoin="round" pointerEvents="none">
+      {o.code}
+    </text>
   )
 })
 

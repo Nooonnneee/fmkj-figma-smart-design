@@ -23,7 +23,7 @@ export function ServicePage({ ctx, no, total }: { ctx: DeckCtx; no: number; tota
       <Chapter ctx={ctx} no={no} title="从一张方案，到每天安心使用。" subtitle="服务流程、付款与验收 / 让每个承诺，都有可核对的交付物" tag="SERVICE & HANDOVER" />
       <div className="flex h-[106px] w-full shrink-0 items-start gap-[28px] overflow-hidden">
         {steps.map(([n, t, note]) => (
-          <div key={n} className={cn('flex min-w-px flex-1 flex-col gap-[8px] overflow-hidden border-t-2 border-doc-accent pt-[12px]', ctx.theme.id === 'grove' && 'rounded-t-[2px]')}>
+          <div key={n} className={cn('flex min-w-px flex-1 flex-col gap-[8px] overflow-hidden border-t-2 border-doc-accent pt-[12px]', ctx.theme.rounded && 'rounded-t-[2px]')}>
             <div className="flex items-center gap-[12px] leading-normal whitespace-nowrap">
               <p className="doc-latin text-[22px] text-doc-accent">{n}</p>
               <p className="doc-strong text-[20px]">{t}</p>

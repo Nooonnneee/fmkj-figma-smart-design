@@ -4,7 +4,7 @@
 import { categoryOfType } from '@/lib/device-types'
 import { cn } from '@/lib/utils'
 
-import { codeRange, type TopoBox } from '../model'
+import { type TopoBox } from '../model'
 import { Chapter, DeckTable, Panel, SectionTitle, Slide, type DeckCtx } from '../parts'
 
 const CARD_W = 604
@@ -84,8 +84,7 @@ export function SystemPage({ ctx, no, total }: { ctx: DeckCtx; no: number; total
     ? m.items.map((i) => [
         <span key="r" className="doc-latin text-doc-accent">{i.ref}</span>,
         <span key="n" className="doc-body">{i.typeName} ×{i.count}{i.unit}</span>,
-        <span key="s" className="doc-body text-doc-ink/90">{i.pending ? '待选型' : i.sku || i.name}</span>,
-        <span key="c" className="doc-latin">{codeRange(i.codes) || '—'}</span>,
+        <span key="s" className="doc-body text-doc-ink/90">{i.pending ? '待选型' : i.name || i.sku}</span>,
         <span key="l" className="doc-body">{i.rooms.slice(0, 2).join('、')}{i.rooms.length > 2 ? `等${i.rooms.length}处` : ''}</span>,
       ])
     : d.categories.map((c) => {
@@ -96,7 +95,6 @@ export function SystemPage({ ctx, no, total }: { ctx: DeckCtx; no: number; total
           <span key="r" className="doc-latin text-doc-accent">{its.length > 1 ? `${its[0].ref}–${its[its.length - 1].ref}` : (its[0]?.ref ?? '—')}</span>,
           <span key="n" className="doc-body">{c.name} ×{c.count}</span>,
           <span key="s" className="doc-body text-doc-ink/90">{its.length}款型号{brands.length ? ` · ${brands.slice(0, 2).join(' / ')}` : ''}</span>,
-          <span key="c" className="doc-latin">{codeRange(its.flatMap((i) => i.codes)) || '—'}</span>,
           <span key="l" className="doc-body">{rooms.slice(0, 2).join('、')}{rooms.length > 2 ? `等${rooms.length}处` : ''}</span>,
         ]
       })
@@ -120,8 +118,7 @@ export function SystemPage({ ctx, no, total }: { ctx: DeckCtx; no: number; total
             columns={[
               { label: '条目', className: 'w-[72px]' },
               { label: '设备 / 数量', className: 'w-[150px]' },
-              { label: '型号 / 接口', className: 'w-[214px]' },
-              { label: '点位', className: 'w-[104px]' },
+              { label: '产品', className: 'w-[318px]' },
               { label: '安装位置', className: 'w-[152px]' },
             ]}
             rows={rows}

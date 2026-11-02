@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, Loader2, Plus, Save } from 'lucide-react'
+import { AlertCircle, Home, Loader2, NotebookPen, Plus, Save, Settings2, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -113,6 +113,18 @@ export function ProjectForm({
     </div>
   )
 
+  const group = (Icon: typeof Home, title: string, children: React.ReactNode, first = false) => (
+    <fieldset className={cn('min-w-0', !first && 'border-t pt-6')}>
+      <legend className="float-left mb-4 flex w-full items-center gap-2 text-sm font-medium">
+        <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <Icon className="size-4" />
+        </span>
+        {title}
+      </legend>
+      <div className="clear-both grid gap-x-4 gap-y-5 md:grid-cols-2">{children}</div>
+    </fieldset>
+  )
+
   return (
     <form action={action} onChange={() => setDirty(true)} className="flex flex-col gap-4">
       {initial.id ? <input type="hidden" name="id" value={initial.id} /> : null}
@@ -127,11 +139,28 @@ export function ProjectForm({
         <CardHeader className="pb-5">
           <CardTitle className="text-base">{isNew ? '客户和地址' : '项目信息'}</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-x-4 gap-y-5 md:grid-cols-2">
-          {text('customerName', '客户姓名', { placeholder: '例如：王女士', autoFocus: isNew, autoComplete: 'off' })}
-          {text('customerPhone', '客户电话', { inputMode: 'tel', autoComplete: 'off' })}
-          {text('community', '小区 / 楼盘', { placeholder: '例如：万科城' })}
-          {text('address', '房号 / 详细地址', { placeholder: '例如：3-1201' })}
+        <CardContent className="flex flex-col gap-6">
+          {group(
+            UserRound,
+            '客户',
+            <>
+              {text('customerName', '客户姓名', { placeholder: '例如：王女士', autoFocus: isNew, autoComplete: 'off' })}
+              {text('customerPhone', '客户电话', { inputMode: 'tel', autoComplete: 'off' })}
+            </>,
+            true,
+          )}
+          {group(
+            Home,
+            '房屋地址',
+            <>
+              {text('community', '小区 / 楼盘', { placeholder: '例如：万科城' })}
+              {text('address', '房号 / 详细地址', { placeholder: '例如：3-1201' })}
+            </>,
+          )}
+          {group(
+            Settings2,
+            '项目设置',
+            <>
           {select('platform', '主平台', PROJECT_PLATFORMS.map((p) => ({ value: p, label: p })), initial.platform || PROJECT_PLATFORMS[0])}
           {text('budget', '预算（元）', { type: 'number', min: 0, step: 1000, inputMode: 'numeric', placeholder: '可不填' })}
           {owners && !isNew ? select('owner', '负责人', owners, '__none', true) : null}
@@ -151,10 +180,16 @@ export function ProjectForm({
               disabled={readOnly}
             />
           </div>
-          <div className="grid gap-2 md:col-span-2">
-            <Label htmlFor="notes">备注</Label>
-            <Textarea id="notes" name="notes" rows={2} maxLength={2000} defaultValue={initial.notes ?? ''} disabled={readOnly} placeholder="户型、装修进度、客户偏好等" />
-          </div>
+            </>,
+          )}
+          {group(
+            NotebookPen,
+            '备注',
+            <div className="grid gap-2 md:col-span-2">
+              <Label htmlFor="notes" className="sr-only">备注</Label>
+              <Textarea id="notes" name="notes" rows={3} maxLength={2000} defaultValue={initial.notes ?? ''} disabled={readOnly} placeholder="户型、装修进度、客户偏好等" />
+            </div>,
+          )}
         </CardContent>
         {readOnly ? null : (
           <CardFooter className="mt-6 justify-end gap-2 border-t">

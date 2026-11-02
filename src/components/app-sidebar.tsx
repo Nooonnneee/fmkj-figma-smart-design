@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import dynamic from "next/dynamic"
 import { usePathname } from "next/navigation"
 import {
   Blocks,
@@ -18,7 +19,6 @@ import {
 } from "lucide-react"
 
 import type { AiModelOption, AiProjectContext } from "@/components/ai/ai-elements"
-import { AiSidebarDock } from "@/components/ai/ai-sidebar-dock"
 import { AppearanceMenuItems } from "@/components/appearance-menu"
 import { BrandMark } from "@/components/brand/brand-mark"
 import { GuardedLink } from "@/components/guarded-link"
@@ -54,6 +54,9 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { APP_NAME, APP_TAGLINE } from "@/lib/brand"
 import type { PluginId } from "@/plugins/types"
 import { isDemoProjectName, projectDisplayName, projectInitial } from "@/lib/project-name"
+
+// AI 对话面板只在切到「AI 对话」时才加载，不拖慢其他页面的首屏
+const AiSidebarDock = dynamic(() => import("@/components/ai/ai-sidebar-dock").then((m) => m.AiSidebarDock), { ssr: false })
 
 export type SidebarUser = { name: string; email: string; membershipBadge?: string }
 export type SidebarBrand = { name: string; logo: string | null }
@@ -136,7 +139,8 @@ export function AppSidebar({
       collapsible="icon"
       style={
         effectiveMode === "chat"
-          ? ({ "--sidebar-width": "24rem" } as React.CSSProperties)
+          ? // AI 对话比导航宽一些便于阅读，但随屏幕宽度收放，避免挤压右侧工作区（1280 宽约 19rem，1440 宽约 21.5rem）
+            ({ "--sidebar-width": "clamp(18rem, 24vw, 22rem)" } as React.CSSProperties)
           : undefined
       }
     >
@@ -149,7 +153,8 @@ export function AppSidebar({
                 <BrandMark decorative className="size-8" />
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold tracking-wide">{APP_NAME}</span>
-                  <span className="truncate text-xs text-muted-foreground">{brand.name || APP_TAGLINE}</span>
+                  {/* 公司名与平台名相同（自营团队）时显示平台副标，避免上下两行重复 */}
+                  <span className="truncate text-xs text-muted-foreground">{brand.name && brand.name !== APP_NAME ? brand.name : APP_TAGLINE}</span>
                 </div>
               </GuardedLink>
             </SidebarMenuButton>
@@ -165,11 +170,11 @@ export function AppSidebar({
               className="group-data-[collapsible=icon]:hidden"
             >
               <TabsList className="w-full">
-                <TabsTrigger value="nav" className="text-xs">
+                <TabsTrigger value="nav" aria-controls="sidebar-panel" className="text-xs">
                   <LayoutGrid className="size-3.5" />
                   导航
                 </TabsTrigger>
-                <TabsTrigger value="chat" className="text-xs">
+                <TabsTrigger value="chat" aria-controls="sidebar-panel" className="text-xs">
                   <MessageSquareText className="size-3.5" />
                   AI 对话
                 </TabsTrigger>
@@ -196,12 +201,12 @@ export function AppSidebar({
       </SidebarHeader>
 
       {effectiveMode === "chat" ? (
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div id="sidebar-panel" className="flex min-h-0 flex-1 flex-col">
           <AiSidebarDock plugins={plugins.filter((p) => p.id !== "ai-copilot")} projects={projects} credits={ai.credits} configured={ai.configured} models={ai.models} />
         </div>
       ) : (
         <>
-          <SidebarContent>
+          <SidebarContent id="sidebar-panel">
             {/* 最常用的动作放在最显眼的位置 */}
             <SidebarGroup className="pb-0">
               <SidebarMenu>
@@ -242,7 +247,7 @@ export function AppSidebar({
                             {projectInitial(p.name)}
                           </span>
                           <span className="truncate">{projectDisplayName(p.name)}</span>
-                          {isDemoProjectName(p.name) ? <span className="ml-auto shrink-0 text-[0.6875rem] text-muted-foreground">示例</span> : null}
+                          {isDemoProjectName(p.name) ? <span className="ml-auto shrink-0 text-xs text-muted-foreground">示例</span> : null}
                         </GuardedLink>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

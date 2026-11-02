@@ -55,7 +55,8 @@ const nextConfig: NextConfig = {
     ]
     return [
       {
-        source: '/(brands|brand|ecosystem|point-markers|point-symbols)/:path*',
+        // 带版本号（?v=）或文件名固定不变的静态图标：长期缓存
+        source: '/(brands|brand|ecosystem|point-markers|point-symbols|point-icons|board)/:path*',
         headers: [
           ...securityHeaders,
           {
@@ -63,6 +64,11 @@ const nextConfig: NextConfig = {
             value: 'public, max-age=31536000, immutable',
           },
         ],
+      },
+      {
+        // 方案氛围图（没有版本号，换图时可能沿用文件名）：缓存一天，过期后后台更新
+        source: '/proposal/:path*',
+        headers: [...securityHeaders, { key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' }],
       },
       {
         source: '/:path*',
@@ -108,6 +114,8 @@ const nextConfig: NextConfig = {
   // Prerender source maps add ~100 MB per static build worker
   enablePrerenderSourceMaps: false,
   experimental: {
+    // 前台与 Payload 后台是两套根布局：未匹配的网址用 app/global-not-found.tsx 返回中文 404
+    globalNotFound: true,
     optimizePackageImports: ['lucide-react', 'radix-ui'],
     // Caps static build workers (~250-380 MB each) to lower `next build` peak memory
     cpus: 2,

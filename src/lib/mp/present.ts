@@ -11,6 +11,7 @@ import type { ProjectDocsData } from '@/lib/project-docs'
 import { projectProgress, statusLabel } from '@/lib/projects'
 import { quoteStatusLabel } from '@/lib/quotes'
 import type { Contract, Media, Project, Quote, User } from '@/payload-types'
+import { planAreaOf } from '@/lib/point-scene'
 
 /** 小程序接口的数据形状：只返回界面需要的字段，图片和图标都是站内相对地址（小程序拼上域名）。 */
 
@@ -138,7 +139,8 @@ export function presentPointMap(d: ProjectDocsData) {
       .filter((a) => a.sheetId && sheetById.has(a.sheetId))
       .map((a) => {
         const s = sheetById.get(a.sheetId!)!
-        return { id: a.id, name: a.name, typeLabel: areaTypeLabel(a.areaType), sheetId: a.sheetId, x0: (a.x - s.x) / s.width, y0: (a.y - s.y) / s.height, x1: (a.x + a.width - s.x) / s.width, y1: (a.y + a.height - s.y) / s.height }
+        // poly：多边形区域的轮廓（比例坐标）；旧版小程序只读外接框 x0–y1，照常显示
+        return { ...planAreaOf(a, s), typeLabel: areaTypeLabel(a.areaType), sheetId: a.sheetId }
       }),
     points: d.points.map((p) => {
       const prod = productOf(p.productId)

@@ -49,32 +49,27 @@ const INSTALL_STEPS = [
 /** 下载页：Windows / macOS 桌面客户端与网页安装版 */
 export default function DownloadPage() {
   return (
-    <div data-landing data-accent="fanmeng" className="dark relative min-h-svh overflow-x-clip bg-background text-foreground">
+    <div data-landing data-accent="fanmeng" className="min-h-svh overflow-x-clip bg-background text-foreground">
       <LandingNav />
       <main>
-        <section aria-labelledby="download-title" className="relative isolate overflow-hidden">
-          <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-            <div className="absolute inset-0 landing-grid landing-mask-radial opacity-60" />
-            <div className="absolute -top-40 left-1/2 size-160 -translate-x-1/2 rounded-full bg-brand-indigo/25 blur-3xl" />
-          </div>
+        <section aria-labelledby="download-title">
           <div className="mx-auto grid max-w-6xl items-center gap-14 px-4 pt-20 pb-16 sm:px-6 sm:pt-28 lg:grid-cols-2 lg:px-8">
             <div>
-              <h1 id="download-title" className="text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+              <h1 id="download-title" className="text-display font-semibold">
                 把{APP_NAME}装进你的电脑
               </h1>
-              <p className="mt-4 max-w-xl text-base text-balance text-muted-foreground sm:text-lg">
+              <p className="mt-6 max-w-xl text-lead text-balance text-muted-foreground">
                 独立窗口打开工作台，设计、报价、合同一气呵成。登录一次长期有效，新版本自动送达。
               </p>
               <DesktopHeroActions />
             </div>
 
             <div aria-hidden className="relative mx-auto w-full max-w-lg">
-              <div className="absolute -inset-8 -z-10 rounded-full bg-brand-violet/20 blur-3xl" />
-              <div className="overflow-hidden rounded-2xl border border-border bg-card/70 shadow-2xl backdrop-blur">
-                <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-                  <span className="size-2.5 rounded-full bg-muted-foreground/40" />
-                  <span className="size-2.5 rounded-full bg-muted-foreground/40" />
-                  <span className="size-2.5 rounded-full bg-muted-foreground/40" />
+              <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-window">
+                <div className="flex items-center gap-2 border-b border-border bg-muted/50 px-4 py-3">
+                  <span className="size-2.5 rounded-full bg-muted-foreground/30" />
+                  <span className="size-2.5 rounded-full bg-muted-foreground/30" />
+                  <span className="size-2.5 rounded-full bg-muted-foreground/30" />
                   <span className="ml-3 text-xs text-muted-foreground">{APP_NAME}</span>
                 </div>
                 <div className="grid grid-cols-4">
@@ -85,11 +80,11 @@ export default function DownloadPage() {
                     <div className="h-2 w-2/3 rounded-full bg-muted" />
                   </div>
                   <div className="col-span-3 flex flex-col items-center gap-5 p-8">
-                    <Image src="/brand/fmkj-app-icon-512.png" alt="" width={512} height={512} unoptimized className="size-28 drop-shadow-2xl" />
+                    <Image src="/brand/fmkj-app-icon-512.png" alt="" width={512} height={512} unoptimized className="size-28 drop-shadow-lg" />
                     <div className="grid w-full grid-cols-3 gap-2">
                       <div className="h-12 rounded-lg bg-muted/70" />
                       <div className="h-12 rounded-lg bg-muted/70" />
-                      <div className="h-12 rounded-lg bg-brand-indigo/20" />
+                      <div className="h-12 rounded-lg bg-primary/15" />
                     </div>
                     <div className="h-2 w-2/3 rounded-full bg-muted" />
                   </div>
@@ -109,14 +104,12 @@ export default function DownloadPage() {
         <section aria-labelledby="features-title" className="py-16 sm:py-24">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
             <SectionHeading id="features-title" eyebrow="为桌面而生" title="比浏览器更顺手的工作台" />
-            <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-12 grid gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">
               {FEATURES.map((feature) => (
-                <div key={feature.title} className="rounded-2xl border border-border bg-card/50 p-6">
-                  <span className="flex size-10 items-center justify-center rounded-xl bg-brand-indigo/15 text-primary">
-                    <feature.icon className="size-5" />
-                  </span>
-                  <h3 className="mt-5 text-base font-semibold">{feature.title}</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">{feature.text}</p>
+                <div key={feature.title} className="bg-card p-6 sm:p-8">
+                  <feature.icon aria-hidden className="size-5 text-muted-foreground" />
+                  <h3 className="mt-6 font-medium">{feature.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{feature.text}</p>
                   {feature.icon === Keyboard ? (
                     <ul className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                       {SHORTCUTS.map((shortcut) => (
@@ -142,8 +135,8 @@ export default function DownloadPage() {
             <SectionHeading id="install-title" eyebrow="安装说明" title="三步装好，马上开工" description="客户端暂未购买系统代码签名证书，首次安装时系统可能会提示风险，按下面的步骤确认即可。" />
             <div className="mt-12 grid gap-4 md:grid-cols-3">
               {INSTALL_STEPS.map((group) => (
-                <div key={group.title} className="rounded-2xl border border-border bg-card/50 p-6">
-                  <h3 className="text-base font-semibold">{group.title}</h3>
+                <div key={group.title} className="rounded-2xl border border-border bg-card p-6">
+                  <h3 className="font-medium">{group.title}</h3>
                   <ol className="mt-4 space-y-3 text-sm text-muted-foreground">
                     {group.steps.map((step, index) => (
                       <li key={step} className="flex gap-3">
@@ -156,13 +149,13 @@ export default function DownloadPage() {
               ))}
             </div>
             <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-              <Button asChild size="lg" className="rounded-full">
+              <Button asChild size="lg" className="h-11 rounded-full bg-foreground px-6 text-base text-background hover:bg-foreground/85">
                 <Link href="/projects">
                   先用网页版
                   <ArrowRight data-icon="inline-end" />
                 </Link>
               </Button>
-              <Button asChild size="lg" variant="outline" className="rounded-full">
+              <Button asChild size="lg" variant="outline" className="h-11 rounded-full px-6 text-base">
                 <Link href="/login">登录账号</Link>
               </Button>
             </div>
