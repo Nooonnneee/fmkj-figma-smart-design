@@ -146,7 +146,7 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
 
         // 按量计费；余额不够本次实际用量时扣到 0 为止（调用前已确认余额 ≥ 1）
         const fresh = await payload.findByID({ collection: 'users', id: user.id, depth: 0, overrideAccess: true, select: { aiCredits: true } })
-        const cost = Math.min(meter.credits(model.cost), Math.max(0, fresh.aiCredits ?? 0))
+        const cost = Math.min(meter.credits(model), Math.max(0, fresh.aiCredits ?? 0))
         const usage = { inputTokens: meter.inputTokens, outputTokens: meter.outputTokens, toolCalls: meter.tools.length, estimated: meter.estimated > 0 }
         const reply = await payload.create({
           collection: 'ai-messages',

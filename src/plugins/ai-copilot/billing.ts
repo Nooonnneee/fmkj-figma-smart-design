@@ -1,15 +1,39 @@
 /**
  * AI 对话按用量计费：
- *   积分 = 倍率 ×（输入 tokens/1000 × 输入单价 + 输出 tokens/1000 × 输出单价）+ Σ 工具费用
- * 结果向上取整，最少 1 积分（失败不扣费）。模型的 `cost` 字段作为「计费倍率」（深度推理等贵模型可设 2、3）。
+ *
+ *   积分 = ceil(倍率 × 本次人民币成本 / 0.1 元 + Σ 工具费用)
+ *
+ * 人民币成本 = 输入未命中缓存 tokens × 输入价
+ *            + 输入命中缓存 tokens × 缓存命中价
+ *            + 输出 tokens × 输出价
+ * 价格单位：元 / 百万 tokens；1 AI 积分 = 0.1 元；最少 1 积分；失败不扣费。
+ *
+ * 模型没有配置价格时，兼容旧公式（避免历史模型直接变成免费）：
+ *   积分 = ceil(倍率 ×（输入 tokens/1000 × 0.1 + 输出 tokens/1000 × 0.5）+ 工具费用）
  */
 
-/** 每 1K 输入 tokens 的积分（倍率为 1 时）。系统提示词、历史与工具结果都计入输入。 */
+/** 1 AI 积分 = 0.1 元 */
+export const CREDIT_VALUE_CNY = 0.1
+
+/** 旧公式兼容费率（模型未配置价格时使用） */
 export const INPUT_PER_1K = 0.1
-/** 每 1K 输出 tokens 的积分（倍率为 1 时），包含深度思考内容。 */
 export const OUTPUT_PER_1K = 0.5
 
-/** 工具调用费用：只读查询便宜，写入/生成类较贵，批量生成点位与智能选型最贵。未列出的按 DEFAULT_TOOL_COST。 */
+export type PricePerMillion = {
+  /** 输入未命中缓存，元/百万 tokens */
+  input: number
+  /** 输出，元/百万 tokens */
+  output: number
+  /** 输入命中缓存，元/百万 tokens */
+  cachedInput: number
+}
+
+export type ModelPricing = {
+  peak: PricePerMillion
+  offPeak: PricePerMillion
+}
+
+/** 工具调用费用，单位积分；只读查询便宜，写入/生成类较贵，批量生成点位与智能选型最贵。 */
 export const TOOL_COSTS: Record<string, number> = {
   list_projects: 0.2,
   get_project_details: 0.2,
@@ -28,19 +52,52 @@ export const TOOL_COSTS: Record<string, number> = {
 }
 export const DEFAULT_TOOL_COST = 0.5
 
-export type TokenUsage = { prompt_tokens?: number; completion_tokens?: number }
+export type TokenUsage = {
+  prompt_tokens?: number
+  completion_tokens?: number
+  /** OpenAI / 部分网关：缓存命中的输入 tokens */
+  prompt_tokens_details?: { cached_tokens?: number } | null
+  /** DeepSeek 原生字段：缓存命中的输入 tokens */
+  prompt_cache_hit_tokens?: number
+}
+
+/** 北京时间的 DeepSeek / TokenHub 高峰时段：工作日 9:00–12:00、14:00–18:00。法定节假日暂按工作日处理。 */
+export function isPeakTime(at: Date = new Date()): boolean {
+  const bj = new Date(at.getTime() + 8 * 60 * 60 * 1000)
+  const day = bj.getUTCDay()
+  const hour = bj.getUTCHours()
+  if (day < 1 || day > 5) return false
+  return (hour >= 9 && hour < 12) || (hour >= 14 && hour < 18)
+}
+
+type PricedModel = {
+  cost?: number | null
+  pricing?: ModelPricing | null
+}
 
 /** 在一次对话中累计 tokens 与工具调用。 */
 export class UsageMeter {
   inputTokens = 0
   outputTokens = 0
+  /** 输入中命中缓存的部分，已包含在 inputTokens 内 */
+  cachedInputTokens = 0
   tools: string[] = []
   /** 接口没有返回 usage 的轮次数（此时按字符估算） */
   estimated = 0
 
   add(usage: TokenUsage | null | undefined, fallback?: { input: string; output: string }) {
     if (usage && (usage.prompt_tokens || usage.completion_tokens)) {
-      this.inputTokens += Math.max(0, Math.trunc(usage.prompt_tokens ?? 0))
+      const prompt = Math.max(0, Math.trunc(usage.prompt_tokens ?? 0))
+      const cached = Math.max(
+        0,
+        Math.trunc(
+          usage.prompt_tokens_details?.cached_tokens ??
+            usage.prompt_cache_hit_tokens ??
+            0,
+        ),
+      )
+      this.inputTokens += prompt
+      this.cachedInputTokens += Math.min(cached, prompt)
       this.outputTokens += Math.max(0, Math.trunc(usage.completion_tokens ?? 0))
     } else if (fallback) {
       this.estimated++
@@ -57,16 +114,31 @@ export class UsageMeter {
     return this.tools.reduce((s, n) => s + (TOOL_COSTS[n] ?? DEFAULT_TOOL_COST), 0)
   }
 
-  /** 本次应扣积分（整数，最少 1） */
-  credits(multiplier: number) {
-    const m = Number.isFinite(multiplier) && multiplier > 0 ? multiplier : 1
-    const tokenCost = m * ((this.inputTokens / 1000) * INPUT_PER_1K + (this.outputTokens / 1000) * OUTPUT_PER_1K)
-    return Math.max(1, Math.ceil(tokenCost + this.toolCost() - 1e-9))
+  /** 本次应扣积分（整数，最少 1）。传入模型价格时按真实成本计费。 */
+  credits(model: PricedModel, at: Date = new Date()): number {
+    const multiplier = Number.isFinite(model?.cost) && Number(model.cost) > 0 ? Number(model.cost) : 1
+    const pricing = model?.pricing
+    const hasPricing = Boolean(pricing && (pricing.peak.input > 0 || pricing.peak.output > 0))
+    let tokenCredits: number
+    if (hasPricing && pricing) {
+      const price = isPeakTime(at) ? pricing.peak : pricing.offPeak
+      const missInput = Math.max(0, this.inputTokens - this.cachedInputTokens)
+      const costCny =
+        (missInput / 1_000_000) * Math.max(0, price.input) +
+        (this.cachedInputTokens / 1_000_000) * Math.max(0, price.cachedInput) +
+        (this.outputTokens / 1_000_000) * Math.max(0, price.output)
+      tokenCredits = multiplier * (costCny / CREDIT_VALUE_CNY)
+    } else {
+      // 旧公式：模型未配置价格时的兼容路径
+      tokenCredits = multiplier * ((this.inputTokens / 1000) * INPUT_PER_1K + (this.outputTokens / 1000) * OUTPUT_PER_1K)
+    }
+    return Math.max(1, Math.ceil(tokenCredits + this.toolCost() - 1e-9))
   }
 
   summary() {
     const t = this.tools.length ? ` · 工具 ${this.tools.length} 次` : ''
-    return `输入 ${this.inputTokens.toLocaleString('en-US')} / 输出 ${this.outputTokens.toLocaleString('en-US')} tokens${t}${this.estimated ? '（部分估算）' : ''}`
+    const c = this.cachedInputTokens ? `（缓存命中 ${this.cachedInputTokens.toLocaleString('en-US')}）` : ''
+    return `输入 ${this.inputTokens.toLocaleString('en-US')}${c} / 输出 ${this.outputTokens.toLocaleString('en-US')} tokens${t}${this.estimated ? '（部分估算）' : ''}`
   }
 }
 

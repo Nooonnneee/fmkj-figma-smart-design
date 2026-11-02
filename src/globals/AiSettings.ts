@@ -105,6 +105,32 @@ export const aiModelsField = {
           { name: 'reasoning', label: '支持深度思考过程（如 R1）', type: 'checkbox', defaultValue: false },
         ],
       },
+      {
+        type: 'collapsible',
+        label: '计费价格（元 / 百万 tokens）',
+        admin: {
+          initCollapsed: true,
+          description: '1 AI 积分 = 0.1 元。填模型真实价格；不填则回退旧倍率公式。高峰时段：北京时间工作日 9:00–12:00、14:00–18:00。',
+        },
+        fields: [
+          {
+            type: 'row',
+            fields: [
+              { name: 'peakInputPrice', label: '高峰输入价', type: 'number', defaultValue: 0, min: 0 },
+              { name: 'peakOutputPrice', label: '高峰输出价', type: 'number', defaultValue: 0, min: 0 },
+              { name: 'peakCachedInputPrice', label: '高峰缓存命中价', type: 'number', defaultValue: 0, min: 0 },
+            ],
+          },
+          {
+            type: 'row',
+            fields: [
+              { name: 'offPeakInputPrice', label: '空闲输入价', type: 'number', defaultValue: 0, min: 0 },
+              { name: 'offPeakOutputPrice', label: '空闲输出价', type: 'number', defaultValue: 0, min: 0 },
+              { name: 'offPeakCachedInputPrice', label: '空闲缓存命中价', type: 'number', defaultValue: 0, min: 0 },
+            ],
+          },
+        ],
+      },
     ],
   } satisfies ArrayField
 

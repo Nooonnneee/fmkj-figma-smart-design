@@ -1,5 +1,6 @@
 import type { AiModelOption } from '@/components/ai/ai-elements'
 import type { PluginId } from '@/plugins/types'
+import type { ModelPricing } from './billing'
 
 /**
  * 受信任的 AI 渠道白名单：
@@ -116,6 +117,8 @@ export type AiModelConfig = AiModelOption & {
   enabled: boolean
   /** 是否为默认选中模型 */
   isDefault?: boolean
+  /** 模型真实价格（元/百万 tokens）；未配置时走旧倍率公式 */
+  pricing?: ModelPricing | null
 }
 
 /**
@@ -135,6 +138,10 @@ export const DEFAULT_AI_MODELS: AiModelConfig[] = [
     apiKeyEnv: AI_PROVIDER_CHANNELS.deepseek.apiKeyEnv,
     enabled: true,
     isDefault: true,
+    pricing: {
+      peak: { input: 2, output: 8, cachedInput: 0.04 },
+      offPeak: { input: 1, output: 4, cachedInput: 0.02 },
+    },
   },
 ]
 
@@ -251,6 +258,22 @@ export function parseAiModels(value: unknown, customChannels: AiCustomChannel[] 
     if (!id || !name || !apiModel || seen.has(id)) continue
     seen.add(id)
     const costNum = Number(r.cost)
+    const num = (v: unknown) => {
+      const n = Number(v)
+      return Number.isFinite(n) && n >= 0 ? n : 0
+    }
+    const peak = {
+      input: num(r.peakInputPrice),
+      output: num(r.peakOutputPrice),
+      cachedInput: num(r.peakCachedInputPrice),
+    }
+    const offPeakRaw = {
+      input: num(r.offPeakInputPrice),
+      output: num(r.offPeakOutputPrice),
+      cachedInput: num(r.offPeakCachedInputPrice),
+    }
+    const offPeak = offPeakRaw.input || offPeakRaw.output || offPeakRaw.cachedInput ? offPeakRaw : peak
+    const pricing = peak.input || peak.output || peak.cachedInput ? { peak, offPeak } : null
     out.push({
       id,
       name,
@@ -267,6 +290,7 @@ export function parseAiModels(value: unknown, customChannels: AiCustomChannel[] 
       apiKeyEnv: channel.apiKeyEnv,
       enabled: r.enabled !== false,
       isDefault: Boolean(r.isDefault),
+      pricing,
     })
   }
   if (out.length === 0) return DEFAULT_AI_MODELS.map((m) => ({ ...m }))
