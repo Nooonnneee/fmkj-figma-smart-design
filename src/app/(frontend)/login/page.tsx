@@ -3,9 +3,11 @@ import { redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 
 import { BrandLogo } from '@/components/landing/landing-chrome'
-import { appAuth } from '@/lib/app-auth'
+import { appAuth, previewDemoEnabled } from '@/lib/app-auth'
 import { APP_NAME, COMPANY_NAME, pageTitle } from '@/lib/brand'
+import { emailOtpConfigured } from '@/lib/email-otp'
 import { qrLoginAvailable } from '@/lib/mp/auth'
+import { safeRedirectPath } from '@/lib/safe-redirect'
 
 import { LoginForm } from './login-form'
 
@@ -15,11 +17,14 @@ export const metadata = { title: pageTitle('登录') }
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string }>
+  searchParams: Promise<{ from?: string; switch?: string; mode?: string; code?: string }>
 }) {
-  if (await appAuth.getCurrentUser()) redirect('/projects')
-  const { from } = await searchParams
-  const redirectTo = from?.startsWith('/') && !from.startsWith('//') ? from : '/projects'
+  const { from, switch: switchAccount, mode, code } = await searchParams
+  const redirectTo = safeRedirectPath(from, '/projects')
+  if (!switchAccount && mode !== 'register' && (await appAuth.getCurrentUser())) redirect(redirectTo)
+  const previewDemo = previewDemoEnabled()
+  const initialMode = mode === 'register' ? 'register' : 'login'
+  const initialCode = typeof code === 'string' ? code.trim().toUpperCase().slice(0, 40) : ''
 
   return (
     <div className="flex min-h-svh flex-col bg-background text-foreground">
@@ -37,7 +42,14 @@ export default async function LoginPage({
       </header>
       <main className="flex flex-1 items-center justify-center px-4 pt-6 pb-20 sm:px-6">
         <div className="w-full max-w-sm">
-          <LoginForm redirectTo={redirectTo} qrAvailable={qrLoginAvailable()} />
+          <LoginForm
+            redirectTo={redirectTo}
+            qrAvailable={qrLoginAvailable()}
+            otpRequired={emailOtpConfigured()}
+            previewDemo={previewDemo}
+            initialMode={initialMode}
+            initialCode={initialCode}
+          />
         </div>
       </main>
       <footer className="px-4 py-6 text-center text-xs text-muted-foreground">

@@ -5,6 +5,7 @@ import { appAuth } from '@/lib/app-auth'
 import { hashToken, issueToken, loadActiveUser, wechatConfigured } from '@/lib/mp/auth'
 import { getPayloadClient } from '@/lib/payload'
 import { renderQrSvgDataUrl } from '@/lib/qr-svg'
+import { safeRedirectPath } from '@/lib/safe-redirect'
 
 const QR_TTL_MS = 3 * 60 * 1000
 
@@ -85,10 +86,7 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json().catch(() => ({}))) as { redirectTo?: string }
-  const redirectTo =
-    typeof body.redirectTo === 'string' && body.redirectTo.startsWith('/') && !body.redirectTo.startsWith('//')
-      ? body.redirectTo
-      : '/projects'
+  const redirectTo = safeRedirectPath(body.redirectTo, '/projects')
 
   const ticket = randomBytes(18).toString('base64url') // 24 chars
   const expiresAt = new Date(Date.now() + QR_TTL_MS).toISOString()
@@ -171,7 +169,7 @@ export async function GET(request: Request) {
     return Response.json({
       ok: true,
       status: 'confirmed',
-      redirectTo: doc.redirect && doc.redirect.startsWith('/') ? doc.redirect : '/projects',
+      redirectTo: safeRedirectPath(doc.redirect, '/projects'),
     })
   }
 

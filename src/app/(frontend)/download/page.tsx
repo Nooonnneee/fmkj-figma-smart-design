@@ -13,6 +13,7 @@ import { APP_NAME, pageTitle } from '@/lib/brand'
 export const metadata: Metadata = {
   title: pageTitle('下载桌面客户端'),
   description: `${APP_NAME} Windows / macOS 桌面客户端：独立窗口、快捷键、打印导出和自动更新，登录一次长期有效。`,
+  alternates: { canonical: '/download' },
 }
 
 const SHORTCUTS = [
@@ -56,7 +57,9 @@ export default function DownloadPage() {
           <div className="mx-auto grid max-w-6xl items-center gap-14 px-4 pt-20 pb-16 sm:px-6 sm:pt-28 lg:grid-cols-2 lg:px-8">
             <div>
               <h1 id="download-title" className="text-display font-semibold">
-                把{APP_NAME}装进你的电脑
+                {/* 按词组换行，避免窄屏断在「装 / 进」中间 */}
+                <span className="inline-block">把{APP_NAME}</span>
+                <span className="inline-block">装进你的电脑</span>
               </h1>
               <p className="mt-6 max-w-xl text-lead text-balance text-muted-foreground">
                 独立窗口打开工作台，设计、报价、合同一气呵成。登录一次长期有效，新版本自动送达。

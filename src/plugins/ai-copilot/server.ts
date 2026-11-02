@@ -198,6 +198,11 @@ async function post(modelOrId: AiModelConfig | string, body: Record<string, unkn
     const detail = (await res.json().catch(() => null)) as { error?: { message?: string } } | null
     if (res.status === 401) throw new AiError(`模型「${model.name}」密钥无效，请检查环境变量 ${envKey}`, 503)
     if (res.status === 402) throw new AiError(`模型「${model.name}」对应账户余额不足，请先在对应平台充值`, 503)
+    // 403：密钥没有该模型权限、账户受限，或所在网络被服务商拦截（返回体通常不是 JSON）
+    if (res.status === 403) {
+      console.error('[ai] provider forbidden', model.id, url, detail?.error?.message)
+      throw new AiError(`模型「${model.name}」的服务拒绝了请求（403）：请检查 ${envKey} 对应账户的权限与状态；在预览环境中可能被网络限制，发布后在正式站点再试`, 503)
+    }
     if (res.status === 429) throw new AiError('请求太频繁，请稍后再试', 429)
     if (res.status === 520) throw new AiError('当前预览环境不允许连接外部 AI 服务。请点击 Publish 发布后，在正式站点或自建服务器使用。', 503)
     console.error('[ai] provider error', model.id, url, res.status, detail?.error?.message)

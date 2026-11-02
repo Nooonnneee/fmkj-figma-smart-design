@@ -23,6 +23,7 @@ import { AppearanceMenuItems } from "@/components/appearance-menu"
 import { BrandMark } from "@/components/brand/brand-mark"
 import { GuardedLink } from "@/components/guarded-link"
 import { LinkPending } from "@/components/link-pending"
+import { MembershipDialog, PluginsDialog } from "@/components/workspace-dialogs"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -118,6 +119,8 @@ export function AppSidebar({
   const { state, setOpen } = useSidebar()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [mode, setMode] = useState<"nav" | "chat">("nav")
+  const [pluginsOpen, setPluginsOpen] = useState(false)
+  const [membershipOpen, setMembershipOpen] = useState(false)
 
   const aiCopilotEnabled = plugins.some((p) => p.id === "ai-copilot" && p.status === "ready" && p.enabled)
   const effectiveMode = aiCopilotEnabled && state === "expanded" ? mode : "nav"
@@ -130,7 +133,7 @@ export function AppSidebar({
     try {
       await fetch("/auth/logout", { method: "POST" })
     } finally {
-      window.location.assign("/login")
+      window.location.assign("/login?switch=1")
     }
   }
 
@@ -259,9 +262,20 @@ export function AppSidebar({
             <SidebarGroup className="mt-auto">
               <SidebarGroupLabel>扩展与账户</SidebarGroupLabel>
               <SidebarMenu>
-                {moreNav.map((item) => (
-                  <NavItem key={item.url} {...item} active={isActive(item.url)} />
-                ))}
+                <SidebarMenuItem>
+                  <SidebarMenuButton tooltip="插件市场" onClick={() => setPluginsOpen(true)}>
+                    <Blocks />
+                    <span>插件市场</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton tooltip="会员与积分" onClick={() => setMembershipOpen(true)}>
+                    <Crown />
+                    <span>会员与积分</span>
+                    <span className="ml-auto text-xs text-muted-foreground tabular-nums">{ai.credits}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <NavItem icon={Settings} label="设置" url="/settings" active={isActive("/settings")} />
               </SidebarMenu>
             </SidebarGroup>
           </SidebarContent>
@@ -309,12 +323,14 @@ export function AppSidebar({
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuGroup>
-                      <DropdownMenuItem asChild>
-                        <GuardedLink href="/membership">
-                          <Crown />
-                          会员与积分
-                          <span className="ml-auto text-xs text-muted-foreground tabular-nums">{ai.credits}</span>
-                        </GuardedLink>
+                      <DropdownMenuItem onSelect={() => setMembershipOpen(true)}>
+                        <Crown />
+                        会员与积分
+                        <span className="ml-auto text-xs text-muted-foreground tabular-nums">{ai.credits}</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setPluginsOpen(true)}>
+                        <Blocks />
+                        插件市场
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <GuardedLink href="/settings">
@@ -345,6 +361,13 @@ export function AppSidebar({
         </>
       )}
       <SidebarRail />
+      <PluginsDialog open={pluginsOpen} onOpenChange={setPluginsOpen} plugins={plugins} />
+      <MembershipDialog
+        open={membershipOpen}
+        onOpenChange={setMembershipOpen}
+        membershipBadge={user.membershipBadge}
+        credits={ai.credits}
+      />
     </Sidebar>
   )
 }

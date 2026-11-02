@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 export const metadata: Metadata = {
   title: `品牌标识 · ${APP_NAME}`,
   description: `${COMPANY_NAME}品牌标识、应用图标、品牌色与使用规范，提供 SVG / PNG 下载。`,
+  alternates: { canonical: '/brand' },
 }
 
 const B = '/brand'

@@ -1,6 +1,6 @@
 'use client'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
@@ -23,7 +23,6 @@ export function DocumentTemplateSettings({ kinds, styles, defaults }: { kinds: D
     <Card>
       <CardHeader>
         <CardTitle>文档模板</CardTitle>
-        <CardDescription>各类交付文档的默认风格与版式，预览时可随时切换</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         {kinds.map((k) => {

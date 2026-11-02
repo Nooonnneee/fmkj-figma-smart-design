@@ -1,9 +1,0 @@
-{"slug":"categories","returning":true,"select":{"slug":true},"documents":[
-{"data":{"name":"网关","slug":"gateway","sortOrder":10}},
-{"data":{"name":"开关面板","slug":"switch","sortOrder":20}},
-{"data":{"name":"灯光","slug":"lighting","sortOrder":30}},
-{"data":{"name":"传感器","slug":"sensor","sortOrder":40}},
-{"data":{"name":"窗帘","slug":"curtain","sortOrder":50}},
-{"data":{"name":"门锁","slug":"lock","sortOrder":60}},
-{"data":{"name":"安防","slug":"security","sortOrder":70}},
-{"data":{"name":"网络","slug":"network","sortOrder":80}}]}

@@ -200,9 +200,10 @@ export async function loadProjectDocs(projectId: string, user: User, scope: Poin
   const multiFloor = new Set(sheets.map((s) => sheetFloorMap.get(s.id))).size > 1
 
   const formatRoomDisplayName = (rawName: string, floor: string) => {
-    if (!multiFloor || !floor) return rawName
-    if (rawName.startsWith(floor) || rawName.includes('层')) return rawName
-    return `${floor} · ${rawName}`
+    const normalized = rawName.replace(/^(地下[一二三123]层|负[一二三123]层|[一二三四五六七八九十1-9]+层)\s*[·•-]?\s*(.+)$/, '$1 · $2')
+    if (!multiFloor || !floor) return normalized
+    if (normalized.startsWith(floor) || normalized.includes('层')) return normalized
+    return `${floor} · ${normalized}`
   }
 
   const areaDisplayName = new Map(

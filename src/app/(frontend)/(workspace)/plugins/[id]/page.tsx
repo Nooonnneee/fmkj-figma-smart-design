@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import { ArrowLeft, Bot, Clock, ExternalLink, FolderKanban, Settings } from 'lucide-react'
 
 import { PageHeader } from '@/components/page-header'
@@ -21,6 +21,7 @@ import { getPluginFlags } from '@/plugins/state'
 
 import { PluginDetailToggle } from './plugin-detail-toggle'
 import { projectDisplayName } from '@/lib/project-name'
+import { redirectToLogin } from '@/lib/login-redirect'
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -31,7 +32,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function PluginDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const user = await appAuth.getCurrentUser()
-  if (!user) redirect('/login')
+  if (!user) return redirectToLogin()
   if (!isPluginId(id)) notFound()
 
   const plugin = PLUGINS.find((p) => p.id === id)

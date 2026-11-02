@@ -88,10 +88,25 @@ function Cover({ ctx }: { ctx: Ctx }) {
 function Overview({ ctx, no }: { ctx: Ctx; no: number }) {
   const { d } = ctx
   const max = Math.max(...d.categories.map((c) => c.count), 1)
+  const acRouters = d.points.filter((p) => p.deviceType === 'ac-router')
+  const allAps = d.points.filter((p) => p.deviceType === 'ap-node' || p.deviceType === 'ceiling-ap')
+  const gateways = d.points.filter((p) => p.deviceType === 'gateway')
+  const apRooms = d.rooms
+    .map((r) => {
+      const aps = r.points.filter((p) => p.deviceType === 'ap-node' || p.deviceType === 'ceiling-ap')
+      if (!aps.length) return null
+      return {
+        room: r.displayName,
+        codes: aps.map((p) => p.code).sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).join('、'),
+        count: aps.length,
+      }
+    })
+    .filter((v): v is { room: string; codes: string; count: number } => Boolean(v))
+
   return (
     <Page ctx={ctx} no={no} title="方案概览">
       <div className="grid flex-1 grid-cols-[1.1fr_1fr] gap-[10mm]">
-        <div className="space-y-[6mm]">
+        <div className="space-y-[5mm]">
           <div className="grid grid-cols-4 gap-3">
             {[
               ['智能点位', d.points.length],
@@ -113,6 +128,28 @@ function Overview({ ctx, no }: { ctx: Ctx; no: number }) {
                   <span className="flex items-center gap-1.5"><span className="size-2 rounded-full" style={{ backgroundColor: c.color }} />{c.name}</span>
                   <span className="h-2 rounded-full bg-neutral-100"><span className="block h-full rounded-full" style={{ width: `${(c.count / max) * 100}%`, backgroundColor: c.color }} /></span>
                   <span className="text-right tabular-nums">{c.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-lg border border-neutral-200 bg-neutral-50/60 p-3">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="font-semibold">网络与中控拓扑（AC 控制 + 各房间 AP 节点）</span>
+              <span className="text-[10px] text-neutral-500">
+                AC 核心 ×{acRouters.length || 1} · AP 房间 ×{apRooms.length}（共 {allAps.length} 台 AP）· 中枢网关 ×{gateways.length}
+              </span>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-1.5 text-[10px]">
+              <div className="col-span-3 flex items-center justify-between rounded border border-neutral-300 bg-white px-2.5 py-1.5">
+                <span className="font-medium">
+                  {acRouters.length ? `${acRouters.map((p) => p.code).join('、')} AC 控制器 / PoE 核心交换` : '弱电箱 AC 控制器 / PoE 核心交换机'}
+                </span>
+                <span className="text-neutral-500">统一管控全屋 AP 漫游与千兆 PoE 供电</span>
+              </div>
+              {apRooms.slice(0, 6).map((r) => (
+                <div key={r.room} className="flex items-center justify-between rounded border border-neutral-200 bg-white px-2 py-1">
+                  <span className="truncate font-medium">{r.room}</span>
+                  <span className="ml-1 shrink-0 font-mono text-[9.5px] text-cyan-700">{r.codes}</span>
                 </div>
               ))}
             </div>

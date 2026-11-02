@@ -221,7 +221,8 @@ export function analyzeProject(areas: AreaLike[], points: PointLike[], sheets: {
   const switches = count(cat('switch'))
   const sensors = count(cat('sensor'))
   const curtains = count(anyOf('curtain-track'))
-  const aps = count(anyOf('ap-node'))
+  const acRouters = count(anyOf('ac-router'))
+  const aps = count(anyOf('ap-node', 'ceiling-ap'))
   const gateways = count(anyOf('gateway'))
   const panels = count(anyOf('touch-panel'))
   const highlights: string[] = []
@@ -230,14 +231,15 @@ export function analyzeProject(areas: AreaLike[], points: PointLike[], sheets: {
   if (switches || panels) highlights.push(`${switches} 个智能开关${panels ? `、${panels} 块中控屏` : ''}，支持一键场景与远程控制`)
   if (sensors) highlights.push(`${sensors} 个传感器，实现人来灯亮与安全告警`)
   if (curtains) highlights.push(`${curtains} 套电动窗帘，随场景与日照自动开合`)
-  if (aps) highlights.push(`${aps} 个 AP，全屋 Wi-Fi 无缝漫游`)
+  if (aps) highlights.push(acRouters ? `${acRouters} 台 AC 控制器统一管理 ${aps} 个房间 AP，全屋 Wi-Fi 无缝漫游` : `${aps} 个 AP，全屋 Wi-Fi 无缝漫游`)
 
   const warnings: string[] = []
   if (!gateways && (sensors || count(anyOf('curtain-track', 'smart-lock')))) warnings.push('没有配置智能网关：传感器、窗帘等无线设备需要网关接入')
   const unassigned = areas.length ? points.filter((p) => !p.areaId).length : 0
   if (unassigned) warnings.push(`${unassigned} 个点位不在任何区域内，区域分析没有统计它们`)
   if (aps) {
-    const bare = sheets.filter((s) => !points.some((p) => p.sheetId === s.id && p.deviceType === 'ap-node'))
+    if (aps >= 2 && !acRouters) warnings.push(`布置了 ${aps} 个 AP 但未配置 AC 路由/PoE 交换机，建议在弱电箱增加 AC 控制器统一管理漫游与供电`)
+    const bare = sheets.filter((s) => !points.some((p) => p.sheetId === s.id && (p.deviceType === 'ap-node' || p.deviceType === 'ceiling-ap')))
     if (bare.length && sheets.length > 1) warnings.push(`「${bare.map((s) => s.name).join('、')}」没有 AP，建议每层至少布置 1 个`)
   }
   const avg = results.length ? Math.round(results.reduce((s, r) => s + r.score, 0) / results.length) : null

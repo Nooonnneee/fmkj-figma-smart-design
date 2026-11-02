@@ -24,7 +24,11 @@ export const loadProposalTemplates = cache(async (user: User | null): Promise<Pr
     .map((d): ProposalTemplateDef => {
       const base = builtinOf.get(d.slug)
       const framework = isProposalFramework(d.framework) ? d.framework : (base?.framework ?? 'full')
-      const sections = (d.sections ?? []).filter(isDeckSection)
+      const rawSections = (d.sections ?? []).filter(isDeckSection)
+      const sections =
+        framework === 'story' && rawSections.length === 6 && !rawSections.includes('system')
+          ? (['cover', 'scenes', 'zones', 'plans', 'system', 'investment', 'service'] as const)
+          : rawSections
       const cover = d.coverImage && typeof d.coverImage === 'object' ? d.coverImage.url : null
       return {
         value: d.slug,
@@ -32,7 +36,7 @@ export const loadProposalTemplates = cache(async (user: User | null): Promise<Pr
         description: d.description || base?.description || '',
         framework,
         theme: isDeckTheme(d.theme) ? d.theme : (base?.theme ?? 'qixu'),
-        sections: sections.length ? sections : frameworkSections(framework),
+        sections: sections.length ? [...sections] : frameworkSections(framework),
         markers: d.markers === 'symbol' || framework === 'construction' ? 'symbol' : 'number',
         tier: isMembershipTier(d.tier) ? d.tier : (base?.tier ?? 'free'),
         headline: d.headline ?? null,

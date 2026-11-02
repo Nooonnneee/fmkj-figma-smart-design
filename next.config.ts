@@ -56,7 +56,7 @@ const nextConfig: NextConfig = {
     return [
       {
         // 带版本号（?v=）或文件名固定不变的静态图标：长期缓存
-        source: '/(brands|brand|ecosystem|point-markers|point-symbols|point-icons|board)/:path*',
+        source: '/(brands|brand|ecosystem|point-markers|point-symbols|point-icons|board|fonts)/:path*',
         headers: [
           ...securityHeaders,
           {

@@ -3,7 +3,7 @@ import type { Metadata } from "next"
 import Script from "next/script"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ACCENT_INIT_SCRIPT } from "@/lib/appearance"
-import { APP_DESCRIPTION, APP_NAME, APP_TAGLINE } from "@/lib/brand"
+import { APP_DESCRIPTION, APP_NAME, APP_TAGLINE, COMPANY_NAME } from "@/lib/brand"
 import { siteSans } from "@/lib/fonts"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -32,6 +32,22 @@ export const metadata: Metadata = {
   ),
   title,
   description,
+  applicationName: APP_NAME,
+  creator: COMPANY_NAME,
+  publisher: COMPANY_NAME,
+  keywords: [
+    "繁梦空间",
+    "FMKJ",
+    "全屋智能设计报价",
+    "智能家居报价系统",
+    "智能家居方案设计软件",
+    "全屋智能点位图",
+    "智能家居报价单模板",
+    "米家全屋智能方案",
+    "Aqara全屋智能报价",
+    "全屋WiFi网络拓扑图",
+    "智能家居施工交底清单",
+  ],
   robots:
     makeSiteSettings.robots?.index === false
       ? { follow: false, index: false }

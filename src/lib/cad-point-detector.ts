@@ -44,13 +44,27 @@ export function detectCadSymbolsFromPixels(img: Pixels): {
     return { points: [], areas: [] }
   }
 
+  // 判断背景是白底还是深色底（部分 CAD 导出图为黑底白线）
+  let lumSum = 0
+  let lumSamples = 0
+  for (let y = yMin; y < yMax; y += 8) {
+    for (let x = xMin; x < xMax; x += 8) {
+      const i = (y * W + x) * ch
+      if (ch === 4 && d[i + 3] < 64) continue
+      lumSum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
+      lumSamples++
+    }
+  }
+  const avgLum = lumSamples > 0 ? lumSum / lumSamples : 255
+  const darkBg = avgLum < 90
+
   const isDark = (x: number, y: number) => {
     if (x < 0 || x >= W || y < 0 || y >= H) return false
     const i = (y * W + x) * ch
     const a = ch === 4 ? d[i + 3] : 255
     if (a < 64) return false
     const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
-    return lum < 110
+    return darkBg ? lum > 145 : lum < 155
   }
 
   // 统计主体区域墨迹比例：如果不是白底黑线的 CAD 图纸（如深色渲染图/彩色照片），直接返回空
@@ -62,76 +76,157 @@ export function detectCadSymbolsFromPixels(img: Pixels): {
     }
   }
   const inkRatio = (darkCount * 4) / totalSample
-  if (inkRatio < 0.008 || inkRatio > 0.28) {
+  if (inkRatio < 0.005 || inkRatio > 0.35) {
     return { points: [], areas: [] }
   }
 
-  // 2. 扫描实心小圆点（CAD 暗装开关符号的核心特征：半径 4~7px 的高密度实心黑圆，外围有斜向引出杆与弧形控制线）
-  const switchCandidates: { x: number; y: number; score: number; ticks: number }[] = []
+  const candidates: { x: number; y: number; type: string }[] = []
   const visited = new Uint8Array(W * H)
 
-  for (let y = yMin + 12; y < yMax - 12; y += 2) {
-    for (let x = xMin + 12; x < xMax - 12; x += 2) {
-      if (!isDark(x, y) || visited[y * W + x]) continue
-
-      // 检查以 (x, y) 为中心、半径 R=5 的圆内黑像素占比
-      let innerDark = 0
-      let innerTotal = 0
-      for (let dy = -5; dy <= 5; dy++) {
-        for (let dx = -5; dx <= 5; dx++) {
-          if (dx * dx + dy * dy <= 25) {
-            innerTotal++
-            if (isDark(x + dx, y + dy)) innerDark++
-          }
-        }
+  const markVisited = (cx: number, cy: number, r: number) => {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const nx = cx + dx
+        const ny = cy + dy
+        if (nx >= 0 && nx < W && ny >= 0 && ny < H) visited[ny * W + nx] = 1
       }
-      // 实心圆核至少 78% 为黑像素
-      if (innerDark / innerTotal < 0.78) continue
-
-      // 检查外环 R=8..11 的黑像素占比：不能是粗墙线或实心大色块（外环黑像素占比应适中 0.08~0.38）
-      let ringDark = 0
-      let ringTotal = 0
-      for (let dy = -11; dy <= 11; dy++) {
-        for (let dx = -11; dx <= 11; dx++) {
-          const r2 = dx * dx + dy * dy
-          if (r2 >= 64 && r2 <= 121) {
-            ringTotal++
-            if (isDark(x + dx, y + dy)) ringDark++
-          }
-        }
-      }
-      const ringRatio = ringDark / ringTotal
-      if (ringRatio < 0.06 || ringRatio > 0.36) continue
-
-      // 排除落在实心墙线上的位置：左右两侧或上下两侧同时有墨迹，说明是墙线而不是开关符号
-      const horizWall =
-        isDark(x - 9, y) && isDark(x - 12, y) && isDark(x + 9, y) && isDark(x + 12, y)
-      const vertWall =
-        isDark(x, y - 9) && isDark(x, y - 12) && isDark(x, y + 9) && isDark(x, y + 12)
-      if (horizWall || vertWall) continue
-
-      // 标记周围 16px 已访问
-      for (let dy = -14; dy <= 14; dy++) {
-        for (let dx = -14; dx <= 14; dx++) {
-          const nx = x + dx
-          const ny = y + dy
-          if (nx >= 0 && nx < W && ny >= 0 && ny < H) visited[ny * W + nx] = 1
-        }
-      }
-
-      // 估算拨杆横杠数量（2键或3键）
-      const ticks = ringRatio > 0.22 ? 3 : 2
-      switchCandidates.push({ x, y, score: innerDark / innerTotal, ticks })
     }
   }
 
-  // 如果整张图连 3 个以上的开关符号特征都没检测到，说明不是带点位符号的 CAD 开关图，返回空（不生成任何默认点位）
-  if (switchCandidates.length < 3 || switchCandidates.length > 60) {
+  // 2. 先扫描高饱和度彩色点位标记（针对彩色 CAD 电气图或已标色点位图）
+  for (let y = yMin + 14; y < yMax - 14; y += 2) {
+    for (let x = xMin + 14; x < xMax - 14; x += 2) {
+      if (visited[y * W + x]) continue
+      const i = (y * W + x) * ch
+      if (ch === 4 && d[i + 3] < 128) continue
+      const r = d[i]
+      const g = d[i + 1]
+      const b = d[i + 2]
+      const max = Math.max(r, g, b)
+      const min = Math.min(r, g, b)
+      if (max < 85 || max - min < 65) continue
+      const sat = (max - min) / max
+      if (sat < 0.38) continue
+
+      // 检查 7px 半径内是否构成紧凑彩色圆斑，且外围 16px 不是大面积彩色底块
+      let colorInner = 0
+      let colorOuter = 0
+      for (let dy = -15; dy <= 15; dy += 2) {
+        for (let dx = -15; dx <= 15; dx += 2) {
+          const idx = ((y + dy) * W + (x + dx)) * ch
+          const mx = Math.max(d[idx], d[idx + 1], d[idx + 2])
+          const mn = Math.min(d[idx], d[idx + 1], d[idx + 2])
+          const isCol = mx >= 80 && mx - mn >= 55
+          const r2 = dx * dx + dy * dy
+          if (r2 <= 49 && isCol) colorInner++
+          else if (r2 >= 144 && r2 <= 225 && isCol) colorOuter++
+        }
+      }
+      if (colorInner >= 10 && colorOuter <= 12) {
+        let hue = 0
+        const delta = max - min
+        if (max === r) hue = ((g - b) / delta) % 6
+        else if (max === g) hue = (b - r) / delta + 2
+        else hue = (r - g) / delta + 4
+        hue = Math.round(hue * 60)
+        if (hue < 0) hue += 360
+
+        let dt = 'switch-2'
+        if (hue >= 22 && hue <= 58) dt = 'downlight'
+        else if (hue >= 115 && hue <= 165) dt = 'motion-sensor'
+        else if (hue > 165 && hue <= 198) dt = 'ap-node'
+        else if (hue >= 200 && hue <= 250) dt = 'switch-2'
+        else if (hue > 250 && hue <= 300) dt = 'gateway'
+        else if (hue > 300 && hue <= 345) dt = 'curtain-track'
+
+        candidates.push({ x, y, type: dt })
+        markVisited(x, y, 18)
+      }
+    }
+  }
+
+  // 3. 扫描 CAD 黑白/灰度符号：空心圆环灯具（筒灯/射灯 ⊕）与实心圆核暗装开关
+  for (let y = yMin + 14; y < yMax - 14; y += 2) {
+    for (let x = xMin + 14; x < xMax - 14; x += 2) {
+      if (visited[y * W + x]) continue
+
+      // 3a. 空心圆环筒灯/射灯符号：中心 r<=2.2 空心，r=4..6.5 圆环墨迹密集且四向闭合，外围 r=9..12 留白
+      let coreInk = 0
+      let coreTot = 0
+      let ringInk = 0
+      let ringTot = 0
+      let moatInk = 0
+      let moatTot = 0
+      for (let dy = -12; dy <= 12; dy++) {
+        for (let dx = -12; dx <= 12; dx++) {
+          const r2 = dx * dx + dy * dy
+          if (r2 <= 5) {
+            coreTot++
+            if (isDark(x + dx, y + dy)) coreInk++
+          } else if (r2 >= 15 && r2 <= 45) {
+            ringTot++
+            if (isDark(x + dx, y + dy)) ringInk++
+          } else if (r2 >= 81 && r2 <= 144) {
+            moatTot++
+            if (isDark(x + dx, y + dy)) moatInk++
+          }
+        }
+      }
+      if (
+        coreInk / coreTot <= 0.35 &&
+        ringInk / ringTot >= 0.5 &&
+        moatInk / moatTot <= 0.2 &&
+        (isDark(x - 5, y) || isDark(x - 6, y)) &&
+        (isDark(x + 5, y) || isDark(x + 6, y)) &&
+        (isDark(x, y - 5) || isDark(x, y - 6)) &&
+        (isDark(x, y + 5) || isDark(x, y + 6))
+      ) {
+        candidates.push({ x, y, type: 'downlight' })
+        markVisited(x, y, 16)
+        continue
+      }
+
+      // 3b. 实心圆核暗装开关符号：中心 r<=4 高密度实心圆，外环 r=7..10 有引出斜杆
+      if (!isDark(x, y)) continue
+      let sCore = 0
+      let sCoreTot = 0
+      let sRing = 0
+      let sRingTot = 0
+      for (let dy = -10; dy <= 10; dy++) {
+        for (let dx = -10; dx <= 10; dx++) {
+          const r2 = dx * dx + dy * dy
+          if (r2 <= 16) {
+            sCoreTot++
+            if (isDark(x + dx, y + dy)) sCore++
+          } else if (r2 >= 49 && r2 <= 100) {
+            sRingTot++
+            if (isDark(x + dx, y + dy)) sRing++
+          }
+        }
+      }
+      const sRingRatio = sRing / sRingTot
+      if (sCore / sCoreTot >= 0.75 && sRingRatio >= 0.06 && sRingRatio <= 0.35) {
+        const horizWall = isDark(x - 10, y) && isDark(x - 14, y) && isDark(x + 10, y) && isDark(x + 14, y)
+        const vertWall = isDark(x, y - 10) && isDark(x, y - 14) && isDark(x, y + 10) && isDark(x, y + 14)
+        if (!horizWall && !vertWall) {
+          candidates.push({
+            x,
+            y,
+            type: sRingRatio > 0.22 ? 'switch-3' : 'switch-2',
+          })
+          markVisited(x, y, 16)
+        }
+      }
+    }
+  }
+
+  // 少于 2 个或超过 240 个噪点时返回空，绝不生成网格默认点位
+  if (candidates.length < 2 || candidates.length > 240) {
     return { points: [], areas: [] }
   }
 
-  const points: DetectedCadPoint[] = switchCandidates.map((c) => ({
-    type: c.ticks >= 3 ? 'switch-3' : 'switch-2',
+  const points: DetectedCadPoint[] = candidates.map((c) => ({
+    type: c.type,
     x: Math.round((c.x / W) * 1000) / 1000,
     y: Math.round((c.y / H) * 1000) / 1000,
   }))

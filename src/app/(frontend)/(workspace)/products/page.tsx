@@ -1,10 +1,8 @@
 import Form from 'next/form'
 import Image from 'next/image'
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import { Check, ChevronDown, ChevronLeft, ChevronRight, ImageIcon, PackageSearch, Search, SlidersHorizontal, X } from 'lucide-react'
 
-import { BrandLogo } from '@/components/brand-logo'
 import { DeviceSymbol } from '@/components/device-symbol'
 import { LinkPending } from '@/components/link-pending'
 import { FilterTabs } from '@/components/filter-tabs'
@@ -13,12 +11,12 @@ import { SearchSubmit } from '@/components/search-submit'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { PRODUCT_PLATFORMS } from '@/collections/Products'
 import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
 import { getBrands, getCatalog } from '@/lib/cached-data'
-import { categoryOf, DEVICE_GROUPS, deviceTypeLabel, deviceTypeOf } from '@/lib/device-types'
+import { categoryOf, DEVICE_GROUPS, deviceTypeOf } from '@/lib/device-types'
 import { cn } from '@/lib/utils'
+import { redirectToLogin } from '@/lib/login-redirect'
 
 export const metadata = { title: pageTitle('产品库') }
 
@@ -57,7 +55,7 @@ const toNumber = (v: string) => (v.trim() === '' ? null : Number.isFinite(Number
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<Params> }) {
   const user = await appAuth.getCurrentUser()
-  if (!user) redirect('/login')
+  if (!user) return redirectToLogin()
   const sp = await searchParams
   const f = Object.fromEntries(KEYS.map((k) => [k, typeof sp[k] === 'string' ? sp[k]!.trim() : ''])) as Record<(typeof KEYS)[number], string>
   const brandSet = new Set(f.brand ? f.brand.split(',').filter(Boolean) : [])
@@ -81,7 +79,13 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 
   const products = byStatus.filter((p) => match(p))
   products.sort((a, b) =>
-    f.sort === 'price-asc' ? a.price - b.price : f.sort === 'price-desc' ? b.price - a.price : f.sort === 'updated' ? b.updatedAt.localeCompare(a.updatedAt) : a.name.localeCompare(b.name, 'zh-CN'),
+    f.sort === 'price-asc'
+      ? (a.price || Infinity) - (b.price || Infinity)
+      : f.sort === 'price-desc'
+        ? b.price - a.price
+        : f.sort === 'updated'
+          ? b.updatedAt.localeCompare(a.updatedAt)
+          : Number(b.price > 0) - Number(a.price > 0) || a.name.localeCompare(b.name, 'zh-CN'),
   )
 
   // 单次遍历归桶统计各类别、各设备类型、各品牌、各平台的产品数量，避免 70+ 次重复 filter
@@ -181,22 +185,12 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
     <section className="mx-auto flex w-full max-w-7xl flex-col gap-6">
       <PageHeader
         title="产品库"
-        description={
-          <>
-            共 <span className="font-medium text-foreground tabular-nums">{products.length}</span> 款设备
-          </>
-        }
         actions={
           <Form action="/products" className="flex flex-wrap items-center gap-2">
             {KEYS.filter((k) => !['q', 'min', 'max', 'page'].includes(k) && f[k]).map((k) => <input key={k} type="hidden" name={k} value={f[k]} />)}
             <div className="relative w-full sm:w-72">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input name="q" defaultValue={f.q} placeholder="搜索名称、SKU、型号、品牌" aria-label="搜索产品" className="pl-9" />
-            </div>
-            <div className="flex items-center gap-1">
-              <Input name="min" defaultValue={f.min} inputMode="decimal" placeholder="¥ 最低" aria-label="最低价" className="w-20" />
-              <span className="text-muted-foreground">–</span>
-              <Input name="max" defaultValue={f.max} inputMode="decimal" placeholder="¥ 最高" aria-label="最高价" className="w-20" />
             </div>
             <SearchSubmit variant="default" />
           </Form>
@@ -232,24 +226,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                       href({ cat: active ? '' : category.slug, type: '' }),
                       n(catCounts.get(category.slug) ?? 0),
                     )}
-                    {active ? (
-                      <div className="my-0.5 ml-3 flex flex-col gap-0.5 border-l pl-2">
-                        {types.map((t) => {
-                          const c = typeCounts.get(t.value) ?? 0
-                          if (!c && f.type !== t.value) return null
-                          return navItem(
-                            <>
-                              <span className="size-4 shrink-0"><DeviceSymbol type={t.value} /></span>
-                              {t.name}
-                            </>,
-                            f.type === t.value,
-                            href({ type: f.type === t.value ? '' : t.value }),
-                            n(c),
-                            t.value,
-                          )
-                        })}
-                      </div>
-                    ) : null}
                   </div>
                 )
               })}
@@ -274,23 +250,11 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
               <span className="px-2 text-xs text-muted-foreground">当前条件下没有品牌</span>
             ),
           )}
-          {section(
-            '平台',
-            <>
-              {navItem('全部平台', !f.platform, href({ platform: '' }))}
-              {PRODUCT_PLATFORMS.map((pl) => {
-                const c = platformCounts.get(pl) ?? 0
-                return c || f.platform === pl ? navItem(pl, f.platform === pl, href({ platform: f.platform === pl ? '' : pl }), n(c), pl) : null
-              })}
-            </>,
-          )}
         </aside>
 
         <div className="flex min-w-0 flex-col gap-4">
-          {/* 窄屏三组筛选排成一行横向滑动，不再叠成三行把产品挤出首屏 */}
           <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&>*]:shrink-0">
             {seg(STATUSES, f.status, 'status', '销售状态')}
-            {seg([{ value: '', label: '全部图片' }, { value: 'yes', label: '有图' }, { value: 'no', label: '缺图' }], f.img, 'img', '图片')}
             <div className="ml-auto flex shrink-0 items-center gap-2">
               {activeCount ? (
                 <Button asChild variant="ghost" size="sm">
@@ -315,7 +279,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
               {shown.map((p) => {
                 const t = deviceTypeOf(p.deviceType)
                 const color = categoryOf(t?.category)?.color ?? '#525252'
-                const model = p.description?.split('\n').find((l) => l.startsWith('型号：'))?.slice(3)
                 return (
                   <li key={p.id} className="group flex flex-col overflow-hidden rounded-xl border bg-card transition-all hover:-translate-y-0.5 hover:shadow-md">
                     <div className="relative flex aspect-square w-full items-center justify-center bg-white p-5">
@@ -332,34 +295,17 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                       ) : (
                         <ImageIcon className="size-8 text-muted-foreground/40" aria-hidden="true" />
                       )}
-                      {/* 图标保留类别色，文字用加深的类别色，保证白底上的对比度 */}
                       <span className="absolute top-2 left-2 flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-xs font-medium shadow-sm ring-1 ring-black/5" style={{ color: `color-mix(in oklch, ${color} 70%, black)` }}>
                         <span className="size-3.5" style={{ color }}><DeviceSymbol type={p.deviceType} /></span>
-                        {deviceTypeLabel(p.deviceType)}
+                        {t?.name ?? '设备'}
                       </span>
                       {p.status === 'inactive' ? <Badge variant="secondary" className="absolute top-2 right-2">已下架</Badge> : null}
                     </div>
-                    <div className="flex flex-1 flex-col gap-1.5 border-t p-3.5">
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        {p.brand?.logo ? <BrandLogo name={p.brand.name} logo={p.brand.logo} className="h-3.5" /> : null}
-                        <span className="truncate">{p.brand?.name ?? '未知品牌'}</span>
-                        {p.platforms.length ? <span className="ml-auto shrink-0 truncate text-xs">{p.platforms.join(' · ')}</span> : null}
-                      </div>
-                      <h2 className="line-clamp-2 text-sm leading-snug font-medium" title={p.name}>{p.name}</h2>
-                      <p className="truncate font-mono text-xs text-muted-foreground" title={model ?? p.sku}>{model ?? p.sku}</p>
-                      <div className="mt-auto flex items-end justify-between gap-2 pt-2">
-                        <div className="leading-tight">
-                          {p.price > 0 ? (
-                            <>
-                              <span className="text-base font-semibold tabular-nums">{yuan(p.price)}</span>
-                              <span className="ml-0.5 text-xs text-muted-foreground">/{p.unit}</span>
-                            </>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">未定价</span>
-                          )}
-                          {p.cost != null && p.cost > 0 ? <p className="text-xs text-muted-foreground tabular-nums">成本 {yuan(p.cost)}</p> : null}
-                        </div>
-                        {p.stock !== null ? <span className="text-xs text-muted-foreground tabular-nums">{p.stock > 0 ? `库存 ${p.stock}` : '无库存'}</span> : null}
+                    <div className="flex flex-1 flex-col justify-between gap-2 border-t p-3">
+                      <h2 className="truncate text-sm font-medium" title={p.name}>{p.name}</h2>
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="truncate text-xs text-muted-foreground">{p.brand?.name ?? p.sku}</span>
+                        <span className="shrink-0 text-sm font-semibold tabular-nums">{p.price > 0 ? yuan(p.price) : '—'}</span>
                       </div>
                     </div>
                   </li>

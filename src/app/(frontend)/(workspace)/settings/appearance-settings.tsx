@@ -5,7 +5,7 @@ import { Monitor, Moon, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
 
 import { useAccent } from '@/components/theme-provider'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { ACCENT_SWATCH, ACCENTS, DEFAULT_ACCENT, isAccent } from '@/lib/appearance'
@@ -51,7 +51,6 @@ export function AppearanceSettings() {
     <Card id="appearance">
       <CardHeader>
         <CardTitle>外观</CardTitle>
-        <CardDescription>仅对当前浏览器生效，打印文档始终保持白底样式。</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
         <div className="flex flex-col gap-2">
@@ -90,7 +89,6 @@ export function AppearanceSettings() {
                   </span>
                   <RadioGroupItem id={`appearance-accent-${a.id}`} value={a.id} />
                 </span>
-                <span className="text-xs text-muted-foreground">{a.description}</span>
               </Label>
             ))}
           </RadioGroup>

@@ -52,7 +52,9 @@ export type DeckGroup = { key: string; name: string; points: DeckPoint[] }
 export type DeckSheet = { sheet: SheetInfo; floorName: string; points: DeckPoint[]; groups: DeckGroup[]; areas: AreaInfo[]; subtotal: number; types: number }
 export type ZoneKey = 'arrive' | 'rest' | 'care' | 'focus'
 export type DeckZone = { key: ZoneKey; rooms: Room[]; photo: string; subtotal: number; points: DeckPoint[] }
-export type TopoBox = { title: string; sub: string }
+export type TopoBox = { title: string; sub: string; badge?: string }
+export type TopoAcNode = { title: string; sub: string; badge: string; codes: string; configured: boolean }
+export type TopoApRoom = { room: string; codes: string; sub: string; count: number }
 export type PayNode = { name: string; percent: number; amount: number }
 export type SceneItem = { name: string; action: string }
 
@@ -139,7 +141,8 @@ const INSTALL_NOTES: [string[], string][] = [
   [SWITCHES, '智能开关中心高约1.3m，86底盒深≥50mm，须有零火线'],
   [['touch-panel'], '中控屏需86底盒与零火线，安装高度1.3–1.5m'],
   [['gateway'], '网关居中放置，预留220V与LAN口'],
-  [['ap-node'], 'AP吸顶安装，需六类网线与PoE供电'],
+  [['ac-router'], 'AC路由/PoE交换机入弱电箱或机柜，核验散热、220V电源与各房间六类网线汇聚'],
+  [['ap-node', 'ceiling-ap'], 'AP节点（吸顶/面板）需六类网线与PoE供电，由AC控制器统一调优漫游'],
   [['curtain-track'], '电动窗帘复核轨道长度、行程与窗帘盒内供电'],
   [['smart-lock'], '门锁需核对门厚、锁体规格与开门方向'],
   [['contact-sensor'], '门磁间隙按设备要求核验'],
@@ -350,29 +353,94 @@ export function buildDeck(d: ProjectDocsData) {
   // 第 03 章：网络与中控拓扑
   const codesOf = (pts: DocPoint[]) => codeRange(pts.map((p) => p.code))
   const roomsOf = (pts: DocPoint[]) => join([...new Set(pts.map(roomName))], 2)
-  const routers = pointsOf('ac-router', 'network-panel')
-  const topoTop: TopoBox = routers.length
-    ? { title: `${codesOf(routers)} 路由 / 网络面板`, sub: `本次配置 ${routers.length} 个 · LAN与供电条件先行核验` }
-    : { title: '宽带 → 路由器 / PoE交换机', sub: '业主另配 · LAN与供电条件先行核验' }
+  const acRouters = pointsOf('ac-router')
+  const netPanels = pointsOf('network-panel')
+  const routers = [...acRouters, ...netPanels]
+  const ap = pointsOf('ap-node', 'ceiling-ap')
+  const acModels = [...new Set(acRouters.map((p) => (p.productId ? d.productById.get(p.productId)?.name : null)).filter((v): v is string => !!v))]
+  const acNode: TopoAcNode = acRouters.length
+    ? {
+        title: `${codesOf(acRouters)} AC 控制器 / PoE 核心交换`,
+        badge: `AC 控制 · ${acRouters.length}台`,
+        sub: `统一管控 ${ap.length ? `${ap.length} 台 AP 漫游` : '全屋局域网'}与千兆 PoE 供电 · ${roomsOf(acRouters)}${acModels[0] ? ` · ${acModels[0]}` : ''}`,
+        codes: codesOf(acRouters),
+        configured: true,
+      }
+    : ap.length
+      ? {
+          title: 'AC 控制器 / PoE 核心交换机',
+          badge: '弱电箱核心',
+          sub: `统一管控全屋 ${ap.length} 台 AP 漫游与 PoE 供电 · 需核验弱电箱电源与六类网线汇聚`,
+          codes: '',
+          configured: false,
+        }
+      : {
+          title: '宽带光猫 → AC 路由 / PoE 交换机',
+          badge: '弱电箱核心',
+          sub: '业主另配 · 千兆 LAN 与供电条件先行核验',
+          codes: '',
+          configured: false,
+        }
+  const topoTop: TopoBox = { title: acNode.title, sub: acNode.sub, badge: acNode.badge }
+
+  // 每个拥有 AP 设备的房间拓扑（按楼层与房间顺序排列，确保无遗漏）
+  const apRooms: TopoApRoom[] = []
+  const seenApIds = new Set<string>()
+  for (const r of d.rooms) {
+    const rAps = r.points.filter((p) => p.deviceType === 'ap-node' || p.deviceType === 'ceiling-ap')
+    if (!rAps.length) continue
+    for (const p of rAps) seenApIds.add(p.id)
+    const rNet = r.points.filter((p) => p.deviceType === 'network-panel')
+    const hasCeiling = rAps.some((p) => p.deviceType === 'ceiling-ap')
+    const hasPanel = rAps.some((p) => p.deviceType === 'ap-node')
+    const kind = hasCeiling && hasPanel ? '吸顶+面板AP' : hasCeiling ? '吸顶AP' : '面板AP'
+    apRooms.push({
+      room: r.displayName,
+      codes: codesOf(rAps),
+      sub: `${kind}${rAps.length > 1 ? ` ×${rAps.length}` : ''}${rNet.length ? ` + 网口×${rNet.length}` : ''} · PoE 漫游`,
+      count: rAps.length,
+    })
+  }
+  const orphanAps = ap.filter((p) => !seenApIds.has(p.id))
+  if (orphanAps.length) {
+    apRooms.push({
+      room: '公共区域',
+      codes: codesOf(orphanAps),
+      sub: `AP 节点 ×${orphanAps.length} · PoE 漫游`,
+      count: orphanAps.length,
+    })
+  }
+
   const hubs: TopoBox[] = []
   const gw = pointsOf('gateway')
-  if (gw.length) hubs.push({ title: `${codesOf(gw)} 智能网关`, sub: `${roomsOf(gw)} · 220V + LAN / ${protocol}协调` })
-  const ap = pointsOf('ap-node')
-  if (ap.length) hubs.push({ title: `${codesOf(ap)} AP节点`, sub: `${roomsOf(ap)} · 六类网线 / PoE 供电` })
+  const shortCodes = (pts: DocPoint[]) => {
+    const c = [...new Set(pts.map((p) => p.code).filter(Boolean))].sort(byCode)
+    return c.length <= 2 ? c.join(' / ') : `${c[0]}～${c[c.length - 1]}（${c.length}处）`
+  }
+  if (gw.length) hubs.push({ title: `${shortCodes(gw)} 智能中枢网关`, badge: `网关 ×${gw.length}`, sub: `${roomsOf(gw)} · LAN 接入 · ${protocol}` })
   const tp = pointsOf('touch-panel')
-  if (tp.length && hubs.length < 2) hubs.push({ title: `${codesOf(tp)} 中控屏`, sub: `${roomsOf(tp)} · 86底盒 · 场景集中控制` })
   const sp = pointsOf('speaker')
-  if (sp.length && hubs.length < 2) hubs.push({ title: `${codesOf(sp)} 智能音箱`, sub: `${roomsOf(sp)} · 语音控制入口` })
-  if (!hubs.length) hubs.push({ title: '手机 App / 语音', sub: 'Wi-Fi 设备直连路由 · 无独立网关' })
+  const vrf = pointsOf('vrf-controller')
+  const ctrl = [...tp, ...sp, ...vrf]
+  if (ctrl.length) {
+    const parts = [tp.length ? `中控屏×${tp.length}` : '', sp.length ? `音箱×${sp.length}` : '', vrf.length ? `空调网关×${vrf.length}` : ''].filter(Boolean).join(' / ')
+    hubs.push({ title: `${shortCodes(ctrl)} 中控与语音交互`, badge: parts, sub: `${roomsOf(ctrl)} · 场景触控与语音控制` })
+  }
+  if (!hubs.length) hubs.push({ title: '手机 App / 语音中控', badge: '直连控制', sub: 'Wi-Fi 设备直连局域网 · 无独立网关' })
   const leaves: TopoBox[] = d.categories
     .filter((c) => c.slug !== 'gateway' && c.slug !== 'network')
     .sort((a, b) => b.count - a.count)
-    .slice(0, 3)
+    .slice(0, 4)
     .map((c) => {
       const pts = d.points.filter((p) => categoryOfType(p.deviceType)?.slug === c.slug)
-      return { title: codesOf(pts) || c.name, sub: `${c.count}${CAT_UNIT[c.slug] ?? '个'}${c.name} · ${CAT_DESC[c.slug] ?? '按需接入'}` }
+      return {
+        title: codesOf(pts) || c.name,
+        badge: `${c.count}${CAT_UNIT[c.slug] ?? '个'}${c.name}`,
+        sub: `${CAT_DESC[c.slug] ?? '按需接入'} · ${roomsOf(pts)}`,
+      }
     })
-  const topology = { top: topoTop, hubs, leaves, link: `${protocol} · 配对与覆盖待实测` }
+  const apLink = apRooms.length ? `PoE 供电 + AC 漫游 · ${apRooms.length} 房间（${ap.length} 台 AP）` : '六类网线预留 · 按需扩展 AP 节点'
+  const topology = { top: topoTop, ac: acNode, apRooms, apTotal: ap.length, apLink, hubs, leaves, link: `${protocol} · 中控联动总线` }
 
   const missingCore = [
     !has('smart-lock') && '智能门锁',
@@ -385,7 +453,7 @@ export function buildDeck(d: ProjectDocsData) {
     [
       has(...SWITCHES) ? '开关仅开关灯，不默认支持调光调色' : '',
       has('curtain-track') ? '电机须复核轨道匹配、行程与窗帘盒供电' : '',
-      has('ap-node') ? '无线覆盖须到场测试' : '',
+      has('ap-node', 'ceiling-ap') ? 'AP漫游与无线覆盖须到场实测调优' : '',
     ]
       .filter(Boolean)
       .join('；') + '。',

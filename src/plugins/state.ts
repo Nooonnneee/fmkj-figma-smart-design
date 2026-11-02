@@ -2,7 +2,8 @@ import { cache } from 'react'
 
 import { appAuth } from '@/lib/app-auth'
 import { getCompanyInfo } from '@/lib/cached-data'
-import { resolveMembership, tierAllows, type MembershipTier } from '@/lib/membership'
+import { featureAccess, resolveMembership, type MembershipTier } from '@/lib/membership'
+import { getMembershipPolicy } from '@/lib/membership-policy'
 import { getPayloadClient } from '@/lib/payload'
 
 import { PLUGINS, type PluginId } from '.'
@@ -26,17 +27,13 @@ export async function getPluginFlags(userId?: string | number | null): Promise<P
     const currentUser = await appAuth.getCurrentUser().catch(() => null)
     resolvedUserId = currentUser?.id ?? null
   }
-  const [{ disabledPlugins }, tier] = await Promise.all([getCompanyInfo(resolvedUserId), userTier(resolvedUserId)])
+  const [{ disabledPlugins }, tier, policy] = await Promise.all([getCompanyInfo(resolvedUserId), userTier(resolvedUserId), getMembershipPolicy()])
   const disabled = new Set(disabledPlugins)
-  return Object.fromEntries(PLUGINS.map((p) => [p.id, p.status === 'ready' && !disabled.has(p.id) && tierAllows(tier, p.tier)])) as PluginFlags
+  return Object.fromEntries(
+    PLUGINS.map((p) => [p.id, p.status === 'ready' && !disabled.has(p.id) && featureAccess({ effectiveTier: tier }, p.tier, policy.strict).allowed]),
+  ) as PluginFlags
 }
 
-/** 账号当前生效的会员等级（插件按最低等级解锁） */
-export async function userTier(userId: string | number | null | undefined): Promise<MembershipTier> {
-  if (userId === null || userId === undefined) return 'free'
-  const payload = await getPayloadClient()
-  const u = await payload
-    .findByID({ collection: 'users', id: userId, depth: 0, overrideAccess: true, select: { membershipTier: true, membershipExpiresAt: true } })
-    .catch(() => null)
-  return resolveMembership(u as never).effectiveTier
-}
+/** 账号当前生效的会员等级（同一次请求只查一次） */
+export const userTier = (userId: string | number | null | undefined): Promise<MembershipTier> =>
+  userId === null || userId === undefined ? Promise.resolve('free') : tierOf(String(userId))

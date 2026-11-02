@@ -6,7 +6,7 @@ import localFont from 'next/font/local'
  * 中文没有 Inter 字形，按 styles.css 里 --font-sans 的顺序落到苹方 / 冬青黑 / 微软雅黑 / 思源黑体。
  *
  * 注意变量名：next/font 用变量名当字族名。不能叫 inter——字族名不区分大小写，会和 styles.css 里
- * 文档模板用的远程 "Inter"（static.figma.com，400 KB+）撞名，浏览器会两份一起下载。
+ * 文档模板按名字引用的 "Inter"（styles.css 里指向 public/fonts 的同一份文件）撞名。
  */
 export const siteSans = localFont({
   src: '../fonts/inter-latin-var.woff2',

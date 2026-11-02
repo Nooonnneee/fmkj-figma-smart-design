@@ -4,64 +4,61 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* 文档模板「栖序雅致」按字体名引用的 Inter 等字体（来自 Figma 设计，按需加载：只有用到这些字体的文档才会下载）。
-   界面本身用的是 src/lib/fonts.ts 自托管的 Inter 拉丁子集（--font-inter），不走这里。 */
+/* 文档模板按字体名引用的字体（来自 Figma 设计稿）。全部不走第三方 CDN：
+   - Inter：本站自托管的 Inter 可变字体（与界面同一份文件，public/fonts）；
+   - 中文黑体 / 宋体、等宽数字：优先用电脑上已装的思源 / Noto 字体，没有时用系统自带的苹方、雅黑、宋体等。
+   这样国内网络和自部署环境下文档都能立即显示，不会因为海外字体加载慢而卡住。 */
 @font-face {
   font-family: "Inter";
-  src: url("https://static.figma.com/font/Inter_1") format("woff2");
+  src: url("/fonts/inter-latin-var.woff2") format("woff2");
   font-style: normal;
   font-weight: 100 900;
   font-display: swap;
 }
 @font-face {
   font-family: "Inter:Light";
-  src: url("https://static.figma.com/font/Inter_1") format("woff2");
+  src: url("/fonts/inter-latin-var.woff2") format("woff2");
   font-style: normal;
   font-weight: 300;
   font-display: swap;
 }
 @font-face {
   font-family: "Inter:Regular";
-  src: url("https://static.figma.com/font/Inter_1") format("woff2");
+  src: url("/fonts/inter-latin-var.woff2") format("woff2");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
 }
 @font-face {
   font-family: "Noto Sans SC:Bold";
-  src: url("https://static.figma.com/font/NotoSansSC-VF_2") format("woff2");
+  src: local("Noto Sans SC Bold"), local("NotoSansSC-Bold"), local("Source Han Sans SC Bold"), local("PingFang SC Semibold"), local("PingFangSC-Semibold"), local("Microsoft YaHei Bold");
   font-style: normal;
   font-weight: 700;
-  font-display: swap;
 }
 @font-face {
   font-family: "Noto Sans SC:Medium";
-  src: url("https://static.figma.com/font/NotoSansSC-VF_2") format("woff2");
+  src: local("Noto Sans SC Medium"), local("NotoSansSC-Medium"), local("Source Han Sans SC Medium"), local("PingFang SC Medium"), local("PingFangSC-Medium"), local("Microsoft YaHei");
   font-style: normal;
   font-weight: 500;
-  font-display: swap;
 }
 @font-face {
   font-family: "Noto Sans SC:Regular";
-  src: url("https://static.figma.com/font/NotoSansSC-VF_2") format("woff2");
+  src: local("Noto Sans SC"), local("NotoSansSC-Regular"), local("Source Han Sans SC"), local("PingFang SC"), local("PingFangSC-Regular"), local("Microsoft YaHei");
   font-style: normal;
   font-weight: 400;
-  font-display: swap;
 }
-/* 文档风格「东方雅韵」的衬线体、「科技」的等宽数字（同样按需加载） */
+/* 文档风格「东方雅韵」等用的衬线体、「科技」的等宽数字 */
 @font-face {
   font-family: "Noto Serif SC";
-  src: url("https://static.figma.com/font/NotoSerifSC-VF_3") format("woff2");
+  src: local("Noto Serif SC"), local("NotoSerifSC-Regular"), local("Source Han Serif SC"), local("Songti SC"), local("STSong"), local("SimSun");
   font-style: normal;
   font-weight: 400 700;
-  font-display: swap;
 }
 @font-face {
   font-family: "JetBrains Mono";
-  src: url("https://static.figma.com/font/JetBrainsMono_wght__1") format("woff2");
+  src: local("JetBrains Mono"), local("JetBrainsMono-Regular"), local("SF Mono"), local("Menlo"), local("Consolas");
   font-style: normal;
   font-weight: 400 500;
-  font-display: swap;
 }
 
 @theme inline {

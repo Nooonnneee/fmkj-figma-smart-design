@@ -8,8 +8,8 @@ import { money, Section, SectionHeader } from './section'
 /** 合同与交付文档：付款节点按已确认报价算好；文档目录全部来自文档模板登记表。 */
 export function DeliverySection({ total, styles }: { total: number | null; styles: DocStyle[] }) {
   const docs = [
-    { name: DOC_KINDS.quote.label, items: DOC_KINDS.quote.layouts.map((l) => l.label), note: `${styles.length} 套风格可换` },
-    { name: '方案演示', items: PROPOSAL_TEMPLATES.map((t) => t.label), note: 'A4 横版，含封面、点位图、场景与预算' },
+    { name: DOC_KINDS.quote.label, items: DOC_KINDS.quote.layouts.map((l) => l.label), note: `${DOC_KINDS.quote.layouts.length} 种版式 × ${styles.length} 套风格可换` },
+    { name: '方案演示', items: PROPOSAL_TEMPLATES.map((t) => t.label), note: 'A4 横版，含封面、点位图、网络与中控拓扑、空间场景与预算' },
     { name: DOC_KINDS.contract.label, items: DOC_KINDS.contract.layouts.map((l) => l.label), note: '签订后锁定，只能登记收款' },
     { name: DOC_KINDS.plans.label, items: DOC_KINDS.plans.layouts.map((l) => l.label), note: '附设备图例与统计' },
     { name: DOC_KINDS.checklist.label, items: DOC_KINDS.checklist.layouts.map((l) => l.label), note: '给安装团队，不含价格' },
@@ -17,7 +17,7 @@ export function DeliverySection({ total, styles }: { total: number | null; style
   return (
     <Section id="delivery" labelledBy="delivery-title">
       <SectionHeader id="delivery-title" title="合同和交付文档，跟着报价走">
-        客户确认报价后一键生成合同，金额、付款节点、工期和质保自动带入。方案演示、点位图和交底清单也从同一份数据生成，不用再抄一遍。
+        客户确认报价后一键生成合同，金额、付款节点、工期和质保自动带入。
       </SectionHeader>
       <div className="mt-14 grid gap-6 lg:grid-cols-5">
         {total != null ? <PaymentSchedule total={total} /> : null}
@@ -37,7 +37,6 @@ export function DeliverySection({ total, styles }: { total: number | null; style
               </li>
             ))}
           </ul>
-          <p className="border-t border-border px-6 py-4 text-xs text-muted-foreground sm:px-8">每份文档都能 A4 打印、另存 PDF 或导出长图。</p>
         </div>
       </div>
     </Section>

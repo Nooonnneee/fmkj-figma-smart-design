@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation'
 
 import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
@@ -10,12 +9,13 @@ import { loadProposalTemplates } from '@/plugins/proposal/registry'
 
 import { monthlyCreditReason } from './actions'
 import { MembershipClient } from './membership-client'
+import { redirectToLogin } from '@/lib/login-redirect'
 
 export const metadata = { title: pageTitle('会员与积分') }
 
 export default async function MembershipPage() {
   const user = await appAuth.getCurrentUser()
-  if (!user) redirect('/login')
+  if (!user) return redirectToLogin()
 
   const payload = await getPayloadClient()
   const reason = await monthlyCreditReason()

@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
 
 import { PageHeader } from '@/components/page-header'
@@ -10,12 +9,13 @@ import { getPayloadClient } from '@/lib/payload'
 import { DEFAULT_PLATFORM, isProjectPlatform } from '@/lib/projects'
 
 import { ProjectForm } from '../project-form'
+import { redirectToLogin } from '@/lib/login-redirect'
 
 export const metadata = { title: pageTitle('新建项目') }
 
 export default async function NewProjectPage() {
   const user = await appAuth.getCurrentUser()
-  if (!user) redirect('/login')
+  if (!user) return redirectToLogin()
   // 主平台默认沿用自己上一个项目，通常同一个人长期做同一个平台
   const payload = await getPayloadClient()
   const last = await payload.find({

@@ -168,9 +168,6 @@ export function DesktopHeroActions() {
           <Link href="#platforms">查看全部平台</Link>
         </Button>
       </div>
-      <p className="mt-3 text-sm text-muted-foreground">
-        {detected.platform === 'other' ? '桌面客户端支持 Windows 和 macOS 电脑，手机上可以使用微信小程序。' : '这个平台的安装包正在准备中，可以先使用网页版，或把网页版安装为应用。'}
-      </p>
     </div>
   )
 }
@@ -230,7 +227,6 @@ export function DesktopPlatformCards() {
               </div>
             ) : (
               <div className="mt-6 flex flex-1 flex-col justify-end gap-4">
-                <p className="text-xs text-muted-foreground">安装包正在准备中，发布后会自动出现在这里。</p>
                 <Button size="lg" variant="outline" className="w-full rounded-full" disabled>
                   即将上线
                 </Button>
