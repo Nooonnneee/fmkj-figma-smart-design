@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>暂时无法连接 · 繁梦空间</title>
+    <link rel="stylesheet" href="pages.css" />
+  </head>
+  <body class="center">
+    <main class="panel" aria-live="polite">
+      <img class="logo" src="icon.svg" alt="" width="88" height="88" />
+      <h1 id="title">暂时无法连接到繁梦空间</h1>
+      <p id="detail" class="lead">服务器暂时无法访问，请稍后重试。</p>
+      <div class="actions">
+        <button id="retry" class="primary" type="button">重新连接</button>
+        <button id="settings" type="button">服务器设置</button>
+      </div>
+      <p id="countdown" class="hint"></p>
+      <p id="meta" class="meta"></p>
+    </main>
+    <script src="offline.js"></script>
+  </body>
+</html>

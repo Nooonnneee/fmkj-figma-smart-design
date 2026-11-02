@@ -1,0 +1,29 @@
+{
+  "name": "fanmeng-space-desktop",
+  "productName": "繁梦空间",
+  "version": "1.0.0",
+  "description": "繁梦空间桌面客户端：智能家居设计报价（Windows / macOS）",
+  "author": "繁梦空间智能信息技术",
+  "homepage": "https://fmkj.top",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --server-url=http://localhost:3000",
+    "check": "node scripts/check.mjs",
+    "icons": "node scripts/make-icons.mjs",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist": "electron-builder --win --mac --publish never",
+    "dist:cross:win": "node scripts/dist-cross.cjs --win --publish never",
+    "dist:cross:mac": "node scripts/dist-cross.cjs --mac zip --arm64 --x64 --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.11"
+  },
+  "devDependencies": {
+    "electron": "45.2.1",
+    "electron-builder": "26.18.0"
+  }
+}

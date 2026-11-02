@@ -1,0 +1,30 @@
+.ai { min-height: 100vh; }
+.topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding: 16rpx 28rpx; background: rgba(244, 244, 245, 0.96); }
+.project-chip { max-width: 380rpx; }
+.warn { margin: 8rpx 28rpx 0; }
+.welcome { padding: 48rpx 32rpx 16rpx; }
+.prompts { display: flex; flex-direction: column; gap: 16rpx; }
+.prompt { padding: 24rpx 28rpx; border-radius: 24rpx; background: var(--paper); border: 1rpx solid var(--rule); font-size: 26rpx; }
+.msgs { padding: 16rpx 28rpx 0; }
+.msg { margin-top: 28rpx; display: flex; flex-direction: column; }
+.msg.user { align-items: flex-end; }
+.bubble { max-width: 86%; padding: 18rpx 26rpx; border-radius: 28rpx; background: #e9e9eb; font-size: 28rpx; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
+.user-images { justify-content: flex-end; margin-bottom: 12rpx; }
+.user-image { width: 200rpx; height: 134rpx; border-radius: 16rpx; background: var(--paper); border: 1rpx solid var(--rule); }
+.tool { display: flex; align-items: center; gap: 12rpx; padding: 14rpx 20rpx; margin-bottom: 12rpx; border-radius: 16rpx; background: var(--paper); border: 1rpx solid var(--rule); font-size: 24rpx; color: var(--pencil); }
+.link { color: var(--ink); text-decoration: underline; }
+.answer { display: block; }
+.answer.error { padding: 16rpx 20rpx; border: 1rpx dashed var(--rule); border-radius: 16rpx; }
+.thinking { padding: 8rpx 0; }
+.msg-actions { margin-top: 12rpx; }
+.composer-spacer { height: calc(260rpx + env(safe-area-inset-bottom)); }
+.composer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 16rpx 24rpx 12rpx; background: rgba(244, 244, 245, 0.97); border-top: 1rpx solid var(--rule); }
+.att-row { margin-bottom: 12rpx; }
+.att { display: flex; align-items: center; gap: 12rpx; width: 100%; padding: 12rpx 16rpx; border-radius: 18rpx; background: var(--paper); border: 1rpx solid var(--rule); }
+.att-thumb { width: 72rpx; height: 48rpx; border-radius: 8rpx; background: var(--paper-muted); }
+.composer-box { display: flex; align-items: flex-end; gap: 12rpx; padding: 12rpx; border-radius: 28rpx; background: var(--paper); border: 1rpx solid var(--rule); }
+.composer-input { flex: 1; min-height: 72rpx; max-height: 240rpx; padding: 16rpx 8rpx; font-size: 28rpx; line-height: 1.5; }
+.send { width: 72rpx; height: 72rpx; border-radius: 50%; background: var(--ink-primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.send.disabled { opacity: 0.3; }
+.hint { margin-top: 8rpx; }
+.history { max-height: 62vh; }

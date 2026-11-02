@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.env*
+deploy/*.env
+media
+*.log
+.tmp-*
+import/
+import-xlsx/
+# 桌面客户端源码与安装包不进入网站镜像
+desktop
+desktop-releases

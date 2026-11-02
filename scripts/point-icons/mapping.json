@@ -1,0 +1,215 @@
+{
+  "version": 1,
+  "source": "fast-409-matching.json",
+  "assignments": {
+    "switch-4": {
+      "kind": "original",
+      "source": "orig:110.png",
+      "path": "original/switch-4.png",
+      "name": "立面 · 场景开关",
+      "category": "04_3b.4 开关"
+    },
+    "switch-3": {
+      "kind": "original",
+      "source": "orig:104.png",
+      "path": "original/switch-3.png",
+      "name": "立面 · 三联开关",
+      "category": "04_3b.4 开关"
+    },
+    "switch-2": {
+      "kind": "original",
+      "source": "orig:103.png",
+      "path": "original/switch-2.png",
+      "name": "立面 · 双联开关",
+      "category": "04_3b.4 开关"
+    },
+    "switch-1": {
+      "kind": "original",
+      "source": "orig:102.png",
+      "path": "original/switch-1.png",
+      "name": "立面 · 单联开关",
+      "category": "04_3b.4 开关"
+    },
+    "spotlight": {
+      "kind": "optimized",
+      "source": "opt:spotlight.png",
+      "path": "optimized/spotlight.png",
+      "name": "射灯"
+    },
+    "track-light": {
+      "kind": "optimized",
+      "source": "opt:track-light.png",
+      "path": "optimized/track-light.png",
+      "name": "轨道灯"
+    },
+    "downlight": {
+      "kind": "optimized",
+      "source": "opt:downlight.png",
+      "path": "optimized/downlight.png",
+      "name": "筒灯"
+    },
+    "ceiling-light": {
+      "kind": "optimized",
+      "source": "opt:ceiling-light.png",
+      "path": "optimized/ceiling-light.png",
+      "name": "吸顶灯"
+    },
+    "pendant-light": {
+      "kind": "optimized",
+      "source": "opt:pendant-light.png",
+      "path": "optimized/pendant-light.png",
+      "name": "吊灯"
+    },
+    "wall-light": {
+      "kind": "optimized",
+      "source": "opt:wall-light.png",
+      "path": "optimized/wall-light.png",
+      "name": "壁灯"
+    },
+    "panel-light": {
+      "kind": "optimized",
+      "source": "opt:panel-light.png",
+      "path": "optimized/panel-light.png",
+      "name": "面板灯"
+    },
+    "light-strip": {
+      "kind": "optimized",
+      "source": "opt:light-strip.png",
+      "path": "optimized/light-strip.png",
+      "name": "灯带"
+    },
+    "other-light": {
+      "kind": "optimized",
+      "source": "opt:other-light.png",
+      "path": "optimized/other-light.png",
+      "name": "其他灯具"
+    },
+    "motion-sensor": {
+      "kind": "optimized",
+      "source": "opt:motion-sensor.png",
+      "path": "optimized/motion-sensor.png",
+      "name": "人体"
+    },
+    "smoke-sensor": {
+      "kind": "optimized",
+      "source": "opt:smoke-sensor.png",
+      "path": "optimized/smoke-sensor.png",
+      "name": "烟雾"
+    },
+    "water-sensor": {
+      "kind": "optimized",
+      "source": "opt:water-sensor.png",
+      "path": "optimized/water-sensor.png",
+      "name": "水浸"
+    },
+    "temp-sensor": {
+      "kind": "optimized",
+      "source": "opt:temp-sensor.png",
+      "path": "optimized/temp-sensor.png",
+      "name": "温湿度"
+    },
+    "smart-lock": {
+      "kind": "original",
+      "source": "orig:085.png",
+      "path": "original/smart-lock.png",
+      "name": "立面 · 智能门锁",
+      "category": "03_3b.3 电气"
+    },
+    "doorbell": {
+      "kind": "optimized",
+      "source": "opt:doorbell.png",
+      "path": "optimized/doorbell.png",
+      "name": "门铃"
+    },
+    "camera": {
+      "kind": "optimized",
+      "source": "opt:camera.png",
+      "path": "optimized/camera.png",
+      "name": "摄像头"
+    },
+    "curtain-track": {
+      "kind": "optimized",
+      "source": "opt:curtain.png",
+      "path": "optimized/curtain-track.png",
+      "name": "窗帘电轨"
+    },
+    "speaker": {
+      "kind": "optimized",
+      "source": "opt:speaker.png",
+      "path": "optimized/speaker.png",
+      "name": "智能音箱"
+    },
+    "touch-panel": {
+      "kind": "original",
+      "source": "orig:088.png",
+      "path": "original/touch-panel.png",
+      "name": "立面 · 智能中枢",
+      "category": "03_3b.3 电气"
+    },
+    "gateway": {
+      "kind": "optimized",
+      "source": "opt:hub.png",
+      "path": "optimized/gateway.png",
+      "name": "智能网关"
+    },
+    "ac-router": {
+      "kind": "original",
+      "source": "orig:082.png",
+      "path": "original/ac-router.png",
+      "name": "立面 · 路由器",
+      "category": "03_3b.3 电气"
+    },
+    "ap-node": {
+      "kind": "original",
+      "source": "orig:051.png",
+      "path": "original/ap-node.png",
+      "name": "平面 · 路由器",
+      "category": "03_3b.3 电气"
+    },
+    "network-panel": {
+      "kind": "original",
+      "source": "orig:075.png",
+      "path": "original/network-panel.png",
+      "name": "立面 · 数据插口",
+      "category": "03_3b.3 电气"
+    },
+    "drying-rack": {
+      "kind": "optimized",
+      "source": "opt:automatic-drying-rack-127x50cm-50x20.png",
+      "path": "optimized/drying-rack.png",
+      "name": "电动晾衣架"
+    },
+    "custom-1793550513224": {
+      "kind": "original",
+      "source": "orig:052.png",
+      "path": "original/custom-1793550513224.png",
+      "name": "平面 · Mesh 节点",
+      "category": "03_3b.3 电气"
+    }
+  },
+  "custom": [
+    {
+      "id": "custom-1793550513224",
+      "name": "吸顶AP",
+      "cat": "network",
+      "kind": "original",
+      "source": "orig:052.png",
+      "path": "original/custom-1793550513224.png",
+      "sourceName": "平面 · Mesh 节点"
+    }
+  ],
+  "hidden": [
+    "dimmer-switch",
+    "scene-switch",
+    "two-way-switch",
+    "socket-usb",
+    "socket-double",
+    "socket",
+    "floor-heating",
+    "fresh-air",
+    "water-heater",
+    "central-ac",
+    "distribution-board",
+    "other"
+  ]
+}

@@ -1,0 +1,5 @@
+.kv { display: flex; justify-content: space-between; align-items: center; gap: 24rpx; padding: 16rpx 0; border-top: 1rpx solid var(--rule); }
+.kv:first-child { border-top: none; }
+.mini-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12rpx; }
+.mini-stats .num { font-size: 34rpx; margin-top: 4rpx; }
+.block { display: block; }

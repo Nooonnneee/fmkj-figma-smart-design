@@ -1,0 +1,104 @@
+<view class="ai">
+  <view class="topbar">
+    <view class="chip project-chip" hover-class="btn-hover" bindtap="pickProject">
+      <image class="icon-sm" src="/assets/icons/folder.svg" />
+      <text class="truncate">{{project ? project.name : '未关联项目'}}</text>
+      <image class="icon-sm" src="/assets/icons/chevron-down-muted.svg" />
+    </view>
+    <view class="row gap-8">
+      <text class="small muted">{{credits}} 积分</text>
+      <view class="icon-btn" hover-class="btn-hover" bindtap="openHistory"><image class="icon" src="/assets/icons/history.svg" /></view>
+      <view class="icon-btn" hover-class="btn-hover" bindtap="newChat"><image class="icon" src="/assets/icons/message-plus.svg" /></view>
+    </view>
+  </view>
+
+  <view wx:if="{{!aiReady}}" class="notice notice-warning warn">
+    <image class="icon-sm" src="/assets/icons/alert.svg" />
+    <text>服务器还没有配置 AI 密钥（DEEPSEEK_API_KEY），请联系管理员。</text>
+  </view>
+
+  <view wx:if="{{!messages.length}}" class="welcome">
+    <view class="h2">{{project ? '关于「' + project.name + '」，想做点什么？' : '有什么可以帮你？'}}</view>
+    <view class="small muted mt-8">可以直接新建项目、上传户型图、检查点位、智能选型、生成报价和合同，结果和网页版同步。</view>
+    <view class="prompts mt-32">
+      <view wx:for="{{prompts}}" wx:key="*this" class="prompt" hover-class="list-item-hover" data-text="{{item}}" bindtap="usePrompt">{{item}}</view>
+    </view>
+  </view>
+
+  <view class="msgs">
+    <view wx:for="{{messages}}" wx:key="id" class="msg {{item.role}}">
+      <block wx:if="{{item.role === 'user'}}">
+        <view wx:if="{{item.images.length}}" class="row wrap gap-8 user-images">
+          <image wx:for="{{item.images}}" wx:for-item="img" wx:key="url" class="user-image" src="{{img.url}}" mode="aspectFill" data-url="{{img.url}}" bindtap="preview" />
+        </view>
+        <view wx:if="{{item.text}}" class="bubble">{{item.text}}</view>
+      </block>
+      <block wx:else>
+        <view wx:for="{{item.tools}}" wx:for-item="t" wx:key="index" class="tool" hover-class="btn-hover" data-href="{{t.href}}" bindtap="openTool">
+          <image class="icon-sm" src="/assets/icons/check.svg" />
+          <text class="grow">{{t.name}}：{{t.summary}}</text>
+          <text wx:if="{{t.href}}" class="small link">{{t.label || '查看'}}</text>
+        </view>
+        <rich-text wx:if="{{item.html}}" class="answer {{item.error ? 'error' : ''}}" nodes="{{item.html}}" user-select />
+        <view wx:if="{{item.pending && !item.html}}" class="small muted thinking">{{item.tools.length ? '正在继续处理…' : '思考中…'}}</view>
+        <view wx:if="{{!item.pending && item.text}}" class="row gap-16 msg-actions">
+          <text class="small muted" data-index="{{index}}" bindtap="copy">复制</text>
+          <text wx:if="{{item.cost}}" class="small muted">消耗 {{item.cost}} 积分</text>
+        </view>
+      </block>
+    </view>
+  </view>
+  <view class="composer-spacer" />
+
+  <view class="composer">
+    <view wx:if="{{attachments.length}}" class="row wrap gap-8 att-row">
+      <view wx:for="{{attachments}}" wx:key="id" class="att">
+        <image class="att-thumb" src="{{item.preview}}" mode="aspectFill" />
+        <view class="grow">
+          <view class="small truncate">{{item.name}}</view>
+          <view class="small muted">{{item.summary}}</view>
+        </view>
+        <image class="icon-sm" src="/assets/icons/x-muted.svg" data-id="{{item.id}}" bindtap="removeAttachment" />
+      </view>
+    </view>
+    <view class="composer-box">
+      <view class="icon-btn" hover-class="btn-hover" bindtap="addImage"><image class="icon" src="/assets/icons/image-plus.svg" /></view>
+      <textarea
+        class="composer-input"
+        value="{{input}}"
+        auto-height
+        maxlength="4000"
+        cursor-spacing="24"
+        show-confirm-bar="{{false}}"
+        placeholder="{{attachments.length ? '补充说明，或直接发送让 AI 处理图纸' : '输入指令，例如：新建项目并生成报价'}}"
+        placeholder-class="placeholder"
+        bindinput="onInput"
+      />
+      <view class="send {{streaming || input || attachments.length ? '' : 'disabled'}}" hover-class="btn-hover" bindtap="onSendTap">
+        <image class="icon" src="{{streaming ? '/assets/icons/stop-white.svg' : '/assets/icons/arrow-up-white.svg'}}" />
+      </view>
+    </view>
+    <view class="small muted text-center hint">AI 生成内容仅供参考，请核对后使用</view>
+  </view>
+
+  <block wx:if="{{showHistory}}">
+    <view class="mask" bindtap="closeHistory" />
+    <view class="sheet">
+      <view class="sheet-head">
+        <text class="title">最近对话</text>
+        <image class="icon" src="/assets/icons/x-muted.svg" bindtap="closeHistory" />
+      </view>
+      <scroll-view scroll-y class="sheet-body history">
+        <view wx:for="{{conversations}}" wx:key="id" class="list-item" hover-class="list-item-hover" data-id="{{item.id}}" bindtap="openConversation" bindlongpress="deleteConversation">
+          <view class="grow">
+            <view class="truncate {{item.id === conversationId ? 'num' : ''}}">{{item.title}}</view>
+            <view class="small muted">{{item.time}}</view>
+          </view>
+        </view>
+        <view wx:if="{{!conversations.length}}" class="empty small">还没有对话</view>
+        <view wx:else class="small muted text-center mt-16">长按可以删除对话</view>
+      </scroll-view>
+    </view>
+  </block>
+</view>
+<privacy-popup id="privacy-popup" />

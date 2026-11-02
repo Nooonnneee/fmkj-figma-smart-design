@@ -1,0 +1,81 @@
+<view wx:if="{{!loading}}" class="page page-pad-bottom">
+  <block wx:if="{{!contract}}">
+    <view class="card">
+      <view class="title">用一份报价生成合同</view>
+      <view class="small muted mt-8">金额、客户信息、地址、付款方式、工期、质保和条款会带上默认值，生成后可以修改。</view>
+    </view>
+    <view class="card card-flush">
+      <view wx:for="{{quotes}}" wx:key="id" class="list-item" hover-class="list-item-hover" data-id="{{item.id}}" bindtap="selectQuote">
+        <view class="radio {{selectedQuote === item.id ? 'on' : ''}}"><image wx:if="{{selectedQuote === item.id}}" class="icon-sm" src="/assets/icons/check-white.svg" /></view>
+        <view class="grow truncate">{{item.title}}</view>
+        <view class="text-right shrink-0">
+          <view class="num">{{item.totalText}}</view>
+          <view class="badge {{item.badge}} mt-8">{{item.statusLabel}}</view>
+        </view>
+      </view>
+      <view wx:if="{{!quotes.length}}" class="empty small">这个项目还没有报价，先在项目里生成报价</view>
+    </view>
+    <view class="bottom-bar">
+      <button class="btn btn-primary" hover-class="btn-hover" disabled="{{!selectedQuote || archived}}" loading="{{saving}}" bindtap="create">生成合同</button>
+    </view>
+  </block>
+
+  <block wx:else>
+    <view class="card">
+      <view class="row between">
+        <text class="num">{{contract.number}}</text>
+        <text class="badge {{signed ? 'badge-success' : 'badge-warning'}}">{{contract.statusLabel}}</text>
+      </view>
+      <view class="big-num mt-16">{{amountText}}</view>
+      <view class="small muted mt-8">大写：{{contract.amountUpper}}</view>
+      <view wx:if="{{signed}}" class="small muted mt-8">签订日期：{{signedText}} · 合同和依据的报价已锁定，只能登记收款</view>
+    </view>
+
+    <view class="section-title"><text class="title">付款与收款</text><text class="small {{percentOk ? 'muted' : 'danger-text'}}">比例合计 {{percentTotal}}%</text></view>
+    <view class="card card-flush">
+      <view wx:for="{{form.payments}}" wx:key="key" class="pay">
+        <view class="row gap-16">
+          <input class="input grow" value="{{item.name}}" disabled="{{signed || readOnly}}" placeholder="款项名称" placeholder-class="placeholder" data-index="{{index}}" data-key="name" bindinput="onPayment" />
+          <input class="input pct" type="digit" value="{{item.percentText}}" disabled="{{signed || readOnly}}" data-index="{{index}}" data-key="percent" bindinput="onPayment" />
+          <text class="muted">%</text>
+        </view>
+        <view class="row between mt-16">
+          <text class="num">{{item.amountText}}</text>
+          <view class="row gap-16">
+            <text class="small muted">{{item.received ? '已收款' : '未收款'}}</text>
+            <switch checked="{{item.received}}" disabled="{{readOnly}}" color="#171717" data-index="{{index}}" bindchange="onReceived" />
+            <image wx:if="{{!signed && !readOnly}}" class="icon" src="/assets/icons/x-muted.svg" data-index="{{index}}" bindtap="removePayment" />
+          </view>
+        </view>
+      </view>
+      <view wx:if="{{!signed && !readOnly && form.payments.length < 6}}" class="list-item" hover-class="list-item-hover" bindtap="addPayment">
+        <image class="icon-sm" src="/assets/icons/plus.svg" /><text class="small">添加一期</text>
+      </view>
+    </view>
+
+    <view class="section-title"><text class="title">合同信息</text></view>
+    <view class="card">
+      <view class="field"><view class="field-label">合同编号</view><input class="input" value="{{form.number}}" disabled="{{signed || readOnly}}" data-key="number" bindinput="onInput" /></view>
+      <view class="field"><view class="field-label">合同金额（元）</view><input class="input" type="digit" value="{{form.amountText}}" disabled="{{signed || readOnly}}" data-key="amountText" bindinput="onInput" /></view>
+      <view class="field"><view class="field-label">甲方（客户）</view><input class="input" value="{{form.customerName}}" disabled="{{signed || readOnly}}" data-key="customerName" bindinput="onInput" /></view>
+      <view class="field"><view class="field-label">甲方电话</view><input class="input" type="number" value="{{form.customerPhone}}" disabled="{{signed || readOnly}}" data-key="customerPhone" bindinput="onInput" /></view>
+      <view class="field"><view class="field-label">施工地址</view><input class="input" value="{{form.address}}" disabled="{{signed || readOnly}}" data-key="address" bindinput="onInput" /></view>
+      <view class="row gap-16">
+        <view class="field grow"><view class="field-label">工期（天）</view><input class="input" type="number" value="{{form.durationText}}" disabled="{{signed || readOnly}}" data-key="durationText" bindinput="onInput" /></view>
+        <view class="field grow"><view class="field-label">质保（月）</view><input class="input" type="number" value="{{form.warrantyText}}" disabled="{{signed || readOnly}}" data-key="warrantyText" bindinput="onInput" /></view>
+      </view>
+      <view class="field">
+        <view class="row between" bindtap="toggleTerms"><text class="field-label">合同条款</text><image class="icon-sm" src="/assets/icons/chevron-down-muted.svg" /></view>
+        <textarea wx:if="{{showTerms}}" class="textarea terms" value="{{form.terms}}" disabled="{{signed || readOnly}}" maxlength="5000" auto-height data-key="terms" bindinput="onInput" />
+      </view>
+    </view>
+
+    <view class="bottom-bar">
+      <button class="btn btn-outline" hover-class="btn-hover" bindtap="more"><image class="icon-sm" src="/assets/icons/layers.svg" />更多</button>
+      <button wx:if="{{!readOnly}}" class="btn btn-outline" hover-class="btn-hover" bindtap="toggleSign"><image class="icon-sm" src="/assets/icons/signature.svg" />{{signed ? '撤销签订' : '标记签订'}}</button>
+      <button wx:if="{{!readOnly}}" class="btn btn-primary" hover-class="btn-hover" loading="{{saving}}" disabled="{{saving}}" bindtap="save">保存</button>
+    </view>
+  </block>
+</view>
+<view wx:else class="empty">加载中…</view>
+<privacy-popup id="privacy-popup" />

@@ -1,0 +1,515 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./shadcn.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* 文档模板「栖序雅致」按字体名引用的 Inter 等字体（来自 Figma 设计，按需加载：只有用到这些字体的文档才会下载）。
+   界面本身用的是 src/lib/fonts.ts 自托管的 Inter 拉丁子集（--font-inter），不走这里。 */
+@font-face {
+  font-family: "Inter";
+  src: url("https://static.figma.com/font/Inter_1") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter:Light";
+  src: url("https://static.figma.com/font/Inter_1") format("woff2");
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter:Regular";
+  src: url("https://static.figma.com/font/Inter_1") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans SC:Bold";
+  src: url("https://static.figma.com/font/NotoSansSC-VF_2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans SC:Medium";
+  src: url("https://static.figma.com/font/NotoSansSC-VF_2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans SC:Regular";
+  src: url("https://static.figma.com/font/NotoSansSC-VF_2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+/* 文档风格「东方雅韵」的衬线体、「科技」的等宽数字（同样按需加载） */
+@font-face {
+  font-family: "Noto Serif SC";
+  src: url("https://static.figma.com/font/NotoSerifSC-VF_3") format("woff2");
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("https://static.figma.com/font/JetBrainsMono_wght__1") format("woff2");
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+}
+
+@theme inline {
+  --animate-marker-in: marker-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-ledger-in: ledger-in 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --font-sans: var(--font-sans);
+  --font-heading: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-serif: var(--font-serif);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-strong: var(--destructive-strong);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/*
+ * 公开页（首页、品牌页、下载页）的字号层级：Linear / OpenAI 式的大标题。
+ * 大字号用 Inter 的 Display 光学尺寸（自动）+ 负字距；中文字形本身有字面留白，字距只收一点。
+ * 产品窗口用一道带偏移的柔和投影，不用发光。
+ */
+@theme {
+  --text-display: clamp(2.5rem, 1.25rem + 4.2vw, 4.5rem);
+  --text-display--line-height: 1.1;
+  --text-display--letter-spacing: -0.022em;
+  --text-headline: clamp(1.875rem, 1.2rem + 2vw, 3rem);
+  --text-headline--line-height: 1.15;
+  --text-headline--letter-spacing: -0.018em;
+  --text-lead: 1.125rem;
+  --text-lead--line-height: 1.75;
+  --shadow-window: 0 1px 2px oklch(0.2 0.02 270 / 0.06), 0 24px 56px -28px oklch(0.2 0.03 270 / 0.28);
+}
+
+:root {
+  --font-sans: var(--font-inter), "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", ui-sans-serif, sans-serif;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  /* 次要文字的对比度下限。0.556 在 --muted 底色上只有 4.35:1，实测 26 个页面共 92 处
+     不达标；0.53 在 --muted 上是 4.82:1、在白底上是 5.25:1，仍然是明确的次要层级。 */
+  --muted-foreground: oklch(0.53 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  /* 浅色警示底（--destructive/10）上的文字。直接用 --destructive 只有 4.0:1。 */
+  --destructive-strong: oklch(0.47 0.2 27.325);
+  --success: oklch(0.49 0.12 155);
+  --warning: oklch(0.52 0.11 75);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-strong: oklch(0.78 0.15 22.216);
+  --success: oklch(0.74 0.12 155);
+  --warning: oklch(0.8 0.11 75);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+/*
+ * 主题风格（强调色）：<html data-accent="fanmeng | jade | classic">。
+ * 「经典」沿用上面的中性色；繁梦紫、青碧在浅色 / 深色下分别覆盖主色、侧边栏和中性色的微妙色调。
+ */
+[data-accent="fanmeng"] {
+  --primary: oklch(0.51 0.22 279);
+  --primary-foreground: oklch(0.985 0.005 285);
+  --secondary: oklch(0.965 0.012 285);
+  --secondary-foreground: oklch(0.3 0.09 280);
+  --muted: oklch(0.968 0.007 285);
+  --muted-foreground: oklch(0.5 0.03 282);
+  --accent: oklch(0.955 0.02 285);
+  --accent-foreground: oklch(0.32 0.12 280);
+  --border: oklch(0.915 0.012 285);
+  --input: oklch(0.915 0.012 285);
+  --ring: oklch(0.62 0.17 281);
+  --sidebar: oklch(0.982 0.008 286);
+  --sidebar-foreground: oklch(0.2 0.03 280);
+  --sidebar-primary: oklch(0.51 0.22 279);
+  --sidebar-primary-foreground: oklch(0.985 0.005 285);
+  --sidebar-accent: oklch(0.948 0.024 285);
+  --sidebar-accent-foreground: oklch(0.3 0.12 280);
+  --sidebar-border: oklch(0.915 0.014 285);
+  --sidebar-ring: oklch(0.62 0.17 281);
+}
+.dark[data-accent="fanmeng"] {
+  --background: oklch(0.155 0.02 283);
+  --foreground: oklch(0.975 0.005 285);
+  --card: oklch(0.2 0.026 283);
+  --card-foreground: oklch(0.975 0.005 285);
+  --popover: oklch(0.205 0.026 283);
+  --popover-foreground: oklch(0.975 0.005 285);
+  --primary: oklch(0.72 0.15 282);
+  --primary-foreground: oklch(0.17 0.04 283);
+  --secondary: oklch(0.26 0.03 283);
+  --secondary-foreground: oklch(0.975 0.005 285);
+  --muted: oklch(0.25 0.026 283);
+  --muted-foreground: oklch(0.73 0.03 285);
+  --accent: oklch(0.27 0.04 283);
+  --accent-foreground: oklch(0.975 0.005 285);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.6 0.15 282);
+  --sidebar: oklch(0.18 0.024 283);
+  --sidebar-foreground: oklch(0.975 0.005 285);
+  --sidebar-primary: oklch(0.72 0.15 282);
+  --sidebar-primary-foreground: oklch(0.17 0.04 283);
+  --sidebar-accent: oklch(0.26 0.034 283);
+  --sidebar-accent-foreground: oklch(0.975 0.005 285);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.6 0.15 282);
+}
+[data-accent="jade"] {
+  --primary: oklch(0.5 0.095 182);
+  --primary-foreground: oklch(0.985 0.005 180);
+  --secondary: oklch(0.965 0.01 180);
+  --secondary-foreground: oklch(0.3 0.05 185);
+  --muted: oklch(0.968 0.006 180);
+  --muted-foreground: oklch(0.5 0.02 185);
+  --accent: oklch(0.955 0.018 178);
+  --accent-foreground: oklch(0.32 0.07 182);
+  --border: oklch(0.915 0.01 180);
+  --input: oklch(0.915 0.01 180);
+  --ring: oklch(0.63 0.1 180);
+  --sidebar: oklch(0.982 0.007 175);
+  --sidebar-foreground: oklch(0.2 0.02 190);
+  --sidebar-primary: oklch(0.5 0.095 182);
+  --sidebar-primary-foreground: oklch(0.985 0.005 180);
+  --sidebar-accent: oklch(0.948 0.02 178);
+  --sidebar-accent-foreground: oklch(0.3 0.07 182);
+  --sidebar-border: oklch(0.915 0.012 178);
+  --sidebar-ring: oklch(0.63 0.1 180);
+}
+.dark[data-accent="jade"] {
+  --background: oklch(0.155 0.014 205);
+  --foreground: oklch(0.975 0.004 180);
+  --card: oklch(0.2 0.018 205);
+  --card-foreground: oklch(0.975 0.004 180);
+  --popover: oklch(0.205 0.018 205);
+  --popover-foreground: oklch(0.975 0.004 180);
+  --primary: oklch(0.76 0.11 178);
+  --primary-foreground: oklch(0.18 0.03 195);
+  --secondary: oklch(0.26 0.022 200);
+  --secondary-foreground: oklch(0.975 0.004 180);
+  --muted: oklch(0.25 0.018 202);
+  --muted-foreground: oklch(0.73 0.02 190);
+  --accent: oklch(0.27 0.03 195);
+  --accent-foreground: oklch(0.975 0.004 180);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.62 0.1 180);
+  --sidebar: oklch(0.18 0.017 205);
+  --sidebar-foreground: oklch(0.975 0.004 180);
+  --sidebar-primary: oklch(0.76 0.11 178);
+  --sidebar-primary-foreground: oklch(0.18 0.03 195);
+  --sidebar-accent: oklch(0.26 0.024 200);
+  --sidebar-accent-foreground: oklch(0.975 0.004 180);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.62 0.1 180);
+}
+
+/* 主题风格色块与品牌色（品牌规范页、Logo 底色使用，不随主题变化） */
+@theme {
+  --color-swatch-fanmeng: oklch(0.55 0.22 280);
+  --color-swatch-jade: oklch(0.56 0.11 180);
+  --color-swatch-classic: oklch(0.205 0 0);
+  --color-brand-violet: #8b6dff;
+  --color-brand-indigo: #3f3bdb;
+  --color-brand-gold: #ffc24b;
+  --color-brand-gold-light: #ffdb7e;
+  --color-brand-gold-deep: #ffb536;
+  --color-brand-dusk: #1d1856;
+  --color-brand-night: #0b0a24;
+  --color-brand-ink: #16123a;
+  --color-brand-slate: #5f5a86;
+  --color-brand-lavender: #b7b0ff;
+  --color-brand-mist: #f4f3ff;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* 界面全是中文。Inter 只有拉丁字形，中文实际落到每台机器各自的默认字体上，
+     换台电脑行高和字宽就变。这里显式补齐中文字体链，保证同一份界面到哪都一样。 */
+  html {
+    font-family:
+      var(--font-sans),
+      "PingFang SC",
+      "Hiragino Sans GB",
+      "Microsoft YaHei",
+      "Noto Sans SC",
+      ui-sans-serif,
+      sans-serif;
+  }
+
+  /* 表格里的金额、数量、日期必须上下对齐；比例数字会让右对齐的列参差不齐。 */
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 标题均衡断行，正文避免末行孤字（不支持的浏览器保持默认换行）。 */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+
+  /* 选中态属于设计系统的一部分，浏览器默认的蓝色和这套中性色不搭。 */
+  ::selection {
+    background: color-mix(in oklch, var(--foreground) 16%, transparent);
+  }
+
+  /* 滚动条、光标和键盘焦点也属于界面的一部分，跟随中性色而不是浏览器默认样式。 */
+  html {
+    scrollbar-color: color-mix(in oklch, var(--foreground) 22%, transparent) transparent;
+    scrollbar-width: thin;
+    caret-color: var(--foreground);
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  a {
+    text-underline-offset: 3px;
+  }
+
+  body[data-density="compact"] {
+    --spacing: 0.225rem;
+  }
+
+  body[data-density="comfortable"] {
+    --spacing: 0.275rem;
+  }
+}
+
+
+.figma-custom-code-fragment {
+  display: contents;
+}
+
+.figma-bypass-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 2147483647;
+  transform: translateY(-150%);
+  border-radius: 6px;
+  background: var(--foreground);
+  color: var(--background);
+  padding: 8px 12px;
+  font: 600 14px/1.2 system-ui, sans-serif;
+  text-decoration: none;
+}
+
+.figma-bypass-link:focus {
+  transform: translateY(0);
+}
+
+/* 画布类页面（点位图）和项目详情铺满内容区，不受页面最大宽度限制（项目各板块自己控制内容宽度）。
+   页面容器见 (workspace)/layout.tsx 的 data-slot="workspace-page"。 */
+[data-slot="workspace-page"]:has(> .full-bleed-page),
+[data-slot="workspace-page"]:has(> .project-header) {
+  max-width: none;
+}
+
+/* 侧栏滚动区域：内容按容器宽度换行，长产品名不会把面板撑宽 */
+.point-map-aside [data-slot="scroll-area-viewport"] > div {
+  display: block !important;
+  min-width: 0 !important;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+}
+
+/*
+ * 文档模板（报价单、合同、点位图、交底清单、方案）的风格变量。
+ * 每份文档的根节点按所选风格设置 --doc-*（见 src/documents/theme.ts），这里映射成 Tailwind 颜色和工具类：
+ * bg-doc-paper、text-doc-muted、border-doc-rule、bg-doc-head、doc-display、doc-numeral …
+ */
+@theme inline {
+  --color-doc-paper: var(--doc-paper);
+  --color-doc-ink: var(--doc-ink);
+  --color-doc-muted: var(--doc-muted);
+  --color-doc-accent: var(--doc-accent);
+  --color-doc-soft: var(--doc-soft);
+  --color-doc-soft-to: var(--doc-soft-to);
+  --color-doc-rule: var(--doc-rule);
+  --color-doc-head: var(--doc-head-bg);
+  --color-doc-head-fg: var(--doc-head-fg);
+  --color-doc-stripe: var(--doc-stripe);
+  --radius-doc: var(--doc-radius);
+}
+
+@utility doc-display {
+  font-family: var(--doc-font-display);
+  font-weight: var(--doc-w-display);
+}
+@utility doc-strong {
+  font-family: var(--doc-font-strong);
+  font-weight: var(--doc-w-strong);
+}
+@utility doc-body {
+  font-family: var(--doc-font-body);
+  font-weight: 400;
+}
+@utility doc-numeral {
+  font-family: var(--doc-font-numeral);
+  font-weight: var(--doc-w-numeral);
+  font-variant-numeric: tabular-nums;
+}
+@utility doc-latin {
+  font-family: var(--doc-font-latin);
+  font-weight: 400;
+}
+
+/* 繁梦空间品牌色（标志、品牌规范页使用；与 public/brand 下的标识文件一致） */
+@theme {
+  --color-brand-indigo: #8f72ff;
+  --color-brand-violet: #4f86ff;
+  --color-brand-moon: #3c6bff;
+  --color-brand-moon-light: #c3b6ff;
+  --color-brand-night: #17123f;
+  --color-brand-ink: #141b3e;
+  --color-brand-paper: #ffffff;
+  --color-brand-mist: #eef1fa;
+}
+
+/* 公开页：锚点跳转时让出吸顶导航的高度，并启用平滑滚动 */
+html:has([data-landing]) {
+  scroll-padding-top: 5rem;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:has([data-landing]) {
+    scroll-behavior: smooth;
+  }
+}
+
+/* 首页点位入场：设备从图纸上方落位（每次切换楼层播放一次，减少动态效果时不播放） */
+@keyframes marker-in {
+  from {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.55);
+  }
+}
+@keyframes ledger-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}

@@ -1,0 +1,2 @@
+.cats { white-space: nowrap; margin-top: 20rpx; display: flex; gap: 12rpx; }
+.cats .chip { margin-right: 12rpx; }

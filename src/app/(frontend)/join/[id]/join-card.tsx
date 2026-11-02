@@ -1,0 +1,105 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { ArrowRight, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
+
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import type { CollaboratorRole } from '@/lib/project-access'
+
+export function JoinCard({
+  projectId,
+  token,
+  role,
+  currentUser,
+}: {
+  projectId: string
+  token: string
+  role: CollaboratorRole
+  currentUser: { name: string; email: string } | null
+}) {
+  const router = useRouter()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function submit(mode: 'current' | 'login') {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await fetch(`/join/${projectId}/accept`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, mode, email, password }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+      if (!res.ok || !data.ok) {
+        setError(data.error ?? '加入失败，请稍后重试')
+        return
+      }
+      toast.success(role === 'edit' ? '已加入项目协作（可编辑）' : '已加入项目协作（仅查看）')
+      router.push(`/projects/${projectId}`)
+      router.refresh()
+    } catch {
+      setError('网络错误，请稍后重试')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (currentUser) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-lg border bg-muted/40 p-3 text-xs">
+          <div className="text-muted-foreground">当前登录账号</div>
+          <div className="mt-0.5 font-medium text-foreground">
+            {currentUser.name}（{currentUser.email}）
+          </div>
+        </div>
+        {error ? <p className="text-xs text-destructive">{error}</p> : null}
+        <Button className="w-full" disabled={busy} onClick={() => void submit('current')}>
+          {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+          接受邀请并进入项目
+          <ArrowRight className="size-4" />
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <form
+        className="space-y-3"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void submit('login')
+        }}
+      >
+        <div className="grid gap-1.5">
+          <Label htmlFor="join-email" className="text-xs">
+            成员邮箱
+          </Label>
+          <Input id="join-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="join-password" className="text-xs">
+            密码
+          </Label>
+          <Input id="join-password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••" />
+        </div>
+        {error ? <p className="text-xs text-destructive">{error}</p> : null}
+        <Button type="submit" className="w-full" disabled={busy}>
+          {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+          登录并加入项目
+          <ArrowRight className="size-4" />
+        </Button>
+        <p className="text-center text-xs text-muted-foreground">请使用管理员为您开通的成员账号登录</p>
+      </form>
+    </div>
+  )
+}

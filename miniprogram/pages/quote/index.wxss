@@ -1,0 +1,9 @@
+.title-input { font-size: 34rpx; font-weight: 600; height: 56rpx; }
+.total-card .big-num { font-size: 48rpx; }
+.line { padding: 28rpx; border-top: 1rpx solid var(--rule); }
+.line:first-child { border-top: none; }
+.mini-input { width: 150rpx; height: 60rpx; padding: 0 16rpx; border-radius: 12rpx; background: var(--paper-muted); text-align: right; font-variant-numeric: tabular-nums; }
+.mini-input.qty { width: 100rpx; text-align: center; }
+.step-btn { width: 60rpx; height: 60rpx; border-radius: 12rpx; background: var(--paper-muted); display: flex; align-items: center; justify-content: center; }
+.fee + .fee { margin-top: 16rpx; }
+.fee-amount { width: 200rpx; flex: none; text-align: right; }

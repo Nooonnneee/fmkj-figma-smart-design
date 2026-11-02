@@ -1,0 +1,37 @@
+<view>
+  <view class="search">
+    <image class="icon-sm" src="/assets/icons/search-muted.svg" />
+    <input placeholder="{{deviceType ? '搜索同类型产品' : '搜索产品、品牌、型号'}}" placeholder-class="placeholder" value="{{q}}" confirm-type="search" bindinput="onQuery" />
+    <image wx:if="{{q}}" class="icon-sm" src="/assets/icons/x-muted.svg" bindtap="clearQuery" />
+  </view>
+  <scroll-view wx:if="{{!deviceType}}" scroll-x class="cats" enable-flex>
+    <view class="chip {{category === '' ? 'active' : ''}}" data-slug="" bindtap="onCategory">全部</view>
+    <view wx:for="{{categories}}" wx:key="slug" class="chip {{category === item.slug ? 'active' : ''}}" data-slug="{{item.slug}}" bindtap="onCategory">
+      <view class="dot" style="background: {{item.color}}" />{{item.name}}
+    </view>
+  </scroll-view>
+  <view wx:else class="small muted mt-16">只显示「{{typeName}}」类型的在售产品</view>
+
+  <view class="card card-flush mt-24">
+    <view wx:for="{{items}}" wx:key="id" class="list-item" hover-class="list-item-hover" data-index="{{index}}" bindtap="onTap">
+      <image class="thumb" src="{{item.imageUrl}}" mode="aspectFit" lazy-load />
+      <view class="grow">
+        <view class="clamp-2">{{item.name}}</view>
+        <view class="row gap-8 mt-8 small muted">
+          <view class="dot" style="background: {{item.type.color}}" />
+          <text class="truncate">{{item.type.name}}{{item.brand ? ' · ' + item.brand : ''}}</text>
+        </view>
+      </view>
+      <view class="text-right shrink-0">
+        <view class="num">{{item.priceText}}</view>
+        <view class="small muted mt-8">/{{item.unit}}</view>
+      </view>
+    </view>
+    <view wx:if="{{!loading && !items.length}}" class="empty">
+      <image class="icon-lg" src="/assets/icons/package-muted.svg" />
+      <text>没有找到产品</text>
+    </view>
+    <view wx:if="{{loading}}" class="empty small">加载中…</view>
+  </view>
+  <view wx:if="{{items.length && !hasMore}}" class="small muted text-center mt-24">共 {{total}} 款产品</view>
+</view>

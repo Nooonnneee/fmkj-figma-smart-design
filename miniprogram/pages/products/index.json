@@ -1,0 +1,1 @@
+{ "navigationBarTitleText": "产品库", "enablePullDownRefresh": true, "usingComponents": { "product-list": "/components/product-list/index" } }

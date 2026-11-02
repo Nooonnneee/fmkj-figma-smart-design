@@ -1,0 +1,24 @@
+{
+  "description": "繁梦空间 · 智能家居设计报价 · 微信小程序",
+  "packOptions": { "ignore": [{ "type": "file", "value": "README.md" }], "include": [] },
+  "miniprogramRoot": "./",
+  "compileType": "miniprogram",
+  "projectname": "fmkj-miniprogram",
+  "appid": "wx7c2c4901a6de8423",
+  "libVersion": "3.4.0",
+  "setting": {
+    "urlCheck": true,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "showShadowRootInWxmlPanel": true,
+    "uglifyFileName": false,
+    "compileHotReLoad": true,
+    "lazyloadPlaceholderEnable": false
+  },
+  "condition": {},
+  "editorSetting": { "tabIndent": "insertSpaces", "tabSize": 2 }
+}
