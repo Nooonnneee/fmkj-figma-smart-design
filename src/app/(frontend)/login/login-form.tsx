@@ -106,18 +106,20 @@ export function LoginForm({
   // 小程序扫码登录状态
   const [qrTicket, setQrTicket] = useState<string | null>(null)
   const [qrImage, setQrImage] = useState<string | null>(null)
+  const [qrPreferMode, setQrPreferMode] = useState<'wxacode' | 'qrcode'>('wxacode')
   const [qrStatus, setQrStatus] = useState<'loading' | 'pending' | 'confirmed' | 'expired'>(
     'loading',
   )
 
-  const createQr = useCallback(async () => {
+  const createQr = useCallback(async (modeOverride?: 'wxacode' | 'qrcode') => {
+    const activeMode = modeOverride ?? qrPreferMode
     setQrStatus('loading')
     setError('')
     try {
       const res = await fetch('/auth/wechat/qr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ redirectTo }),
+        body: JSON.stringify({ redirectTo, preferMode: activeMode }),
       })
       const data = (await res.json().catch(() => null)) as {
         ok?: boolean
@@ -134,7 +136,7 @@ export function LoginForm({
     } catch {
       setQrStatus('expired')
     }
-  }, [redirectTo])
+  }, [redirectTo, qrPreferMode])
 
   useEffect(() => {
     if (qrAvailable && loginTab === 'wechat') void createQr()
@@ -681,8 +683,25 @@ export function LoginForm({
               <div className="space-y-1">
                 <div className="text-sm font-medium">请使用微信小程序扫码登录</div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  打开小程序「我的 → 扫码登录」或直接用微信扫一扫
+                  {qrPreferMode === 'wxacode'
+                    ? '直接用微信扫一扫，或打开小程序点「扫码登录电脑」'
+                    : '请打开小程序 → 点击首页或「我的」里的「扫码登录电脑」扫此码'}
                 </p>
+                <Button
+                  type="button"
+                  variant="link"
+                  size="xs"
+                  className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    const next = qrPreferMode === 'wxacode' ? 'qrcode' : 'wxacode'
+                    setQrPreferMode(next)
+                    void createQr(next)
+                  }}
+                >
+                  {qrPreferMode === 'wxacode'
+                    ? '扫码后只进小程序没弹窗？切换为「小程序内扫码」'
+                    : '切换回「微信扫一扫小程序码」'}
+                </Button>
               </div>
             </div>
           </TabsContent>

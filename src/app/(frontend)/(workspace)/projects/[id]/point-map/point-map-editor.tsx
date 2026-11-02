@@ -18,6 +18,7 @@ import {
   Loader2,
   MapPinned,
   Maximize2,
+  Minimize2,
   Minus,
   Plus,
   ReceiptText,
@@ -138,6 +139,9 @@ export function PointMapEditor({
   const [selection, setSelection] = useState<Set<string>>(() => new Set())
   const [tool, setTool] = useState<BoardTool>('select')
   const [armed, setArmed] = useState<SymbolTemplate | null>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [mobilePlaceOpen, setMobilePlaceOpen] = useState(false)
+  const editorRootRef = useRef<HTMLDivElement>(null)
   const [placeTab, setPlaceTab] = useState<'devices' | 'lighting'>('devices')
   const [ctxMenu, setCtxMenu] = useState<CanvasContextMenuTarget | null>(null)
   const [cropFile, setCropFile] = useState<File | null>(null)
@@ -269,6 +273,34 @@ export function PointMapEditor({
     const s = sizeRef.current
     setViewport(zoomAt(v, s.w / 2, s.h / 2, v.zoom * factor))
   }, [setViewport])
+
+  const toggleFullscreen = useCallback(async () => {
+    const next = !isFullscreen
+    setIsFullscreen(next)
+    try {
+      if (next && editorRootRef.current?.requestFullscreen) {
+        await editorRootRef.current.requestFullscreen()
+        const orientation = (screen as unknown as { orientation?: { lock?: (mode: string) => Promise<void> } }).orientation
+        await orientation?.lock?.('landscape').catch(() => undefined)
+      } else if (!next && document.fullscreenElement) {
+        await document.exitFullscreen()
+      }
+    } catch {
+      // fallback to CSS fixed fullscreen when browser fullscreen API is restricted
+    }
+    setTimeout(() => fitSheet(activeSheetId, false), 80)
+  }, [isFullscreen, fitSheet, activeSheetId])
+
+  useEffect(() => {
+    const onFsChange = () => {
+      if (!document.fullscreenElement && isFullscreen) {
+        setIsFullscreen(false)
+        setTimeout(() => fitSheet(activeSheetId, false), 80)
+      }
+    }
+    document.addEventListener('fullscreenchange', onFsChange)
+    return () => document.removeEventListener('fullscreenchange', onFsChange)
+  }, [isFullscreen, fitSheet, activeSheetId])
 
   /* ---------------- 初次定位：从报价单跳回时定位到点位 / 区域 / 楼层，否则铺满第一张图纸 ---------------- */
 
@@ -845,7 +877,15 @@ export function PointMapEditor({
   const armedLabel = armed ? pack.look({ symbolId: armed.symbolId, data: armed.data }).name : ''
 
   return (
-    <div className="full-bleed-page -mx-4 -mt-6 -mb-5 flex h-[calc(100svh-5.5rem)] flex-col md:-mx-8 md:-mb-7 md:h-[calc(100svh-3rem)]">
+    <div
+      ref={editorRootRef}
+      className={cn(
+        'full-bleed-page flex flex-col bg-background',
+        isFullscreen
+          ? 'fixed inset-0 z-50 m-0 h-svh w-screen'
+          : '-mx-4 -mt-6 -mb-5 h-[calc(100svh-5.5rem)] md:-mx-8 md:-mb-7 md:h-[calc(100svh-3rem)]',
+      )}
+    >
       <form ref={quoteForm} action={createQuoteFromProject} className="hidden">
         <input type="hidden" name="projectId" value={projectId} />
         <input type="hidden" name="scope" value={scope} />
@@ -942,10 +982,30 @@ export function PointMapEditor({
             })}
             {readOnly ? null : <Button variant="ghost" size="sm" className="shrink-0 text-muted-foreground" onClick={() => fileInput.current?.click()}><Plus className="size-4" />添加</Button>}
             <div className="ml-auto flex shrink-0 items-center gap-0.5 pl-2">
+              {!readOnly ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="mr-1 lg:hidden"
+                  onClick={() => setMobilePlaceOpen((v) => !v)}
+                >
+                  <Plus className="size-4" />
+                  放置设备
+                </Button>
+              ) : null}
               <Button variant="ghost" size="icon-sm" aria-label="缩小" onClick={() => zoomBy(1 / 1.2)}><Minus className="size-4" /></Button>
               <Button variant="ghost" size="sm" className="min-w-14 tabular-nums" title="图纸铺满画布（100%，Ctrl/⌘ + 0）" onClick={() => fitSheet(activeSheetId)}>{zoomPct}%</Button>
               <Button variant="ghost" size="icon-sm" aria-label="放大" onClick={() => zoomBy(1.2)}><Plus className="size-4" /></Button>
               {snap.sheets.length > 1 ? <Button variant="ghost" size="sm" onClick={() => fitSheet(null)}><Maximize2 className="size-4" />全部</Button> : null}
+              <Button
+                variant={isFullscreen ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => void toggleFullscreen()}
+                title={isFullscreen ? '退出全屏' : '全屏画布（手机端自动尝试横屏）'}
+              >
+                {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+                <span className="hidden sm:inline">{isFullscreen ? '退出全屏' : '全屏'}</span>
+              </Button>
             </div>
           </div>
 
@@ -1065,7 +1125,18 @@ export function PointMapEditor({
           </div>
         </div>
 
-        <aside className="point-map-aside flex max-h-[32svh] w-full shrink-0 flex-col border-t bg-background lg:max-h-none lg:w-84 lg:border-t-0 lg:border-l">
+        <aside
+          className={cn(
+            'point-map-aside flex w-full shrink-0 flex-col border-t bg-background lg:max-h-none lg:w-84 lg:border-t-0 lg:border-l',
+            mobilePlaceOpen ? 'fixed inset-x-0 bottom-0 z-40 max-h-[70svh] rounded-t-2xl border shadow-xl lg:static lg:z-auto lg:rounded-none lg:shadow-none' : 'hidden lg:flex',
+          )}
+        >
+          <div className="flex items-center justify-between border-b px-4 py-2 lg:hidden">
+            <span className="text-xs font-semibold">选择要放置的设备</span>
+            <Button variant="ghost" size="icon-xs" onClick={() => setMobilePlaceOpen(false)} aria-label="关闭放置面板">
+              <X className="size-4" />
+            </Button>
+          </div>
           {selectedPoint && selectedSymbol ? (
             <>
               <SelectedPoint
@@ -1141,16 +1212,16 @@ export function PointMapEditor({
             ) : null}
 
             {readOnly ? null : (
-              <TabsContent value="place" className="flex min-h-0 flex-col">
+              <TabsContent value="place" className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div className="mx-4 mt-3 flex rounded-lg bg-muted p-0.5" role="radiogroup" aria-label="符号库">
                   {(['devices', 'lighting'] as const).map((t) => (
                     <Button key={t} size="xs" variant="ghost" role="radio" aria-checked={placeTab === t} className={cn('h-7 flex-1 rounded-md', placeTab === t && 'bg-background shadow-sm')} onClick={() => setPlaceTab(t)}>{t === 'devices' ? '智能设备' : '灯光设计'}</Button>
                   ))}
                 </div>
                 {placeTab === 'devices' ? (
-                  <PlacePanel groups={filteredGroups} query={query} onQuery={setQuery} counts={summary.byType} armed={armedDevice} onArm={(t) => { setTool('select'); setArmed(t ? deviceTpl(t) : null) }} disabled={!snap.sheets.length} />
+                  <PlacePanel groups={filteredGroups} query={query} onQuery={setQuery} counts={summary.byType} armed={armedDevice} onArm={(t) => { setTool('select'); setArmed(t ? deviceTpl(t) : null); setMobilePlaceOpen(false) }} disabled={!snap.sheets.length} />
                 ) : (
-                  <LightingPanel armedId={armed && !armedDevice ? armed.symbolId : null} onArm={(tpl) => { setTool('select'); setArmed(tpl) }} disabled={!snap.sheets.length} calibrated={!!activeSheet?.mmPerUnit} />
+                  <LightingPanel armedId={armed && !armedDevice ? armed.symbolId : null} onArm={(tpl) => { setTool('select'); setArmed(tpl); setMobilePlaceOpen(false) }} disabled={!snap.sheets.length} calibrated={!!activeSheet?.mmPerUnit} />
                 )}
                 <div className="mt-auto flex gap-1 border-t px-3 py-2">
                   <Button variant="ghost" size="xs" className="flex-1 text-muted-foreground" onClick={() => setTab('areas')}>区域</Button>
@@ -1161,11 +1232,11 @@ export function PointMapEditor({
               </TabsContent>
             )}
 
-            <TabsContent value="areas" className="flex min-h-0 flex-col">
+            <TabsContent value="areas" className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <AreasPanel sheets={snap.sheets} areas={snap.areas} analysis={analysis} unassigned={unassigned} selectedAreaId={selectedArea?.id ?? null} onAdd={addArea} onFocus={focusArea} readOnly={readOnly} />
             </TabsContent>
 
-            <TabsContent value="summary" className="flex min-h-0 flex-col">
+            <TabsContent value="summary" className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <ScrollArea className="min-h-0 flex-1">
                 <div className="space-y-2 p-4">
                   {issues.length ? (

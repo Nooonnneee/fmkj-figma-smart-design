@@ -43,6 +43,10 @@
       <view class="quick-icon"><image class="icon" src="/assets/icons/package.svg" /></view>
       <text class="small">产品库</text>
     </view>
+    <view class="quick-item" hover-class="list-item-hover" bindtap="scanWebLogin">
+      <view class="quick-icon"><image class="icon" src="/assets/icons/maximize.svg" /></view>
+      <text class="small">扫码登录电脑</text>
+    </view>
   </view>
 
   <view class="section-title">

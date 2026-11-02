@@ -23,7 +23,7 @@ import { AppearanceMenuItems } from "@/components/appearance-menu"
 import { BrandMark } from "@/components/brand/brand-mark"
 import { GuardedLink } from "@/components/guarded-link"
 import { LinkPending } from "@/components/link-pending"
-import { MembershipDialog, PluginsDialog } from "@/components/workspace-dialogs"
+import { MembershipDialog } from "@/components/workspace-dialogs"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -116,10 +116,9 @@ export function AppSidebar({
   ai: { credits: number; configured: boolean; models?: AiModelOption[] }
 }) {
   const pathname = usePathname()
-  const { state, setOpen } = useSidebar()
+  const { state, setOpen, widthPx } = useSidebar()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [mode, setMode] = useState<"nav" | "chat">("nav")
-  const [pluginsOpen, setPluginsOpen] = useState(false)
   const [membershipOpen, setMembershipOpen] = useState(false)
 
   const aiCopilotEnabled = plugins.some((p) => p.id === "ai-copilot" && p.status === "ready" && p.enabled)
@@ -141,7 +140,7 @@ export function AppSidebar({
     <Sidebar
       collapsible="icon"
       style={
-        effectiveMode === "chat"
+        effectiveMode === "chat" && !widthPx
           ? // AI 对话比导航宽一些便于阅读，但随屏幕宽度收放，避免挤压右侧工作区（1280 宽约 19rem，1440 宽约 21.5rem）
             ({ "--sidebar-width": "clamp(18rem, 24vw, 22rem)" } as React.CSSProperties)
           : undefined
@@ -262,14 +261,9 @@ export function AppSidebar({
             <SidebarGroup className="mt-auto">
               <SidebarGroupLabel>扩展与账户</SidebarGroupLabel>
               <SidebarMenu>
+                <NavItem icon={Blocks} label="插件市场" url="/plugins" active={isActive("/plugins")} />
                 <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="插件市场" onClick={() => setPluginsOpen(true)}>
-                    <Blocks />
-                    <span>插件市场</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton tooltip="会员与积分" onClick={() => setMembershipOpen(true)}>
+                  <SidebarMenuButton tooltip="会员与积分" isActive={isActive("/membership")} onClick={() => setMembershipOpen(true)}>
                     <Crown />
                     <span>会员与积分</span>
                     <span className="ml-auto text-xs text-muted-foreground tabular-nums">{ai.credits}</span>
@@ -328,9 +322,11 @@ export function AppSidebar({
                         会员与积分
                         <span className="ml-auto text-xs text-muted-foreground tabular-nums">{ai.credits}</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setPluginsOpen(true)}>
-                        <Blocks />
-                        插件市场
+                      <DropdownMenuItem asChild>
+                        <GuardedLink href="/plugins">
+                          <Blocks />
+                          插件市场
+                        </GuardedLink>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <GuardedLink href="/settings">
@@ -361,7 +357,6 @@ export function AppSidebar({
         </>
       )}
       <SidebarRail />
-      <PluginsDialog open={pluginsOpen} onOpenChange={setPluginsOpen} plugins={plugins} />
       <MembershipDialog
         open={membershipOpen}
         onOpenChange={setMembershipOpen}

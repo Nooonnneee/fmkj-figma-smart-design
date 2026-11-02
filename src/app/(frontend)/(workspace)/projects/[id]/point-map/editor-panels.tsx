@@ -109,10 +109,10 @@ export function PlacePanel({
                         onClick={() => onArm(active ? null : t.value)}
                         aria-pressed={active}
                         title={`放置${deviceTypeLabel(t.value)}`}
-                        className={cn('relative h-auto flex-col gap-1 px-1 py-2 text-xs font-normal', active && 'border-primary bg-primary/5 ring-2 ring-primary/30')}
+                        className={cn('relative h-auto min-w-0 flex-col gap-1 px-1.5 py-2 text-center text-xs font-normal whitespace-normal', active && 'border-primary bg-primary/5 ring-2 ring-primary/30')}
                       >
                         <PointMarker type={t.value} className="size-7" />
-                        <span className="leading-tight">{t.name}</span>
+                        <span className="w-full truncate leading-tight">{t.name}</span>
                         {n ? <span className="absolute top-1 right-1 rounded-full bg-primary px-1.5 text-xs leading-4 font-medium text-primary-foreground tabular-nums">{n}</span> : null}
                       </Button>
                     )

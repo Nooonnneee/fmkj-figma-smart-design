@@ -3,11 +3,9 @@ const { yuan } = require('../../utils/format')
 const { getMeta, typeGroups } = require('../../utils/meta')
 const { pickImage } = require('../../utils/pick')
 
-/**
- * 点位图：查看图纸和点位、缩放；放置 / 移动 / 换类型 / 删除点位；指定型号、默认型号、智能选型；上传户型图。
- * 图纸是 3:2 标准图纸，点位坐标是相对图纸的 0–1 比例，和网页版共用同一份数据。
- */
-const ZOOMS = [1, 1.5, 2, 3]
+const MIN_SCALE = 1
+const MAX_SCALE = 4
+const clamp = (v, min, max) => Math.min(max, Math.max(min, v))
 
 Page({
   data: {
@@ -15,6 +13,8 @@ Page({
     loading: true,
     readOnly: false,
     smartSelect: false,
+    isLandscape: true,
+    fullscreen: false,
     sheets: [],
     sheetIndex: 0,
     sheetUrl: '',
@@ -28,11 +28,14 @@ Page({
     scope: 'all',
     scopes: [],
     scopeIndex: 0,
-    zoomIndex: 0,
-    sheetW: 300,
-    sheetH: 200,
-    viewH: 200,
-    markerSize: 24,
+    scale: 1,
+    scaleText: '100%',
+    panX: 0,
+    panY: 0,
+    sheetW: 360,
+    sheetH: 240,
+    viewH: 260,
+    markerSize: 20,
     showLabels: true,
     tab: 'legend',
     mode: 'view',
@@ -43,12 +46,12 @@ Page({
     groups: [],
   },
   map: null,
+  gesture: null,
+  justDragged: false,
 
   onLoad(query) {
-    const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
-    this.baseW = win.windowWidth - Math.round((win.windowWidth / 750) * 56) - 2
-    this.setData({ id: query.id, viewH: Math.round((this.baseW * 2) / 3) })
-    this.applyZoom(0)
+    this.setData({ id: query.id })
+    this.computeViewport(false)
     getMeta()
       .then((m) =>
         this.setData({
@@ -58,6 +61,39 @@ Page({
       )
       .catch(() => null)
     this.load()
+  },
+
+  onResize(res) {
+    const size = (res && res.size) || null
+    this.computeViewport(this.data.fullscreen, size ? size.windowWidth : undefined, size ? size.windowHeight : undefined)
+  },
+
+  computeViewport(fullscreen, customW, customH) {
+    const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
+    const winW = customW || win.windowWidth || 667
+    const winH = customH || win.windowHeight || 375
+    const isLandscape = winW > winH
+    const availW = fullscreen ? winW : isLandscape ? Math.max(260, winW - 220 - 24) : Math.max(260, winW - 24)
+    const availH = fullscreen ? winH : isLandscape ? Math.max(200, winH - 62) : Math.round((availW * 2) / 3)
+    // 在可用画布区域内按 3:2 完整放下整张图纸
+    let sheetW = availW
+    let sheetH = Math.round((sheetW * 2) / 3)
+    if (sheetH > availH) {
+      sheetH = availH
+      sheetW = Math.round((sheetH * 3) / 2)
+    }
+    this.setData({
+      isLandscape,
+      fullscreen,
+      viewH: availH,
+      sheetW,
+      sheetH,
+      scale: 1,
+      scaleText: '100%',
+      panX: 0,
+      panY: 0,
+      markerSize: 20,
+    })
   },
 
   async load() {
@@ -100,22 +136,107 @@ Page({
     })
   },
 
-  applyZoom(i) {
-    const z = ZOOMS[i]
-    const w = Math.round(this.baseW * z)
-    this.setData({ zoomIndex: i, sheetW: w, sheetH: Math.round((w * 2) / 3), markerSize: Math.round(16 + 6 * z) })
+  applyScale(nextScale, nextPanX, nextPanY) {
+    const s = Math.round(clamp(nextScale, MIN_SCALE, MAX_SCALE) * 100) / 100
+    const maxPanX = Math.max(0, ((this.data.sheetW * s) - this.data.sheetW) / 2 + 60)
+    const maxPanY = Math.max(0, ((this.data.sheetH * s) - this.data.sheetH) / 2 + 40)
+    const panX = s <= 1.01 ? 0 : Math.round(clamp(nextPanX !== undefined ? nextPanX : this.data.panX, -maxPanX, maxPanX))
+    const panY = s <= 1.01 ? 0 : Math.round(clamp(nextPanY !== undefined ? nextPanY : this.data.panY, -maxPanY, maxPanY))
+    // 缩放时稍微反向收敛点位图标尺寸，避免放大 3–4 倍时图标过大遮挡户型图
+    const markerSize = Math.round(clamp(20 / Math.pow(s, 0.35), 12, 22))
+    this.setData({
+      scale: s,
+      scaleText: Math.round(s * 100) + '%',
+      panX,
+      panY,
+      markerSize,
+    })
   },
   zoomIn() {
-    this.applyZoom(Math.min(ZOOMS.length - 1, this.data.zoomIndex + 1))
+    this.applyScale(this.data.scale + 0.5)
   },
   zoomOut() {
-    this.applyZoom(Math.max(0, this.data.zoomIndex - 1))
+    this.applyScale(this.data.scale - 0.5)
   },
   zoomFit() {
-    this.applyZoom(0)
+    this.applyScale(1, 0, 0)
+  },
+  toggleFullscreen() {
+    this.computeViewport(!this.data.fullscreen)
   },
   toggleLabels() {
     this.setData({ showLabels: !this.data.showLabels })
+  },
+
+  /* ---------- 双指捏合缩放与单指拖拽平移 ---------- */
+
+  onTouchStart(e) {
+    const touches = e.touches || []
+    if (touches.length >= 2) {
+      const dx = touches[1].clientX - touches[0].clientX
+      const dy = touches[1].clientY - touches[0].clientY
+      this.gesture = {
+        type: 'pinch',
+        startDist: Math.max(10, Math.hypot(dx, dy)),
+        startScale: this.data.scale,
+        startPanX: this.data.panX,
+        startPanY: this.data.panY,
+        startMidX: (touches[0].clientX + touches[1].clientX) / 2,
+        startMidY: (touches[0].clientY + touches[1].clientY) / 2,
+      }
+      this.justDragged = true
+    } else if (touches.length === 1) {
+      this.gesture = {
+        type: 'pan',
+        startX: touches[0].clientX,
+        startY: touches[0].clientY,
+        startPanX: this.data.panX,
+        startPanY: this.data.panY,
+        moved: false,
+      }
+    }
+  },
+
+  onTouchMove(e) {
+    const g = this.gesture
+    const touches = e.touches || []
+    if (!g) return
+    if (touches.length >= 2) {
+      const dx = touches[1].clientX - touches[0].clientX
+      const dy = touches[1].clientY - touches[0].clientY
+      const dist = Math.max(10, Math.hypot(dx, dy))
+      const midX = (touches[0].clientX + touches[1].clientX) / 2
+      const midY = (touches[0].clientY + touches[1].clientY) / 2
+      const baseScale = g.type === 'pinch' ? g.startScale : this.data.scale
+      const baseDist = g.type === 'pinch' ? g.startDist : dist
+      const nextScale = clamp(baseScale * (dist / baseDist), MIN_SCALE, MAX_SCALE)
+      const panX = (g.startPanX || 0) + (midX - (g.startMidX || midX))
+      const panY = (g.startPanY || 0) + (midY - (g.startMidY || midY))
+      this.justDragged = true
+      this.applyScale(nextScale, panX, panY)
+      return
+    }
+    if (g.type === 'pan' && touches.length === 1) {
+      const dx = touches[0].clientX - g.startX
+      const dy = touches[0].clientY - g.startY
+      if (!g.moved && Math.hypot(dx, dy) > 5) {
+        g.moved = true
+        this.justDragged = true
+      }
+      if (g.moved && this.data.scale > 1.01) {
+        this.applyScale(this.data.scale, g.startPanX + dx, g.startPanY + dy)
+      }
+    }
+  },
+
+  onTouchEnd(e) {
+    const touches = e.touches || []
+    if (touches.length === 0) {
+      this.gesture = null
+      setTimeout(() => {
+        this.justDragged = false
+      }, 60)
+    }
   },
   onSheetTab(e) {
     this.showSheet(Number(e.currentTarget.dataset.index))
@@ -148,6 +269,7 @@ Page({
   },
 
   onCanvasTap(e) {
+    if (this.justDragged) return
     if (this.data.mode === 'view') {
       if (this.data.selectedId) this.setData({ selectedId: '' })
       return
@@ -157,7 +279,7 @@ Page({
     const y = t.clientY !== undefined ? t.clientY : e.detail.y
     wx.createSelectorQuery()
       .in(this)
-      .select('#sheet')
+      .select('#plan-sheet')
       .boundingClientRect((rect) => {
         if (!rect) return
         const rx = (x - rect.left) / rect.width

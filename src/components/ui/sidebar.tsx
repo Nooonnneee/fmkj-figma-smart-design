@@ -26,9 +26,12 @@ import { PanelLeftIcon } from "lucide-react"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
+const SIDEBAR_WIDTH_STORAGE_KEY = "fmkj:sidebar-width"
 const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
+const SIDEBAR_MIN_WIDTH = 180
+const SIDEBAR_MAX_WIDTH = 440
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 type SidebarContextProps = {
@@ -39,6 +42,10 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
+  widthPx: number | null
+  setWidthPx: (width: number | null) => void
+  isDragging: boolean
+  setIsDragging: (dragging: boolean) => void
 }
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null)
@@ -72,6 +79,21 @@ function SidebarProvider({
   // We use openProp and setOpenProp for control from outside the component.
   const [_open, _setOpen] = React.useState(defaultOpen)
   const open = openProp ?? _open
+  const [widthPx, setWidthPx] = React.useState<number | null>(null)
+  const [isDragging, setIsDragging] = React.useState(false)
+
+  React.useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY)
+      const parsed = saved ? Number(saved) : NaN
+      if (Number.isFinite(parsed) && parsed >= SIDEBAR_MIN_WIDTH && parsed <= SIDEBAR_MAX_WIDTH) {
+        setWidthPx(Math.round(parsed))
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, [])
+
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
       const openState = typeof value === "function" ? value(open) : value
@@ -121,17 +143,22 @@ function SidebarProvider({
       openMobile,
       setOpenMobile,
       toggleSidebar,
+      widthPx,
+      setWidthPx,
+      isDragging,
+      setIsDragging,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, widthPx, isDragging]
   )
 
   return (
     <SidebarContext.Provider value={contextValue}>
       <div
         data-slot="sidebar-wrapper"
+        data-dragging={isDragging ? "true" : undefined}
         style={
           {
-            "--sidebar-width": SIDEBAR_WIDTH,
+            "--sidebar-width": widthPx ? `${widthPx}px` : SIDEBAR_WIDTH,
             "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
             ...style,
           } as React.CSSProperties
@@ -162,7 +189,7 @@ function Sidebar({
   variant?: "sidebar" | "floating" | "inset"
   collapsible?: "offcanvas" | "icon" | "none"
 }) {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+  const { isMobile, state, openMobile, setOpenMobile, isDragging } = useSidebar()
 
   if (collapsible === "none") {
     return (
@@ -214,12 +241,14 @@ function Sidebar({
       data-variant={variant}
       data-side={side}
       data-slot="sidebar"
+      data-dragging={isDragging ? "true" : undefined}
     >
       {/* This is what handles the sidebar gap on desktop */}
       <div
         data-slot="sidebar-gap"
         className={cn(
           "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
+          "group-data-[dragging=true]:transition-none",
           "group-data-[collapsible=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
           variant === "floating" || variant === "inset"
@@ -232,6 +261,7 @@ function Sidebar({
         data-side={side}
         className={cn(
           "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
+          "group-data-[dragging=true]:transition-none",
           // Adjust the padding for floating and inset variants.
           variant === "floating" || variant === "inset"
             ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
@@ -279,18 +309,79 @@ function SidebarTrigger({
 }
 
 function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
-  const { toggleSidebar } = useSidebar()
+  const { setOpen, toggleSidebar, widthPx, setWidthPx, isDragging, setIsDragging } = useSidebar()
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return
+    event.preventDefault()
+    const startX = event.clientX
+    let moved = false
+    let latestWidth: number | null = widthPx
+
+    const onMove = (ev: PointerEvent) => {
+      if (!moved && Math.abs(ev.clientX - startX) > 3) {
+        moved = true
+        setIsDragging(true)
+        document.body.style.userSelect = "none"
+        document.body.style.cursor = "col-resize"
+      }
+      if (!moved) return
+      if (ev.clientX < 100) {
+        setOpen(false)
+      } else {
+        setOpen(true)
+        const clamped = Math.round(Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, ev.clientX)))
+        latestWidth = clamped
+        setWidthPx(clamped)
+      }
+    }
+
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove)
+      window.removeEventListener("pointerup", onUp)
+      window.removeEventListener("pointercancel", onUp)
+      if (moved) {
+        setIsDragging(false)
+        document.body.style.userSelect = ""
+        document.body.style.cursor = ""
+        if (latestWidth !== null) {
+          try {
+            window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(latestWidth))
+          } catch {
+            // ignore storage errors
+          }
+        }
+      } else {
+        toggleSidebar()
+      }
+    }
+
+    window.addEventListener("pointermove", onMove)
+    window.addEventListener("pointerup", onUp)
+    window.addEventListener("pointercancel", onUp)
+  }
+
+  const handleDoubleClick = () => {
+    setWidthPx(null)
+    try {
+      window.localStorage.removeItem(SIDEBAR_WIDTH_STORAGE_KEY)
+    } catch {
+      // ignore storage errors
+    }
+  }
 
   return (
     <button
       data-sidebar="rail"
       data-slot="sidebar-rail"
-      aria-label="切换侧边栏"
+      data-dragging={isDragging ? "true" : undefined}
+      aria-label="拖拽调整侧边栏宽度或点击切换侧边栏"
       tabIndex={-1}
-      onClick={toggleSidebar}
-      title="切换侧边栏"
+      onPointerDown={handlePointerDown}
+      onDoubleClick={handleDoubleClick}
+      title="左右拖拽调整侧边栏宽度 · 单击收起/展开 · 双击恢复默认宽度"
       className={cn(
-        "absolute inset-y-0 z-20 hidden w-4 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:start-1/2 after:w-[2px] hover:after:bg-sidebar-border sm:flex ltr:-translate-x-1/2 rtl:-translate-x-1/2",
+        "absolute inset-y-0 z-20 hidden w-4 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:start-1/2 after:w-[2px] hover:after:bg-primary/40 data-[dragging=true]:after:bg-primary sm:flex ltr:-translate-x-1/2 rtl:-translate-x-1/2",
         "in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",
         "[[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",
         "group-data-[collapsible=offcanvas]:translate-x-0 group-data-[collapsible=offcanvas]:after:left-full hover:group-data-[collapsible=offcanvas]:bg-sidebar",

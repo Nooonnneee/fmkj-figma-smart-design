@@ -18,6 +18,8 @@ import { categoryOf, DEVICE_GROUPS, deviceTypeOf } from '@/lib/device-types'
 import { cn } from '@/lib/utils'
 import { redirectToLogin } from '@/lib/login-redirect'
 
+import { ProductsResizableLayout } from './resizable-filter-layout'
+
 export const metadata = { title: pageTitle('产品库') }
 
 const yuan = (value: number | null | undefined) =>
@@ -88,28 +90,10 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           : Number(b.price > 0) - Number(a.price > 0) || a.name.localeCompare(b.name, 'zh-CN'),
   )
 
-  // 单次遍历归桶统计各类别、各设备类型、各品牌、各平台的产品数量，避免 70+ 次重复 filter
-  let allCatCount = 0
-  const catCounts = new Map<string, number>()
-  const typeCounts = new Map<string, number>()
   const brandCounts = new Map<string, number>()
-  const platformCounts = new Map<string, number>()
   for (const p of byStatus) {
-    if (match(p, 'cat')) {
-      allCatCount++
-      const cs = p.categorySlug ?? deviceTypeOf(p.deviceType)?.category
-      if (cs) catCounts.set(cs, (catCounts.get(cs) ?? 0) + 1)
-    }
-    if (p.deviceType && match(p, 'type')) {
-      typeCounts.set(p.deviceType, (typeCounts.get(p.deviceType) ?? 0) + 1)
-    }
     if (p.brand?.slug && match(p, 'brand')) {
       brandCounts.set(p.brand.slug, (brandCounts.get(p.brand.slug) ?? 0) + 1)
-    }
-    if (p.platforms.length && match(p, 'platform')) {
-      for (const pl of p.platforms) {
-        platformCounts.set(pl, (platformCounts.get(pl) ?? 0) + 1)
-      }
     }
   }
   const visibleBrands = brands.filter((b) => (brandCounts.get(b.slug) ?? 0) > 0 || brandSet.has(b.slug))
@@ -136,8 +120,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   const shown = products.slice((page - 1) * PAGE, page * PAGE)
   const pageHref = (n: number) => { const h = href({}); const q = n > 1 ? `page=${n}` : ''; return q ? (h.includes('?') ? `${h}&${q}` : `${h}?${q}`) : h }
 
-  const n = (v: number) => <span className="ml-auto text-xs text-muted-foreground tabular-nums">{v}</span>
-  const navItem = (label: React.ReactNode, active: boolean, to: string, extra?: React.ReactNode, key?: string) => (
+  const navItem = (label: React.ReactNode, active: boolean, to: string, key?: string) => (
     <Link
       key={key}
       href={to}
@@ -150,7 +133,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
     >
       <LinkPending />
       {label}
-      {extra}
     </Link>
   )
   const seg = (items: readonly { value: string; label: string }[], current: string, key: 'status' | 'img' | 'sort', label: string) => (
@@ -176,7 +158,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       </>,
       active,
       toggleBrand(b.slug),
-      n(brandCounts.get(b.slug) ?? 0),
       b.id,
     )
   }
@@ -197,68 +178,70 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         }
       />
 
-      <div className="grid gap-6 lg:grid-cols-[15rem_1fr]">
-        {/* 窄屏下筛选栏默认收起（纯 CSS 开关，无需客户端脚本），避免类别和品牌列表占满首屏 */}
-        <input type="checkbox" id="product-filters" aria-label="显示筛选" className="peer sr-only" />
-        <label
-          htmlFor="product-filters"
-          className="flex h-9 cursor-pointer items-center justify-between rounded-lg border bg-background px-3 text-sm font-medium peer-focus-visible:ring-2 peer-focus-visible:ring-ring lg:hidden"
-        >
-          <span className="flex items-center gap-2"><SlidersHorizontal className="size-4" />筛选{activeCount ? <span className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground tabular-nums">{activeCount}</span> : null}</span>
-          <ChevronDown className="size-4 text-muted-foreground" />
-        </label>
-        {/* 吸顶时让出 48px 顶栏 */}
-        <aside className="hidden flex-col gap-5 peer-checked:flex lg:sticky lg:top-16 lg:flex lg:max-h-[calc(100vh-5rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
-          {section(
-            '类别',
-            <>
-              {navItem('全部类别', !f.cat, href({ cat: '', type: '' }), n(allCatCount))}
-              {DEVICE_GROUPS.map(({ category, types }) => {
-                const active = f.cat === category.slug
-                return (
-                  <div key={category.slug}>
-                    {navItem(
-                      <>
-                        <span className="size-2 shrink-0 rounded-full" style={{ background: category.color }} />
-                        {category.name}
-                      </>,
-                      active,
-                      href({ cat: active ? '' : category.slug, type: '' }),
-                      n(catCounts.get(category.slug) ?? 0),
-                    )}
-                  </div>
-                )
-              })}
-            </>,
-          )}
-          {section(
-            '品牌',
-            sortedBrands.length ? (
+      <ProductsResizableLayout
+        mobileToggle={
+          <>
+            <input type="checkbox" id="product-filters" aria-label="显示筛选" className="peer sr-only" />
+            <label
+              htmlFor="product-filters"
+              className="flex h-9 cursor-pointer items-center justify-between rounded-lg border bg-background px-3 text-sm font-medium peer-focus-visible:ring-2 peer-focus-visible:ring-ring lg:hidden"
+            >
+              <span className="flex items-center gap-2"><SlidersHorizontal className="size-4" />筛选</span>
+              <ChevronDown className="size-4 text-muted-foreground" />
+            </label>
+          </>
+        }
+        sidebar={
+          <>
+            {section(
+              '类别',
               <>
-                {sortedBrands.slice(0, PRIMARY_BRANDS).map(brandItem)}
-                {restBrands.length ? (
-                  <details open={restBrands.some((b) => brandSet.has(b.slug))} className="group">
-                    <summary className="flex h-8 cursor-pointer list-none items-center px-2 text-xs text-primary hover:underline">
-                      <span className="group-open:hidden">展开其余 {restBrands.length} 个品牌</span>
-                      <span className="hidden group-open:inline">收起</span>
-                    </summary>
-                    <div className="flex flex-col gap-0.5">{restBrands.map(brandItem)}</div>
-                  </details>
-                ) : null}
-              </>
-            ) : (
-              <span className="px-2 text-xs text-muted-foreground">当前条件下没有品牌</span>
-            ),
-          )}
-        </aside>
-
-        <div className="flex min-w-0 flex-col gap-4">
+                {navItem('全部类别', !f.cat, href({ cat: '', type: '' }))}
+                {DEVICE_GROUPS.map(({ category }) => {
+                  const active = f.cat === category.slug
+                  return (
+                    <div key={category.slug}>
+                      {navItem(
+                        <>
+                          <span className="size-2 shrink-0 rounded-full" style={{ background: category.color }} />
+                          <span className="truncate">{category.name}</span>
+                        </>,
+                        active,
+                        href({ cat: active ? '' : category.slug, type: '' }),
+                      )}
+                    </div>
+                  )
+                })}
+              </>,
+            )}
+            {section(
+              '品牌',
+              sortedBrands.length ? (
+                <>
+                  {sortedBrands.slice(0, PRIMARY_BRANDS).map(brandItem)}
+                  {restBrands.length ? (
+                    <details open={restBrands.some((b) => brandSet.has(b.slug))} className="group">
+                      <summary className="flex h-8 cursor-pointer list-none items-center px-2 text-xs text-primary hover:underline">
+                        <span className="group-open:hidden">展开更多品牌</span>
+                        <span className="hidden group-open:inline">收起</span>
+                      </summary>
+                      <div className="flex flex-col gap-0.5">{restBrands.map(brandItem)}</div>
+                    </details>
+                  ) : null}
+                </>
+              ) : (
+                <span className="px-2 text-xs text-muted-foreground">当前条件下没有品牌</span>
+              ),
+            )}
+          </>
+        }
+      >
           <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&>*]:shrink-0">
             {seg(STATUSES, f.status, 'status', '销售状态')}
             <div className="ml-auto flex shrink-0 items-center gap-2">
               {activeCount ? (
                 <Button asChild variant="ghost" size="sm">
-                  <Link href={f.sort ? `/products?sort=${f.sort}` : '/products'}><X className="size-4" />清除 {activeCount} 个筛选</Link>
+                  <Link href={f.sort ? `/products?sort=${f.sort}` : '/products'}><X className="size-4" />清除筛选</Link>
                 </Button>
               ) : null}
               {seg(SORTS, f.sort, 'sort', '排序')}
@@ -329,8 +312,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
               )}
             </nav>
           ) : null}
-        </div>
-      </div>
+      </ProductsResizableLayout>
     </section>
   )
 }

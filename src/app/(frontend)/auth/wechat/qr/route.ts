@@ -31,7 +31,7 @@ function checkQrRateLimit(ip: string): boolean {
 }
 
 /** 尝试调用微信官方 getwxacodeunlimit 生成小程序码；若未配置或小程序尚未发布正式版则返回 null，自动降级为标准 QR 码。 */
-async function tryCreateWxacodeDataUrl(scene: string): Promise<string | null> {
+async function tryCreateWxacodeDataUrl(scene: string, requestedEnv?: string): Promise<string | null> {
   if (!wechatConfigured()) return null
   try {
     const tokenParams = new URLSearchParams({
@@ -45,7 +45,7 @@ async function tryCreateWxacodeDataUrl(scene: string): Promise<string | null> {
     const tokenJson = (await tokenRes.json().catch(() => null)) as { access_token?: string } | null
     if (!tokenJson?.access_token) return null
 
-    const rawEnv = process.env.WECHAT_MP_ENV_VERSION?.trim()
+    const rawEnv = (requestedEnv || process.env.WECHAT_MP_ENV_VERSION || '').trim()
     const envVersion = rawEnv === 'trial' || rawEnv === 'develop' ? rawEnv : 'release'
     const codeRes = await fetch(
       `https://api.weixin.qq.com/wxa/getwxacodeunlimit?access_token=${encodeURIComponent(tokenJson.access_token)}`,
@@ -85,7 +85,10 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: '生成二维码太频繁，请稍后再试' }, { status: 429 })
   }
 
-  const body = (await request.json().catch(() => ({}))) as { redirectTo?: string }
+  const body = (await request.json().catch(() => ({}))) as {
+    redirectTo?: string
+    preferMode?: 'wxacode' | 'qrcode' | 'trial'
+  }
   const redirectTo = safeRedirectPath(body.redirectTo, '/projects')
 
   const ticket = randomBytes(18).toString('base64url') // 24 chars
@@ -114,14 +117,17 @@ export async function POST(request: Request) {
     })
     .catch(() => null)
 
-  const wxacode = await tryCreateWxacodeDataUrl(ticket)
+  const wxacode =
+    body.preferMode === 'qrcode'
+      ? null
+      : await tryCreateWxacodeDataUrl(ticket, body.preferMode === 'trial' ? 'trial' : undefined)
   const qrImage = wxacode ?? renderQrSvgDataUrl(`fmkj-login:${ticket}`)
 
   return Response.json({
     ok: true,
     ticket,
     qrImage,
-    mode: wxacode ? 'wxacode' : 'qrcode',
+    mode: wxacode ? (body.preferMode === 'trial' ? 'trial' : 'wxacode') : 'qrcode',
     expiresAt,
   })
 }
