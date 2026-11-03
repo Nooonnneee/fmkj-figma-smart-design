@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 }
 
 /** 模板与示例项目很少变动：按小时重新生成；后台修改模板、场景或图片时立即刷新（见 lib/revalidate-templates.ts） */
-export const revalidate = 3600
+export const dynamic = 'force-dynamic'
 
 export default async function TemplatesPage() {
   const [templates, docs, company] = await Promise.all([loadPublicProposalTemplates(), getTemplatePreviewDocs().catch(() => null), getCompanyInfo().catch(() => null)])

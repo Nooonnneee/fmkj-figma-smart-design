@@ -14,7 +14,7 @@ import { categoryOfType, DEVICE_GROUPS } from '@/lib/device-types'
 import { yuan } from '@/lib/quotes'
 import { wiringSpecOf } from '@/app/(frontend)/print/projects/[id]/wiring/page'
 
-export const revalidate = 3600
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: pageTitle('全屋智能点位图例符号与产品选型库'),
