@@ -15,5 +15,6 @@ export async function GET(request: Request) {
   }
   const { token, expiresAt } = await issueToken('web', { userId: String(user.id), client: 'web-view' })
   await appAuth.startMpWebSession(token, expiresAt)
-  return new Response(null, { status: 303, headers: { location: target } })
+  const sep = target.includes('?') ? '&' : '?'
+  return new Response(null, { status: 303, headers: { location: `${target}${sep}mp=1` } })
 }

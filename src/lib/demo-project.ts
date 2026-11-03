@@ -2,7 +2,7 @@ import type { PayloadRequest } from 'payload'
 
 import { DEFAULT_CONTRACT_TERMS, DEFAULT_DURATION_DAYS, DEFAULT_PAYMENTS, DEFAULT_WARRANTY_MONTHS } from '@/lib/contracts'
 import { relId } from '@/lib/access'
-import { PLAN_H, PLAN_POINTS, PLAN_ROOMS, PLAN_W } from '@/components/landing/demo-data'
+import { BUILTIN_DEMO_SHEETS } from '@/lib/builtin-demo-sheets'
 import { DEVICE_TYPE_ORDER } from '@/lib/device-types'
 import { getPayloadClient } from '@/lib/payload'
 import { buildAreaElements, buildPointElements, buildSheetElements, compactScene, markerFile, type SceneEl, type SceneFile } from '@/lib/point-scene'
@@ -11,61 +11,72 @@ import { SHEET, sheetOrigin } from '@/lib/sheet-spec'
 import type { Product, Project, Quote } from '@/payload-types'
 
 const DEMO_TEMPLATE_NAME = '【示例】湖山赋别墅全屋智能'
+const TOTAL_DEMO_POINTS = BUILTIN_DEMO_SHEETS.reduce((sum, s) => sum + s.points.length, 0)
 
 /**
  * 构造内置的「湖山赋别墅全屋智能」点位图场景（含 1F/2F/3F 三张标准图纸、房间分区与点位），
  * 当自托管数据库尚未创建 `isDemoTemplate: true` 的母版项目时自动初始化。
  */
-function buildBuiltinDemoScene(defaultProducts: Record<string, string>) {
+export function buildBuiltinDemoScene(defaultProducts: Record<string, string> = {}) {
   const elements: SceneEl[] = []
   const files: Record<string, SceneFile> = {}
-  const sheetDefs = [
-    { index: 0, id: 'sh-demo-1f', name: '1F 一层平面图' },
-    { index: 1, id: 'sh-demo-2f', name: '2F 二层卧室区' },
-    { index: 2, id: 'sh-demo-3f', name: '3F 三层主卧套房' },
-  ]
 
-  for (const s of sheetDefs) {
-    const fileId = `sheet-file-${s.id}`
-    files[fileId] = { id: fileId, dataURL: '/blank-sheet.svg', mimeType: 'image/svg+xml' }
-    elements.push(...buildSheetElements({ index: s.index, name: s.name, fileId, sheetId: s.id }))
-  }
+  BUILTIN_DEMO_SHEETS.forEach((sheet, idx) => {
+    const fileId = `sheet-file-${sheet.id}`
+    files[fileId] = { id: fileId, dataURL: sheet.url, mimeType: 'image/png' }
+    elements.push(...buildSheetElements({ index: idx, name: sheet.name, fileId, sheetId: sheet.id }))
 
-  // 将示例房间与点位按比例映射到标准图纸尺寸上
-  const scaleX = SHEET.width / PLAN_W
-  const scaleY = SHEET.height / PLAN_H
-  const origin1F = sheetOrigin(0)
-  for (const r of PLAN_ROOMS) {
-    elements.push(
-      ...buildAreaElements({
-        name: r.name,
-        x: origin1F.x + Math.round(r.x * scaleX),
-        y: origin1F.y + Math.round(r.y * scaleY),
-        width: Math.round(r.w * scaleX),
-        height: Math.round(r.h * scaleY),
-      }),
-    )
-  }
+    const origin = sheetOrigin(idx)
+    for (const a of sheet.areas) {
+      const ax = origin.x + Math.round(a.x0 * SHEET.width)
+      const ay = origin.y + Math.round(a.y0 * SHEET.height)
+      const aw = Math.max(20, Math.round((a.x1 - a.x0) * SHEET.width))
+      const ah = Math.max(20, Math.round((a.y1 - a.y0) * SHEET.height))
+      const polygon = a.poly
+        ? a.poly.map(([px, py]) => [
+            Math.round((px - a.x0) * SHEET.width),
+            Math.round((py - a.y0) * SHEET.height),
+          ] as [number, number])
+        : undefined
+      elements.push(
+        ...buildAreaElements({
+          name: a.name,
+          x: ax,
+          y: ay,
+          width: aw,
+          height: ah,
+          polygon,
+        }),
+      )
+    }
 
-  for (const p of PLAN_POINTS) {
-    files[`mk2-${p.type}`] = markerFile(p.type)
-    elements.push(
-      ...buildPointElements({
-        deviceType: p.type,
-        cx: origin1F.x + Math.round(p.x * scaleX),
-        cy: origin1F.y + Math.round(p.y * scaleY),
-        code: p.code,
-        productId: defaultProducts[p.type] ?? null,
-      }),
-    )
-  }
+    for (const p of sheet.points) {
+      files[`mk2-${p.type}`] = markerFile(p.type)
+      elements.push(
+        ...buildPointElements({
+          deviceType: p.type,
+          cx: origin.x + Math.round(p.rx * SHEET.width),
+          cy: origin.y + Math.round(p.ry * SHEET.height),
+          code: p.code,
+          productId: defaultProducts[p.type] ?? null,
+        }),
+      )
+    }
+  })
 
   return compactScene(elements, files)
 }
 
+function isLegacyBlankDemoScene(pointMap: unknown): boolean {
+  if (!pointMap || typeof pointMap !== 'object') return true
+  const raw = JSON.stringify(pointMap)
+  if (raw.includes('blank-sheet.svg') || raw.includes('sh-demo-1f')) return true
+  return false
+}
+
 /**
  * 确保数据库中存在一份 `isDemoTemplate: true` 的「【示例】湖山赋别墅全屋智能」母版项目及其 2 份示例报价单。
- * 若自托管环境首次运行尚未创建母版，自动结合当前产品库初始化一份。
+ * 若自托管环境首次运行尚未创建母版，或旧母版使用的是 blank-sheet.svg 占位图，则自动初始化/升级为真实三层户型图与 137 个点位。
  */
 export async function ensureDemoTemplateProject(): Promise<Project | null> {
   const payload = await getPayloadClient()
@@ -78,8 +89,12 @@ export async function ensureDemoTemplateProject(): Promise<Project | null> {
       overrideAccess: true,
     })
     .catch(() => null)
-  if (byFlag?.docs?.[0]) return byFlag.docs[0] as Project
+  const existingTemplate = byFlag?.docs?.[0] as Project | undefined
+  if (existingTemplate && !isLegacyBlankDemoScene(existingTemplate.pointMap) && (existingTemplate.pointCount ?? 0) >= 100) {
+    return existingTemplate
+  }
 
+  if (!existingTemplate) {
   const byOwnerless = await payload
     .find({
       collection: 'projects',
@@ -89,7 +104,7 @@ export async function ensureDemoTemplateProject(): Promise<Project | null> {
       overrideAccess: true,
     })
     .catch(() => null)
-  if (byOwnerless?.docs?.[0]) {
+  if (byOwnerless?.docs?.[0] && !isLegacyBlankDemoScene(byOwnerless.docs[0].pointMap)) {
     const updated = await payload
       .update({
         collection: 'projects',
@@ -100,6 +115,7 @@ export async function ensureDemoTemplateProject(): Promise<Project | null> {
       })
       .catch(() => byOwnerless.docs[0])
     return updated as Project
+  }
   }
 
   // 数据库中没有任何母版项目时，根据当前产品库自动初始化母版项目与两份示例报价单
@@ -129,6 +145,25 @@ export async function ensureDemoTemplateProject(): Promise<Project | null> {
   }
 
   const pointMap = buildBuiltinDemoScene(defaultProducts)
+  if (existingTemplate) {
+    const upgraded = await payload
+      .update({
+        collection: 'projects',
+        id: existingTemplate.id,
+        data: {
+          name: DEMO_TEMPLATE_NAME,
+          community: '湖山赋',
+          pointMap,
+          pointCount: TOTAL_DEMO_POINTS,
+          defaultProducts,
+        } as never,
+        overrideAccess: true,
+        depth: 0,
+      })
+      .catch(() => existingTemplate)
+    return upgraded as Project
+  }
+
   const template = (await payload.create({
     collection: 'projects',
     data: {
@@ -144,6 +179,7 @@ export async function ensureDemoTemplateProject(): Promise<Project | null> {
       isDemoTemplate: true,
       notes: '系统内置的全屋智能演示项目（含点位图、智能选型、报价单与合同），你可以自由修改点位、导出打印或直接删除。',
       pointMap,
+      pointCount: TOTAL_DEMO_POINTS,
       defaultProducts,
     } as never,
     overrideAccess: true,
@@ -152,8 +188,10 @@ export async function ensureDemoTemplateProject(): Promise<Project | null> {
 
   // 按点位统计各设备类型数量，生成「含灯具」和「不含灯具」两份母版报价单
   const counts = new Map<string, number>()
-  for (const pt of PLAN_POINTS) {
-    counts.set(pt.type, (counts.get(pt.type) ?? 0) + 1)
+  for (const sh of BUILTIN_DEMO_SHEETS) {
+    for (const pt of sh.points) {
+      counts.set(pt.type, (counts.get(pt.type) ?? 0) + 1)
+    }
   }
   const buildItems = (scope: 'all' | 'no-light') => {
     const rows: Array<Record<string, unknown>> = []

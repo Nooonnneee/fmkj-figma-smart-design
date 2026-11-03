@@ -58,11 +58,8 @@
       <view class="grow">
         <view class="title truncate">{{item.name}}</view>
         <view class="small muted mt-8 truncate">{{item.metaLine}}</view>
-        <view class="steps mt-16">
-          <view wx:for="{{item.steps}}" wx:for-item="done" wx:for-index="i" wx:key="i" class="step {{done ? 'done' : ''}}" />
-        </view>
       </view>
-      <view class="badge shrink-0">{{item.progress.detail}}</view>
+      <image class="icon-sm" src="/assets/icons/chevron-right-muted.svg" />
     </view>
     <view wx:if="{{!loading && !recentProjects.length}}" class="empty">
       <image class="icon-lg" src="/assets/icons/folder-muted.svg" />

@@ -16,14 +16,8 @@
           <text wx:if="{{item.status === 'archived'}}" class="badge shrink-0">已归档</text>
         </view>
         <view class="small muted mt-8 truncate">{{item.metaLine}}</view>
-        <view class="steps mt-16">
-          <view wx:for="{{item.steps}}" wx:for-item="done" wx:for-index="i" wx:key="i" class="step {{done ? 'done' : ''}}" />
-        </view>
-        <view class="row between mt-16 small muted">
-          <text>{{item.progress.detail}}</text>
-          <text>{{item.time}}</text>
-        </view>
       </view>
+      <text class="small muted shrink-0">{{item.time}}</text>
     </view>
     <view wx:if="{{!loading && !items.length}}" class="empty">
       <image class="icon-lg" src="/assets/icons/folder-muted.svg" />
