@@ -29,6 +29,12 @@
       <view class="big-num mt-16">{{amountText}}</view>
       <view class="small muted mt-8">大写：{{contract.amountUpper}}</view>
       <view wx:if="{{signed}}" class="small muted mt-8">签订日期：{{signedText}} · 合同和依据的报价已锁定，只能登记收款</view>
+      <view class="row between mt-16">
+        <text class="small muted">含正式条款与报价明细附件</text>
+        <button class="btn btn-outline btn-sm" hover-class="btn-hover" bindtap="print">
+          <image class="icon-sm" src="/assets/icons/printer.svg" />预览 / 导出 PDF
+        </button>
+      </view>
     </view>
 
     <view class="section-title"><text class="title">付款与收款</text><text class="small {{percentOk ? 'muted' : 'danger-text'}}">比例合计 {{percentTotal}}%</text></view>

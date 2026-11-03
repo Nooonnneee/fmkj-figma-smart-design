@@ -241,6 +241,7 @@ Page({
   },
   more() {
     const actions = []
+    if (this.data.printPath) actions.push({ label: '预览 / 导出报价单 PDF', run: () => this.print() })
     if (this.data.project) actions.push({ label: '查看点位图', run: () => wx.navigateTo({ url: '/pages/pointmap/index?id=' + this.data.project.id }) })
     if (!this.data.readOnly && this.data.project) actions.push({ label: '从点位图同步数量', run: () => this.sync() })
     if (!this.data.readOnly && !(this.data.contract && this.data.contract.usesThisQuote)) actions.push({ label: '删除这份报价', run: () => this.remove() })

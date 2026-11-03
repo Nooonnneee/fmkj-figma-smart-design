@@ -21,6 +21,8 @@ import { projectDisplayName } from '@/lib/project-name'
 import type { Media, Project } from '@/payload-types'
 import { PLUGIN_DOC_STYLES } from '@/plugins/doc-styles/styles'
 
+import { ShareExportButton } from './share-export-button'
+
 export const metadata: Metadata = {
   title: `方案与报价预览 · ${APP_NAME}`,
   robots: { index: false, follow: false },
@@ -46,17 +48,28 @@ async function loadSharedShowcase(token: string) {
     })
     project = (demoRes.docs[0] as Project | undefined) ?? null
   } else {
+    // 只拉取 id 与 shareConfig，避免扫描项目表时把数以百计的 pointMap 大 JSON 全部读进内存
     const res = await payload.find({
       collection: 'projects',
-      limit: 200,
+      limit: 1000,
       depth: 0,
       overrideAccess: true,
+      select: { shareConfig: true } as never,
     })
-    project =
-      (res.docs as Project[]).find((p) => {
-        const sc = (p as unknown as { shareConfig?: { enabled?: boolean; token?: string } | null }).shareConfig
-        return sc && sc.enabled !== false && sc.token === trimmed
-      }) ?? null
+    const matched = (res.docs as Project[]).find((p) => {
+      const sc = (p as unknown as { shareConfig?: { enabled?: boolean; token?: string } | null }).shareConfig
+      return sc && sc.enabled !== false && sc.token === trimmed
+    })
+    if (matched) {
+      project = (await payload
+        .findByID({
+          collection: 'projects',
+          id: matched.id,
+          depth: 0,
+          overrideAccess: true,
+        })
+        .catch(() => null)) as Project | null
+    }
   }
   if (!project) return null
 
@@ -183,12 +196,13 @@ export default async function ClientSharePage({ params }: { params: Promise<{ to
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             {company.phone ? (
-              <span className="inline-flex items-center gap-1">
+              <span className="hidden items-center gap-1 sm:inline-flex">
                 <Phone className="size-3.5" />
                 {company.phone}
               </span>
             ) : null}
-            <Badge variant="outline">业主方案预览</Badge>
+            <Badge variant="outline" className="hidden sm:inline-flex">业主方案预览</Badge>
+            <ShareExportButton projectName={data.project.name} />
           </div>
         </div>
       </header>
