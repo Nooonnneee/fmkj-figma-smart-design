@@ -27,6 +27,7 @@ export type PluginViewItem = {
   entry: string | null
   provides: string[]
   enabled: boolean
+  tier?: 'free' | 'pro' | 'team'
   /** 所需会员（免费为 null） */
   tierBadge: string | null
   /** 严格模式下会员等级不够，不能启用 */
@@ -107,7 +108,20 @@ export function PluginList({ items, stages, selectedId, upgradeHint }: { items: 
             </CardTitle>
           </div>
           <div className="flex shrink-0 items-center gap-2 pt-0.5">
-            {p.tierBadge ? <Badge variant="outline" className="text-xs">{p.tierBadge}</Badge> : null}
+            {p.tierBadge ? (
+              <span
+                className={cn(
+                  'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold',
+                  p.tierBadge === 'Pro'
+                    ? 'bg-amber-500/15 text-amber-700 ring-1 ring-amber-500/30 dark:text-amber-400'
+                    : p.tierBadge === 'Plus'
+                      ? 'bg-primary/12 text-primary ring-1 ring-primary/25'
+                      : 'bg-muted text-muted-foreground',
+                )}
+              >
+                {p.tierBadge}
+              </span>
+            ) : null}
             {pending ? (
               <Badge variant="outline" className="text-xs text-muted-foreground">规划中</Badge>
             ) : p.locked && !enabled ? (

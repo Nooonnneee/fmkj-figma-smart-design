@@ -1,4 +1,6 @@
 import { getCompanyInfo } from '@/lib/cached-data'
+import { featureAccess } from '@/lib/membership'
+import { getMembershipContext } from '@/lib/membership-policy'
 import { getPayloadClient } from '@/lib/payload'
 import { loadProjectDocs } from '@/lib/project-docs'
 import type { User } from '@/payload-types'
@@ -17,7 +19,7 @@ const fail = (status: number, error: string) => Response.json({ ok: false, error
  * 按实际用量计费（tokens × 模型倍率 + 工具调用费用，见 billing.ts），调用成功后才扣，出错不扣。
  */
 export async function handleAiChat(request: Request, user: User): Promise<Response> {
-  const [flags, company] = await Promise.all([getPluginFlags(user.id), getCompanyInfo(user.id)])
+  const [flags, company, access] = await Promise.all([getPluginFlags(user.id), getCompanyInfo(user.id), getMembershipContext(user)])
   if (!flags['ai-copilot']) return fail(404, '「AI 对话」插件已关闭')
 
   const body = (await request.json().catch(() => null)) as { conversationId?: unknown; message?: unknown; modelId?: unknown; projectId?: unknown; pluginIds?: unknown } | null
@@ -26,6 +28,10 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
   if (text.length > MAX_INPUT) return fail(400, `单条消息最多 ${MAX_INPUT} 字`)
   const model = findModel(body?.modelId, company.aiModels)
   if (!model) return fail(400, '不支持的模型')
+  const modelTierCheck = featureAccess(access.membership, model.minTier ?? 'free', access.strict)
+  if (!modelTierCheck.allowed) {
+    return fail(403, `模型「${model.name}」为 ${model.tierBadge ?? 'Plus'} 会员专属高阶模型，请升级至 ${model.tierBadge ?? 'Plus'} 会员后使用`)
+  }
   if (!resolveModelApiKey(model)) {
     return fail(503, `模型「${model.name}」还没有配置密钥环境变量（${model.apiKeyEnv}），请在设置或环境变量中添加`)
   }
@@ -71,7 +77,7 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
   await payload.create({ collection: 'ai-messages', data: { conversation: conversationId, owner: user.id, role: 'user', content: text }, overrideAccess: true, depth: 0 })
 
   const tools = availableTools(model.id, pluginIds, flags)
-  const messages: LlmMessage[] = [{ role: 'system', content: systemPrompt(project) }, ...history, { role: 'user', content: text }]
+  const messages: LlmMessage[] = [{ role: 'system', content: systemPrompt(project, pluginIds, flags) }, ...history, { role: 'user', content: text }]
   const encoder = new TextEncoder()
 
   const body$ = new ReadableStream({
@@ -146,7 +152,7 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
 
         // 按量计费；余额不够本次实际用量时扣到 0 为止（调用前已确认余额 ≥ 1）
         const fresh = await payload.findByID({ collection: 'users', id: user.id, depth: 0, overrideAccess: true, select: { aiCredits: true } })
-        const cost = Math.min(meter.credits(model), Math.max(0, fresh.aiCredits ?? 0))
+        const cost = Math.min(meter.credits(model.cost), Math.max(0, fresh.aiCredits ?? 0))
         const usage = { inputTokens: meter.inputTokens, outputTokens: meter.outputTokens, toolCalls: meter.tools.length, estimated: meter.estimated > 0 }
         const reply = await payload.create({
           collection: 'ai-messages',

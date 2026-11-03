@@ -120,6 +120,36 @@ const RULES: Record<AreaType, { needs: Need[]; scenes: string[] }> = {
 
 export const LEVEL_LABEL: Record<Level, string> = { core: '必备', recommended: '推荐', optional: '可选' }
 
+/** 导出结构化房间配置规则（供领域知识导出脚本 export-domain-knowledge.ts 与知识库同步） */
+export const ROOM_ANALYSIS_RULES = Object.fromEntries(
+  (Object.keys(RULES) as AreaType[]).map((areaType) => {
+    const r = RULES[areaType]
+    return [
+      areaType,
+      {
+        areaType,
+        label: areaTypeLabel(areaType),
+        needs: r.needs.map((n) => ({
+          label: n.label,
+          level: n.level,
+          levelLabel: LEVEL_LABEL[n.level],
+          reason: n.reason,
+          matchingDevices: DEVICE_TYPE_ORDER.filter((dt) => n.match(dt)),
+        })),
+        scenes: r.scenes,
+      },
+    ]
+  }),
+) as Record<
+  AreaType,
+  {
+    areaType: AreaType
+    label: string
+    needs: { label: string; level: Level; levelLabel: string; reason: string; matchingDevices: string[] }[]
+    scenes: string[]
+  }
+>
+
 type AreaLike = { id: string; name: string; areaType: AreaType; sheetId?: string | null }
 type PointLike = { deviceType: string; areaId: string | null; sheetId: string | null }
 

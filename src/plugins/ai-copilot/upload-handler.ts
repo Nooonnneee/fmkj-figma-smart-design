@@ -8,10 +8,10 @@ import { enabledAiModels, type AiModelConfig } from './templates'
 
 const fail = (status: number, error: string) => Response.json({ ok: false, error }, { status })
 
-const VISION_MODEL_RE = /vl|vision|gpt-4o|gemini|claude-3|glm-4v|pixtral|qvq|omni/i
+const VISION_MODEL_RE = /vl|vision|glm-4v|qvq|omni|doubao.*vision/i
 
 /**
- * 当后台启用了支持视觉（Vision）的多模态模型（如 qwen-vl-max、gpt-4o、glm-4v-plus、doubao-vision），
+ * 当后台启用了支持视觉（Vision）的国产多模态模型（如 qwen-vl-max、glm-4v-plus、doubao-1-5-vision-pro），
  * 且本地像素检测未检出足够点位时，自动调用多模态视觉模型识图提取真实点位坐标。
  */
 async function detectPointsViaVisionModel(pngBuffer: Buffer): Promise<{ type: string; x: number; y: number }[]> {

@@ -5,7 +5,7 @@
 import type { ManagedScene } from '@/lib/scenes'
 
 import type { DeckItem, DeckModel } from '../model'
-import { Chapter, Slide, type DeckCtx } from '../parts'
+import { Chapter, imgLoading, Slide, type DeckCtx } from '../parts'
 
 export type DeckScene = { scene: ManagedScene; rooms: string[]; items: DeckItem[] }
 
@@ -34,7 +34,7 @@ export function ScenesPage({ ctx, no, total, scenes, part }: { ctx: DeckCtx; no:
         {scenes.map(({ scene, rooms, items }) => (
           <div key={scene.id} className="flex min-h-0 flex-col overflow-hidden rounded-(--deck-radius) border border-doc-rule bg-(--deck-diagram)">
             <div className="relative min-h-[260px] flex-1 overflow-hidden bg-doc-stripe">
-              <img src={scene.image?.url ?? `/proposal/photos/${CHAPTER_PHOTO[scene.chapter] ?? 'home'}.jpg`} alt={scene.image?.alt ?? scene.name} loading="eager" decoding="sync" className="absolute inset-0 size-full object-cover" />
+              <img src={scene.image?.url ?? `/proposal/photos/${CHAPTER_PHOTO[scene.chapter] ?? 'home'}.jpg`} alt={scene.image?.alt ?? scene.name} {...imgLoading(ctx)} className="absolute inset-0 size-full object-cover" />
               {scene.tagline ? (
                 <span className="doc-latin absolute top-[16px] left-[16px] rounded-[calc(var(--deck-radius-sm)/2)] bg-(--deck-chip) px-[10px] py-[4px] text-[11px] tracking-[0.2em] text-(--deck-chip-ink)">{scene.tagline}</span>
               ) : null}

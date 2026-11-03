@@ -205,8 +205,17 @@ function parseDocumentDefaults(value: unknown): CompanyInfo['documentDefaults'] 
   return out
 }
 
+const DEFAULT_WECHAT_QR_URL = '/brand/wechat-contact-qr.jpg'
+
+function resolveCompanyQr(qr: Media | null, rawUrl: string | null, fallbackAlt: string): { url: string; alt: string } {
+  if (rawUrl && !rawUrl.includes('20261028221115_35_1')) {
+    return { url: rawUrl, alt: qr?.alt || fallbackAlt }
+  }
+  return { url: DEFAULT_WECHAT_QR_URL, alt: qr?.alt || fallbackAlt }
+}
+
 const getBaseCompanyInfo = memoize(
-  'company-settings-v7',
+  'company-settings-v8',
   [CACHE_TAGS.company],
   TTL,
   async (): Promise<CompanyInfo> => {
@@ -222,13 +231,14 @@ const getBaseCompanyInfo = memoize(
     const qr = s.qrCode && typeof s.qrCode === 'object' ? (s.qrCode as Media) : null
     const logoUrl = resolveMediaUrl(logo)
     const qrUrl = resolveMediaUrl(qr)
+    const qrCaption = s.qrCaption ?? '扫码添加微信'
     return {
       name: s.name || 'FMKJ 智能家居',
       slogan: s.slogan ?? null,
       phone: s.phone ?? null,
       email: s.email ?? null,
       address: s.address ?? null,
-      qrCaption: s.qrCaption ?? null,
+      qrCaption,
       quoteNotes: s.quoteNotes ?? null,
       contractTerms: s.contractTerms ?? null,
       printProductImages: s.printProductImages !== false,
@@ -236,7 +246,7 @@ const getBaseCompanyInfo = memoize(
       disabledPlugins: Array.isArray(s.disabledPlugins) ? s.disabledPlugins.filter((v): v is string => typeof v === 'string') : [],
       aiModels: parseAiModels(rawAiModels, parseCustomChannels((ai as unknown as { customChannels?: unknown } | null)?.customChannels)),
       logo: logo && logoUrl ? { url: logoUrl, alt: logo.alt || s.name, width: logo.width ?? null, height: logo.height ?? null } : null,
-      qrCode: qr && qrUrl ? { url: qrUrl, alt: qr.alt || '二维码' } : null,
+      qrCode: resolveCompanyQr(qr, qrUrl, qrCaption),
     }
   },
 )
@@ -321,7 +331,7 @@ export async function getCompanyInfo(userId?: string | number | null): Promise<C
         disabledPlugins,
         aiModels: base.aiModels,
         logo: logo && logoUrl ? { url: logoUrl, alt: logo.alt || name, width: logo.width ?? null, height: logo.height ?? null } : null,
-        qrCode: qr && qrUrl ? { url: qrUrl, alt: qr.alt || '二维码' } : null,
+        qrCode: qr && qrUrl ? resolveCompanyQr(qr, qrUrl, p.qrCaption || '二维码') : base.qrCode,
         isCustom: true,
       }
     },

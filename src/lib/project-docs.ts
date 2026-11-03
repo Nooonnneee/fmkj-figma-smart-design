@@ -3,7 +3,7 @@ import { analyzeProject, floorTagFromSheetName, groupRooms, roomKey, type AreaAn
 import { getCatalog, getCompanyInfo, resolveMediaUrl, type CatalogProduct } from '@/lib/cached-data'
 import { categoryOfType, DEVICE_CATEGORIES, DEVICE_TYPE_ORDER, deviceTypeOf } from '@/lib/device-types'
 import { getPayloadClient } from '@/lib/payload'
-import { assignScenes, loadScenes } from '@/lib/scenes'
+import { assignScenes, loadSceneLibrary } from '@/lib/scenes'
 import { resolveFinalQuote } from '@/lib/deliverables'
 import { fillDefaultProducts, parseDefaults, resolvePoint } from '@/lib/point-map-items'
 import { normalizeScene, sceneAreas, scenePoints, sceneSheets, type AreaInfo, type PointInfo, type SheetInfo } from '@/lib/point-scene'
@@ -45,7 +45,21 @@ export type FloorSummary = {
  * 若项目已有对应报价单（或通过 quoteId 指定），点位的型号、图片与单价自动与报价单同步（含临时改价与换型号）。
  */
 export async function loadProjectDocs(projectId: string, user: User, scope: PointScope = 'all', quoteId?: string | null) {
+  return loadDocs(projectId, user, scope, quoteId)
+}
+
+/**
+ * 系统身份读取项目文档（不校验登录）：只用于平台内置的示例母版项目（模板库、模板缩略图预览）。
+ * 不返回其他项目列表，避免泄露任何成员数据。
+ */
+export async function loadSystemProjectDocs(projectId: string) {
+  return loadDocs(projectId, null, 'all', null)
+}
+
+async function loadDocs(projectId: string, user: User | null, scope: PointScope = 'all', quoteId?: string | null) {
   const payload = await getPayloadClient()
+  // 成员读取按自己的权限过滤；系统读取（示例母版）绕过权限
+  const acc = user ? { user, overrideAccess: false as const } : { overrideAccess: true as const }
   // 只依赖项目编号的查询和项目本身同时发出，减少数据库往返（每次往返约 0.2 秒）
   // 报价只取方案与文档用到的字段，不展开关联（条目里的产品只用编号，图片单独按需读取）
   const quotesP = payload.find({
@@ -54,35 +68,36 @@ export async function loadProjectDocs(projectId: string, user: User, scope: Poin
     sort: '-updatedAt',
     limit: 50,
     depth: 0,
-    user,
-    overrideAccess: false,
+    ...acc,
     select: { title: true, status: true, total: true, items: true, fees: true, discount: true, updatedAt: true },
   })
-  const contractsP = payload.find({ collection: 'contracts', where: { project: { equals: projectId } }, limit: 1, depth: 0, user, overrideAccess: false })
-  const projectsP = payload.find({
-    collection: 'projects',
-    sort: '-updatedAt',
-    limit: 30,
-    depth: 0,
-    user,
-    overrideAccess: false,
-    select: { name: true, community: true, customerName: true, pointCount: true, platform: true },
-  })
-  const scenesP = loadScenes(payload, user).catch(() => [])
+  const contractsP = payload.find({ collection: 'contracts', where: { project: { equals: projectId } }, limit: 1, depth: 0, ...acc })
+  const projectsP = user
+    ? payload.find({
+        collection: 'projects',
+        sort: '-updatedAt',
+        limit: 30,
+        depth: 0,
+        user,
+        overrideAccess: false,
+        select: { name: true, community: true, customerName: true, pointCount: true, platform: true },
+      })
+    : Promise.resolve({ docs: [] as Project[] })
+  const scenesP = loadSceneLibrary(payload, user)
   const catalogP = getCatalog()
   const project = (await payload
-    .findByID({ collection: 'projects', id: projectId, depth: 0, user, overrideAccess: false })
+    .findByID({ collection: 'projects', id: projectId, depth: 0, ...acc })
     .catch(() => null)) as Project | null
   if (!project) {
     void Promise.allSettled([quotesP, contractsP, projectsP, scenesP, catalogP])
     return null
   }
   const ownerId = relId(project.owner)
-  const headerUserId = ownerId || String(user.id)
+  const headerUserId = ownerId || (user ? String(user.id) : null)
   const ownerP = ownerId
     ? (payload.findByID({ collection: 'users', id: ownerId, depth: 0, overrideAccess: true, select: { name: true, phone: true } }).catch(() => null) as Promise<User | null>)
     : Promise.resolve(null)
-  const [catalog, company, quotesRes, contracts, projectsRes, owner, sceneLibrary] = await Promise.all([
+  const [catalog, company, quotesRes, contracts, projectsRes, owner, scenes] = await Promise.all([
     catalogP,
     getCompanyInfo(headerUserId),
     quotesP,
@@ -91,6 +106,7 @@ export async function loadProjectDocs(projectId: string, user: User, scope: Poin
     ownerP,
     scenesP,
   ])
+  const sceneLibrary = scenes.scenes
   const contract = contracts.docs[0] ?? null
   const allQuotes = quotesRes.docs as Quote[]
   const contractQuoteId = relId(contract?.quote)
@@ -125,7 +141,7 @@ export async function loadProjectDocs(projectId: string, user: User, scope: Poin
   const mediaById = new Map<string, Media>()
   if (imageIds.length) {
     const media = await payload
-      .find({ collection: 'media', where: { id: { in: imageIds } }, limit: imageIds.length, depth: 0, user, overrideAccess: false, select: { url: true, filename: true, alt: true } })
+      .find({ collection: 'media', where: { id: { in: imageIds } }, limit: imageIds.length, depth: 0, ...acc, select: { url: true, filename: true, alt: true } })
       .catch(() => null)
     for (const m of media?.docs ?? []) mediaById.set(String(m.id), m as Media)
   }
@@ -342,7 +358,7 @@ export async function loadProjectDocs(projectId: string, user: User, scope: Poin
       pointCount: p.pointCount ?? 0,
     }))
 
-  // 场景库有启用的场景时，按项目真实的房间和设备重新分配场景（替换内置的按房间类型推荐）
+  // 按项目真实的房间和设备分配场景（后台场景库为空时用内置场景库），替换按房间类型的通用推荐
   if (sceneLibrary.length) assignScenes(sceneLibrary, rooms).forEach((s, i) => (rooms[i].scenes = s))
 
   return {
@@ -350,6 +366,8 @@ export async function loadProjectDocs(projectId: string, user: User, scope: Poin
     owner,
     company,
     sceneLibrary,
+    /** 场景来自后台场景库（library）还是内置场景库（builtin） */
+    sceneSource: scenes.source,
     sheets,
     areas,
     points,

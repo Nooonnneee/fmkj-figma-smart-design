@@ -10,7 +10,7 @@ const KEY = 'fmkj:board:view:v1'
 export const DEFAULT_VIEW: ViewSettings = {
   grid: true,
   rulers: true,
-  labels: true,
+  labels: false,
   symbolStyle: 'plan',
   symbolSize: DEFAULT_SYMBOL_SIZE,
   sheetOpacity: 0.6,

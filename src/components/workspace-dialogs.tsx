@@ -15,34 +15,35 @@ import { cn } from '@/lib/utils'
 
 const TIER_HIGHLIGHTS: Record<string, { subtitle: string; tag?: string; perks: string[] }> = {
   free: {
-    subtitle: '适合个人设计师快速上手体验',
+    subtitle: '个人设计师入门体验',
+    tag: '免费',
     perks: [
-      '10 个进行中项目（归档不占额度）',
-      '每个项目最多 2 位成员协作',
-      '基础横版方案模板与核心流程',
-      '点位图、报价单、合同 PDF 导出',
+      '10 个进行中项目 · 每项目 2 人协作',
+      'AI 模型：Go 标准高速国产模型（DeepSeek-V3 / 通义 Qwen-Plus / 豆包 Pro）',
+      '方案模板：栖序雅致、原木自然、预算速览（3 套）',
+      '基础插件：方案演示、房间分析、智能选型、AI 识图、现场勘测单',
     ],
   },
   pro: {
-    subtitle: '适合独立设计师与工作室高定交付',
+    subtitle: '独立设计师与工作室主力首选',
     tag: '推荐订阅',
     perks: [
-      '每月免费赠送 300 AI 积分（识图布点 / 方案生成）',
-      '50 个进行中项目 + 每项目 5 人协同',
-      '解锁全部高定方案模板（栖序雅致 / 东方雅韵 / 墨金臻选）',
-      '解锁全部施工与算量插件（布线表 / 备货单 / 勘测单 / DWG）',
-      '业主交付资料包一键合并 PDF 与 ZIP 打包',
+      '每月免费赠送 300 AI 积分 · 50 个项目 · 5 人协同',
+      'AI 高阶模型：解锁 Plus 视觉多模态模型（Qwen-VL-Max / 豆包 Vision-Pro / GLM-4V-Plus / Kimi K2）',
+      '高定模板：解锁「墨金臻选」「智域科技」「晨曦暖调」「素白极简」+ 6 套报价风格包',
+      '进阶插件：解锁 AI 对话侧栏、DWG 导入、强弱电布线表、场景与账号移交单',
+      '交付特权：解锁「业主交付资料包」一键合并 PDF 与 ZIP 打包',
     ],
   },
   team: {
-    subtitle: '适合全屋智能集成商与工程交付团队',
-    tag: '团队尊享',
+    subtitle: '全屋智能集成商与工程团队旗舰',
+    tag: '旗舰尊享',
     perks: [
-      '每月免费赠送 1,000 AI 积分（高频识图与全案生成）',
-      '不限进行中项目数量，大型团队无忧扩容',
-      '不限项目协作成员（支持可编辑 / 仅查看分级）',
-      '包含专业版全部高定方案模板与施工交付插件',
-      '包含业主交付资料包一键打包与专属技术支持',
+      '每月免费赠送 1,000 AI 积分 · 不限项目数 · 不限协作成员',
+      'AI 旗舰模型：独占 Pro 满血深度推理模型（DeepSeek-R1 / 通义 QwQ-Plus / QVQ-Max / 豆包 Thinking）',
+      '顶奢模板：包含 Plus 全部模板 + 独占「东方雅韵」顶奢新中式别墅提案',
+      '工程插件：包含 Plus 全部插件 + 独占「采购与备货核验单」「售后维保记录」',
+      '包含业主交付资料包一键打包与团队级技术支持',
     ],
   },
 }
@@ -62,7 +63,7 @@ export function MembershipDialog({
   const inputRef = useRef<HTMLInputElement>(null)
   const [code, setCode] = useState('')
   const [pending, setPending] = useState(false)
-  const currentBadge = membershipBadge || '体验版'
+  const currentBadge = membershipBadge || 'Go'
 
   async function handleRedeem(e: React.FormEvent) {
     e.preventDefault()
@@ -99,9 +100,9 @@ export function MembershipDialog({
         <DialogHeader>
           <div className="flex flex-wrap items-center justify-between gap-3 pr-6">
             <div>
-              <DialogTitle className="text-lg font-semibold">会员订阅与 AI 积分</DialogTitle>
+              <DialogTitle className="text-lg font-semibold">会员订阅（Go / Plus / Pro）与 AI 积分</DialogTitle>
               <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
-                升级专业版或旗舰版，解锁全套高定方案模板、施工算量插件、一键交付资料包与每月赠送 AI 积分
+                升级 Plus 或 Pro 会员，解锁高阶视觉/深度推理大模型、高定方案模板、施工算量插件、一键交付资料包与每月赠分
               </DialogDescription>
             </div>
             <div className="flex items-center gap-2 rounded-xl border bg-muted/40 px-3 py-1.5 text-xs">

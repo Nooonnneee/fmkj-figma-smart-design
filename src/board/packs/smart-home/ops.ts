@@ -121,3 +121,236 @@ export function removeSheet(doc: BoardDoc, sheet: SheetObj) {
   }
   return removeObjects(doc, ids)
 }
+
+function pointInPoly(poly: Vec[], x: number, y: number): boolean {
+  let inside = false
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x
+    const yi = poly[i].y
+    const xj = poly[j].x
+    const yj = poly[j].y
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside
+  }
+  return inside
+}
+
+function polyCentroid(area: AreaObj): Vec {
+  if (!area.poly || area.poly.length < 3) {
+    return { x: area.x + area.w / 2, y: area.y + area.h / 2 }
+  }
+  let sx = 0
+  let sy = 0
+  for (const p of area.poly) {
+    sx += p.x
+    sy += p.y
+  }
+  return { x: sx / area.poly.length, y: sy / area.poly.length }
+}
+
+function roomDevicesForType(
+  areaType: string,
+  includeLighting: boolean,
+  floorState: { hasGateway: boolean; hasVrf: boolean; cameraCount: number },
+): string[] {
+  const list: string[] = []
+  switch (areaType) {
+    case 'entrance':
+      list.push('smart-lock', 'switch-2', 'motion-sensor')
+      if (floorState.cameraCount < 2) {
+        list.push('camera')
+        floorState.cameraCount++
+      }
+      if (includeLighting) list.push('downlight')
+      break
+    case 'living':
+      if (!floorState.hasGateway) {
+        list.push('gateway')
+        floorState.hasGateway = true
+      }
+      list.push('touch-panel', 'curtain-track')
+      if (!floorState.hasVrf) {
+        list.push('vrf-controller')
+        floorState.hasVrf = true
+      }
+      if (floorState.cameraCount < 2) {
+        list.push('camera')
+        floorState.cameraCount++
+      }
+      list.push('ap-node', 'network-panel', 'switch-3')
+      if (includeLighting) list.push('ceiling-light', 'downlight', 'downlight', 'downlight', 'downlight', 'light-strip')
+      break
+    case 'dining':
+      list.push('switch-2', 'speaker')
+      if (includeLighting) list.push('ceiling-light', 'downlight', 'downlight')
+      break
+    case 'kitchen':
+      list.push('switch-1', 'smoke-sensor', 'water-sensor')
+      if (includeLighting) list.push('downlight', 'downlight')
+      break
+    case 'bedroom':
+      list.push('switch-2', 'switch-2', 'curtain-track', 'motion-sensor', 'ap-node', 'temp-sensor')
+      if (includeLighting) list.push('ceiling-light', 'downlight', 'downlight')
+      break
+    case 'kids':
+      list.push('switch-2', 'curtain-track', 'temp-sensor')
+      if (includeLighting) list.push('ceiling-light', 'downlight', 'downlight')
+      break
+    case 'study':
+      list.push('switch-2', 'curtain-track', 'speaker', 'network-panel')
+      if (includeLighting) list.push('ceiling-light', 'downlight', 'downlight')
+      break
+    case 'bathroom':
+      list.push('switch-1', 'motion-sensor', 'water-sensor')
+      if (includeLighting) list.push('downlight', 'downlight')
+      break
+    case 'balcony':
+      list.push('switch-1', 'curtain-track')
+      if (includeLighting) list.push('ceiling-light')
+      break
+    case 'corridor':
+    case 'stairs':
+      list.push('switch-2', 'motion-sensor')
+      if (includeLighting) list.push('downlight', 'downlight')
+      break
+    case 'closet':
+      list.push('switch-1', 'motion-sensor')
+      if (includeLighting) list.push('light-strip', 'downlight')
+      break
+    case 'theater':
+      list.push('touch-panel', 'curtain-track')
+      if (includeLighting) list.push('light-strip', 'spotlight', 'spotlight', 'spotlight', 'spotlight')
+      break
+    case 'garage':
+      list.push('motion-sensor', 'camera')
+      if (includeLighting) list.push('ceiling-light')
+      break
+    case 'utility':
+      list.push('water-sensor', 'smoke-sensor')
+      if (includeLighting) list.push('downlight')
+      break
+    default:
+      list.push('switch-2', 'motion-sensor')
+      if (includeLighting) list.push('downlight', 'downlight')
+      break
+  }
+  return list
+}
+
+/**
+ * 智能生成点位（覆盖目标图纸上的已有点位，保留或自动补齐房间区域，通过 commit 推入历史栈，支持一键撤销）。
+ */
+export function autoGenerateSheetPoints(
+  doc: BoardDoc,
+  opts: { sheetId?: string | null; includeLighting?: boolean } = {},
+): { doc: BoardDoc; addedPoints: number; removedPoints: number; addedAreas: number } {
+  const sheets = sheetsOf(doc)
+  const targetSheets = opts.sheetId ? sheets.filter((s) => s.sheetId === opts.sheetId) : sheets
+  if (!targetSheets.length) return { doc, addedPoints: 0, removedPoints: 0, addedAreas: 0 }
+
+  const includeLighting = opts.includeLighting !== false
+  const inTargetSheet = (x: number, y: number) =>
+    targetSheets.some((s) => x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h)
+
+  let removedPoints = 0
+  const keptObjects: BoardObj[] = []
+  for (const o of doc.objects) {
+    if (o.kind === 'symbol' && inTargetSheet(o.x, o.y)) {
+      removedPoints++
+      continue
+    }
+    keptObjects.push(o)
+  }
+
+  let workingDoc: BoardDoc = { objects: keptObjects }
+  let addedAreas = 0
+  let addedPoints = 0
+
+  for (const sheet of targetSheets) {
+    let sheetAreas = workingDoc.objects.filter(
+      (o): o is AreaObj =>
+        o.kind === 'area' &&
+        o.x + o.w / 2 >= sheet.x &&
+        o.x + o.w / 2 <= sheet.x + sheet.w &&
+        o.y + o.h / 2 >= sheet.y &&
+        o.y + o.h / 2 <= sheet.y + sheet.h,
+    )
+
+    // 若该图纸尚未划分房间区域，自动创建一套标准户型房间区域
+    if (sheetAreas.length === 0) {
+      const defaultRooms: { name: string; type: string; rx: number; ry: number; rw: number; rh: number }[] = [
+        { name: '玄关', type: 'entrance', rx: 0.06, ry: 0.56, rw: 0.18, rh: 0.34 },
+        { name: '客厅', type: 'living', rx: 0.26, ry: 0.44, rw: 0.38, rh: 0.46 },
+        { name: '餐厅', type: 'dining', rx: 0.26, ry: 0.08, rw: 0.24, rh: 0.32 },
+        { name: '厨房', type: 'kitchen', rx: 0.06, ry: 0.08, rw: 0.18, rh: 0.44 },
+        { name: '主卧', type: 'bedroom', rx: 0.66, ry: 0.46, rw: 0.28, rh: 0.44 },
+        { name: '次卧', type: 'bedroom', rx: 0.66, ry: 0.08, rw: 0.28, rh: 0.34 },
+        { name: '主卫', type: 'bathroom', rx: 0.52, ry: 0.08, rw: 0.12, rh: 0.32 },
+      ]
+      const created: AreaObj[] = []
+      for (const r of defaultRooms) {
+        const res = createArea(
+          workingDoc,
+          {
+            x: Math.round(sheet.x + r.rx * sheet.w),
+            y: Math.round(sheet.y + r.ry * sheet.h),
+            w: Math.round(r.rw * sheet.w),
+            h: Math.round(r.rh * sheet.h),
+          },
+          r.type,
+          r.name,
+        )
+        workingDoc = res.doc
+        created.push(res.obj)
+        addedAreas++
+      }
+      sheetAreas = created
+    }
+
+    const floorState = { hasGateway: false, hasVrf: false, cameraCount: 0 }
+    // 优先处理客厅，确保每层网关与 VRF 优先落在客厅
+    const sortedAreas = [...sheetAreas].sort((a, b) => (a.areaType === 'living' ? -1 : b.areaType === 'living' ? 1 : 0))
+
+    for (const area of sortedAreas) {
+      const devTypes = roomDevicesForType(area.areaType, includeLighting, floorState)
+      if (!devTypes.length) continue
+
+      const cols = Math.min(4, Math.max(2, Math.ceil(Math.sqrt(devTypes.length))))
+      const rows = Math.ceil(devTypes.length / cols)
+      const centroid = polyCentroid(area)
+      const padX = Math.min(28, Math.max(14, area.w * 0.14))
+      const padY = Math.min(32, Math.max(18, area.h * 0.18))
+      const innerW = Math.max(24, area.w - padX * 2)
+      const innerH = Math.max(24, area.h - padY * 2)
+
+      for (const [idx, dt] of devTypes.entries()) {
+        const c = idx % cols
+        const r = Math.floor(idx / cols)
+        let px = area.x + padX + (cols === 1 ? innerW / 2 : (c / (cols - 1)) * innerW)
+        let py = area.y + padY + (rows === 1 ? innerH / 2 : (r / (rows - 1)) * innerH)
+
+        // 如果是异形多边形区域且网格点落在凹角外侧，向多边形重心收敛确保点位落在房间内
+        if (area.poly && area.poly.length >= 3 && !pointInPoly(area.poly, px, py)) {
+          for (const t of [0.35, 0.6, 0.8, 1]) {
+            const tx = px + (centroid.x - px) * t
+            const ty = py + (centroid.y - py) * t
+            if (pointInPoly(area.poly, tx, ty) || t === 1) {
+              px = tx + ((idx % 3) - 1) * 14
+              py = ty + (Math.floor(idx / 3) - 1) * 14
+              break
+            }
+          }
+        }
+
+        const createdPt = createPoint(
+          workingDoc,
+          { symbolId: dt, sizeCm: null, real: false, data: { deviceType: dt } },
+          { x: Math.round(px), y: Math.round(py) },
+        )
+        workingDoc = createdPt.doc
+        addedPoints++
+      }
+    }
+  }
+
+  return { doc: workingDoc, addedPoints, removedPoints, addedAreas }
+}

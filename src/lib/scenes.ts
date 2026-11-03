@@ -2,6 +2,8 @@ import type { Payload } from 'payload'
 
 import type { User } from '@/payload-types'
 
+import { BUILTIN_SCENES } from './builtin-scenes'
+
 /** 场景库里的一条场景（只取方案需要的字段） */
 export type ManagedScene = {
   id: string
@@ -19,9 +21,10 @@ export type ManagedScene = {
   anyDevices: string[]
 }
 
-/** 读取启用的场景；场景库为空时返回空数组，调用方沿用内置场景 */
-export async function loadScenes(payload: Payload, user: User): Promise<ManagedScene[]> {
-  const res = await payload.find({ collection: 'scenes', where: { enabled: { equals: true } }, sort: 'sortOrder', limit: 200, depth: 1, overrideAccess: false, user })
+/** 读取后台场景库里启用的场景；user 为 null 时按系统身份读取（模板库示例方案用） */
+export async function loadScenes(payload: Payload, user: User | null): Promise<ManagedScene[]> {
+  const access = user ? { user, overrideAccess: false } : { overrideAccess: true }
+  const res = await payload.find({ collection: 'scenes', where: { enabled: { equals: true } }, sort: 'sortOrder', limit: 200, depth: 1, ...access })
   return res.docs.map((d) => {
     const img = d.image && typeof d.image === 'object' && d.image.url ? { url: d.image.url, alt: d.image.alt || d.name } : null
     return {
@@ -40,6 +43,15 @@ export async function loadScenes(payload: Payload, user: User): Promise<ManagedS
       anyDevices: d.anyDevices ?? [],
     }
   })
+}
+
+/**
+ * 方案用的场景库：后台有启用的场景用后台的；一条都没有（或读取失败）时用内置场景库，
+ * 保证「生活场景」章节和房间场景不会空白。
+ */
+export async function loadSceneLibrary(payload: Payload, user: User | null): Promise<{ scenes: ManagedScene[]; source: 'library' | 'builtin' }> {
+  const managed = await loadScenes(payload, user).catch(() => [])
+  return managed.length ? { scenes: managed, source: 'library' } : { scenes: BUILTIN_SCENES, source: 'builtin' }
 }
 
 const devicesOk = (s: ManagedScene, types: Set<string>) => s.requiredDevices.every((t) => types.has(t)) && (!s.anyDevices.length || s.anyDevices.some((t) => types.has(t)))

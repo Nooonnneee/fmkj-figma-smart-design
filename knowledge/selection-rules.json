@@ -1,0 +1,128 @@
+{
+  "platforms": [
+    "米家",
+    "Aqara Home",
+    "Apple Home",
+    "华为鸿蒙智家",
+    "KNX",
+    "Control4",
+    "网络/弱电",
+    "待定"
+  ],
+  "tiers": [
+    {
+      "value": "economy",
+      "label": "经济",
+      "pricePercentile": 0.2,
+      "description": "在候选池中按价格从低到高排序，取 20% 分位数的产品"
+    },
+    {
+      "value": "standard",
+      "label": "标准",
+      "pricePercentile": 0.5,
+      "description": "在候选池中按价格从低到高排序，取 50% 分位数的产品"
+    },
+    {
+      "value": "premium",
+      "label": "高端",
+      "pricePercentile": 0.85,
+      "description": "在候选池中按价格从低到高排序，取 85% 分位数的产品"
+    }
+  ],
+  "platformFallbackChains": {
+    "米家": [
+      {
+        "brandPattern": null,
+        "platforms": [
+          "米家"
+        ]
+      },
+      {
+        "brandPattern": null,
+        "platforms": [
+          "通用",
+          "Matter"
+        ]
+      }
+    ],
+    "Aqara Home": [
+      {
+        "brandPattern": "aqara",
+        "platforms": null
+      },
+      {
+        "brandPattern": null,
+        "platforms": [
+          "Apple Home",
+          "Matter"
+        ]
+      },
+      {
+        "brandPattern": null,
+        "platforms": [
+          "通用"
+        ]
+      }
+    ],
+    "Apple Home": [
+      {
+        "brandPattern": null,
+        "platforms": [
+          "Apple Home",
+          "Matter"
+        ]
+      },
+      {
+        "brandPattern": null,
+        "platforms": [
+          "通用"
+        ]
+      }
+    ],
+    "华为鸿蒙智家": [
+      {
+        "brandPattern": null,
+        "platforms": [
+          "华为"
+        ]
+      },
+      {
+        "brandPattern": null,
+        "platforms": [
+          "通用"
+        ]
+      }
+    ],
+    "KNX": [
+      {
+        "brandPattern": null,
+        "platforms": [
+          "KNX"
+        ]
+      },
+      {
+        "brandPattern": null,
+        "platforms": [
+          "通用"
+        ]
+      }
+    ],
+    "Control4": [
+      {
+        "brandPattern": null,
+        "platforms": [
+          "通用"
+        ]
+      }
+    ],
+    "网络/弱电": [
+      {
+        "brandPattern": null,
+        "platforms": [
+          "通用"
+        ]
+      }
+    ]
+  },
+  "brandUnificationRule": "同一设备大类内统计选中次数最多的主品牌；若同大类其他设备类型存在该主品牌产品，且价差 ≤ max(30元, 原选中产品价格 × 40%)，自动替换为该主品牌产品以保持面板与设备外观统一。"
+}

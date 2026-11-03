@@ -20,7 +20,7 @@ export type SelectableProduct = { id: string; name: string; price: number; statu
 
 type Pref = { brands?: RegExp; platforms?: string[] }
 /** 项目主平台 → 逐级放宽的候选条件 */
-const PLATFORM_PREFS: Record<string, Pref[]> = {
+export const PLATFORM_PREFS: Record<string, Pref[]> = {
   米家: [{ platforms: ['米家'] }, { platforms: ['通用', 'Matter'] }],
   'Aqara Home': [{ brands: /aqara/i }, { platforms: ['Apple Home', 'Matter'] }, { platforms: ['通用'] }],
   'Apple Home': [{ platforms: ['Apple Home', 'Matter'] }, { platforms: ['通用'] }],

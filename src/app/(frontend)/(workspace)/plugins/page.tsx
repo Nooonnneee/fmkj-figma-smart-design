@@ -14,11 +14,12 @@ export const metadata = { title: pageTitle('插件市场') }
 
 const isStage = (v: unknown): v is PluginStage => PLUGIN_STAGES.some((s) => s.key === v)
 
-export default async function PluginsPage({ searchParams }: { searchParams: Promise<{ stage?: string; plugin?: string }> }) {
+export default async function PluginsPage({ searchParams }: { searchParams: Promise<{ stage?: string; tier?: string; plugin?: string }> }) {
   const user = await appAuth.getCurrentUser()
   if (!user) return redirectToLogin()
   const [sp, flags, access] = await Promise.all([searchParams, getPluginFlags(user.id), getMembershipContext(user)])
   const stage = isStage(sp.stage) ? sp.stage : null
+  const tierFilter = sp.tier === 'free' || sp.tier === 'pro' || sp.tier === 'team' ? sp.tier : null
 
   const items: PluginViewItem[] = PLUGINS.filter((p) => p.status === 'ready').map((p) => {
     const tier = featureAccess(access.membership, p.tier, access.strict)
@@ -32,32 +33,46 @@ export default async function PluginsPage({ searchParams }: { searchParams: Prom
       entry: p.entry?.label ?? null,
       provides: p.provides,
       enabled: flags[p.id],
-      tierBadge: p.tier === 'free' ? null : tierBadge(p.tier),
+      tier: p.tier,
+      tierBadge: tierBadge(p.tier),
       locked: !tier.allowed,
     }
   })
+  const filtered = items.filter((p) => (!stage || p.stage === stage) && (!tierFilter || p.tier === tierFilter))
 
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-5">
       <PageHeader
         title="插件市场"
+        description="每个插件均标明所属会员档位（Go 基础 / Plus 进阶 / Pro 旗舰），按需开启扩展能力。"
         actions={
-          <FilterTabs
-            label="插件阶段"
-            items={[
-              { key: 'all', label: '全部', href: '/plugins', active: !stage },
-              ...PLUGIN_STAGES.map((s) => ({
-                key: s.key,
-                label: s.label,
-                href: `/plugins?stage=${s.key}`,
-                active: stage === s.key,
-              })),
-            ]}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <FilterTabs
+              label="会员档位"
+              items={[
+                { key: 'all-tier', label: '全部档位', href: stage ? `/plugins?stage=${stage}` : '/plugins', active: !tierFilter },
+                { key: 'free', label: 'Go 基础', href: stage ? `/plugins?stage=${stage}&tier=free` : '/plugins?tier=free', active: tierFilter === 'free' },
+                { key: 'pro', label: 'Plus 进阶', href: stage ? `/plugins?stage=${stage}&tier=pro` : '/plugins?tier=pro', active: tierFilter === 'pro' },
+                { key: 'team', label: 'Pro 旗舰', href: stage ? `/plugins?stage=${stage}&tier=team` : '/plugins?tier=team', active: tierFilter === 'team' },
+              ]}
+            />
+            <FilterTabs
+              label="插件阶段"
+              items={[
+                { key: 'all', label: '全部阶段', href: tierFilter ? `/plugins?tier=${tierFilter}` : '/plugins', active: !stage },
+                ...PLUGIN_STAGES.map((s) => ({
+                  key: s.key,
+                  label: s.label,
+                  href: tierFilter ? `/plugins?stage=${s.key}&tier=${tierFilter}` : `/plugins?stage=${s.key}`,
+                  active: stage === s.key,
+                })),
+              ]}
+            />
+          </div>
         }
       />
       <PluginList
-        items={stage ? items.filter((p) => p.stage === stage) : items}
+        items={filtered}
         stages={[]}
         selectedId={sp.plugin ?? null}
         upgradeHint={access.upgradeHint}

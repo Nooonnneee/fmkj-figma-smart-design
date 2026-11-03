@@ -1,6 +1,6 @@
 'use client'
 
-import { Download, Eye, EyeOff, FileJson, FileUp, Grid3x3, Hand, ImageDown, MousePointer2, Pentagon, Redo2, Ruler, Undo2 } from 'lucide-react'
+import { Download, Eye, EyeOff, FileJson, FileUp, Grid3x3, Hand, ImageDown, MousePointer2, Pentagon, Redo2, Ruler, Sparkles, Undo2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -43,6 +43,7 @@ export function BoardToolbar(props: {
   canRedo: boolean
   onUndo: () => void
   onRedo: () => void
+  onAutoGenerate?: () => void
   onExportPng: () => void
   onExportJson: () => void
   onImportJson: () => void
@@ -63,6 +64,18 @@ export function BoardToolbar(props: {
       {readOnly ? null : (
         <>
           <span className="mx-0.5 h-5 w-px bg-border" />
+          {props.onAutoGenerate ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(btn, 'text-primary hover:text-primary')}
+              aria-label="智能生成点位"
+              title="智能生成点位（覆盖当前点位，可随时撤销）"
+              onClick={props.onAutoGenerate}
+            >
+              <Sparkles className="size-4" />
+            </Button>
+          ) : null}
           <Button variant="ghost" size="icon" className={btn} disabled={!props.canUndo} aria-label="撤销" title="撤销（Ctrl/⌘ + Z）" onClick={props.onUndo}>
             <Undo2 className="size-4" />
           </Button>

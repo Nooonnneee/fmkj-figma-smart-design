@@ -20,6 +20,8 @@ const ORDER = [
   'categories',
   'tags',
   'folders',
+  'proposal-templates',
+  'scenes',
   'users',
   'products',
   'projects',
@@ -28,6 +30,7 @@ const ORDER = [
   'ai-conversations',
   'ai-messages',
   'ai-credit-ledger',
+  'redemption-codes',
 ] as const
 // 上传相关字段由文件本身生成，导入时不带。
 const UPLOAD_FIELDS = new Set(['url', 'filename', 'mimeType', 'filesize', 'width', 'height', 'sizes', 'focalX', 'focalY'])
@@ -99,9 +102,12 @@ for (const slug of ORDER) {
 
 for (const [slug, data] of Object.entries(dump.globals)) {
   const { id: _id, createdAt: _c, updatedAt: _u, globalType: _g, ...rest } = data
+  if (!payload.globals.config.some((g) => g.slug === slug)) continue
   await payload.updateGlobal({ slug: slug as 'company-settings', data: rest as never, overrideAccess: true })
   console.log(`${slug}: 已更新`)
 }
+
+console.log('\n提示：旧版导出文件不含方案模板与场景库时，可运行 scripts/seed-proposal-library.ts 补齐内置内容。')
 
 console.log('\n导入完成：\n' + summary.join('\n'))
 process.exit(0)

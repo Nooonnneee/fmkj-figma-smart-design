@@ -25,6 +25,7 @@ export type DeliveryDoc = {
   /** 打印页地址；null = 还不能生成（例如没有点位、没有合同） */
   url: string | null
   defaultOn: boolean
+  tierBadge?: 'Go' | 'Plus' | 'Pro'
 }
 
 type Option = { value: string; label: string }
@@ -70,8 +71,7 @@ export function DeliveryPackage({
   docs,
   quotes,
   finalQuote,
-  templates,
-  template,
+  proposalPicker,
   cover,
   access,
 }: {
@@ -82,8 +82,8 @@ export function DeliveryPackage({
   docs: DeliveryDoc[]
   quotes: Option[]
   finalQuote: { id: string | null; sourceLabel: string | null; locked: boolean }
-  templates: Option[]
-  template: string
+  /** 方案行里的模板选择器（带缩略图，见 template-picker-field.tsx） */
+  proposalPicker?: React.ReactNode
   cover: { company: string; customer: string; address: string; date: string }
   /** 资料包所需会员：meets 是否满足；allowed 是否可用（提示模式下不满足也可用） */
   access: { meets: boolean; allowed: boolean; badge: string; hint: string }
@@ -97,7 +97,7 @@ export function DeliveryPackage({
   const busy = progress !== null
   const chosen = docs.filter((d) => d.url && selected[d.key])
 
-  const save = (patch: { finalQuote?: string | null; proposalTemplate?: string | null }, ok: string) =>
+  const save = (patch: { finalQuote?: string | null }, ok: string) =>
     startSaving(async () => {
       const res = await setDeliverables(projectId, patch)
       if (!res.ok) return void toast.error(res.error)
@@ -150,7 +150,9 @@ export function DeliveryPackage({
       <div className="flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4">
         <div className="flex min-w-0 items-center gap-2">
           <h3 id="package-title" className="text-base font-semibold">交付资料包</h3>
-          {!access.meets ? <Badge variant="outline">{access.badge}功能</Badge> : null}
+          <span className="inline-flex items-center rounded-md bg-primary/12 px-2 py-0.5 text-xs font-semibold text-primary ring-1 ring-primary/25">
+            {access.badge} 一键打包特权
+          </span>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" disabled={!access.allowed || busy || !chosen.length} onClick={() => void build('zip')}>
@@ -197,9 +199,21 @@ export function DeliveryPackage({
               onCheckedChange={(v) => setSelected((s) => ({ ...s, [d.key]: v === true }))}
               aria-label={`资料包包含${d.title}`}
             />
-            <label htmlFor={`pkg-${d.key}`} className={cn('min-w-44 flex-1', !d.url && 'text-muted-foreground')}>
+            <label htmlFor={`pkg-${d.key}`} className={cn('flex min-w-44 flex-1 items-center gap-2', !d.url && 'text-muted-foreground')}>
               <span className="text-sm font-medium">{d.title}</span>
-              {d.note ? <span className="ml-2 text-xs text-muted-foreground tabular-nums">{d.note}</span> : null}
+              {d.tierBadge && d.tierBadge !== 'Go' ? (
+                <span
+                  className={cn(
+                    'inline-flex items-center rounded px-1.5 py-0.2 text-[10px] font-semibold',
+                    d.tierBadge === 'Pro'
+                      ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+                      : 'bg-primary/12 text-primary',
+                  )}
+                >
+                  {d.tierBadge}
+                </span>
+              ) : null}
+              {d.note ? <span className="text-xs text-muted-foreground tabular-nums">{d.note}</span> : null}
             </label>
             {d.key === 'quote' && quotes.length > 1 ? (
               <Select
@@ -219,20 +233,7 @@ export function DeliveryPackage({
                 </SelectContent>
               </Select>
             ) : null}
-            {d.key === 'proposal' && templates.length > 1 ? (
-              <Select value={template} disabled={!editable || saving || busy} onValueChange={(v) => save({ proposalTemplate: v }, '已设为交付方案模板')}>
-                <SelectTrigger size="sm" className="ml-7 max-w-44 sm:ml-0" aria-label="选择交付方案模板">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {templates.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>
-                      {t.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : null}
+            {d.key === 'proposal' && proposalPicker && !busy ? proposalPicker : null}
             {d.url ? (
               <Button asChild variant="ghost" size="xs" className="text-muted-foreground">
                 <Link href={d.url}>

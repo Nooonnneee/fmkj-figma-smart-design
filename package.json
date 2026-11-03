@@ -10,7 +10,11 @@
     "format": "oxfmt",
     "generate:importmap": "NODE_OPTIONS=--no-deprecation payload generate:importmap",
     "generate:types": "NODE_OPTIONS=--no-deprecation payload generate:types",
-    "payload": "NODE_OPTIONS=--no-deprecation payload"
+    "payload": "NODE_OPTIONS=--no-deprecation payload",
+    "knowledge:export": "NODE_OPTIONS=--no-deprecation payload run --input '{\"scriptPath\":\"scripts/export-domain-knowledge.ts\"}'",
+    "knowledge:check": "NODE_OPTIONS=--no-deprecation payload run --input '{\"scriptPath\":\"scripts/export-domain-knowledge.ts\",\"scriptArgs\":[\"--check\"]}'",
+    "templates:seed": "NODE_OPTIONS=--no-deprecation payload run --input '{\"scriptPath\":\"scripts/seed-proposal-library.ts\"}'",
+    "templates:thumbs": "node scripts/generate-template-thumbnails.mjs"
   },
   "dependencies": {
     "@payloadcms/db-postgres": "4.0.0-beta.4",

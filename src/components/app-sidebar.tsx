@@ -5,6 +5,7 @@ import dynamic from "next/dynamic"
 import { usePathname } from "next/navigation"
 import {
   Blocks,
+  BookOpen,
   Bot,
   ChevronsUpDown,
   Crown,
@@ -269,6 +270,7 @@ export function AppSidebar({
                     <span className="ml-auto text-xs text-muted-foreground tabular-nums">{ai.credits}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                <NavItem icon={BookOpen} label="使用文档" url="/docs" active={isActive("/docs")} />
                 <NavItem icon={Settings} label="设置" url="/settings" active={isActive("/settings")} />
               </SidebarMenu>
             </SidebarGroup>
@@ -326,6 +328,12 @@ export function AppSidebar({
                         <GuardedLink href="/plugins">
                           <Blocks />
                           插件市场
+                        </GuardedLink>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <GuardedLink href="/docs">
+                          <BookOpen />
+                          使用文档 (Docs)
                         </GuardedLink>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>

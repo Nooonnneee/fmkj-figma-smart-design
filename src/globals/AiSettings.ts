@@ -31,7 +31,7 @@ export const aiModelsField = {
             type: 'text',
             required: true,
             maxLength: 80,
-            admin: { placeholder: '如：DeepSeek V3 / GPT-4o / 通义千问 Max' },
+            admin: { placeholder: '如：DeepSeek V3 / 通义千问 Qwen-VL-Max / 智谱 GLM-4V-Plus' },
           },
           {
             name: 'channelId',
@@ -63,13 +63,29 @@ export const aiModelsField = {
             type: 'text',
             required: true,
             maxLength: 120,
-            admin: { placeholder: '如：deepseek-chat / gpt-4o-mini / qwen-plus' },
+            admin: { placeholder: '如：deepseek-chat / qwen-vl-max / deepseek-reasoner' },
           },
         ],
       },
       {
         type: 'row',
         fields: [
+          {
+            name: 'minTier',
+            label: '所需会员等级（Go / Plus / Pro）',
+            type: 'select',
+            defaultValue: 'auto',
+            options: [
+              { label: '自动推断（按模型名与倍率匹配）', value: 'auto' },
+              { label: 'Go 基础版（免费及所有用户可用）', value: 'free' },
+              { label: 'Plus 专业版（Plus / Pro 可用）', value: 'pro' },
+              { label: 'Pro 旗舰版（仅 Pro 独占）', value: 'team' },
+            ],
+            admin: {
+              width: '28%',
+              description: '控制前台模型选择器上的 Go / Plus / Pro 标签与可用权限。',
+            },
+          },
           {
             name: 'cost',
             label: '计费倍率',
@@ -79,6 +95,7 @@ export const aiModelsField = {
             min: 0,
             max: 100,
             admin: {
+              width: '22%',
               description: '按用量计费：每次对话积分 = 倍率 ×（每 1K 输入 tokens 0.1 + 每 1K 输出 tokens 0.5）+ 工具调用费用，向上取整、最少 1。贵的模型可设 2、3。',
             },
           },
@@ -88,12 +105,14 @@ export const aiModelsField = {
             type: 'text',
             defaultValue: '工具调用',
             maxLength: 40,
+            admin: { width: '25%' },
           },
           {
             name: 'description',
             label: '模型简介',
             type: 'text',
             maxLength: 200,
+            admin: { width: '25%' },
           },
         ],
       },
@@ -103,32 +122,6 @@ export const aiModelsField = {
           { name: 'enabled', label: '启用该模型', type: 'checkbox', defaultValue: true },
           { name: 'isDefault', label: '设为默认模型', type: 'checkbox', defaultValue: false },
           { name: 'reasoning', label: '支持深度思考过程（如 R1）', type: 'checkbox', defaultValue: false },
-        ],
-      },
-      {
-        type: 'collapsible',
-        label: '计费价格（元 / 百万 tokens）',
-        admin: {
-          initCollapsed: true,
-          description: '1 AI 积分 = 0.1 元。填模型真实价格；不填则回退旧倍率公式。高峰时段：北京时间工作日 9:00–12:00、14:00–18:00。',
-        },
-        fields: [
-          {
-            type: 'row',
-            fields: [
-              { name: 'peakInputPrice', label: '高峰输入价', type: 'number', defaultValue: 0, min: 0 },
-              { name: 'peakOutputPrice', label: '高峰输出价', type: 'number', defaultValue: 0, min: 0 },
-              { name: 'peakCachedInputPrice', label: '高峰缓存命中价', type: 'number', defaultValue: 0, min: 0 },
-            ],
-          },
-          {
-            type: 'row',
-            fields: [
-              { name: 'offPeakInputPrice', label: '空闲输入价', type: 'number', defaultValue: 0, min: 0 },
-              { name: 'offPeakOutputPrice', label: '空闲输出价', type: 'number', defaultValue: 0, min: 0 },
-              { name: 'offPeakCachedInputPrice', label: '空闲缓存命中价', type: 'number', defaultValue: 0, min: 0 },
-            ],
-          },
         ],
       },
     ],

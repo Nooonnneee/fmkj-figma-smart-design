@@ -1,13 +1,15 @@
 import type { Metadata } from 'next'
 import Image from 'next/image'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { MapPin, Phone } from 'lucide-react'
+import { ArrowRight, Gift, MapPin, MessageCircle, Phone, Sparkles } from 'lucide-react'
 
 import { PlanDemo } from '@/components/landing/plan-demo'
 import { ProposalShowcase } from '@/components/landing/proposal-showcase'
 import { QuoteShowcase } from '@/components/landing/quote-showcase'
 import { money, Section } from '@/components/landing/section'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { MINIMAL_STYLE } from '@/documents/minimal'
 import { DOC_KINDS } from '@/documents/registry'
 import { relId } from '@/lib/access'
@@ -251,12 +253,67 @@ export default async function ClientSharePage({ params }: { params: Promise<{ to
         ) : null}
       </main>
 
-      <footer className="border-t border-border/70 py-8 text-center text-xs text-muted-foreground">
-        <p>
-          {company.name}
-          {company.phone ? ` · 电话：${company.phone}` : ''}
-          {company.address ? ` · 地址：${company.address}` : ''}
-        </p>
+      <footer className="mt-16 border-t border-border/70 bg-muted/20 py-12">
+        <div className="mx-auto grid max-w-6xl gap-6 px-4 sm:px-6 lg:grid-cols-12 lg:px-8">
+          {/* 左侧：本方案专属设计师 / 服务商联系卡 */}
+          <div className="flex flex-col justify-between gap-4 rounded-2xl border bg-card p-6 sm:flex-row sm:items-center lg:col-span-6">
+            <div className="space-y-2">
+              <Badge variant="secondary" className="text-xs">方案设计及交付团队</Badge>
+              <p className="text-lg font-semibold">{company.name}</p>
+              {company.slogan ? <p className="text-xs text-muted-foreground">{company.slogan}</p> : null}
+              <div className="space-y-1 pt-1 text-xs text-muted-foreground">
+                {company.phone ? <p>联系电话：{company.phone}</p> : null}
+                {company.address ? <p>服务地址：{company.address}</p> : null}
+              </div>
+            </div>
+            {company.qrCode?.url ? (
+              <div className="flex shrink-0 flex-col items-center gap-1.5">
+                <div className="overflow-hidden rounded-xl border bg-white p-1.5 shadow-2xs">
+                  <Image
+                    src={company.qrCode.url}
+                    alt={company.qrCaption || '微信联系二维码'}
+                    width={96}
+                    height={96}
+                    unoptimized
+                    className="size-24 object-contain"
+                  />
+                </div>
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <MessageCircle className="size-3 text-primary" />
+                  {company.qrCaption || '扫码添加微信'}
+                </span>
+              </div>
+            ) : null}
+          </div>
+
+          {/* 右侧：繁梦空间 FMKJ 品牌背书微名片（驱动同行裂变） */}
+          <div className="flex flex-col justify-between gap-4 rounded-2xl border bg-card p-6 lg:col-span-6">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-1.5 text-xs font-medium text-primary">
+                <Sparkles className="size-3.5" />
+                由「繁梦空间 FMKJ」全屋智能设计工作台驱动生成
+              </div>
+              <p className="text-base font-semibold">几分钟完成全屋智能点位图、8 章横版提案与精准报价</p>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                上传户型图自动识别开关灯具点位，一键匹配米家、Aqara、Apple Home、华为、KNX 产品库，同步导出客户提案、报价单、合同与水电施工交底单。
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2.5 pt-1">
+              <Button asChild size="sm" className="rounded-full">
+                <Link href="/login?mode=register">
+                  <Gift className="size-3.5" />
+                  设计师免费体验（送 20 AI 积分）
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="sm" className="rounded-full">
+                <Link href="/">
+                  了解繁梦空间
+                  <ArrowRight className="size-3.5" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
       </footer>
     </div>
   )

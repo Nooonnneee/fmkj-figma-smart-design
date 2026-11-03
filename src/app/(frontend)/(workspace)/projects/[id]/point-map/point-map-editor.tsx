@@ -26,7 +26,9 @@ import {
   RotateCw,
   Ruler,
   Save,
+  Sparkles,
   Trash2,
+  Undo2,
   X,
   ChevronLeft,
 } from 'lucide-react'
@@ -54,7 +56,7 @@ import { fitBox, lerpViewport, toScene, zoomAt, type Size } from '@/board/core/v
 import { smartHomePack } from '@/board/packs/smart-home'
 import { analyzeDoc, decodeScene, encodeDoc, exportBoardJson, parseBoardJson } from '@/board/packs/smart-home/codec'
 import { lightingVariant } from '@/board/packs/smart-home/look'
-import { changePointType, cloneObjects, createArea, createPoint, createSheet, removeSheet, setPointReal, setPointVariant, updateArea as updateAreaOp, updateSheet } from '@/board/packs/smart-home/ops'
+import { autoGenerateSheetPoints, changePointType, cloneObjects, createArea, createPoint, createSheet, removeSheet, setPointReal, setPointVariant, updateArea as updateAreaOp, updateSheet } from '@/board/packs/smart-home/ops'
 import { analyzeAreas } from '@/lib/area-analysis'
 import { areaTypeLabel } from '@/lib/area-types'
 import { DEVICE_GROUPS, DEVICE_TYPE_ORDER, deviceTypeLabel } from '@/lib/device-types'
@@ -155,6 +157,9 @@ export function PointMapEditor({
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [tab, setTab] = useState(readOnly ? 'summary' : 'place')
   const [calib, setCalib] = useState<{ sheetId: string; units: number; value: string } | null>(null)
+  const [autoGenOpen, setAutoGenOpen] = useState(false)
+  const [autoGenScope, setAutoGenScope] = useState<'current' | 'all'>('current')
+  const [autoGenIncludeLighting, setAutoGenIncludeLighting] = useState(true)
   const [draft, setDraft] = useState<Draft | null>(null)
   const activeQuote = useMemo(() => (initialFocus?.quoteId ? quotes.find((q) => q.id === initialFocus.quoteId) : undefined) ?? quotes[0] ?? null, [quotes, initialFocus?.quoteId])
   /** 显示范围：只看开关等。只改画面显示，不改图纸数据 */
@@ -494,6 +499,33 @@ export function PointMapEditor({
   )
 
   const rotate = useCallback((ids: Iterable<string>, deg: number) => commit((d) => rotateSymbols(d, [...ids], { delta: fromDeg(deg) })), [commit])
+
+  /** 智能生成点位：覆盖目标图纸上的当前点位，推入 board 历史栈，支持一键撤销 */
+  const runAutoGeneratePoints = useCallback(() => {
+    if (readOnly) return
+    const targetSheetId = autoGenScope === 'current' ? activeSheetId : null
+    const res = autoGenerateSheetPoints(board.current.current.doc, {
+      sheetId: targetSheetId,
+      includeLighting: autoGenIncludeLighting,
+    })
+    setAutoGenOpen(false)
+    if (!res.addedPoints) {
+      toast.error('当前还没有可生成点位的图纸，请先添加户型图')
+      return
+    }
+    commit(res.doc)
+    setSelection(new Set())
+    toast.success(
+      `已智能生成 ${res.addedPoints} 个点位${res.removedPoints ? `（已覆盖原有 ${res.removedPoints} 个点位）` : ''}${res.addedAreas ? `，并自动划分 ${res.addedAreas} 个房间区域` : ''}`,
+      {
+        description: '可随时点击工具栏「撤销」按钮或按 Ctrl/⌘ + Z 恢复原有点位',
+        action: {
+          label: '撤销',
+          onClick: () => board.undo(),
+        },
+      },
+    )
+  }, [readOnly, autoGenScope, activeSheetId, autoGenIncludeLighting, board, commit])
 
   /* ---------------- 图纸 ---------------- */
 
@@ -904,6 +936,27 @@ export function PointMapEditor({
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {readOnly ? null : (
             <>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={!snap.sheets.length || !!cropFile}
+                onClick={() => setAutoGenOpen(true)}
+                title="根据房间区域智能生成全屋点位（会覆盖当前点位，支持一键撤销）"
+              >
+                <Sparkles className="size-4 text-primary" />
+                <span>智能生成点位</span>
+              </Button>
+              {board.canUndo ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={board.undo}
+                  title="撤销上一步操作（Ctrl/⌘ + Z）"
+                >
+                  <Undo2 className="size-4" />
+                  <span className="hidden sm:inline">撤销</span>
+                </Button>
+              ) : null}
               <Button variant="outline" size="sm" disabled={!!cropFile} onClick={() => fileInput.current?.click()} aria-label="添加图纸" title="添加图纸"><ImagePlus className="size-4" /><span className="hidden sm:inline">添加图纸</span></Button>
               {dwgEnabled ? (
                 <Button variant="outline" size="sm" disabled={converting || !!cropFile} onClick={() => dwgInput.current?.click()} aria-label="导入 DWG" title="导入 DWG">
@@ -1054,6 +1107,7 @@ export function PointMapEditor({
               canRedo={board.canRedo}
               onUndo={board.undo}
               onRedo={board.redo}
+              onAutoGenerate={!readOnly && snap.sheets.length ? () => setAutoGenOpen(true) : undefined}
               onExportPng={() => void exportPng()}
               onExportJson={exportJson}
               onImportJson={() => jsonInput.current?.click()}
@@ -1289,6 +1343,90 @@ export function PointMapEditor({
           <DialogFooter>
             <Button variant="outline" onClick={() => setCalib(null)}>取消</Button>
             <Button onClick={applyCalibration}>确定</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={autoGenOpen} onOpenChange={setAutoGenOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="size-4 text-primary" />
+              智能生成点位
+            </DialogTitle>
+            <DialogDescription>
+              系统将根据图纸上的房间区域自动配置全屋智能设备与灯光点位。
+              <strong className="mt-1 block font-medium text-foreground">
+                注意：此操作会覆盖目标图纸上的当前点位（生成后可随时点击「撤销」或按 Ctrl/⌘ + Z 恢复）。
+              </strong>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-1 text-xs">
+            {snap.sheets.length > 1 ? (
+              <div className="space-y-1.5">
+                <span className="font-medium text-muted-foreground">生成目标图纸</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={autoGenScope === 'current' ? 'default' : 'outline'}
+                    onClick={() => setAutoGenScope('current')}
+                  >
+                    当前图纸（{activeSheet?.name ?? '当前层'}）
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={autoGenScope === 'all' ? 'default' : 'outline'}
+                    onClick={() => setAutoGenScope('all')}
+                  >
+                    全部图纸（{snap.sheets.length} 张）
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2.5">
+              <div className="space-y-0.5 pr-3">
+                <div className="font-medium text-foreground">同时生成照明灯具点位</div>
+                <div className="text-[11px] text-muted-foreground">
+                  开启后一并生成吸顶灯、筒射灯与灯带；关闭则仅生成智能开关、网关、AP、窗帘与传感器
+                </div>
+              </div>
+              <Switch checked={autoGenIncludeLighting} onCheckedChange={setAutoGenIncludeLighting} />
+            </div>
+
+            <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-muted-foreground">
+              {(() => {
+                const targetPts =
+                  autoGenScope === 'current' && activeSheetId
+                    ? snap.points.filter((p) => p.sheetId === activeSheetId).length
+                    : snap.points.length
+                const targetAreas =
+                  autoGenScope === 'current' && activeSheetId
+                    ? snap.areas.filter((a) => a.sheetId === activeSheetId).length
+                    : snap.areas.length
+                return (
+                  <span>
+                    {targetAreas > 0
+                      ? `将按已划分的 ${targetAreas} 个房间区域重新排布点位`
+                      : '当前图纸尚未划分房间区域，将自动生成标准户型房间区域并排布点位'}
+                    {targetPts > 0 ? `，并覆盖现有的 ${targetPts} 个点位（可撤销）。` : '。'}
+                  </span>
+                )
+              })()}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAutoGenOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={runAutoGeneratePoints}>
+              <Sparkles className="size-4" />
+              确认覆盖并生成（可撤销）
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

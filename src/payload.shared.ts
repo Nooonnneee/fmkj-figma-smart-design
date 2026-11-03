@@ -39,6 +39,9 @@ export const sharedConfig = {
   admin: {
     user: Admins.slug,
     constrainWidth: true,
+    components: {
+      beforeDashboard: ['@/components/admin/ai-model-fetcher#AdminAiQuickBanner'],
+    },
     dashboard: {
       widgets: [],
       defaultLayout: [

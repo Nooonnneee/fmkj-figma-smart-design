@@ -3,6 +3,8 @@
 import { APIError } from 'payload'
 
 import { appAuth } from '@/lib/app-auth'
+import { featureAccess, tierBadge } from '@/lib/membership'
+import { getMembershipContext } from '@/lib/membership-policy'
 import { getPayloadClient } from '@/lib/payload'
 import { loadProposalTemplates } from '@/plugins/proposal/registry'
 
@@ -33,7 +35,8 @@ export type DeliverablesPatch = { finalQuote?: string | null; proposalTemplate?:
 
 /**
  * 设置交付资料：定稿报价、交付方案模板（只接受这两个字段）。
- * 报价必须属于本项目（由项目集合的校验保证），模板必须是当前可用的方案模板。
+ * 报价必须属于本项目（由项目集合的校验保证）；模板必须是当前可用的业主方案模板（施工交底单独生成），
+ * 会员严格模式下还要满足模板的会员等级。
  */
 export async function setDeliverables(projectId: string, patch: DeliverablesPatch): Promise<{ ok: true } | { ok: false; error: string }> {
   const user = await appAuth.getCurrentUser()
@@ -44,7 +47,11 @@ export async function setDeliverables(projectId: string, patch: DeliverablesPatc
     const slug = typeof patch.proposalTemplate === 'string' ? patch.proposalTemplate.trim().slice(0, 60) : ''
     if (slug) {
       const templates = await loadProposalTemplates(user)
-      if (!templates.some((t) => t.value === slug)) return { ok: false, error: '方案模板不存在或已停用' }
+      const tpl = templates.find((t) => t.value === slug)
+      if (!tpl) return { ok: false, error: '方案模板不存在或已停用' }
+      if (tpl.kind !== 'owner') return { ok: false, error: '施工交底会单独生成，交付方案请选择业主方案模板' }
+      const access = await getMembershipContext(user)
+      if (!featureAccess(access.membership, tpl.tier, access.strict).allowed) return { ok: false, error: `「${tpl.label}」是 ${tierBadge(tpl.tier)} 模板，升级后才能设为交付方案` }
     }
     data.proposalTemplate = slug || null
   }

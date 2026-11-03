@@ -1,0 +1,476 @@
+{
+  "categories": [
+    {
+      "slug": "switch",
+      "name": "开关",
+      "codePrefix": "K",
+      "color": "#2563eb",
+      "sortOrder": 10
+    },
+    {
+      "slug": "socket",
+      "name": "插座",
+      "codePrefix": "Z",
+      "color": "#0d9488",
+      "sortOrder": 20
+    },
+    {
+      "slug": "lighting",
+      "name": "灯具",
+      "codePrefix": "L",
+      "color": "#d97706",
+      "sortOrder": 30
+    },
+    {
+      "slug": "sensor",
+      "name": "传感器",
+      "codePrefix": "S",
+      "color": "#059669",
+      "sortOrder": 40
+    },
+    {
+      "slug": "lock",
+      "name": "门锁",
+      "codePrefix": "D",
+      "color": "#475569",
+      "sortOrder": 50
+    },
+    {
+      "slug": "security",
+      "name": "监控",
+      "codePrefix": "V",
+      "color": "#dc2626",
+      "sortOrder": 60
+    },
+    {
+      "slug": "curtain",
+      "name": "窗帘",
+      "codePrefix": "C",
+      "color": "#db2777",
+      "sortOrder": 70
+    },
+    {
+      "slug": "gateway",
+      "name": "网关中控",
+      "codePrefix": "G",
+      "color": "#7c3aed",
+      "sortOrder": 80
+    },
+    {
+      "slug": "network",
+      "name": "全屋 WiFi",
+      "codePrefix": "N",
+      "color": "#0891b2",
+      "sortOrder": 90
+    },
+    {
+      "slug": "vrf",
+      "name": "VRF 控制器",
+      "codePrefix": "AC",
+      "color": "#ea580c",
+      "sortOrder": 100
+    },
+    {
+      "slug": "other",
+      "name": "其他",
+      "codePrefix": "Q",
+      "color": "#525252",
+      "sortOrder": 110
+    }
+  ],
+  "deviceTypes": [
+    {
+      "value": "switch-4",
+      "name": "四开",
+      "category": "switch",
+      "symbol": "switch",
+      "symbolSvg": "/point-symbols/switch.svg",
+      "keys": 4,
+      "keywordPattern": "四开|四键|4键|4开"
+    },
+    {
+      "value": "switch-3",
+      "name": "三开",
+      "category": "switch",
+      "symbol": "switch",
+      "symbolSvg": "/point-symbols/switch.svg",
+      "keys": 3,
+      "keywordPattern": "三开|三键|3键|3开"
+    },
+    {
+      "value": "switch-2",
+      "name": "双开",
+      "category": "switch",
+      "symbol": "switch",
+      "symbolSvg": "/point-symbols/switch.svg",
+      "keys": 2,
+      "keywordPattern": "双开|双键|二开|2键|2开"
+    },
+    {
+      "value": "switch-1",
+      "name": "单开",
+      "category": "switch",
+      "symbol": "switch",
+      "symbolSvg": "/point-symbols/switch.svg",
+      "keys": 1,
+      "keywordPattern": "单开|单键|一开|1键|1开|开关"
+    },
+    {
+      "value": "socket-usb",
+      "name": "USB 插座",
+      "category": "socket",
+      "symbol": "socket-usb",
+      "symbolSvg": "/point-symbols/socket-usb.svg",
+      "keys": null,
+      "keywordPattern": "usb.*插座|插座.*usb"
+    },
+    {
+      "value": "socket-double",
+      "name": "双插",
+      "category": "socket",
+      "symbol": "socket-double",
+      "symbolSvg": "/point-symbols/socket-double.svg",
+      "keys": null,
+      "keywordPattern": "双插|双联插座"
+    },
+    {
+      "value": "socket",
+      "name": "五孔",
+      "category": "socket",
+      "symbol": "socket",
+      "symbolSvg": "/point-symbols/socket.svg",
+      "keys": null,
+      "keywordPattern": "五孔|插座"
+    },
+    {
+      "value": "spotlight",
+      "name": "射灯",
+      "category": "lighting",
+      "symbol": "spotlight",
+      "symbolSvg": "/point-symbols/spotlight.svg",
+      "keys": null,
+      "keywordPattern": "射灯|格栅"
+    },
+    {
+      "value": "track-light",
+      "name": "轨道灯",
+      "category": "lighting",
+      "symbol": "track-light",
+      "symbolSvg": "/point-symbols/track-light.svg",
+      "keys": null,
+      "keywordPattern": "轨道灯|磁吸"
+    },
+    {
+      "value": "downlight",
+      "name": "筒灯",
+      "category": "lighting",
+      "symbol": "downlight",
+      "symbolSvg": "/point-symbols/downlight.svg",
+      "keys": null,
+      "keywordPattern": "筒灯"
+    },
+    {
+      "value": "ceiling-light",
+      "name": "吸顶灯",
+      "category": "lighting",
+      "symbol": "ceiling-light",
+      "symbolSvg": "/point-symbols/ceiling-light.svg",
+      "keys": null,
+      "keywordPattern": "吸顶灯"
+    },
+    {
+      "value": "pendant-light",
+      "name": "吊灯",
+      "category": "lighting",
+      "symbol": "pendant-light",
+      "symbolSvg": "/point-symbols/pendant-light.svg",
+      "keys": null,
+      "keywordPattern": "吊灯"
+    },
+    {
+      "value": "wall-light",
+      "name": "壁灯",
+      "category": "lighting",
+      "symbol": "wall-light",
+      "symbolSvg": "/point-symbols/wall-light.svg",
+      "keys": null,
+      "keywordPattern": "壁灯"
+    },
+    {
+      "value": "panel-light",
+      "name": "面板灯",
+      "category": "lighting",
+      "symbol": "panel-light",
+      "symbolSvg": "/point-symbols/panel-light.svg",
+      "keys": null,
+      "keywordPattern": "面板灯|平板灯"
+    },
+    {
+      "value": "light-strip",
+      "name": "灯带",
+      "category": "lighting",
+      "symbol": "light-strip",
+      "symbolSvg": "/point-symbols/light-strip.svg",
+      "keys": null,
+      "keywordPattern": "灯带|灯条|线性灯"
+    },
+    {
+      "value": "other-light",
+      "name": "其他灯具",
+      "category": "lighting",
+      "symbol": "other-light",
+      "symbolSvg": "/point-symbols/other-light.svg",
+      "keys": null,
+      "keywordPattern": "青空灯|灯泡|灯管|tube"
+    },
+    {
+      "value": "motion-sensor",
+      "name": "人体",
+      "category": "sensor",
+      "symbol": "motion-sensor",
+      "symbolSvg": "/point-symbols/motion-sensor.svg",
+      "keys": null,
+      "keywordPattern": "人体|人在|存在|移动"
+    },
+    {
+      "value": "smoke-sensor",
+      "name": "烟雾",
+      "category": "sensor",
+      "symbol": "smoke-sensor",
+      "symbolSvg": "/point-symbols/smoke-sensor.svg",
+      "keys": null,
+      "keywordPattern": "烟雾|烟感"
+    },
+    {
+      "value": "water-sensor",
+      "name": "水浸",
+      "category": "sensor",
+      "symbol": "water-sensor",
+      "symbolSvg": "/point-symbols/water-sensor.svg",
+      "keys": null,
+      "keywordPattern": "水浸|漏水"
+    },
+    {
+      "value": "temp-sensor",
+      "name": "温湿度",
+      "category": "sensor",
+      "symbol": "temp-sensor",
+      "symbolSvg": "/point-symbols/temp-sensor.svg",
+      "keys": null,
+      "keywordPattern": "温湿度|温度"
+    },
+    {
+      "value": "contact-sensor",
+      "name": "门磁",
+      "category": "sensor",
+      "symbol": "contact-sensor",
+      "symbolSvg": "/point-symbols/contact-sensor.svg",
+      "keys": null,
+      "keywordPattern": "门窗传感|门磁|窗磁"
+    },
+    {
+      "value": "smart-lock",
+      "name": "智能门锁",
+      "category": "lock",
+      "symbol": "lock",
+      "symbolSvg": "/point-symbols/lock.svg",
+      "keys": null,
+      "keywordPattern": "门锁|指纹锁|智能锁"
+    },
+    {
+      "value": "doorbell",
+      "name": "门铃",
+      "category": "lock",
+      "symbol": "doorbell",
+      "symbolSvg": "/point-symbols/doorbell.svg",
+      "keys": null,
+      "keywordPattern": "门铃|猫眼"
+    },
+    {
+      "value": "camera",
+      "name": "摄像头",
+      "category": "security",
+      "symbol": "camera",
+      "symbolSvg": "/point-symbols/camera.svg",
+      "keys": null,
+      "keywordPattern": "摄像|监控|云台"
+    },
+    {
+      "value": "curtain-track",
+      "name": "窗帘电轨",
+      "category": "curtain",
+      "symbol": "curtain",
+      "symbolSvg": "/point-symbols/curtain.svg",
+      "keys": null,
+      "keywordPattern": "窗帘|电轨|开合帘"
+    },
+    {
+      "value": "speaker",
+      "name": "智能音箱",
+      "category": "gateway",
+      "symbol": "speaker",
+      "symbolSvg": "/point-symbols/speaker.svg",
+      "keys": null,
+      "keywordPattern": "音箱|音响"
+    },
+    {
+      "value": "touch-panel",
+      "name": "中控屏",
+      "category": "gateway",
+      "symbol": "touch-panel",
+      "symbolSvg": "/point-symbols/touch-panel.svg",
+      "keys": null,
+      "keywordPattern": "中控屏|妙控屏|智能面板|缤纷面板|触控屏|智能屏"
+    },
+    {
+      "value": "gateway",
+      "name": "智能网关",
+      "category": "gateway",
+      "symbol": "hub",
+      "symbolSvg": "/point-symbols/hub.svg",
+      "keys": null,
+      "keywordPattern": "网关|中控"
+    },
+    {
+      "value": "ac-router",
+      "name": "AC 路由",
+      "category": "network",
+      "symbol": "router",
+      "symbolSvg": "/point-symbols/router.svg",
+      "keys": null,
+      "keywordPattern": "路由|AC控制器|ac 路由"
+    },
+    {
+      "value": "ceiling-ap",
+      "name": "吸顶AP",
+      "category": "network",
+      "symbol": "mesh",
+      "symbolSvg": "/point-symbols/mesh.svg",
+      "keys": null,
+      "keywordPattern": "吸顶 ?AP|吸顶式 ?AP|天花 ?AP"
+    },
+    {
+      "value": "ap-node",
+      "name": "AP 节点",
+      "category": "network",
+      "symbol": "mesh",
+      "symbolSvg": "/point-symbols/mesh.svg",
+      "keys": null,
+      "keywordPattern": "\\bAP\\b|mesh|面板 ?AP"
+    },
+    {
+      "value": "network-panel",
+      "name": "网络面板",
+      "category": "network",
+      "symbol": "data",
+      "symbolSvg": "/point-symbols/data.svg",
+      "keys": null,
+      "keywordPattern": "网络面板|网口|信息面板"
+    },
+    {
+      "value": "vrf-controller",
+      "name": "VRF 控制器",
+      "category": "vrf",
+      "symbol": "ac-wall",
+      "symbolSvg": "/point-symbols/ac-wall.svg",
+      "keys": null,
+      "keywordPattern": "vrf|空调网关|多联机|中央空调"
+    },
+    {
+      "value": "other",
+      "name": "其他设备",
+      "category": "other",
+      "symbol": "other",
+      "symbolSvg": "/point-symbols/other.svg",
+      "keys": null,
+      "keywordPattern": "$^"
+    }
+  ],
+  "areaTypes": [
+    {
+      "value": "entrance",
+      "label": "玄关",
+      "keywordPattern": "玄关|门厅|入户"
+    },
+    {
+      "value": "living",
+      "label": "客厅",
+      "keywordPattern": "客厅|起居|会客"
+    },
+    {
+      "value": "dining",
+      "label": "餐厅",
+      "keywordPattern": "餐厅|餐"
+    },
+    {
+      "value": "kitchen",
+      "label": "厨房",
+      "keywordPattern": "厨房|厨|西厨|中厨"
+    },
+    {
+      "value": "bedroom",
+      "label": "卧室",
+      "keywordPattern": "卧|客房|房间|老人房"
+    },
+    {
+      "value": "kids",
+      "label": "儿童房",
+      "keywordPattern": "儿童|小孩|男孩|女孩"
+    },
+    {
+      "value": "study",
+      "label": "书房",
+      "keywordPattern": "书房|工作室|办公"
+    },
+    {
+      "value": "bathroom",
+      "label": "卫生间",
+      "keywordPattern": "卫|洗手间|浴室|厕|淋浴"
+    },
+    {
+      "value": "balcony",
+      "label": "阳台",
+      "keywordPattern": "阳台|露台|花园|晾晒"
+    },
+    {
+      "value": "corridor",
+      "label": "过道",
+      "keywordPattern": "过道|走廊|走道|廊"
+    },
+    {
+      "value": "stairs",
+      "label": "楼梯",
+      "keywordPattern": "楼梯|梯"
+    },
+    {
+      "value": "closet",
+      "label": "衣帽间",
+      "keywordPattern": "衣帽|衣柜间|更衣"
+    },
+    {
+      "value": "theater",
+      "label": "影音室",
+      "keywordPattern": "影音|影院|视听"
+    },
+    {
+      "value": "leisure",
+      "label": "休闲区",
+      "keywordPattern": "茶室|休闲|棋牌|健身|娱乐"
+    },
+    {
+      "value": "garage",
+      "label": "车库",
+      "keywordPattern": "车库"
+    },
+    {
+      "value": "utility",
+      "label": "设备间",
+      "keywordPattern": "设备|储藏|杂物|洗衣|家政"
+    },
+    {
+      "value": "other",
+      "label": "其他",
+      "keywordPattern": "$^"
+    }
+  ]
+}

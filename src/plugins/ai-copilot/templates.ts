@@ -1,6 +1,6 @@
 import type { AiModelOption } from '@/components/ai/ai-elements'
+import { allAiSkillSpecs } from '@/plugins/ai-catalog'
 import type { PluginId } from '@/plugins/types'
-import type { ModelPricing } from './billing'
 
 /**
  * 受信任的 AI 渠道白名单：
@@ -107,7 +107,7 @@ export type AiModelConfig = AiModelOption & {
   channelId: AiProviderChannelId | 'custom'
   /** channelId 为 custom 时对应的自定义渠道标识 */
   customChannel?: string
-  /** 实际传给接口的 model 参数名（如 deepseek-chat、gpt-4o、qwen-max） */
+  /** 实际传给接口的 model 参数名（如 deepseek-chat、qwen-vl-max、deepseek-reasoner） */
   apiModel: string
   /** 只读展示：由 channelId 决定的接口地址说明 */
   baseUrl: string
@@ -117,8 +117,29 @@ export type AiModelConfig = AiModelOption & {
   enabled: boolean
   /** 是否为默认选中模型 */
   isDefault?: boolean
-  /** 模型真实价格（元/百万 tokens）；未配置时走旧倍率公式 */
-  pricing?: ModelPricing | null
+}
+
+export function inferModelTier(apiModel: string, reasoning?: boolean, cost?: number): { minTier: 'free' | 'pro' | 'team'; tierBadge: 'Go' | 'Plus' | 'Pro' } {
+  const m = apiModel.toLowerCase()
+  if (reasoning || /reasoner|deepseek-r1|\br1\b|qwq|qvq|thinking|glm-zero/i.test(m) || (cost ?? 1) >= 3) {
+    return { minTier: 'team', tierBadge: 'Pro' }
+  }
+  if (/vl|vision|qwen-max|glm-4v|glm-4-plus|kimi|moonshot-v1-128k|doubao-1-5-vision/i.test(m) || (cost ?? 1) === 2) {
+    return { minTier: 'pro', tierBadge: 'Plus' }
+  }
+  return { minTier: 'free', tierBadge: 'Go' }
+}
+
+export function resolveExplicitOrInferredTier(
+  explicitMinTier: unknown,
+  apiModel: string,
+  reasoning?: boolean,
+  cost?: number,
+): { minTier: 'free' | 'pro' | 'team'; tierBadge: 'Go' | 'Plus' | 'Pro' } {
+  if (explicitMinTier === 'free') return { minTier: 'free', tierBadge: 'Go' }
+  if (explicitMinTier === 'pro') return { minTier: 'pro', tierBadge: 'Plus' }
+  if (explicitMinTier === 'team') return { minTier: 'team', tierBadge: 'Pro' }
+  return inferModelTier(apiModel, reasoning, cost)
 }
 
 /**
@@ -127,21 +148,52 @@ export type AiModelConfig = AiModelOption & {
 export const DEFAULT_AI_MODELS: AiModelConfig[] = [
   {
     id: 'deepseek-flash',
-    name: 'DeepSeek V4.1-Flash-1017',
+    name: 'DeepSeek V3（高速标准）',
     provider: AI_PROVIDER_CHANNELS.deepseek.label,
     channelId: 'deepseek',
-    tag: '默认 · 工具调用',
+    tag: 'Go 基础 · 高速工具调用',
     cost: 1,
     description: '高速长上下文模型（1M 上下文），支持多步调用系统工具与已启用插件',
     apiModel: 'deepseek-flash',
     baseUrl: AI_PROVIDER_CHANNELS.deepseek.baseUrl,
     apiKeyEnv: AI_PROVIDER_CHANNELS.deepseek.apiKeyEnv,
+    minTier: 'free',
+    tierBadge: 'Go',
     enabled: true,
     isDefault: true,
-    pricing: {
-      peak: { input: 2, output: 8, cachedInput: 0.04 },
-      offPeak: { input: 1, output: 4, cachedInput: 0.02 },
-    },
+  },
+  {
+    id: 'qwen-vl-plus',
+    name: '通义千问 Qwen-VL-Max（高阶视觉多模态）',
+    provider: AI_PROVIDER_CHANNELS.dashscope.label,
+    channelId: 'dashscope',
+    tag: 'Plus 专属 · 视觉识图与高定方案',
+    cost: 2,
+    description: 'Plus 会员高阶视觉与多模态模型，支持复杂 CAD/户型图点位识别与高定方案润色',
+    apiModel: 'qwen-vl-max',
+    baseUrl: AI_PROVIDER_CHANNELS.dashscope.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.dashscope.apiKeyEnv,
+    minTier: 'pro',
+    tierBadge: 'Plus',
+    enabled: true,
+    isDefault: false,
+  },
+  {
+    id: 'deepseek-r1-pro',
+    name: 'DeepSeek-R1（满血深度推理）',
+    provider: AI_PROVIDER_CHANNELS.deepseek.label,
+    channelId: 'deepseek',
+    tag: 'Pro 旗舰 · 别墅全案深度审查',
+    cost: 3,
+    reasoning: true,
+    description: 'Pro 旗舰深度推理大模型，适合多层别墅回路审查、跨平台协议规划与整案预算优化',
+    apiModel: 'deepseek-reasoner',
+    baseUrl: AI_PROVIDER_CHANNELS.deepseek.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.deepseek.apiKeyEnv,
+    minTier: 'team',
+    tierBadge: 'Pro',
+    enabled: true,
+    isDefault: false,
   },
 ]
 
@@ -150,88 +202,172 @@ export const AI_MODELS: AiModelOption[] = DEFAULT_AI_MODELS
 /** 后台「设置 → AI 模型与接口」里可一键添加的常用官方 API 与 NewAPI 聚合网关预设 */
 export const AI_PROVIDER_PRESETS: Omit<AiModelConfig, 'id' | 'enabled' | 'isDefault'>[] = [
   {
-    name: 'NewAPI / OneAPI 聚合模型',
-    provider: AI_PROVIDER_CHANNELS.newapi.label,
-    channelId: 'newapi',
-    tag: '聚合网关 · 多模型',
-    cost: 1,
-    description: '通过自建 NewAPI / OneAPI 统一网关调用各类大模型（兼容 OpenAI /v1/chat/completions）',
-    apiModel: 'gpt-4o-mini',
-    baseUrl: AI_PROVIDER_CHANNELS.newapi.baseUrl,
-    apiKeyEnv: AI_PROVIDER_CHANNELS.newapi.apiKeyEnv,
-    reasoning: false,
-  },
-  {
-    name: 'DeepSeek V3（官方）',
+    name: 'DeepSeek-V3（高速标准）',
     provider: AI_PROVIDER_CHANNELS.deepseek.label,
     channelId: 'deepseek',
-    tag: '主力 · 工具调用',
+    tag: 'Go 基础 · 高速工具调用',
     cost: 1,
-    description: 'DeepSeek 官方主力对话模型，擅长全屋智能点位规划、选型与报价工具调用',
+    description: 'DeepSeek 官方主力高速对话模型，擅长全屋智能点位规划、选型与报价工具调用',
     apiModel: 'deepseek-chat',
     baseUrl: AI_PROVIDER_CHANNELS.deepseek.baseUrl,
     apiKeyEnv: AI_PROVIDER_CHANNELS.deepseek.apiKeyEnv,
+    minTier: 'free',
+    tierBadge: 'Go',
     reasoning: false,
   },
   {
-    name: 'DeepSeek R1（深度思考）',
-    provider: AI_PROVIDER_CHANNELS.deepseek.label,
-    channelId: 'deepseek',
-    tag: '深度推理',
-    cost: 2,
-    description: 'DeepSeek 深度推理模型，适合复杂别墅多层方案审查与预算优化分析',
-    apiModel: 'deepseek-reasoner',
-    baseUrl: AI_PROVIDER_CHANNELS.deepseek.baseUrl,
-    apiKeyEnv: AI_PROVIDER_CHANNELS.deepseek.apiKeyEnv,
-    reasoning: true,
-  },
-  {
-    name: '硅基流动 SiliconFlow（DeepSeek V3）',
-    provider: AI_PROVIDER_CHANNELS.siliconflow.label,
-    channelId: 'siliconflow',
-    tag: '国内聚合 · 高速',
-    cost: 1,
-    description: '通过硅基流动聚合 API 调用开源与商业模型，一个 Key 切换多模型',
-    apiModel: 'deepseek-ai/DeepSeek-V3',
-    baseUrl: AI_PROVIDER_CHANNELS.siliconflow.baseUrl,
-    apiKeyEnv: AI_PROVIDER_CHANNELS.siliconflow.apiKeyEnv,
-    reasoning: false,
-  },
-  {
-    name: '通义千问 Qwen-Plus（阿里百炼）',
+    name: '通义千问 Qwen-Plus（日常主力）',
     provider: AI_PROVIDER_CHANNELS.dashscope.label,
     channelId: 'dashscope',
-    tag: '阿里百炼 · 稳定',
+    tag: 'Go 基础 · 稳定均衡',
     cost: 1,
-    description: '阿里云百炼 OpenAI 兼容接口，支持工具调用与长文本方案生成',
+    description: '阿里云百炼均衡主力模型，响应稳定，适合常规报价生成与产品库检索',
     apiModel: 'qwen-plus',
     baseUrl: AI_PROVIDER_CHANNELS.dashscope.baseUrl,
     apiKeyEnv: AI_PROVIDER_CHANNELS.dashscope.apiKeyEnv,
+    minTier: 'free',
+    tierBadge: 'Go',
     reasoning: false,
   },
   {
-    name: '豆包 Doubao-Pro（火山方舟）',
+    name: '豆包 Doubao-1.5-Pro（高速响应）',
     provider: AI_PROVIDER_CHANNELS.ark.label,
     channelId: 'ark',
-    tag: '火山引擎',
+    tag: 'Go 基础 · 火山方舟',
     cost: 1,
-    description: '字节跳动火山方舟 OpenAI 兼容接口（可将模型名替换为你的推理接入点 ep-xxxx）',
+    description: '字节跳动火山方舟高速对话模型，适合高频日常问答与基础配置生成',
     apiModel: 'doubao-1-5-pro-32k-250115',
     baseUrl: AI_PROVIDER_CHANNELS.ark.baseUrl,
     apiKeyEnv: AI_PROVIDER_CHANNELS.ark.apiKeyEnv,
+    minTier: 'free',
+    tierBadge: 'Go',
     reasoning: false,
   },
   {
-    name: 'Kimi（月之暗面 Moonshot）',
+    name: '智谱清言 GLM-4-Flash（轻量极速）',
+    provider: AI_PROVIDER_CHANNELS.zhipu.label,
+    channelId: 'zhipu',
+    tag: 'Go 基础 · 极速响应',
+    cost: 1,
+    description: '智谱开放平台高性价比极速模型，适合快速检索与简单指令执行',
+    apiModel: 'glm-4-flash',
+    baseUrl: AI_PROVIDER_CHANNELS.zhipu.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.zhipu.apiKeyEnv,
+    minTier: 'free',
+    tierBadge: 'Go',
+    reasoning: false,
+  },
+  {
+    name: '通义千问 Qwen-VL-Max（高阶视觉多模态）',
+    provider: AI_PROVIDER_CHANNELS.dashscope.label,
+    channelId: 'dashscope',
+    tag: 'Plus 专属 · 户型图视觉识别',
+    cost: 2,
+    description: '阿里视觉多模态旗舰，支持上传 CAD/户型图识别开关、灯具点位与空间结构',
+    apiModel: 'qwen-vl-max',
+    baseUrl: AI_PROVIDER_CHANNELS.dashscope.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.dashscope.apiKeyEnv,
+    minTier: 'pro',
+    tierBadge: 'Plus',
+    reasoning: false,
+  },
+  {
+    name: '豆包 Doubao-1.5-Vision-Pro（视觉多模态）',
+    provider: AI_PROVIDER_CHANNELS.ark.label,
+    channelId: 'ark',
+    tag: 'Plus 专属 · 图纸视觉理解',
+    cost: 2,
+    description: '火山方舟高阶视觉理解大模型，支持建筑平面图区域划分与图例识别',
+    apiModel: 'doubao-1-5-vision-pro-32k-250115',
+    baseUrl: AI_PROVIDER_CHANNELS.ark.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.ark.apiKeyEnv,
+    minTier: 'pro',
+    tierBadge: 'Plus',
+    reasoning: false,
+  },
+  {
+    name: '智谱清言 GLM-4V-Plus（高清图纸视觉）',
+    provider: AI_PROVIDER_CHANNELS.zhipu.label,
+    channelId: 'zhipu',
+    tag: 'Plus 专属 · 多模态识图',
+    cost: 2,
+    description: '智谱高阶多模态视觉模型，擅长高分辨率户型图与电气图例识别',
+    apiModel: 'glm-4v-plus',
+    baseUrl: AI_PROVIDER_CHANNELS.zhipu.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.zhipu.apiKeyEnv,
+    minTier: 'pro',
+    tierBadge: 'Plus',
+    reasoning: false,
+  },
+  {
+    name: '通义千问 Qwen-Max（高定文本旗舰）',
+    provider: AI_PROVIDER_CHANNELS.dashscope.label,
+    channelId: 'dashscope',
+    tag: 'Plus 专属 · 复杂工具编排',
+    cost: 2,
+    description: '通义千问文本旗舰模型，适合复杂多步工具连续调用与高定提案话术润色',
+    apiModel: 'qwen-max',
+    baseUrl: AI_PROVIDER_CHANNELS.dashscope.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.dashscope.apiKeyEnv,
+    minTier: 'pro',
+    tierBadge: 'Plus',
+    reasoning: false,
+  },
+  {
+    name: '月之暗面 Kimi K2（超长清单与合同）',
     provider: AI_PROVIDER_CHANNELS.moonshot.label,
     channelId: 'moonshot',
-    tag: '长上下文',
-    cost: 1,
-    description: 'Moonshot OpenAI 兼容接口，适合超长清单与方案文档分析',
+    tag: 'Plus 专属 · 超长上下文',
+    cost: 2,
+    description: 'Moonshot 旗舰长文本模型，适合超长工程采购清单核对、合同条款审查与方案润色',
     apiModel: 'kimi-k2-0711-preview',
     baseUrl: AI_PROVIDER_CHANNELS.moonshot.baseUrl,
     apiKeyEnv: AI_PROVIDER_CHANNELS.moonshot.apiKeyEnv,
+    minTier: 'pro',
+    tierBadge: 'Plus',
     reasoning: false,
+  },
+  {
+    name: 'DeepSeek-R1（满血深度推理）',
+    provider: AI_PROVIDER_CHANNELS.deepseek.label,
+    channelId: 'deepseek',
+    tag: 'Pro 旗舰 · 别墅全案深度审查',
+    cost: 3,
+    description: 'DeepSeek 满血深度推理模型，适合多层别墅回路审查、跨平台协议规划与整案预算精算',
+    apiModel: 'deepseek-reasoner',
+    baseUrl: AI_PROVIDER_CHANNELS.deepseek.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.deepseek.apiKeyEnv,
+    minTier: 'team',
+    tierBadge: 'Pro',
+    reasoning: true,
+  },
+  {
+    name: '通义千问 QwQ-Plus（复杂工程逻辑推理）',
+    provider: AI_PROVIDER_CHANNELS.dashscope.label,
+    channelId: 'dashscope',
+    tag: 'Pro 旗舰 · 深度逻辑思考',
+    cost: 3,
+    description: '阿里深度思考推理模型，擅长水电交底严密核验、多回路配电计算与预算优化推演',
+    apiModel: 'qwq-plus',
+    baseUrl: AI_PROVIDER_CHANNELS.dashscope.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.dashscope.apiKeyEnv,
+    minTier: 'team',
+    tierBadge: 'Pro',
+    reasoning: true,
+  },
+  {
+    name: '通义千问 QVQ-Max（视觉深度思考推理）',
+    provider: AI_PROVIDER_CHANNELS.dashscope.label,
+    channelId: 'dashscope',
+    tag: 'Pro 旗舰 · 视觉思维链推理',
+    cost: 3,
+    description: '阿里视觉深度推理旗舰，支持边看复杂别墅户型图边做深度工程点位推演',
+    apiModel: 'qvq-max',
+    baseUrl: AI_PROVIDER_CHANNELS.dashscope.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.dashscope.apiKeyEnv,
+    minTier: 'team',
+    tierBadge: 'Pro',
+    reasoning: true,
   },
 ]
 
@@ -258,22 +394,9 @@ export function parseAiModels(value: unknown, customChannels: AiCustomChannel[] 
     if (!id || !name || !apiModel || seen.has(id)) continue
     seen.add(id)
     const costNum = Number(r.cost)
-    const num = (v: unknown) => {
-      const n = Number(v)
-      return Number.isFinite(n) && n >= 0 ? n : 0
-    }
-    const peak = {
-      input: num(r.peakInputPrice),
-      output: num(r.peakOutputPrice),
-      cachedInput: num(r.peakCachedInputPrice),
-    }
-    const offPeakRaw = {
-      input: num(r.offPeakInputPrice),
-      output: num(r.offPeakOutputPrice),
-      cachedInput: num(r.offPeakCachedInputPrice),
-    }
-    const offPeak = offPeakRaw.input || offPeakRaw.output || offPeakRaw.cachedInput ? offPeakRaw : peak
-    const pricing = peak.input || peak.output || peak.cachedInput ? { peak, offPeak } : null
+    const validCost = Number.isInteger(costNum) && costNum >= 0 && costNum <= 100 ? costNum : 1
+    const isReasoning = Boolean(r.reasoning)
+    const tierInfo = resolveExplicitOrInferredTier(r.minTier, apiModel, isReasoning, validCost)
     out.push({
       id,
       name,
@@ -281,16 +404,17 @@ export function parseAiModels(value: unknown, customChannels: AiCustomChannel[] 
       channelId,
       ...(custom ? { customChannel: custom.key } : {}),
       tag: cleanStr(r.tag, 40, '工具调用'),
-      cost: Number.isInteger(costNum) && costNum >= 0 && costNum <= 100 ? costNum : 1,
+      cost: validCost,
       description: cleanStr(r.description, 200, `${name}（${apiModel}）`),
-      reasoning: Boolean(r.reasoning),
+      reasoning: isReasoning,
       apiModel,
       // 内置渠道用固定 baseUrl 与 apiKeyEnv；自定义渠道用后台已校验的地址与 AI_ 前缀变量名
       baseUrl: channel.baseUrl,
       apiKeyEnv: channel.apiKeyEnv,
+      minTier: tierInfo.minTier,
+      tierBadge: tierInfo.tierBadge,
       enabled: r.enabled !== false,
       isDefault: Boolean(r.isDefault),
-      pricing,
     })
   }
   if (out.length === 0) return DEFAULT_AI_MODELS.map((m) => ({ ...m }))
@@ -331,77 +455,17 @@ export type AiPromptTemplate = {
   promptTemplate: string
 }
 
-export const DEFAULT_AI_TEMPLATES: AiPromptTemplate[] = [
-  {
-    id: 'tpl-room-audit',
-    name: '房间点位完整度审查',
-    category: '点位审查',
-    description: '调用「房间智能分析」插件，按户型逐间检查必配点位、安防传感器与双控遗漏',
-    recommendedModelId: 'deepseek-flash',
-    requiredPlugins: ['room-insights'],
-    variables: [
-      { key: 'layout', label: '户型结构', defaultValue: '三室两厅两卫', options: ['两室两厅一卫', '三室两厅两卫', '四室两厅三卫', '复式 / 别墅'] },
-      { key: 'focus', label: '审查重点', defaultValue: '照明回路与安防传感器', options: ['照明回路与安防传感器', '全屋无主灯调光', '老人与儿童看护', '精装房后装改造'] },
-    ],
-    promptTemplate:
-      '请按【{layout}】户型标准，调用「房间智能分析」插件审查当前项目的点位配置（重点关注：{focus}），列出缺失点位、原因及推荐联动场景。',
-  },
-  {
-    id: 'tpl-smart-select',
-    name: '按平台与档次一键配单',
-    category: '选型报价',
-    description: '调用「智能选型」插件，按指定生态平台和预算档次匹配全屋默认设备型号',
-    recommendedModelId: 'deepseek-flash',
-    requiredPlugins: ['smart-select', 'room-insights'],
-    variables: [
-      { key: 'platform', label: '主平台', defaultValue: '米家', options: ['米家', 'Apple Home', '华为', '涂鸦', 'Matter', 'KNX'] },
-      { key: 'tier', label: '配置档次', defaultValue: '标准档', options: ['经济档', '标准档', '高端档'] },
-    ],
-    promptTemplate:
-      '请调用「智能选型」插件，以【{platform}】为主平台、按【{tier}】预算标准，为当前项目的开关、窗帘、门锁、传感器与网关推荐默认型号组合，并说明选型理由。',
-  },
-  {
-    id: 'tpl-blueprint-vision',
-    name: '户型图 AI 识图协议生成',
-    category: '图纸识图',
-    description: '调用「AI 识别导入」插件，生成标准 3:2 户型图的房间与点位比例坐标识别指令',
-    recommendedModelId: 'deepseek-flash',
-    requiredPlugins: ['ai-import'],
-    variables: [
-      { key: 'sheetName', label: '图纸楼层', defaultValue: '一层平面图', options: ['一层平面图', '二层平面图', '地下室平面图', '全套标准图'] },
-      { key: 'scope', label: '布点范围', defaultValue: '全屋点位（含灯光开关与传感）', options: ['全屋点位（含灯光开关与传感）', '仅智能开关与插座', '不含灯具（后装改造）'] },
-    ],
-    promptTemplate:
-      '请调用「AI 识别导入」插件，针对【{sheetName}】按【{scope}】生成 fmkj-points JSON 识图提示词与导入校验清单。',
-  },
-  {
-    id: 'tpl-qixu-handover',
-    name: '栖序提案与付款验收说明',
-    category: '交付话术',
-    description: '结合「方案演示」与「文档风格包」，生成客户汇报话术、三阶段付款说明与共同验收清单',
-    recommendedModelId: 'deepseek-flash',
-    requiredPlugins: ['proposal', 'doc-styles'],
-    variables: [
-      { key: 'paymentSplit', label: '付款比例', defaultValue: '40% / 50% / 10%', options: ['40% / 50% / 10%', '30% / 60% / 10%', '50% / 40% / 10%'] },
-      { key: 'warranty', label: '质保与维护', defaultValue: '设备质保 12 个月，含 1 年上门联调', options: ['设备质保 12 个月，含 1 年上门联调', '设备质保 24 个月，含季度巡检'] },
-    ],
-    promptTemplate:
-      '请调用「方案演示」与「文档风格包」插件，按栖序提案「08 服务交付 · 付款与确认」结构，采用【{paymentSplit}】付款节点与【{warranty}】条款，生成给客户的方案汇报话术与现场验收确认要点。',
-  },
-  {
-    id: 'tpl-wiring-deep',
-    name: '水电交底与零火线预留清单',
-    category: '点位审查',
-    description: '针对现场水电施工交底，按点位汇总零火线、窗帘盒电源、网口与网关位置要求',
-    recommendedModelId: 'deepseek-flash',
-    requiredPlugins: ['room-insights', 'proposal'],
-    variables: [
-      { key: 'stage', label: '施工阶段', defaultValue: '水电开槽布管前', options: ['水电开槽布管前', '吊顶木工封板前', '油漆完工安装前'] },
-    ],
-    promptTemplate:
-      '当前项目处于【{stage}】阶段，请结合项目点位生成一份给水电工与项目经理的强弱电预留交底注意事项（含零火线、底盒深度、窗帘电源与网关网口要求）。',
-  },
-]
+/** 从各插件自注册的 skills 元数据自动汇总生成全局对话技能模板 */
+export const DEFAULT_AI_TEMPLATES: AiPromptTemplate[] = allAiSkillSpecs().map((s) => ({
+  id: s.id,
+  name: s.name,
+  category: s.category,
+  description: s.description,
+  recommendedModelId: s.recommendedModelId,
+  requiredPlugins: s.requiredPlugins as PluginId[],
+  variables: s.variables,
+  promptTemplate: s.promptTemplate,
+}))
 
 export function fillPromptTemplate(tpl: AiPromptTemplate, values: Record<string, string>): string {
   let out = tpl.promptTemplate

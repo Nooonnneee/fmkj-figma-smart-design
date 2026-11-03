@@ -9,6 +9,7 @@ import { getMembershipContext } from '@/lib/membership-policy'
 import { isPointScope, loadProjectDocs, POINT_SCOPES, type PointScope } from '@/lib/project-docs'
 import { constructionDeckPages } from '@/plugins/proposal/construction-deck'
 import { customizeTheme, DECK_THEMES, DeckRoot, deckPages, isDeckTheme } from '@/plugins/proposal/deck'
+import { buildTemplateGallery } from '@/plugins/proposal/preview'
 import { loadProposalTemplates } from '@/plugins/proposal/registry'
 import {
   DEFAULT_PROPOSAL_TEMPLATE,
@@ -18,18 +19,24 @@ import {
 } from '@/plugins/proposal/templates'
 import { getPluginFlags } from '@/plugins/state'
 
+import { ProposalTemplateSwitcher } from './template-switcher'
+
 export const metadata = { title: '智能家居方案', robots: { index: false, follow: false } }
 
-/** 方案演示（插件）：按模板（章节结构 + 视觉主题）生成横版提案或施工交底，可打印、导出 PDF 或图片。 */
+/**
+ * 方案演示（插件）：按模板（章节结构 + 视觉主题）生成横版提案或施工交底，可打印、导出 PDF 或图片。
+ * embed=1：只显示方案页面（模板选择器里的「预览样张」用）。
+ */
 export default async function ProposalPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ template?: string; markers?: string; scope?: string; quoteId?: string }>
+  searchParams: Promise<{ template?: string; markers?: string; scope?: string; quoteId?: string; embed?: string }>
 }) {
   const { id } = await params
   const sp = await searchParams
+  const embed = sp.embed === '1'
   const user = await appAuth.getCurrentUser()
   if (!user) redirect(`/login?from=/print/projects/${id}/proposal`)
   let scope: PointScope = isPointScope(sp.scope) ? sp.scope : 'all'
@@ -49,22 +56,26 @@ export default async function ProposalPage({
   const docs = d
   const [flags, templates, access] = await Promise.all([getPluginFlags(docs.owner?.id ?? user.id), templatesP, accessP])
   if (!flags.proposal) notFound()
-  // 模板：网址参数 → 设置里的默认方案模板 → 栖序雅致
+  // 模板：网址参数 → 项目在「归档」里选定的交付方案模板 → 设置里的默认方案模板 → 栖序雅致
   const saved = d.company.documentDefaults.proposal?.layout
-  const tpl = resolveProposalTemplate(sp.template ?? saved, templates) ?? resolveProposalTemplate(DEFAULT_PROPOSAL_TEMPLATE, templates) ?? templates[0]!
+  const tpl =
+    resolveProposalTemplate(sp.template, templates) ??
+    resolveProposalTemplate(docs.proposalTemplate, templates) ??
+    resolveProposalTemplate(saved, templates) ??
+    resolveProposalTemplate(DEFAULT_PROPOSAL_TEMPLATE, templates) ??
+    templates[0]!
   const t = tpl.value
   const deck = tpl.framework !== 'construction'
   const theme = customizeTheme(DECK_THEMES[isDeckTheme(tpl.theme) ? tpl.theme : 'qixu'], { headline: tpl.headline, coverTagline: tpl.tagline, coverPhoto: tpl.coverPhoto, accent: tpl.accent })
   const markerOptions: { value: ProposalMarkers; label: string }[] = deck
     ? [
-        { value: 'number', label: '编号' },
         { value: 'symbol', label: '设备图标' },
       ]
     : [
         { value: 'symbol', label: '设备图标' },
         { value: 'product', label: '产品图' },
       ]
-  const markers: ProposalMarkers = isProposalMarkers(sp.markers) && markerOptions.some((o) => o.value === sp.markers) ? sp.markers : tpl.markers
+  const markers: ProposalMarkers = isProposalMarkers(sp.markers) && markerOptions.some((o) => o.value === sp.markers) ? sp.markers : 'symbol'
   const date = new Date().toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: 'long', day: 'numeric' })
   const base = `/print/projects/${id}/proposal`
   const activeQuoteId = docs.quote ? String(docs.quote.id) : ''
@@ -80,17 +91,31 @@ export default async function ProposalPage({
   }
   const tierOk = featureAccess(access.membership, tpl.tier, access.strict)
   const empty = docs.points.length === 0 ? <DocEmpty projectId={id}>点位图里还没有点位。布置好设备后，这里会生成整套方案。</DocEmpty> : null
+  // 模板选择器：缩略图与页数直接用本项目的数据计算（只在打开选择器时渲染）
+  const gallery = embed ? null : buildTemplateGallery(templates, docs, { tier: access.membership.effectiveTier, strict: access.strict, insights: flags['room-insights'] })
+  const templateLinks = Object.fromEntries(templates.map((x) => [x.value, href({ template: x.value })]))
 
   return (
     <div className="min-h-screen bg-neutral-200/70 print:min-h-0 print:bg-white">
       <style>{'@media print { @page { size: A4 landscape; margin: 0; } }'}</style>
-      <PrintToolbar
-        back={{ href: `/projects/${id}/archive`, label: '返回归档' }}
-        exportName={`${docs.project.name}-${tpl.label}${scope === 'all' ? '' : '-' + POINT_SCOPES.find((x) => x.value === scope)!.label}`}
-        wide={deck}
-        locked={tierOk.allowed ? undefined : { message: `「${tpl.label}」是${tierBadge(tpl.tier)}模板，可以预览，升级后导出`, href: '/membership' }}
-        note={tierOk.meets ? undefined : `${tierBadge(tpl.tier)}模板`}
-        groups={[
+      {gallery ? (
+        <PrintToolbar
+          back={{ href: `/projects/${id}/archive`, label: '返回归档' }}
+          exportName={`${docs.project.name}-${tpl.label}${scope === 'all' ? '' : '-' + POINT_SCOPES.find((x) => x.value === scope)!.label}`}
+          wide={deck}
+          locked={tierOk.allowed ? undefined : { message: `「${tpl.label}」是${tierBadge(tpl.tier)}模板，可以预览，升级后导出`, href: '/membership' }}
+          note={tierOk.meets ? undefined : `${tierBadge(tpl.tier)}模板`}
+          picker={
+            <ProposalTemplateSwitcher
+              templates={gallery.items}
+              thumbs={gallery.thumbs}
+              value={t}
+              links={templateLinks}
+              previewLinks={Object.fromEntries(Object.entries(templateLinks).map(([k, v]) => [k, `${v}&embed=1`]))}
+              pageNote="按本项目计算"
+            />
+          }
+          groups={[
           ...(docs.projectList.length > 1
             ? [
                 {
@@ -104,7 +129,6 @@ export default async function ProposalPage({
                 },
               ]
             : []),
-          { label: '模板', value: t, options: templates.map((x) => ({ value: x.value, label: x.label, href: `${base}?template=${encodeURIComponent(x.value)}&scope=${scope}` })) },
           { label: '范围', value: scope, options: POINT_SCOPES.map((x) => ({ value: x.value, label: x.label, href: href({ scope: x.value }) })) },
           ...(docs.quotes.length > 1
             ? [
@@ -120,8 +144,9 @@ export default async function ProposalPage({
               ]
             : []),
           { label: '点位', value: markers, options: markerOptions.map((o) => ({ ...o, href: href({ markers: o.value }) })) },
-        ]}
-      />
+          ]}
+        />
+      ) : null}
       {deck ? (
         <DeckRoot theme={theme}>
           {empty}

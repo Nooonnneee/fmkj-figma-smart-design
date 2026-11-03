@@ -34,7 +34,7 @@ export function PlanFigure({
   points,
   areas = [],
   mode = 'symbol',
-  showCodes = true,
+  showCodes = false,
   showAreas = true,
   dim = 0.55,
   className,

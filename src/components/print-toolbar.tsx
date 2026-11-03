@@ -39,6 +39,7 @@ export function PrintToolbar({
   wide = false,
   locked,
   note,
+  picker,
 }: {
   back: { href: string; label: string }
   groups: { label: string; value: string; options: Option[] }[]
@@ -47,6 +48,8 @@ export function PrintToolbar({
   wide?: boolean
   locked?: { message: string; href: string }
   note?: string
+  /** 放在「版式与选项」前面的选择器（例如带缩略图的方案模板选择器） */
+  picker?: React.ReactNode
 }) {
   const [busy, setBusy] = useState<'pdf' | 'img' | null>(null)
   const [exportResult, setExportResult] = useState<ExportResultState | null>(null)
@@ -240,6 +243,8 @@ export function PrintToolbar({
               </Link>
             </span>
           ) : null}
+
+          {picker}
 
           {groups.length > 0 ? (
             <Popover>

@@ -5,10 +5,11 @@
 import { deviceTypeOf } from '@/lib/device-types'
 import { cn } from '@/lib/utils'
 
-import { pad, type DeckSheet } from '../model'
+import { type DeckSheet } from '../model'
 import { PlanLegend } from '@/components/plan-legend'
+import { PointMarker } from '@/components/point-marker'
 
-import { Chapter, contentCrop, NoBadge, PlanCard, PlanView, SectionTitle, Slide, type DeckCtx } from '../parts'
+import { Chapter, contentCrop, PlanCard, PlanView, SectionTitle, Slide, type DeckCtx } from '../parts'
 
 /** 需求色带（4 栏渐变） */
 function NeedsBand({ ctx }: { ctx: DeckCtx }) {
@@ -40,7 +41,7 @@ export function PlanPage({ ctx, no, total, s, first }: { ctx: DeckCtx; no: numbe
   const maxGroups = Math.floor(avail / groupRow)
   const groups = s.groups.length > maxGroups ? s.groups.slice(0, maxGroups - 1) : s.groups
   const hidden = s.groups.length - groups.length
-  const legend = ctx.markers === 'symbol'
+  const legend = true
   const planH = (first ? 470 : 576) - (legend ? 40 : 0)
   return (
     <Slide ctx={ctx} no={no} total={total} name={`02 住宅平面 · ${s.sheet.name}`}>
@@ -48,7 +49,7 @@ export function PlanPage({ ctx, no, total, s, first }: { ctx: DeckCtx; no: numbe
       {first ? <NeedsBand ctx={ctx} /> : null}
       <div className="flex min-h-0 w-full flex-1 items-start gap-[32px] overflow-hidden">
         <div className="flex w-[868px] shrink-0 flex-col gap-[12px]">
-          <SectionTitle title={`${multi ? s.floorName : '住宅平面'} · ${s.groups.length ? `${s.points.length}点` : '暂无点位'}`} note="编号与报价条目一一对应" />
+          <SectionTitle title={`${multi ? s.floorName : '住宅平面'} · ${s.groups.length ? `${s.points.length}点` : '暂无点位'}`} note="设备图标与右侧清单、报价条目一一对应" />
           <PlanCard left={multi ? s.sheet.name : m.layoutText} right="示意平面 · 不按比例" className="w-[868px]" >
             <div className="flex items-center justify-center pt-[34px] pb-[12px]" style={{ height: planH }}>
               <PlanView ctx={ctx} sheet={s.sheet} points={s.points} areas={s.areas} width={820} height={planH - 46} crop={contentCrop(s.sheet, s.areas, s.points)} />
@@ -63,7 +64,7 @@ export function PlanPage({ ctx, no, total, s, first }: { ctx: DeckCtx; no: numbe
             {perPoint
               ? s.points.map((p) => (
                   <div key={p.id} className="flex items-center gap-[16px] border-b border-doc-rule" style={{ height: ROW }}>
-                    <NoBadge>{pad(p.no)}</NoBadge>
+                    <PointMarker type={p.deviceType} className="size-[24px] shrink-0" />
                     <div className="min-w-0 flex-1 leading-[1.35]">
                       <p className="doc-body truncate text-[14px]">
                         {p.room} · {p.typeName}
@@ -78,11 +79,13 @@ export function PlanPage({ ctx, no, total, s, first }: { ctx: DeckCtx; no: numbe
               : groups.map((g) => {
                   const types = [...new Set(g.points.map((p) => p.deviceType))]
                   const refs = [...new Set(g.points.map((p) => p.ref).filter((r): r is string => !!r))]
-                  const lo = g.points[0]?.no ?? 0
-                  const hi = g.points[g.points.length - 1]?.no ?? 0
                   return (
                     <div key={g.key} className="flex items-center gap-[14px] border-b border-doc-rule" style={{ height: groupRow }}>
-                      <NoBadge wide>{lo === hi ? pad(lo) : `${pad(lo)}–${pad(hi)}`}</NoBadge>
+                      <span className="flex min-w-[46px] shrink-0 items-center -space-x-1">
+                        {types.slice(0, 3).map((t) => (
+                          <PointMarker key={t} type={t} className="size-[20px] rounded-full ring-1 ring-white" />
+                        ))}
+                      </span>
                       <div className="min-w-0 flex-1 leading-[1.35]">
                         <p className="doc-body truncate text-[14px]">
                           {g.name} · {g.points.length}点

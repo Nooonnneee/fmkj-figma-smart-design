@@ -1,1 +1,0 @@
-# fmkj-figma-smart-design

@@ -44,7 +44,7 @@ export function AiPanel({
     <ScrollArea className="min-h-0 flex-1">
       <div className="space-y-4 p-4">
         <ol className="space-y-2 text-xs text-muted-foreground">
-          <li className="flex gap-2"><span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-foreground">1</span>下载当前图纸的标准图，连同识别提示词一起发给 AI（豆包、通义、ChatGPT 等）。</li>
+          <li className="flex gap-2"><span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-foreground">1</span>下载当前图纸的标准图，连同识别提示词一起发给 AI（豆包、通义千问、Kimi、DeepSeek 等）。</li>
           <li className="flex gap-2"><span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-foreground">2</span>把 AI 返回的 JSON 粘贴到下面，点位会自动换成平台图标放到对应位置。</li>
         </ol>
         <div className="rounded-lg border p-3 text-xs">
@@ -107,4 +107,3 @@ export function AiPanel({
     </ScrollArea>
   )
 }
-

@@ -11,7 +11,7 @@
 
   <view class="stats two mt-24">
     <view class="stat"><text class="label">AI 积分</text><text class="num">{{me.aiCredits || 0}}</text></view>
-    <view class="stat" bindtap="openRedeem"><text class="label">会员等级</text><text class="num">{{me.membershipBadge || '体验版'}}</text></view>
+    <view class="stat" bindtap="openRedeem"><text class="label">会员等级</text><text class="num">{{me.membershipBadge || 'Go'}}</text></view>
   </view>
 
   <view class="card card-flush mt-24">
@@ -75,34 +75,33 @@
   <block wx:if="{{redeeming}}">
     <view class="mask" bindtap="closeRedeem" />
     <view class="sheet">
-      <view class="sheet-head"><text class="title">会员权益与兑换</text><image class="icon" src="/assets/icons/x-muted.svg" bindtap="closeRedeem" /></view>
+      <view class="sheet-head"><text class="title">Go / Plus / Pro 会员权益与兑换</text><image class="icon" src="/assets/icons/x-muted.svg" bindtap="closeRedeem" /></view>
       <scroll-view scroll-y class="sheet-body tier-sheet-body">
         <view class="tier-list">
           <view class="tier-card tier-pro">
             <view class="row between">
-              <text class="tier-title">专业设计师版（Pro）</text>
+              <text class="tier-title">Plus 专业版</text>
               <text class="badge badge-ink">推荐订阅</text>
             </view>
             <view class="small muted mt-8">独立设计师与工作室高定交付首选</view>
             <view class="tier-perks mt-16">
-              <view class="tier-perk">✓ 每月免费赠送 300 AI 积分（识图布点 / 方案生成）</view>
-              <view class="tier-perk">✓ 50 个进行中项目 + 每项目 5 人协同设计</view>
-              <view class="tier-perk">✓ 解锁全部高定方案模板（栖序雅致 / 东方雅韵 / 墨金臻选）</view>
-              <view class="tier-perk">✓ 解锁全部施工算量插件（布线表 / 备货单 / 勘测单 / DWG）</view>
-              <view class="tier-perk">✓ 业主交付资料包一键合并 PDF 与 ZIP 打包</view>
+              <view class="tier-perk">✓ 每月赠 300 AI 积分 · 50 个项目 · 5 人协同</view>
+              <view class="tier-perk">✓ 解锁 Plus 高阶视觉多模态模型（Qwen-VL-Max / 豆包 Vision / GLM-4V-Plus）</view>
+              <view class="tier-perk">✓ 解锁墨金臻选、智域科技、晨曦暖调、素白极简模板 + 6 套报价风格</view>
+              <view class="tier-perk">✓ 解锁 DWG 导入、强弱电布线表、场景移交单与一键交付资料包</view>
             </view>
           </view>
 
           <view class="tier-card">
             <view class="row between">
-              <text class="tier-title">旗舰集成商版（Studio）</text>
-              <text class="badge">团队尊享</text>
+              <text class="tier-title">Pro 旗舰版</text>
+              <text class="badge">旗舰尊享</text>
             </view>
             <view class="small muted mt-8">适合全屋智能集成商与工程交付团队</view>
             <view class="tier-perks mt-16">
-              <view class="tier-perk">✓ 每月免费赠送 1,000 AI 积分（高频识图与全案生成）</view>
-              <view class="tier-perk">✓ 不限进行中项目数量，不限项目协作成员</view>
-              <view class="tier-perk">✓ 包含专业版全部高定方案模板、施工插件与交付资料包</view>
+              <view class="tier-perk">✓ 每月赠 1,000 AI 积分 · 不限项目数 · 不限协作成员</view>
+              <view class="tier-perk">✓ 独占 Pro 满血深度推理模型（DeepSeek-R1 / 通义 QwQ-Plus / QVQ-Max）</view>
+              <view class="tier-perk">✓ 包含 Plus 全部特权 + 独占「东方雅韵」顶奢别墅模板与采购备货核验单</view>
             </view>
           </view>
         </view>

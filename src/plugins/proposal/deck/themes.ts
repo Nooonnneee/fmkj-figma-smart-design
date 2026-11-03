@@ -4,13 +4,15 @@
  * + 方案专用变量（--deck-*：说明卡、平面卡、编号圆点、照片标注、圆角）
  * + 版式变体（封面、章节标题、表格）+ 少量外观开关（深浅、数字字体、品牌标记、圆角）。
  *
- * - 栖序雅致：Figma 设计稿原样（暖白纸、灰紫、Inter 细体大编号、深灰表头、照片色带封面）；
- * - 墨金臻选：深色画面、香槟金、衬线标题、整幅照片封面、金线表头，适合电子版演示；
- * - 原木自然：燕麦纸、橄榄绿、衬线标题、左右分栏封面、圆角照片与卡片；
- * - 智域科技：深海蓝画面、电光青强调、整幅照片封面，适合科技感与年轻业主；
- * - 素白极简：纯白纸面、墨黑文字、纯文字封面，不用照片也有质感；
- * - 晨曦暖调：奶油纸色、陶土橙、圆角卡片与竖幅照片，温暖亲和；
- * - 东方雅韵：宣纸色、青瓷绿、衬线标题，适合新中式与东方风住宅。
+ * - qixu 栖序雅致：Figma 设计稿原样（暖白纸、灰紫、Inter 细体大编号、深灰表头、照片色带封面）；
+ * - noir 墨金臻选：深色画面、香槟金、衬线标题、整幅照片封面、金线表头，适合屏幕演示；
+ * - grove 原木自然：燕麦纸、橄榄绿、衬线标题、左右分栏封面、圆角照片与卡片；
+ * - azure 晨岚现代（「智域科技」模板使用）：冷白纸面、深海蓝强调、细线卡片、照片色带封面；
+ * - terra 陶土暖阳：米杏纸色、陶土橙、分栏封面与圆角卡片；
+ * - mono 素白极简：纯白纸面、墨黑文字、纯文字封面，不用照片也有质感；
+ * - dawn 晨曦暖调：奶油纸色、陶土橙、圆角卡片与竖幅照片，温暖亲和；
+ * - jade 东方雅韵：宣纸色、青瓷绿、衬线标题与茶室照片，适合新中式与东方风住宅。
+ * 每个主题使用自己的封面照片（public/proposal/photos/cover-*.jpg），模板缩略图因此一眼可辨。
  */
 import type { CSSProperties } from 'react'
 
@@ -290,7 +292,7 @@ export const DECK_THEMES: Record<DeckThemeId, DeckTheme> = {
     headline: '清爽有序，一切刚刚好。',
     tagline: 'MODERN LIVING',
     coverTagline: 'CLEAR · CALM · CONNECTED',
-    coverPhoto: '/proposal/photos/living.jpg',
+    coverPhoto: '/proposal/photos/cover-azure.jpg',
     photoNote: '氛围意向图 · 非项目实景',
   },
   terra: {
@@ -410,7 +412,7 @@ export const DECK_THEMES: Record<DeckThemeId, DeckTheme> = {
     headline: '每一个清晨，都被温柔唤醒。',
     tagline: 'WARM HOME',
     coverTagline: 'GOOD MORNING, HOME',
-    coverPhoto: '/proposal/photos/bedroom.jpg',
+    coverPhoto: '/proposal/photos/cover-dawn.jpg',
     photoNote: '氛围意向图 · 非项目实景',
   },
   jade: {
@@ -450,7 +452,7 @@ export const DECK_THEMES: Record<DeckThemeId, DeckTheme> = {
     headline: '雅致如瓷，静享东方。',
     tagline: 'ORIENTAL LIVING',
     coverTagline: 'ORIENTAL SERENITY',
-    coverPhoto: '/proposal/photos/study.jpg',
+    coverPhoto: '/proposal/photos/cover-jade.jpg',
     photoNote: '氛围意向图 · 非项目实景',
   },
 }

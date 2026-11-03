@@ -817,7 +817,7 @@ export interface Contract {
   createdAt: string;
 }
 /**
- * 方案中的智能场景。生成方案时按房间类型和设备自动匹配，条件不满足的场景不会出现。
+ * 方案中的智能场景。生成方案时按房间类型和设备自动匹配，条件不满足的场景不会出现；文案只写匹配条件里的设备能做到的事。全部停用时方案改用内置场景库。
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "scenes".
@@ -987,7 +987,7 @@ export interface Scene {
   createdAt: string;
 }
 /**
- * 模板 = 版式框架（有哪些章节）+ 视觉主题（配色与版式），再换上自己的强调色、封面图和标语。
+ * 模板 = 版式框架（有哪些章节）+ 视觉主题（配色与版式），再换上自己的强调色、封面图和标语。编排规范：封面固定在第一页；模板没选封面时自动补上；每个章节最多出现一次，重复的章节只保留第一次；投资明细排在服务交付之前，服务交付固定在最后一章。保存后模板库与选择器里的缩略图自动更新。
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "proposal-templates".
@@ -1003,16 +1003,28 @@ export interface ProposalTemplate {
    * 模板选择器里显示
    */
   description?: string | null;
+  /**
+   * 如：别墅、大平层等高净值业主；留空沿用版式框架的默认说明
+   */
+  audience?: string | null;
+  /**
+   * 如：首次方案沟通、签约前定稿
+   */
+  occasion?: string | null;
+  /**
+   * 2–3 个短标签，如「深色画面」「整幅照片封面」，显示在选择器卡片上
+   */
+  highlights?: string[] | null;
   framework: 'full' | 'story' | 'budget' | 'construction';
   /**
    * 施工交底不使用
    */
   theme?: ('qixu' | 'noir' | 'grove' | 'azure' | 'terra' | 'mono' | 'dawn' | 'jade') | null;
   /**
-   * 留空使用版式框架的推荐章节；选择的顺序就是方案里的顺序
+   * 留空使用版式框架的推荐章节；按编排规范，封面固定第一页，投资明细与服务交付固定在最后
    */
   sections?: ('cover' | 'plans' | 'system' | 'zones' | 'scenes' | 'rooms' | 'investment' | 'service')[] | null;
-  markers?: ('number' | 'symbol') | null;
+  markers?: ('symbol' | 'number') | null;
   tier?: ('free' | 'pro' | 'team') | null;
   /**
    * 十六进制颜色，如 #7a5c22；留空沿用主题配色
@@ -1698,6 +1710,9 @@ export interface ProposalTemplatesSelect<T extends boolean = true> {
   name?: T;
   slug?: T;
   description?: T;
+  audience?: T;
+  occasion?: T;
+  highlights?: T;
   framework?: T;
   theme?: T;
   sections?: T;
@@ -2011,6 +2026,10 @@ export interface CompanySetting {
         customChannel?: string | null;
         apiModel: string;
         /**
+         * 控制前台模型选择器上的 Go / Plus / Pro 标签与可用权限。
+         */
+        minTier?: ('auto' | 'free' | 'pro' | 'team') | null;
+        /**
          * 按用量计费：每次对话积分 = 倍率 ×（每 1K 输入 tokens 0.1 + 每 1K 输出 tokens 0.5）+ 工具调用费用，向上取整、最少 1。贵的模型可设 2、3。
          */
         cost: number;
@@ -2079,6 +2098,10 @@ export interface AiSetting {
          */
         customChannel?: string | null;
         apiModel: string;
+        /**
+         * 控制前台模型选择器上的 Go / Plus / Pro 标签与可用权限。
+         */
+        minTier?: ('auto' | 'free' | 'pro' | 'team') | null;
         /**
          * 按用量计费：每次对话积分 = 倍率 ×（每 1K 输入 tokens 0.1 + 每 1K 输出 tokens 0.5）+ 工具调用费用，向上取整、最少 1。贵的模型可设 2、3。
          */
@@ -2171,6 +2194,7 @@ export interface CompanySettingsSelect<T extends boolean = true> {
         channelId?: T;
         customChannel?: T;
         apiModel?: T;
+        minTier?: T;
         cost?: T;
         tag?: T;
         description?: T;
@@ -2206,6 +2230,7 @@ export interface AiSettingsSelect<T extends boolean = true> {
         channelId?: T;
         customChannel?: T;
         apiModel?: T;
+        minTier?: T;
         cost?: T;
         tag?: T;
         description?: T;

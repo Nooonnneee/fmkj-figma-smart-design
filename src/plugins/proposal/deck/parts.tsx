@@ -12,7 +12,11 @@ import type { ProposalMarkers } from '../templates'
 import { pad, type DeckModel, type DeckPoint } from './model'
 import type { DeckTheme } from './themes'
 
-export type DeckCtx = { m: DeckModel; theme: DeckTheme; markers: ProposalMarkers }
+/** lazy：缩略图与模板库里图片延迟加载（打印 / 导出时必须立即加载，默认 false） */
+export type DeckCtx = { m: DeckModel; theme: DeckTheme; markers: ProposalMarkers; lazy?: boolean }
+
+/** 方案图片的加载方式：导出需要同步加载；缩略图延迟加载，避免一次拉取多张大图 */
+export const imgLoading = (ctx: DeckCtx) => (ctx.lazy ? ({ loading: 'lazy', decoding: 'async' } as const) : ({ loading: 'eager', decoding: 'sync' } as const))
 
 /** 金额数字：栖序用 Inter，衬线风格用衬线数字 */
 export const amountFont = (ctx: DeckCtx) => (ctx.theme.amount === 'latin' ? 'doc-latin' : 'doc-numeral')
@@ -209,7 +213,19 @@ const CALLOUT_SLOTS = [
 ]
 
 /** 氛围照片 + 点位标注 */
-export function Photo({ src, width, height, note, callouts = [] }: { src: string; width: number; height: number; note?: string; callouts?: { no: number; code: string }[] }) {
+export function Photo({
+  src,
+  width,
+  height,
+  note,
+  callouts = [],
+}: {
+  src: string
+  width: number
+  height: number
+  note?: string
+  callouts?: { no: number; code: string; deviceType?: string }[]
+}) {
   const chipW = 112
   const chipH = 32
   return (
@@ -241,9 +257,7 @@ export function Photo({ src, width, height, note, callouts = [] }: { src: string
           className="doc-latin absolute flex items-center gap-[8px] rounded-[calc(var(--deck-radius-sm)/2)] bg-(--deck-chip) px-[8px] text-[12px] text-(--deck-chip-fg)"
           style={{ left: CALLOUT_SLOTS[i].x * width, top: CALLOUT_SLOTS[i].y * height, width: chipW, height: chipH }}
         >
-          <span className="flex size-[20px] shrink-0 items-center justify-center rounded-full text-[10.5px]" style={{ background: 'var(--deck-marker)', color: 'var(--deck-marker-fg)' }}>
-            {pad(c.no)}
-          </span>
+          <img src={markerSrc(c.deviceType ?? 'other')} alt="" className="size-[20px] shrink-0" />
           <span className="truncate font-semibold">{c.code}</span>
         </span>
       ))}
@@ -331,20 +345,6 @@ export function PlanView({
   const vy = fit(box.y, box.h, vh, SH)
   const u = (px: number) => px / k
   const dense = points.length > 48
-  // 方案是给客户看的：图上只画设备图标和序号，不印施工代号（代号在施工交底里）
-  const showCodes = false
-  const r = u(dense ? 8.5 : 10.5)
-  const symbols = ctx.markers === 'symbol'
-  const placed = points.filter((p) => p.rx != null && p.ry != null)
-  /** 标签（代号或编号）放在点位右侧；右侧位置被其它点位占住时不画，避免叠字 */
-  const labelFits = (p: DeckPoint, text: string, offset: number) => {
-    const cx = p.rx! * SW
-    const cy = p.ry! * SH
-    const x0 = cx + offset
-    const x1 = x0 + u(text.length * 7.2 + 4)
-    const hy = u(8) + r
-    return !placed.some((q) => q !== p && q.rx! * SW + r > x0 && q.rx! * SW - r < x1 && Math.abs(q.ry! * SH - cy) < hy)
-  }
   return (
     <div className="relative shrink-0 overflow-hidden" style={{ width, height }}>
       {sheet.url ? (
@@ -384,30 +384,10 @@ export function PlanView({
           if (p.rx == null || p.ry == null) return null
           const cx = p.rx * SW
           const cy = p.ry * SH
-          if (symbols) {
-            const s = u(dense ? 18 : 22)
-            return (
-              <g key={p.id}>
-                <image href={markerSrc(p.deviceType)} x={cx - s / 2} y={cy - s / 2} width={s} height={s} />
-                {p.no && labelFits(p, pad(p.no), s / 2 + u(2)) ? (
-                  <text x={cx + s / 2 + u(2)} y={cy - s / 2 + u(8)} fontSize={u(10)} fontWeight={600} style={{ fill: 'var(--deck-plan-code)', fontFamily: 'var(--doc-font-latin)' }} stroke="#ffffff" strokeWidth={u(3)} paintOrder="stroke">
-                    {pad(p.no)}
-                  </text>
-                ) : null}
-              </g>
-            )
-          }
+          const s = u(dense ? 20 : 24)
           return (
             <g key={p.id}>
-              <circle cx={cx} cy={cy} r={r} style={{ fill: 'var(--deck-marker)', stroke: 'var(--deck-marker-ring)' }} strokeWidth={u(1.5)} />
-              <text x={cx} y={cy + u(dense ? 3 : 3.6)} textAnchor="middle" fontSize={u(dense ? 8 : 10)} fontWeight={600} style={{ fill: 'var(--deck-marker-fg)', fontFamily: 'var(--doc-font-latin)' }}>
-                {p.no ? pad(p.no) : '·'}
-              </text>
-              {showCodes && p.code && labelFits(p, p.code, r + u(4)) ? (
-                <text x={cx + r + u(4)} y={cy + u(4)} fontSize={u(11.5)} fontWeight={600} style={{ fill: 'var(--deck-plan-code)', fontFamily: 'var(--doc-font-latin)' }} stroke="#ffffff" strokeWidth={u(3)} paintOrder="stroke">
-                  {p.code}
-                </text>
-              ) : null}
+              <image href={markerSrc(p.deviceType)} x={cx - s / 2} y={cy - s / 2} width={s} height={s} />
             </g>
           )
         })}

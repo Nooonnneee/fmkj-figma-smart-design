@@ -7,18 +7,23 @@ import { contractStatusLabel, fmtLongDate, paymentAmounts } from '@/lib/contract
 import { FINAL_QUOTE_SOURCE_LABEL, resolveFinalQuote } from '@/lib/deliverables'
 import { FEATURE_TIERS, featureAccess, tierBadge } from '@/lib/membership'
 import { getMembershipContext } from '@/lib/membership-policy'
+import { deviceTypeOf } from '@/lib/device-types'
 import { inferScopeFromTitle } from '@/lib/point-scopes'
+import { normalizeScene, planAreaOf, sceneAreas, scenePoints, sceneSheets } from '@/lib/point-scene'
 import { projectDisplayName, quoteShortTitle } from '@/lib/project-name'
 import { quoteStatusLabel, yuan } from '@/lib/quotes'
 import { cn } from '@/lib/utils'
+import { buildTemplateGallery, getTemplatePreviewDocs } from '@/plugins/proposal/preview'
 import { loadProposalTemplates } from '@/plugins/proposal/registry'
-import { DEFAULT_PROPOSAL_TEMPLATE, resolveProposalTemplate } from '@/plugins/proposal/templates'
+import { DEFAULT_PROPOSAL_TEMPLATE, ownerTemplates, resolveProposalTemplate } from '@/plugins/proposal/templates'
 import { getPluginFlags } from '@/plugins/state'
 
 import { getProject, getProjectDeals } from '../project-data'
 import { ArchiveButton } from './archive-button'
 import { CopyClientLinkButton } from './copy-client-link'
 import { DeliveryPackage, type DeliveryDoc } from './delivery-package'
+import { SocialPosterDialog, type SocialPosterData } from './social-poster-dialog'
+import { ArchiveTemplatePicker } from './template-picker-field'
 import { parseShareConfig } from '@/lib/project-access'
 
 /** 归档：核对资料 → 确认定稿（一份报价、一份方案）→ 打包交付资料 → 归档（项目转为只读）。 */
@@ -31,15 +36,57 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
     await payload.update({ collection: 'projects', id: project.id, data: { shareConfig } as never, overrideAccess: true, depth: 0 }).catch(() => null)
   }
   const ownerId = relId(project.owner) || user.id
-  const [flags, templates, company, access] = await Promise.all([getPluginFlags(ownerId), loadProposalTemplates(user), getCompanyInfo(ownerId), getMembershipContext(user)])
+  const [flags, templates, company, access, fullSceneDoc, previewDocs] = await Promise.all([
+    getPluginFlags(ownerId),
+    loadProposalTemplates(user),
+    getCompanyInfo(ownerId),
+    getMembershipContext(user),
+    payload.findByID({ collection: 'projects', id: project.id, depth: 0, overrideAccess: true, select: { pointMap: true } }).catch(() => null),
+    getTemplatePreviewDocs().catch(() => null),
+  ])
   const pid = String(project.id)
   const points = project.pointCount ?? 0
   const final = resolveFinalQuote(quotes, { contractQuoteId: relId(contract?.quote), finalQuoteId: relId(project.finalQuote) })
   const finalQuote = final.quote
+
+  // 组装「小红书 / 朋友圈 3:4 案例晒单海报」数据（自动脱敏，只用小区名或项目简称，不暴露业主姓名电话）
+  const normalized = normalizeScene(fullSceneDoc?.pointMap as never)
+  const allSheets = sceneSheets(normalized.elements, normalized.files).filter((s) => s.url)
+  const allAreas = sceneAreas(normalized.elements, allSheets)
+  const allPoints = scenePoints(normalized.elements, allSheets, allAreas)
+  const firstSheet = allSheets[0] ?? null
+  const typeCounter = new Map<string, number>()
+  for (const pt of allPoints) {
+    typeCounter.set(pt.deviceType, (typeCounter.get(pt.deviceType) ?? 0) + 1)
+  }
+  const topTypes = [...typeCounter.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([type, count]) => ({ type, name: deviceTypeOf(type)?.name ?? '设备', count }))
+  const posterData: SocialPosterData = {
+    title: project.community?.trim() || projectDisplayName(project.name),
+    platform: project.platform || '全屋智能',
+    pointCount: allPoints.length || points,
+    roomCount: new Set(allPoints.map((p) => p.areaId).filter(Boolean)).size || allAreas.length,
+    floorCount: allSheets.length,
+    totalAmount: finalQuote?.total ?? project.budget ?? null,
+    companyName: company.name,
+    qrCodeUrl: company.qrCode?.url ?? '/brand/wechat-contact-qr.jpg',
+    sheet: firstSheet
+      ? {
+          name: firstSheet.name,
+          url: firstSheet.url!,
+          points: allPoints
+            .filter((p) => p.sheetId === firstSheet.id && p.rx !== null && p.ry !== null)
+            .map((p) => ({ id: p.id, deviceType: p.deviceType, code: p.code, rx: p.rx, ry: p.ry })),
+          areas: allAreas.filter((a) => a.sheetId === firstSheet.id).map((a) => planAreaOf(a, firstSheet)),
+        }
+      : null,
+    topTypes,
+  }
   const payments = contract?.payments ?? []
   const amounts = paymentAmounts(contract?.amount ?? 0, payments)
   const received = payments.filter((p) => p.received).length
-  const deckTemplates = templates.filter((t) => t.framework !== 'construction')
+  const deckTemplates = ownerTemplates(templates)
   const tpl =
     resolveProposalTemplate(project.proposalTemplate, deckTemplates) ??
     resolveProposalTemplate(DEFAULT_PROPOSAL_TEMPLATE, deckTemplates) ??
@@ -100,6 +147,7 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
             note: points ? '' : '未布置点位',
             url: proposalUrl,
             defaultOn: true,
+            tierBadge: tpl ? (tierBadge(tpl.tier) as 'Go' | 'Plus' | 'Pro') : 'Go',
           },
         ]
       : []),
@@ -123,6 +171,7 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
             note: points ? '' : '未布置点位',
             url: points ? `/print/projects/${pid}/wiring` : null,
             defaultOn: false,
+            tierBadge: 'Plus' as const,
           },
         ]
       : []),
@@ -134,6 +183,7 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
             note: points ? '' : '未布置点位',
             url: points ? `/print/projects/${pid}/procurement?cost=0` : null,
             defaultOn: false,
+            tierBadge: 'Pro' as const,
           },
         ]
       : []),
@@ -145,6 +195,7 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
             note: points ? '' : '未布置点位',
             url: points ? `/print/projects/${pid}/handover` : null,
             defaultOn: true,
+            tierBadge: 'Plus' as const,
           },
         ]
       : []),
@@ -163,6 +214,14 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
   const pkg = featureAccess(access.membership, FEATURE_TIERS.package, access.strict)
   const otherQuotes = quotes.filter((q) => String(q.id) !== String(finalQuote?.id ?? ''))
   const otherTemplates = flags.proposal && points ? deckTemplates.filter((t) => t.value !== tpl?.value) : []
+  // 交付方案模板选择器：缩略图用示例别墅（各项目共用缓存），预览样张用本项目的数据
+  const gallery = flags.proposal ? buildTemplateGallery(deckTemplates, previewDocs, { tier: access.membership.effectiveTier, strict: access.strict, insights: flags['room-insights'] }) : null
+  const previewLinks = Object.fromEntries(
+    deckTemplates.map((t) => [
+      t.value,
+      `/print/projects/${pid}/proposal?${new URLSearchParams({ template: t.value, embed: '1', ...(finalQuote ? { quoteId: String(finalQuote.id), scope: inferScopeFromTitle(finalQuote.title) } : {}) }).toString()}`,
+    ]),
+  )
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
@@ -171,7 +230,10 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
           <h2 className="text-xl font-semibold tracking-tight">归档</h2>
           {archived ? <p className="text-sm text-muted-foreground">已于 {fmtLongDate(project.archivedAt)} 归档（只读）</p> : null}
         </div>
-        {shareConfig.enabled ? <CopyClientLinkButton token={shareConfig.token} /> : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {points > 0 ? <SocialPosterDialog data={posterData} /> : null}
+          {shareConfig.enabled ? <CopyClientLinkButton token={shareConfig.token} /> : null}
+        </div>
       </header>
 
       <DeliveryPackage
@@ -181,8 +243,19 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
         docs={docs}
         quotes={quotes.map((q) => ({ value: String(q.id), label: `${qTitle(q)} · ${yuan(q.total)}` }))}
         finalQuote={{ id: finalQuote ? String(finalQuote.id) : null, sourceLabel: final.source ? FINAL_QUOTE_SOURCE_LABEL[final.source] : null, locked: final.source === 'contract' }}
-        templates={deckTemplates.map((t) => ({ value: t.value, label: t.tier === 'free' ? t.label : `${t.label} · ${tierBadge(t.tier)}` }))}
-        template={tpl?.value ?? ''}
+        proposalPicker={
+          gallery && deckTemplates.length ? (
+            <ArchiveTemplatePicker
+              projectId={pid}
+              templates={gallery.items}
+              thumbs={gallery.thumbs}
+              value={tpl?.value ?? null}
+              previewLinks={previewLinks}
+              editable={!readOnly}
+              strict={access.strict}
+            />
+          ) : undefined
+        }
         cover={{
           company: company.name,
           customer: project.customerName ?? '',

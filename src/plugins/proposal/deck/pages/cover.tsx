@@ -6,7 +6,7 @@
 import { pointScopeLabel } from '@/lib/point-scopes'
 
 import { pad, yuanShort } from '../model'
-import { Brand, headerTagline, Slide, type DeckCtx } from '../parts'
+import { Brand, headerTagline, imgLoading, Slide, type DeckCtx } from '../parts'
 
 const SUBTITLE = '全屋智能 · 点位设计与服务报价'
 
@@ -35,7 +35,7 @@ export function CoverPage({ ctx, no, total }: { ctx: DeckCtx; no: number; total:
         <p className="doc-latin text-[12px] whitespace-nowrap text-doc-muted">{t.coverTagline}</p>
       </div>
       <div className="absolute inset-x-0 top-[90px] h-[520px] overflow-hidden">
-        <img src={t.coverPhoto} alt="" loading="eager" decoding="sync" className="size-full object-cover" />
+        <img src={t.coverPhoto} alt="" {...imgLoading(ctx)} className="size-full object-cover" />
         <span className="doc-body absolute bottom-[26px] left-[56px] bg-white px-[12px] py-[5px] text-[11px] text-[#252523]">{t.photoNote}</span>
       </div>
       <div className="absolute top-[648px] left-[56px] w-[830px]">
@@ -73,7 +73,7 @@ function ImmersiveCover({ ctx, no, total }: { ctx: DeckCtx; no: number; total: n
   ]
   return (
     <Slide ctx={ctx} no={no} total={total} name="01 封面" cover>
-      <img src={t.coverPhoto} alt="" loading="eager" decoding="sync" className="absolute inset-0 size-full object-cover" />
+      <img src={t.coverPhoto} alt="" {...imgLoading(ctx)} className="absolute inset-0 size-full object-cover" />
       <div aria-hidden className="absolute inset-0 bg-linear-to-r from-doc-paper via-doc-paper/80 to-doc-paper/10" />
       <div aria-hidden className="absolute inset-x-0 bottom-0 h-[420px] bg-linear-to-t from-doc-paper via-doc-paper/85 to-transparent" />
       <div className="absolute inset-x-[56px] top-[36px] flex h-[34px] items-center justify-between">
@@ -144,7 +144,7 @@ function SplitCover({ ctx, no, total }: { ctx: DeckCtx; no: number; total: numbe
         </div>
       </div>
       <div className="absolute top-[36px] right-[56px] h-[888px] w-[636px] overflow-hidden rounded-[28px]">
-        <img src={t.coverPhoto} alt="" loading="eager" decoding="sync" className="size-full object-cover" />
+        <img src={t.coverPhoto} alt="" {...imgLoading(ctx)} className="size-full object-cover" />
         <span className="doc-body absolute bottom-[22px] left-[22px] rounded-full bg-(--deck-chip) px-[12px] py-[5px] text-[11px] text-(--deck-chip-ink)">{t.photoNote}</span>
       </div>
       <div className="absolute top-[906px] left-[56px] flex w-[640px] justify-between leading-normal">

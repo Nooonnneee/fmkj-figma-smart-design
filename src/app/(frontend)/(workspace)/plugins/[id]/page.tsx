@@ -10,15 +10,17 @@ import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
 import { getCompanyInfo } from '@/lib/cached-data'
 import { getPayloadClient } from '@/lib/payload'
-import { isPluginId, PLUGINS } from '@/plugins'
+import { AI_PERMISSIONS, isPluginId, PLUGINS } from '@/plugins'
 import { DEFAULT_AI_TEMPLATES, enabledAiModels } from '@/plugins/ai-copilot/templates'
 import { PLUGIN_DOC_STYLES } from '@/plugins/doc-styles/styles'
 import { featureAccess, tierBadge } from '@/lib/membership'
 import { getMembershipContext } from '@/lib/membership-policy'
 import { PLUGIN_STAGES } from '@/plugins'
+import { buildTemplateGallery, getTemplatePreviewDocs } from '@/plugins/proposal/preview'
 import { loadProposalTemplates } from '@/plugins/proposal/registry'
 import { getPluginFlags } from '@/plugins/state'
 
+import { TemplateCard } from '@/components/proposal-template-card'
 import { PluginDetailToggle } from './plugin-detail-toggle'
 import { projectDisplayName } from '@/lib/project-name'
 import { redirectToLogin } from '@/lib/login-redirect'
@@ -39,7 +41,7 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
   if (!plugin) notFound()
 
   const payload = await getPayloadClient()
-  const [flags, company, access, templates, projectsRes] = await Promise.all([
+  const [flags, company, access, templates, projectsRes, previewDocs] = await Promise.all([
     getPluginFlags(user.id),
     getCompanyInfo(user.id),
     getMembershipContext(user),
@@ -54,6 +56,7 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
       overrideAccess: false,
       select: { name: true, customerName: true, platform: true, pointCount: true },
     }),
+    plugin.id === 'proposal' ? getTemplatePreviewDocs().catch(() => null) : Promise.resolve(null),
   ])
 
   const enabled = flags[plugin.id]
@@ -61,6 +64,7 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
   const stage = PLUGIN_STAGES.find((s) => s.key === plugin.stage)!
   const tierOk = featureAccess(access.membership, plugin.tier, access.strict)
   const activeAiModels = enabledAiModels(company.aiModels)
+  const gallery = plugin.id === 'proposal' ? buildTemplateGallery(templates, previewDocs, { tier: access.membership.effectiveTier, strict: access.strict }) : null
   const projects = projectsRes.docs.map((p) => ({
     id: String(p.id),
     name: projectDisplayName(p.name),
@@ -201,20 +205,72 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
             </div>
           ) : null}
 
-          {plugin.id === 'proposal' ? (
-            <div className="space-y-2 border-t pt-4">
-              <div className="text-xs font-medium text-muted-foreground">可用的方案模板（{templates.length} 套，后台「方案 → 方案模板」可调整）</div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {templates.map((tpl) => (
-                  <div key={tpl.value} className="rounded-lg border p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium">{tpl.label}</span>
-                      {tpl.tier !== 'free' ? <Badge variant="outline" className="h-4 px-1.5 text-xs">{tierBadge(tpl.tier)}</Badge> : null}
-                    </div>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{tpl.description}</p>
-                  </div>
+          {gallery ? (
+            <div className="space-y-3 border-t pt-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-medium text-muted-foreground">
+                  可用的方案模板（业主方案 {gallery.items.filter((t) => t.kind === 'owner').length} 套 · 施工交底 {gallery.items.filter((t) => t.kind === 'construction').length} 套）
+                </span>
+                <Button asChild variant="outline" size="xs">
+                  <Link href="/templates" target="_blank">
+                    打开模板库
+                    <ExternalLink className="size-3" />
+                  </Link>
+                </Button>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {gallery.items.map((t) => (
+                  <TemplateCard key={t.value} t={t} thumb={gallery.thumbs[t.value]} />
                 ))}
               </div>
+            </div>
+          ) : null}
+
+          {plugin.ai ? (
+            <div className="space-y-3 border-t pt-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-medium text-muted-foreground">
+                  插件 AI 元数据（工具 {plugin.ai.tools.length} · 技能 {plugin.ai.skills.length} · 知识条目 {plugin.ai.knowledge.length}）
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  {plugin.ai.permissions.map((perm) => {
+                    const meta = AI_PERMISSIONS.find((p) => p.value === perm)
+                    return (
+                      <Badge key={perm} variant="outline" className="font-mono text-[10px] font-normal" title={meta?.label}>
+                        {perm}
+                      </Badge>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {plugin.ai.tools.length > 0 ? (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {plugin.ai.tools.map((tool) => (
+                    <div key={tool.name} className="rounded-lg border p-3 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium">{tool.title}</span>
+                        <Badge variant="secondary" className="font-mono text-[10px]">
+                          +{tool.cost} 积分 · {tool.mutates ? '写入' : '只读'}
+                        </Badge>
+                      </div>
+                      <code className="mt-0.5 block font-mono text-[11px] text-muted-foreground">{tool.name}</code>
+                      <p className="mt-1 text-muted-foreground">{tool.description}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {plugin.ai.knowledge.length > 0 ? (
+                <div className="space-y-1.5">
+                  {plugin.ai.knowledge.map((k) => (
+                    <div key={k.id} className="rounded-lg border bg-muted/20 px-3 py-2 text-xs">
+                      <span className="font-medium">{k.title}：</span>
+                      <span className="text-muted-foreground">{k.summary}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : null}
         </CardContent>

@@ -23,12 +23,12 @@ function callouts(zone: DeckZone) {
     const ib = CALLOUT_ORDER.indexOf(b.deviceType)
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)
   })
-  const out: { no: number; code: string }[] = []
+  const out: { no: number; code: string; deviceType: string }[] = []
   for (const p of pts) {
     if (out.length >= 2) break
     // 标注用设备名称（客户看得懂），不用施工代号；同类设备只标一个
     if (out.some((o) => o.code === p.typeName)) continue
-    out.push({ no: p.no, code: p.typeName })
+    out.push({ no: p.no, code: p.typeName, deviceType: p.deviceType })
   }
   return out
 }

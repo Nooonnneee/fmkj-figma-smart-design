@@ -1,6 +1,7 @@
+import Image from 'next/image'
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Gift, MessageCircle, Sparkles } from 'lucide-react'
 
 import { AppsSection } from '@/components/landing/apps-section'
 import { DeliverySection } from '@/components/landing/delivery-section'
@@ -27,15 +28,16 @@ export const metadata: Metadata = {
 const DOC_STYLES = [MINIMAL_STYLE, ...PLUGIN_DOC_STYLES]
 
 /**
- * 首页：产品本身就是展示。数据来自系统内置的示例母版项目。
- * 必须在请求时读取数据库（构建阶段没有数据库，静态生成会拿不到示例项目，
- * 导致上线后一段时间首页项目演示消失），因此强制动态渲染。
+ * 首页：产品本身就是展示。数据来自系统内置的示例母版项目，
+ * 按小时重新生成（示例母版很少改动；改动后最迟一小时生效）。
  */
-export const dynamic = 'force-dynamic'
+export const revalidate = 3600
 
 export default async function HomePage() {
   const [data, company] = await Promise.all([getLandingShowcase().catch(() => null), getCompanyInfo().catch(() => null)])
   const hasDemo = Boolean(data?.sheets.length)
+  const wechatQrUrl = company?.qrCode?.url ?? '/brand/wechat-contact-qr.jpg'
+  const wechatQrCaption = company?.qrCaption ?? '扫码添加微信'
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || process.env.FIGMA_PUBLIC_URL || 'https://fmkj.top').replace(/\/+$/, '')
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -138,25 +140,59 @@ export default async function HomePage() {
         {data ? <LibrarySection products={data.library.products} brands={data.library.brands} /> : null}
         <AppsSection />
 
-        <section aria-labelledby="closing-title" className="border-t border-border/70 px-4 py-24 text-center sm:px-6 sm:py-32 lg:px-8">
-          <h2 id="closing-title" className="mx-auto max-w-3xl text-headline font-medium">
-            下一个项目，从一张户型图开始
-          </h2>
-          <p className="mx-auto mt-5 max-w-xl text-lead text-muted-foreground">免费注册即送 20 AI 积分，并自带一份三层别墅示例项目。</p>
-          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <Button asChild size="lg" className="h-11 rounded-full bg-foreground px-6 text-base text-background hover:bg-foreground/85">
-              <Link href="/projects">
-                进入工作台
-                <ArrowRight data-icon="inline-end" />
-              </Link>
-            </Button>
-            <Button asChild size="lg" variant="outline" className="h-11 rounded-full px-6 text-base">
-              <Link href="/login?mode=register">免费注册</Link>
-            </Button>
+        <section aria-labelledby="closing-title" className="border-t border-border/70 px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
+          <div className="mx-auto grid max-w-5xl items-center gap-10 rounded-3xl border bg-card p-6 shadow-xs sm:p-10 lg:grid-cols-[1fr_auto]">
+            <div className="space-y-5 text-left">
+              <div className="inline-flex items-center gap-1.5 rounded-full border bg-muted/50 px-3 py-1 text-xs font-medium text-muted-foreground">
+                <Sparkles className="size-3.5 text-primary" />
+                全屋智能设计师与集成商专属福利
+              </div>
+              <h2 id="closing-title" className="text-headline font-medium">
+                下一个项目，从一张户型图开始
+              </h2>
+              <p className="max-w-xl text-base leading-relaxed text-muted-foreground">
+                免费注册即送 <strong className="font-semibold text-foreground">20 AI 积分</strong> 并自带完整三层别墅示例项目。添加微信可领取
+                <strong className="font-semibold text-foreground"> 7 天专业版体验兑换码</strong>（解锁全套高定提案模板、施工水电布线表与一键交付包），或咨询团队私有化部署。
+              </p>
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <Button asChild size="lg" className="h-11 rounded-full bg-foreground px-6 text-base text-background hover:bg-foreground/85">
+                  <Link href="/projects">
+                    进入工作台
+                    <ArrowRight data-icon="inline-end" />
+                  </Link>
+                </Button>
+                <Button asChild size="lg" variant="outline" className="h-11 rounded-full px-6 text-base">
+                  <Link href="/login?mode=register">
+                    <Gift className="size-4" />
+                    免费注册领 20 积分
+                  </Link>
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center gap-3 rounded-2xl border bg-muted/30 p-5 text-center sm:min-w-56">
+              <div className="overflow-hidden rounded-xl border bg-white p-2 shadow-2xs">
+                <Image
+                  src={wechatQrUrl}
+                  alt={wechatQrCaption}
+                  width={152}
+                  height={152}
+                  unoptimized
+                  className="size-36 object-contain"
+                />
+              </div>
+              <div className="space-y-0.5">
+                <p className="flex items-center justify-center gap-1.5 text-sm font-semibold">
+                  <MessageCircle className="size-4 text-primary" />
+                  {wechatQrCaption}
+                </p>
+                <p className="text-xs text-muted-foreground">领专业版体验码 · 部署与合作咨询</p>
+              </div>
+            </div>
           </div>
         </section>
       </main>
-      <LandingFooter />
+      <LandingFooter qrCodeUrl={wechatQrUrl} qrCaption={wechatQrCaption} />
     </div>
   )
 }

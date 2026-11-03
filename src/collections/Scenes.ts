@@ -1,14 +1,16 @@
 import type { CollectionConfig } from 'payload'
 
-import { cmsAdminOnly, cmsAdminOrMember } from '@/lib/access'
+import { cmsAdminOnly, cmsAdminOrMember, isCmsAdmin } from '@/lib/access'
 import { AREA_TYPES } from '@/lib/area-types'
 import { DEVICE_TYPES } from '@/lib/device-types'
+import { revalidateTemplatePages } from '@/lib/revalidate-templates'
 
 const deviceOptions = DEVICE_TYPES.map((t) => ({ label: t.name, value: t.value }))
 
 /**
  * 场景库：方案里展示的智能场景（回家、离家、观影、起夜……）。
  * 生成方案时按项目实际的房间和设备匹配：只有满足条件的场景才会出现，并且只引用项目里真实存在的设备。
+ * 场景库一条启用的都没有时，方案使用内置场景库（lib/builtin-scenes.ts），「生活场景」章节不会空白。
  */
 export const Scenes: CollectionConfig = {
   slug: 'scenes',
@@ -17,7 +19,8 @@ export const Scenes: CollectionConfig = {
     useAsTitle: 'name',
     defaultColumns: ['name', 'scope', 'chapter', 'enabled', 'sortOrder'],
     group: '方案',
-    description: '方案中的智能场景。生成方案时按房间类型和设备自动匹配，条件不满足的场景不会出现。',
+    description: '方案中的智能场景。生成方案时按房间类型和设备自动匹配，条件不满足的场景不会出现；文案只写匹配条件里的设备能做到的事。全部停用时方案改用内置场景库。',
+    components: { beforeListTable: ['@/components/admin/library-banner#ScenesLibraryBanner'] },
   },
   defaultSort: 'sortOrder',
   access: {
@@ -25,6 +28,37 @@ export const Scenes: CollectionConfig = {
     create: cmsAdminOnly,
     update: cmsAdminOnly,
     delete: cmsAdminOnly,
+  },
+  endpoints: [
+    {
+      // 补齐内置场景（含图片）；已有的场景按标识跳过
+      path: '/seed-builtins',
+      method: 'post',
+      handler: async (req) => {
+        if (!isCmsAdmin(req)) return Response.json({ error: '无权限' }, { status: 403 })
+        const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host')
+        const proto = req.headers.get('x-forwarded-proto') ?? (host?.startsWith('localhost') ? 'http' : 'https')
+        const { seedBuiltinScenes } = await import('@/lib/proposal-library')
+        const result = await seedBuiltinScenes(req.payload, { origin: host ? `${proto}://${host}` : undefined })
+        revalidateTemplatePages('all')
+        return Response.json(result)
+      },
+    },
+  ],
+  hooks: {
+    // 场景会出现在每一份示例样张里：变动后刷新整个模板库
+    afterChange: [
+      ({ doc }) => {
+        revalidateTemplatePages('all')
+        return doc
+      },
+    ],
+    afterDelete: [
+      ({ doc }) => {
+        revalidateTemplatePages('all')
+        return doc
+      },
+    ],
   },
   fields: [
     {

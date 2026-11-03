@@ -1,15 +1,18 @@
 import { dwgConverterPlugin } from './dwg-converter'
+import { PLUGIN_AI_SPECS } from './ai-catalog'
 import { PLUGIN_DOC_STYLES } from './doc-styles/styles'
 import type { AppPlugin, PluginId } from './types'
 
 export type { AppPlugin, PluginId, PluginStage } from './types'
 export { PLUGIN_STAGES } from './types'
+export { PLUGIN_AI_SPECS, allAiSkillSpecs, allAiToolSpecs, validatePluginAiPermissions } from './ai-catalog'
+export { AI_PERMISSIONS, type AiKnowledgeEntry, type AiPermission, type AiSkillSpec, type AiToolSpec, type PluginAiSpec } from './ai-types'
 
 /**
  * 已安装的插件。新增插件：在 src/plugins/<id>/ 写好功能，再在这里登记清单。
  * 主链路（项目信息、点位布置、报价、合同、归档、产品库、设置）不依赖任何插件。
  */
-export const PLUGINS: AppPlugin[] = [
+const RAW_PLUGINS: AppPlugin[] = [
   {
     id: 'ai-copilot',
     stage: 'global',
@@ -156,6 +159,11 @@ export const PLUGINS: AppPlugin[] = [
     provides: ['质保台账', '检修记录', '配置备份'],
   },
 ]
+
+export const PLUGINS: AppPlugin[] = RAW_PLUGINS.map((p) => ({
+  ...p,
+  ai: PLUGIN_AI_SPECS[p.id],
+}))
 
 export const PLUGIN_IDS = PLUGINS.map((p) => p.id)
 export const isPluginId = (v: unknown): v is PluginId => PLUGIN_IDS.includes(v as PluginId)

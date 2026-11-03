@@ -2,6 +2,7 @@ import type { Plugin as PayloadPlugin } from 'payload'
 
 import type { DocStyle } from '@/documents/types'
 import type { MembershipTier } from '@/lib/membership'
+import type { PluginAiSpec } from './ai-types'
 
 /** 插件服务于项目的哪个阶段（插件市场按阶段分组，项目里按阶段给出入口） */
 export type PluginStage = 'design' | 'quote' | 'build' | 'after' | 'global'
@@ -33,6 +34,8 @@ export type AppPlugin = {
   payload?: PayloadPlugin
   /** 提供的文档风格 */
   docStyles?: DocStyle[]
+  /** 插件向 AI 助手注册的工具、技能模板、领域知识、调用指导与权限声明 */
+  ai?: PluginAiSpec
 }
 
 export type PluginId =

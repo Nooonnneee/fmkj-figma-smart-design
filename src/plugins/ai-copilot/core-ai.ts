@@ -1,0 +1,359 @@
+import { DESIGN_RULE_TEXT } from '@/lib/design-rules'
+import { DEVICE_CATEGORIES } from '@/lib/device-types'
+import { PROJECT_PLATFORMS } from '@/lib/projects'
+import type { PluginAiSpec } from '@/plugins/ai-types'
+
+/**
+ * 核心工作台 AI 能力（随 ai-copilot 插件启用）：
+ * 覆盖项目信息、点位图、产品库检索、报价单、合同与导出链接。
+ */
+export const coreAiSpec: PluginAiSpec = {
+  permissions: [
+    'projects:read',
+    'projects:write',
+    'point-map:read',
+    'point-map:write',
+    'catalog:read',
+    'defaults:write',
+    'quotes:read',
+    'quotes:write',
+    'contracts:read',
+    'contracts:write',
+    'documents:read',
+  ],
+  guidance: [
+    '当用户提出创建或修改请求时，主动调用对应工具直接完成操作（可分多步连续调用，例如：新建项目 → 布置房间和点位 → 智能选型 → 生成报价单），不要只给口头步骤。',
+    '当用户上传了真实户型图图片时，严禁调用 setup_rooms_and_points 生成网格默认点位！只有图像真实识别出点位（add_floor_sheet 的 detectedPoints）或用户提供了点位 JSON（import_points_json）时才生成点位图标；若未识别出点位，保持点位图为空（0 点位）。',
+  ],
+  knowledge: [
+    {
+      id: 'core-workflow',
+      title: '平台五步核心业务主链路',
+      summary: '项目信息 → 点位图设计 → 报价台 → 施工合同 → 归档导出',
+      rules: [
+        '主链路固定为：1. 项目信息 → 2. 点位图（fmkj-board-system）→ 3. 报价单（与点位双向同步）→ 4. 施工合同（三阶段分期付款）→ 5. 归档与交付资料包。',
+        `支持的生态主平台：${PROJECT_PLATFORMS.join('、')}。`,
+        `设备 11 大类及编号前缀：${DEVICE_CATEGORIES.map((c) => `${c.name}(${c.code})`).join('、')}。`,
+      ],
+    },
+    {
+      id: 'point-design-rules',
+      title: '点位图照图识别与默认设计规范',
+      summary: '强电开关插座灯具只照图识别，弱电与传感器按数量规范布置',
+      rules: [
+        DESIGN_RULE_TEXT,
+        '导出点位图与方案平面图时统一直接展示标准化 SVG 设备图标，不使用纯数字圆点代号。',
+      ],
+    },
+  ],
+  skills: [],
+  tools: [
+    {
+      name: 'list_projects',
+      title: '项目查询',
+      description: '查询或搜索项目列表（可按关键词、状态、主平台筛选），也可用来把某个已有项目设为当前操作项目。',
+      cost: 0.2,
+      permissions: ['projects:read'],
+      scope: 'workspace',
+      mutates: false,
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: '项目名称、客户姓名或小区关键词（可选）' },
+          status: { type: 'string', enum: ['active', 'archived', 'all'], description: '进行中 active / 已归档 archived / 全部 all（默认 active）' },
+          switchToProjectId: { type: 'string', description: '如果需要切换到某个项目继续操作，传入该项目 ID（可选）' },
+        },
+      },
+    },
+    {
+      name: 'create_project',
+      title: '新建项目',
+      description: '创建一个新的全屋智能项目。项目名称留空时会按「小区 + 房号」或客户姓名自动生成。创建成功后会自动将当前会话关联到该新项目。',
+      cost: 0.5,
+      permissions: ['projects:write'],
+      scope: 'workspace',
+      mutates: true,
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: '项目名称（可选，留空自动按小区+房号或客户名生成）' },
+          customerName: { type: 'string', description: '客户姓名（如 张先生）' },
+          customerPhone: { type: 'string', description: '客户电话' },
+          community: { type: 'string', description: '小区 / 楼盘名称（如 西溪壹号）' },
+          address: { type: 'string', description: '房号 / 详细地址（如 3幢1201）' },
+          platform: {
+            type: 'string',
+            enum: [...PROJECT_PLATFORMS],
+            description: '主平台（米家 / Aqara Home / Apple Home / 华为鸿蒙智家 / KNX / Control4 / 网络/弱电 / 待定）',
+          },
+          budget: { type: 'number', description: '客户预算（元，可选）' },
+          notes: { type: 'string', description: '项目备注（可选）' },
+        },
+      },
+    },
+    {
+      name: 'update_project',
+      title: '修改项目信息',
+      description: '修改当前关联项目（或指定 projectId）的基本信息、主平台、预算、备注，或将项目归档/恢复。',
+      cost: 0.5,
+      permissions: ['projects:write'],
+      scope: 'project',
+      mutates: true,
+      projectArg: 'projectId',
+      allowArchived: true,
+      parameters: {
+        type: 'object',
+        properties: {
+          projectId: { type: 'string', description: '项目 ID（可选，不传则修改当前关联项目）' },
+          name: { type: 'string', description: '项目名称' },
+          customerName: { type: 'string', description: '客户姓名' },
+          customerPhone: { type: 'string', description: '客户电话' },
+          community: { type: 'string', description: '小区 / 楼盘' },
+          address: { type: 'string', description: '房号 / 详细地址' },
+          platform: { type: 'string', enum: [...PROJECT_PLATFORMS], description: '主平台' },
+          budget: { type: 'number', description: '预算（元）' },
+          notes: { type: 'string', description: '备注' },
+          status: { type: 'string', enum: ['active', 'archived'], description: '状态：active 进行中 / archived 已归档' },
+        },
+      },
+    },
+    {
+      name: 'add_floor_sheet',
+      title: '添加户型图纸',
+      description:
+        '将用户在对话框中拖入或上传的户型图图片（带有 url 和 mediaId）添加到当前关联项目的点位图中作为标准楼层图纸。如果上传附件中带有真实识别出的点位（detectedPoints），会一并在图纸对应坐标上生成点位图标；若没有识别出点位，则只添加干净的户型图纸，不生成任何默认点位。',
+      cost: 1,
+      permissions: ['point-map:write'],
+      scope: 'project',
+      mutates: true,
+      parameters: {
+        type: 'object',
+        properties: {
+          url: { type: 'string', description: '上传后返回的图片 URL（如 /api/media/file/...）' },
+          mediaId: { type: 'string', description: '上传后返回的 mediaId' },
+          sheetName: { type: 'string', description: '图纸名称（如 一层平面图、二层开关布置图）' },
+          detectedPoints: {
+            type: 'array',
+            description: '上传户型图时自动识别出的真实点位坐标列表（若无识别点位则不传，不要编造坐标）',
+            items: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', description: '设备类型代号（如 switch-2, switch-3, downlight, ceiling-light）' },
+                x: { type: 'number', description: '0-1 水平比例坐标' },
+                y: { type: 'number', description: '0-1 垂直比例坐标' },
+              },
+              required: ['type', 'x', 'y'],
+            },
+          },
+        },
+        required: ['url'],
+      },
+    },
+    {
+      name: 'import_points_json',
+      title: '导入点位JSON',
+      description: '将用户拖入上传或粘贴的 fmkj-points 格式点位识别 JSON（含 sheets / areas / points）直接导入到当前关联项目的点位图中。',
+      cost: 1,
+      permissions: ['point-map:write'],
+      scope: 'project',
+      mutates: true,
+      parameters: {
+        type: 'object',
+        properties: {
+          jsonText: { type: 'string', description: '完整的点位 JSON 字符串' },
+        },
+        required: ['jsonText'],
+      },
+    },
+    {
+      name: 'setup_rooms_and_points',
+      title: '点位图房间与布点',
+      description:
+        '仅用于【没有上传户型图】的纯文字需求项目，在空白示意图上创建房间框和设备点位。只布置 WiFi AP、网络面板、窗帘电轨、网关、中控屏、VRF 控制器、人体传感器、音箱、摄像头；开关、插座、灯具没有图纸准确点位时不生成。如果项目已经上传了真实户型图（非空白图），严禁调用此工具生成网格默认点位！',
+      cost: 2,
+      permissions: ['point-map:write'],
+      scope: 'project',
+      mutates: true,
+      parameters: {
+        type: 'object',
+        properties: {
+          sheetName: { type: 'string', description: '图纸名称（默认「一层平面图」）' },
+          mode: { type: 'string', enum: ['append', 'replace'], description: 'append 在现有基础上追加（默认）；replace 清空当前图纸后重新生成' },
+          rooms: {
+            type: 'array',
+            description: '要布置的房间及每个房间内的设备点位列表',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: '房间名称（如 玄关、客厅、餐厅、厨房、主卧、次卧、儿童房、书房、主卫、客卫、阳台）' },
+                type: { type: 'string', description: '房间类型可选：entrance, living, dining, kitchen, bedroom, kids, study, bathroom, balcony, corridor, cloakroom, utility' },
+                devices: {
+                  type: 'array',
+                  description: '该房间内要放置的设备类型及数量',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      deviceType: {
+                        type: 'string',
+                        description:
+                          '设备类型（如 switch-1, switch-2, switch-3, switch-4, socket, socket-double, socket-usb, downlight, spotlight, track-light, ceiling-light, light-strip, curtain-track, smart-lock, doorbell, camera, motion-sensor, contact-sensor, water-sensor, smoke-sensor, temp-sensor, gateway, touch-panel, speaker, ac-router, ap-node, network-panel, vrf-controller）',
+                      },
+                      count: { type: 'number', description: '数量（1–20）' },
+                    },
+                    required: ['deviceType', 'count'],
+                  },
+                },
+              },
+              required: ['name', 'devices'],
+            },
+          },
+        },
+        required: ['rooms'],
+      },
+    },
+    {
+      name: 'search_products',
+      title: '产品库检索',
+      description: '搜索平台产品库（728 款在售产品）：可按关键词、设备类型、品牌名称、生态平台、最高价格筛选，返回产品 ID、型号、SKU、品牌、售价与成本。',
+      cost: 0.3,
+      permissions: ['catalog:read'],
+      scope: 'workspace',
+      mutates: false,
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: '搜索关键词（如 零火开关、人体存在、静音窗帘、网关）' },
+          deviceType: { type: 'string', description: '设备类型代号（如 switch-1, switch-2, switch-3, curtain-track, smart-lock, motion-sensor, water-sensor, gateway, downlight）' },
+          brand: { type: 'string', description: '品牌名称（如 Aqara、小米、领普、易来）' },
+          platform: { type: 'string', description: '生态平台（如 米家、Apple Home、华为、涂鸦、Matter、KNX）' },
+          maxPrice: { type: 'number', description: '最高单价（元）' },
+        },
+      },
+    },
+    {
+      name: 'set_project_defaults',
+      title: '指定默认型号',
+      description: '为当前关联项目的指定设备类型设置具体的默认产品型号（传入设备类型与对应的产品 ID）。',
+      cost: 0.5,
+      permissions: ['defaults:write'],
+      scope: 'project',
+      mutates: true,
+      parameters: {
+        type: 'object',
+        properties: {
+          items: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                deviceType: { type: 'string', description: '设备类型代号（如 switch-3, curtain-track）' },
+                productId: { type: 'string', description: '产品 ID（可通过 search_products 获取）' },
+              },
+              required: ['deviceType', 'productId'],
+            },
+          },
+        },
+        required: ['items'],
+      },
+    },
+    {
+      name: 'get_project_details',
+      title: '项目点位与报价明细',
+      description: '读取当前关联项目的详细点位清单、已汇总的产品金额、以及项目下所有报价单和合同信息。',
+      cost: 0.2,
+      permissions: ['projects:read', 'point-map:read', 'quotes:read', 'contracts:read'],
+      scope: 'project',
+      mutates: false,
+      parameters: { type: 'object', properties: {} },
+    },
+    {
+      name: 'create_or_update_quote',
+      title: '报价单生成与修改',
+      description:
+        '为当前关联项目生成一份新的报价单（根据点位图和默认型号汇总），或修改已有的报价单（传入 quoteId 可修改标题、状态 draft/sent/accepted、优惠金额 discount、附加费用 fees 如安装调试费、备注 notes）。',
+      cost: 1,
+      permissions: ['quotes:write'],
+      scope: 'project',
+      mutates: true,
+      parameters: {
+        type: 'object',
+        properties: {
+          quoteId: { type: 'string', description: '要修改的已有报价单 ID（不传则根据点位图新建一份报价单）' },
+          title: { type: 'string', description: '报价单标题（可选）' },
+          status: { type: 'string', enum: ['draft', 'sent', 'accepted'], description: '报价单状态：draft 草稿 / sent 已发送 / accepted 已确认' },
+          discount: { type: 'number', description: '优惠减免金额（元，非负数字）' },
+          fees: {
+            type: 'array',
+            description: '附加费用列表（如安装调试费、线材辅料费）',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: '费用名称（如 安装调试费）' },
+                amount: { type: 'number', description: '金额（元）' },
+              },
+              required: ['name', 'amount'],
+            },
+          },
+          notes: { type: 'string', description: '报价单备注说明' },
+        },
+      },
+    },
+    {
+      name: 'create_or_update_contract',
+      title: '合同生成与管理',
+      description:
+        '为当前关联项目生成合同（若尚无合同则基于最新报价单自动创建），或修改已有合同的金额、工期、质保期、付款分期比例（合计需 100%）、合同条款、签订状态（draft/signed）及各期收款登记。',
+      cost: 1,
+      permissions: ['contracts:write'],
+      scope: 'project',
+      mutates: true,
+      parameters: {
+        type: 'object',
+        properties: {
+          quoteId: { type: 'string', description: '依据的报价单 ID（可选，不传则自动取项目最新报价单）' },
+          amount: { type: 'number', description: '合同总金额（元，可选）' },
+          durationDays: { type: 'number', description: '工期天数（1–365，可选）' },
+          warrantyMonths: { type: 'number', description: '质保月数（0–120，可选）' },
+          payments: {
+            type: 'array',
+            description: '付款节点列表（各期 percent 合计需为 100）',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: '款项节点名称（如 签约预付款 / 设备到场款 / 验收尾款）' },
+                percent: { type: 'number', description: '比例（0–100）' },
+                received: { type: 'boolean', description: '是否已收款' },
+              },
+              required: ['name', 'percent'],
+            },
+          },
+          terms: { type: 'string', description: '合同条款正文（可选）' },
+          status: { type: 'string', enum: ['draft', 'signed'], description: '合同状态：draft 草稿 / signed 已签订' },
+        },
+      },
+    },
+    {
+      name: 'get_document_links',
+      title: '打印与导出文档',
+      description: '获取当前项目所有可打印/导出 PDF 文档的直达链接（点位图、点位交底清单、报价单、合同、方案演示与已启用插件的工程单据），支持指定风格与模板。',
+      cost: 0.2,
+      permissions: ['documents:read'],
+      scope: 'project',
+      mutates: false,
+      parameters: {
+        type: 'object',
+        properties: {
+          style: {
+            type: 'string',
+            enum: ['qixu', 'business', 'oriental', 'tech', 'noir', 'grove', 'minimal'],
+            description: '文档风格：qixu 栖序雅致 / business 商务蓝 / oriental 东方雅韵 / tech 科技 / noir 墨金臻选 / grove 原木自然 / minimal 简约',
+          },
+          template: {
+            type: 'string',
+            description: '方案模板标识（如 qixu, noir, grove, quick, azure, mono, dawn, jade, construction）',
+          },
+        },
+      },
+    },
+  ],
+}

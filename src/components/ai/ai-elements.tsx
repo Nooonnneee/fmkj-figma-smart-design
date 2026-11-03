@@ -18,7 +18,17 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
-export type AiModelOption = { id: string; name: string; provider: string; tag: string; cost: number; reasoning?: boolean; description: string }
+export type AiModelOption = {
+  id: string
+  name: string
+  provider: string
+  tag: string
+  cost: number
+  reasoning?: boolean
+  description: string
+  minTier?: 'free' | 'pro' | 'team'
+  tierBadge?: 'Go' | 'Plus' | 'Pro'
+}
 export type AiConnectablePlugin = { id: string; name: string; description: string; status: 'ready' | 'coming-soon'; enabled: boolean; where: string; provides: string[] }
 export type AiProjectContext = { id: string; name: string; customerName: string | null; platform: string | null; pointCount: number }
 export type AiToolCall = { pluginId: string; pluginName: string; action: string; summary: string; details: string[]; href?: string; hrefLabel?: string }
@@ -393,16 +403,44 @@ export function AiPromptComposer({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button type="button" className="inline-flex h-7 items-center gap-1 rounded-full px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
+                {selectedModel.tierBadge ? (
+                  <span
+                    className={cn(
+                      'rounded px-1 py-0.2 text-[10px] font-semibold',
+                      selectedModel.tierBadge === 'Pro'
+                        ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+                        : selectedModel.tierBadge === 'Plus'
+                          ? 'bg-primary/15 text-primary'
+                          : 'bg-muted text-muted-foreground',
+                    )}
+                  >
+                    {selectedModel.tierBadge}
+                  </span>
+                ) : null}
                 {selectedModel.name}
                 <ChevronDown className="size-3" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" side="top" className="w-60">
-              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">模型</DropdownMenuLabel>
+            <DropdownMenuContent align="start" side="top" className="w-72">
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">选择 AI 模型（Go / Plus / Pro 分档）</DropdownMenuLabel>
               {models.map((m) => (
                 <DropdownMenuItem key={m.id} onSelect={() => onSelectModel(m.id)} className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="text-sm">{m.name}</div>
+                    <div className="flex items-center gap-1.5 text-sm">
+                      <span className="truncate font-medium">{m.name}</span>
+                      <span
+                        className={cn(
+                          'shrink-0 rounded px-1.5 py-0.2 text-[10px] font-semibold',
+                          m.tierBadge === 'Pro'
+                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+                            : m.tierBadge === 'Plus'
+                              ? 'bg-primary/15 text-primary'
+                              : 'bg-muted text-muted-foreground',
+                        )}
+                      >
+                        {m.tierBadge ?? 'Go'}
+                      </span>
+                    </div>
                     <div className="truncate text-xs text-muted-foreground">{m.tag} · 按量计费{m.cost !== 1 ? ` ×${m.cost}` : ''}</div>
                   </div>
                   {m.id === selectedModel.id ? <Check className="size-3.5 shrink-0" /> : null}

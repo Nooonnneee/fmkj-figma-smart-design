@@ -32,8 +32,27 @@ const ALL_SECTIONS: DeckSection[] = ['cover', 'plans', 'system', 'zones', 'scene
  * 按模板的章节顺序生成页面（framework.ts）。没有点位时只保留封面、投资与服务交付。
  */
 export function deckPages(d: ProjectDocsData, theme: DeckTheme, opts: { markers: ProposalMarkers; insights: boolean; sections?: DeckSection[] }) {
+  return deckPageRenders(d, theme, opts).map((r, i, all) => <Fragment key={i}>{r(i + 1, all.length)}</Fragment>)
+}
+
+/** 方案的页数（选择器、模板库里显示「约 N 页」；与 deckPages 的分页完全一致） */
+export const countDeckPages = (d: ProjectDocsData, theme: DeckTheme, opts: { insights: boolean; sections?: DeckSection[] }) =>
+  deckPageRenders(d, theme, { ...opts, markers: 'symbol' }).length
+
+/** 只渲染封面（模板缩略图）并给出总页数：封面上的页码按整套方案的总页数显示，和真实方案一致 */
+export function deckCover(d: ProjectDocsData, theme: DeckTheme, opts: { insights: boolean; sections?: DeckSection[] }) {
+  const renders = deckPageRenders(d, theme, { ...opts, markers: 'symbol', lazy: true })
+  return { cover: renders[0]?.(1, renders.length) ?? null, total: renders.length }
+}
+
+/** 整套方案（公开样张页用，图片延迟加载） */
+export function deckPreviewPages(d: ProjectDocsData, theme: DeckTheme, opts: { insights: boolean; sections?: DeckSection[] }) {
+  return deckPageRenders(d, theme, { ...opts, markers: 'symbol', lazy: true }).map((r, i, all) => <Fragment key={i}>{r(i + 1, all.length)}</Fragment>)
+}
+
+function deckPageRenders(d: ProjectDocsData, theme: DeckTheme, opts: { markers: ProposalMarkers; insights: boolean; sections?: DeckSection[]; lazy?: boolean }): PageRender[] {
   const m = buildDeck(d)
-  const ctx: DeckCtx = { m, theme, markers: opts.markers === 'symbol' ? 'symbol' : 'number' }
+  const ctx: DeckCtx = { m, theme, markers: 'symbol', lazy: opts.lazy }
   const pages: PageRender[] = []
   const needsPoints = new Set<DeckSection>(['plans', 'system', 'zones', 'scenes', 'rooms'])
   const sections = (opts.sections?.length ? opts.sections : ALL_SECTIONS).filter((s) => d.points.length || !needsPoints.has(s))
@@ -81,14 +100,25 @@ export function deckPages(d: ProjectDocsData, theme: DeckTheme, opts: { markers:
     },
   }
   for (const s of sections) render[s]()
-  return pages.map((r, i) => <Fragment key={i}>{r(i + 1, pages.length)}</Fragment>)
+  return pages
 }
 
 /** 方案根节点：风格变量 + 方案专用变量；页面按 1440px 设计稿排版，窄屏横向滚动 */
-export function DeckRoot({ theme, children }: { theme: DeckTheme; children: React.ReactNode }) {
+export function DeckRoot({ theme, children, bare = false }: { theme: DeckTheme; children: React.ReactNode; bare?: boolean }) {
   return (
     <DocRoot style={theme.style} className="overflow-x-auto print:overflow-visible">
-      <div style={deckVars(theme)} className="min-w-[1440px] space-y-6 py-6 print:min-w-0 print:space-y-0 print:py-0">
+      <div style={deckVars(theme)} className={bare ? 'w-[1440px] space-y-0' : 'min-w-[1440px] space-y-6 py-6 print:min-w-0 print:space-y-0 print:py-0'}>
+        {children}
+      </div>
+    </DocRoot>
+  )
+}
+
+/** 缩略图外框：只带风格变量，不加留白，内容按 1440 × 960 原尺寸排版（外层再整体缩放） */
+export function DeckFrame({ theme, children }: { theme: DeckTheme; children: React.ReactNode }) {
+  return (
+    <DocRoot style={theme.style} className="overflow-hidden">
+      <div style={deckVars(theme)} className="w-[1440px] [&_section]:shadow-none">
         {children}
       </div>
     </DocRoot>

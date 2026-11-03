@@ -4,7 +4,7 @@ const { getMeta, typeGroups } = require('../../utils/meta')
 const { pickImage } = require('../../utils/pick')
 
 const MIN_SCALE = 1
-const MAX_SCALE = 4
+const MAX_SCALE = 5
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v))
 
 Page({
@@ -13,7 +13,7 @@ Page({
     loading: true,
     readOnly: false,
     smartSelect: false,
-    isLandscape: true,
+    isLandscape: false,
     fullscreen: false,
     sheets: [],
     sheetIndex: 0,
@@ -34,9 +34,9 @@ Page({
     panY: 0,
     sheetW: 360,
     sheetH: 240,
-    viewH: 260,
+    viewH: 520,
     markerSize: 20,
-    showLabels: true,
+    showLabels: false,
     tab: 'legend',
     mode: 'view',
     placeType: null,
@@ -70,12 +70,12 @@ Page({
 
   computeViewport(fullscreen, customW, customH) {
     const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
-    const winW = customW || win.windowWidth || 667
-    const winH = customH || win.windowHeight || 375
-    const isLandscape = winW > winH
-    const availW = fullscreen ? winW : isLandscape ? Math.max(260, winW - 220 - 24) : Math.max(260, winW - 24)
-    const availH = fullscreen ? winH : isLandscape ? Math.max(200, winH - 62) : Math.round((availW * 2) / 3)
-    // 在可用画布区域内按 3:2 完整放下整张图纸
+    const winW = customW || win.windowWidth || 390
+    const winH = customH || win.windowHeight || 780
+    const isLandscape = false
+    const availW = fullscreen ? winW : Math.max(280, winW - 24)
+    // 竖版下大幅拉高画布工作区上下高度（约占可视高度 68%，至少 480px；全屏时占满 100% 屏幕高度）
+    const availH = fullscreen ? winH : Math.max(480, Math.round(winH * 0.68))
     let sheetW = availW
     let sheetH = Math.round((sheetW * 2) / 3)
     if (sheetH > availH) {
@@ -138,10 +138,10 @@ Page({
 
   applyScale(nextScale, nextPanX, nextPanY) {
     const s = Math.round(clamp(nextScale, MIN_SCALE, MAX_SCALE) * 100) / 100
-    const maxPanX = Math.max(0, ((this.data.sheetW * s) - this.data.sheetW) / 2 + 60)
-    const maxPanY = Math.max(0, ((this.data.sheetH * s) - this.data.sheetH) / 2 + 40)
-    const panX = s <= 1.01 ? 0 : Math.round(clamp(nextPanX !== undefined ? nextPanX : this.data.panX, -maxPanX, maxPanX))
-    const panY = s <= 1.01 ? 0 : Math.round(clamp(nextPanY !== undefined ? nextPanY : this.data.panY, -maxPanY, maxPanY))
+    const maxPanX = Math.max(80, Math.abs((this.data.sheetW * s) - this.data.sheetW) / 2 + 120)
+    const maxPanY = Math.max(140, Math.abs((this.data.sheetH * s) - this.data.viewH) / 2 + 160)
+    const panX = Math.round(clamp(nextPanX !== undefined ? nextPanX : this.data.panX, -maxPanX, maxPanX))
+    const panY = Math.round(clamp(nextPanY !== undefined ? nextPanY : this.data.panY, -maxPanY, maxPanY))
     // 缩放时稍微反向收敛点位图标尺寸，避免放大 3–4 倍时图标过大遮挡户型图
     const markerSize = Math.round(clamp(20 / Math.pow(s, 0.35), 12, 22))
     this.setData({
@@ -223,7 +223,7 @@ Page({
         g.moved = true
         this.justDragged = true
       }
-      if (g.moved && this.data.scale > 1.01) {
+      if (g.moved) {
         this.applyScale(this.data.scale, g.startPanX + dx, g.startPanY + dy)
       }
     }

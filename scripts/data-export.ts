@@ -21,6 +21,9 @@ export const COLLECTIONS = [
   'categories',
   'tags',
   'folders',
+  // 方案素材库（引用媒体库图片）：漏导会让自建服务器的方案全部退回内置模板、场景章节空白
+  'proposal-templates',
+  'scenes',
   'users',
   'products',
   'projects',
@@ -29,7 +32,11 @@ export const COLLECTIONS = [
   'ai-conversations',
   'ai-messages',
   'ai-credit-ledger',
+  'redemption-codes',
 ] as const
+
+/** 一并导出的全局设置（AI 模型与渠道只存变量名，不含密钥） */
+export const GLOBALS = ['company-settings', 'ai-settings', 'membership-settings'] as const
 
 // Figma 平台附加的字段，自建服务器的表结构里没有，导出时去掉。
 const PLATFORM_FIELDS = new Set(['createdBy', 'updatedBy', '_h_folders', '_h_tags', 'prefix', '_objectKey', 'original', 'thumbnailURL', 'sessions',
@@ -91,7 +98,11 @@ await Promise.all(
 console.log(`media files: ${ok}/${(data.media as unknown[]).length}`)
 if (failed.length) console.log('下载失败：\n' + failed.join('\n'))
 
-const globals = { 'company-settings': clean((await payload.findGlobal({ slug: 'company-settings', depth: 0, overrideAccess: true })) as unknown as Record<string, unknown>) }
+const globals: Record<string, Record<string, unknown>> = {}
+for (const slug of GLOBALS) {
+  const doc = await payload.findGlobal({ slug, depth: 0, overrideAccess: true }).catch(() => null)
+  if (doc) globals[slug] = clean(doc as unknown as Record<string, unknown>)
+}
 fs.writeFileSync(path.join(outDir, 'data.json'), JSON.stringify({ exportedAt: new Date().toISOString(), collections: data, globals }, null, 2))
 console.log(`已导出到 ${outDir}`)
 process.exit(0)

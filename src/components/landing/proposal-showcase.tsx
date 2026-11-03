@@ -13,6 +13,7 @@ import { DEFAULT_PAYMENTS, paymentAmounts } from '@/lib/contracts'
 import { categoryOfType, DEVICE_CATEGORIES, deviceTypeOf } from '@/lib/device-types'
 import type { CompanyInfo } from '@/lib/cached-data'
 import type { LandingShowcase } from '@/lib/landing-showcase'
+import { markerSrc } from '@/lib/point-marker-data'
 import { yuan } from '@/lib/quotes'
 import { cn } from '@/lib/utils'
 import { DECK_THEMES, deckVars, type DeckTheme, type DeckThemeId } from '@/plugins/proposal/deck/themes'
@@ -951,12 +952,12 @@ function PlanSlide({ data, theme, no }: { data: LandingShowcase; theme: DeckThem
   ]
   const roomSummary = useMemo(() => {
     if (!sheet) return []
-    const map = new Map<string, { name: string; codes: string[]; types: Set<string>; count: number }>()
+    const map = new Map<string, { name: string; deviceTypes: string[]; types: Set<string>; count: number }>()
     for (const p of sheet.points) {
       const r = p.room || '公共区域'
-      const cur = map.get(r) ?? { name: r, codes: [], types: new Set<string>(), count: 0 }
+      const cur = map.get(r) ?? { name: r, deviceTypes: [], types: new Set<string>(), count: 0 }
       cur.count += 1
-      if (p.code) cur.codes.push(p.code)
+      if (!cur.deviceTypes.includes(p.type)) cur.deviceTypes.push(p.type)
       cur.types.add(deviceTypeOf(p.type)?.name ?? '设备')
       map.set(r, cur)
     }
@@ -985,13 +986,15 @@ function PlanSlide({ data, theme, no }: { data: LandingShowcase; theme: DeckThem
         <div className="relative flex-1 overflow-hidden rounded-(--deck-radius) border border-(--deck-card-border) bg-white p-4">
           <img src={sheet.url} alt={sheet.name} className="size-full object-contain opacity-75" />
           <svg viewBox="0 0 1200 800" className="absolute inset-0 size-full">
-            {sheet.points.map((p, idx) => (
-              <g key={p.id} transform={`translate(${p.rx * 1200}, ${p.ry * 800})`}>
-                <circle r={12} fill="var(--deck-marker)" stroke="var(--deck-marker-ring)" strokeWidth={2} />
-                <text textAnchor="middle" dy="3.5" fontSize={9.5} fontWeight={600} fill="var(--deck-marker-fg)">
-                  {String(idx + 1).padStart(2, '0')}
-                </text>
-              </g>
+            {sheet.points.map((p) => (
+              <image
+                key={p.id}
+                href={markerSrc(p.type)}
+                x={p.rx * 1200 - 15}
+                y={p.ry * 800 - 15}
+                width={30}
+                height={30}
+              />
             ))}
           </svg>
         </div>
@@ -1005,7 +1008,7 @@ function PlanSlide({ data, theme, no }: { data: LandingShowcase; theme: DeckThem
               <thead>
                 <tr className="bg-doc-head text-left text-doc-head-fg">
                   <th className="w-[96px] px-3 py-2 font-medium">空间</th>
-                  <th className="w-[120px] px-3 py-2 font-medium">点位代号</th>
+                  <th className="w-[110px] px-3 py-2 font-medium">设备图标</th>
                   <th className="px-3 py-2 font-medium">包含设备</th>
                   <th className="w-[64px] px-3 py-2 text-right font-medium">数量</th>
                 </tr>
@@ -1014,7 +1017,13 @@ function PlanSlide({ data, theme, no }: { data: LandingShowcase; theme: DeckThem
                 {roomSummary.map((r, i) => (
                   <tr key={r.name} className={cn('h-[38px] border-b border-doc-rule', i % 2 === 1 && 'bg-(--deck-box)/50')}>
                     <td className="doc-strong px-3">{r.name}</td>
-                    <td className="doc-latin truncate px-3 text-doc-accent">{codeRange(r.codes)}</td>
+                    <td className="px-3">
+                      <span className="flex items-center -space-x-1">
+                        {r.deviceTypes.slice(0, 4).map((dt) => (
+                          <PointMarker key={dt} type={dt} className="size-5 rounded-full ring-1 ring-white" />
+                        ))}
+                      </span>
+                    </td>
                     <td className="doc-body truncate px-3 text-doc-muted">{[...r.types].slice(0, 3).join('、')}</td>
                     <td className="doc-latin px-3 text-right tabular-nums">{r.count}</td>
                   </tr>

@@ -1,8 +1,9 @@
 'use client'
 
+import Link from 'next/link'
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Coins, Crown, FolderKanban, Gift, History, Loader2, Minus, Sparkles, Users } from 'lucide-react'
+import { BookOpen, Check, Coins, Crown, FolderKanban, Gift, History, Loader2, Minus, Sparkles, Users } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { PageHeader } from '@/components/page-header'
@@ -27,31 +28,32 @@ const fmtDateTime = (iso: string) =>
 
 const TIER_PERKS: Record<MembershipTier, { tag?: string; highlights: string[] }> = {
   free: {
+    tag: '免费入门',
     highlights: [
-      '10 个进行中项目（归档不占额度）',
-      '每个项目最多 2 位协作成员',
-      '基础横版方案模板与核心流程',
-      '点位图、报价单、合同与交底单 PDF 导出',
+      '10 个进行中项目 · 每项目最多 2 位协作成员',
+      'AI 模型：Go 标准高速国产模型（DeepSeek-V3 / 通义 Qwen-Plus / 豆包 Pro）',
+      '方案模板：栖序雅致、原木自然、预算速览（3 套）',
+      '基础插件：方案演示、房间分析、智能选型、AI 识图、现场勘测单',
     ],
   },
   pro: {
     tag: '推荐订阅',
     highlights: [
-      '每月免费赠送 300 AI 积分（识图布点 / 方案生成）',
-      '50 个进行中项目 + 每项目 5 人协同设计',
-      '解锁全部高定方案模板（栖序雅致 / 东方雅韵 / 墨金臻选）',
-      '解锁全部施工与算量扩展插件（布线表 / 备货单 / 勘测单 / DWG）',
-      '业主交付资料包一键合并 PDF 与打包 ZIP',
+      '每月免费赠送 300 AI 积分 · 50 个项目 · 每项目 5 人协同',
+      'AI 高阶模型：解锁 Plus 视觉多模态与长文本模型（Qwen-VL-Max / 豆包 Vision-Pro / GLM-4V-Plus / Kimi K2）',
+      '高定模板：解锁「墨金臻选」「智域科技」「晨曦暖调」「素白极简」+ 6 套报价风格包',
+      '进阶插件：解锁 AI 对话侧栏、DWG 导入、强弱电布线表、场景与账号移交单',
+      '交付特权：解锁「业主交付资料包」一键合并 PDF 与打包 ZIP',
     ],
   },
   team: {
-    tag: '团队尊享',
+    tag: '旗舰尊享',
     highlights: [
-      '每月免费赠送 1,000 AI 积分（高频识图与全案生成）',
-      '不限进行中项目数量，大型工程团队无限扩容',
-      '不限项目协作成员（支持可编辑 / 仅查看权限分级）',
-      '包含专业版全部高定方案模板与施工交付插件',
-      '包含业主交付资料包一键打包与团队级优先支持',
+      '每月免费赠送 1,000 AI 积分 · 不限进行中项目 · 不限协作成员',
+      'AI 旗舰模型：独占 Pro 满血深度推理大模型（DeepSeek-R1 满血版 / 通义 QwQ-Plus / QVQ-Max / 豆包 Thinking）',
+      '顶奢模板：包含 Plus 全部模板 + 独占「东方雅韵」顶奢新中式别墅提案',
+      '工程插件：包含 Plus 全部插件 + 独占「采购与备货核验单」「售后维保记录」',
+      '包含业主交付资料包一键打包与团队级优先技术支持',
     ],
   },
 }
@@ -116,8 +118,16 @@ export function MembershipClient({
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <PageHeader
-        title="会员与积分"
-        description="升级专业版或旗舰版，解锁全套高定方案模板、专业施工算量插件、业主交付资料包与每月赠送 AI 积分。"
+        title="会员与积分（Go / Plus / Pro）"
+        description="升级 Plus 或 Pro 会员，解锁高阶视觉/满血推理大模型、全套高定方案模板、专业施工算量插件、业主交付资料包与每月赠送 AI 积分。"
+        actions={
+          <Button asChild variant="outline" size="sm">
+            <Link href="/docs#ai-billing">
+              <BookOpen className="size-3.5" />
+              使用文档与计费规则
+            </Link>
+          </Button>
+        }
       />
 
       <Card className="gap-0 overflow-hidden py-0">

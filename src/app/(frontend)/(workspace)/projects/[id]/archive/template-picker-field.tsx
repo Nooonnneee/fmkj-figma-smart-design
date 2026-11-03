@@ -1,0 +1,68 @@
+'use client'
+
+import { useRouter } from 'next/navigation'
+import { LayoutTemplate } from 'lucide-react'
+import { toast } from 'sonner'
+
+import { Button } from '@/components/ui/button'
+import type { PickerTemplate } from '@/plugins/proposal/picker-data'
+import { Swatches, TemplatePicker, TierPill } from '@/plugins/proposal/template-picker'
+
+import { setDeliverables } from './actions'
+
+/** 归档 → 交付资料包里的「方案模板」：带缩略图挑选，设为本项目的交付方案模板 */
+export function ArchiveTemplatePicker({
+  projectId,
+  templates,
+  thumbs,
+  value,
+  previewLinks,
+  editable,
+  strict,
+}: {
+  projectId: string
+  templates: PickerTemplate[]
+  thumbs: Record<string, React.ReactNode>
+  value: string | null
+  previewLinks: Record<string, string>
+  editable: boolean
+  /** 会员严格模式：不满足等级的模板不能设为交付方案 */
+  strict: boolean
+}) {
+  const router = useRouter()
+  const current = templates.find((t) => t.value === value)
+
+  async function select(v: string) {
+    const t = templates.find((x) => x.value === v)
+    const res = await setDeliverables(projectId, { proposalTemplate: v })
+    if (!res.ok) {
+      toast.error(res.error)
+      return
+    }
+    toast.success(`交付方案已换成「${t?.label ?? v}」`)
+    router.refresh()
+  }
+
+  return (
+    <TemplatePicker
+      templates={templates}
+      thumbs={thumbs}
+      value={value}
+      previewHref={previewLinks}
+      kinds={['owner']}
+      selectLabel="设为交付方案"
+      pageNote="按示例别墅项目计算（预览样张使用本项目的数据）"
+      blockLocked={strict}
+      disabled={!editable}
+      onSelect={editable ? select : undefined}
+      trigger={
+        <Button type="button" variant="outline" size="sm" className="ml-7 h-8 gap-2 text-xs sm:ml-0" aria-label={`交付方案模板：${current?.label ?? '未选择'}，点击${editable ? '更换' : '查看'}`}>
+          {current ? <Swatches colors={current.swatches} /> : <LayoutTemplate className="size-3.5" />}
+          <span className="max-w-28 truncate">{current?.label ?? '选择模板'}</span>
+          {current ? <TierPill t={current} /> : null}
+          <span className="text-muted-foreground">{editable ? '更换' : '查看'}</span>
+        </Button>
+      }
+    />
+  )
+}

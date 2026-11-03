@@ -1,0 +1,946 @@
+{
+  "orchestrationRules": [
+    "封面固定在第一页；模板没选封面时自动补上",
+    "每个章节最多出现一次，重复的章节只保留第一次",
+    "投资明细排在服务交付之前，服务交付固定在最后一章",
+    "需要点位的章节（住宅平面、系统与设备、空间章节、生活场景、其余空间）在项目没有点位时自动跳过",
+    "生活场景按场景库匹配项目真实的房间与设备；场景库为空时使用内置场景，章节不会空白",
+    "施工交底是独立版式（不含价格），不和业主方案混排，也不参与章节编排"
+  ],
+  "sections": [
+    {
+      "value": "cover",
+      "label": "封面",
+      "description": "品牌、标题、项目与预算",
+      "pages": "1 页",
+      "needsPoints": false,
+      "price": false
+    },
+    {
+      "value": "plans",
+      "label": "住宅平面",
+      "description": "每张图纸一页，点位编号与索引",
+      "pages": "每张图纸 1 页",
+      "needsPoints": true,
+      "price": false
+    },
+    {
+      "value": "system",
+      "label": "系统与设备",
+      "description": "网络拓扑、设备类别与配置原则",
+      "pages": "1 页",
+      "needsPoints": true,
+      "price": false
+    },
+    {
+      "value": "zones",
+      "label": "空间章节",
+      "description": "进门、休息、看护、专注四个空间章节",
+      "pages": "每个有设备的空间 1 页（最多 4 页）",
+      "needsPoints": true,
+      "price": true
+    },
+    {
+      "value": "scenes",
+      "label": "生活场景",
+      "description": "场景库匹配到的场景：图片、联动步骤与实际产品",
+      "pages": "每 2 个场景 1 页",
+      "needsPoints": true,
+      "price": false
+    },
+    {
+      "value": "rooms",
+      "label": "其余空间",
+      "description": "没有展开的房间：设备与小计",
+      "pages": "按房间数分页",
+      "needsPoints": true,
+      "price": true
+    },
+    {
+      "value": "investment",
+      "label": "投资明细",
+      "description": "设备清单、费用与合计",
+      "pages": "每 12 行 1 页",
+      "needsPoints": false,
+      "price": true
+    },
+    {
+      "value": "service",
+      "label": "服务交付",
+      "description": "服务流程、付款节点与签字确认",
+      "pages": "1 页",
+      "needsPoints": false,
+      "price": false
+    }
+  ],
+  "frameworks": [
+    {
+      "value": "full",
+      "label": "完整提案",
+      "description": "8 章完整提案：平面 → 系统 → 空间 → 场景 → 投资 → 交付，适合正式汇报",
+      "audience": "已经确认需求、准备签约的业主",
+      "occasion": "方案深化后的正式汇报、签约前定稿",
+      "sections": [
+        "cover",
+        "plans",
+        "system",
+        "zones",
+        "scenes",
+        "rooms",
+        "investment",
+        "service"
+      ]
+    },
+    {
+      "value": "story",
+      "label": "场景故事",
+      "description": "先讲生活场景，再落到空间、平面与预算，适合首次沟通打动业主",
+      "audience": "还在了解全屋智能、需要被打动的业主",
+      "occasion": "首次方案沟通、家庭成员一起看方案",
+      "sections": [
+        "cover",
+        "scenes",
+        "zones",
+        "plans",
+        "system",
+        "investment",
+        "service"
+      ]
+    },
+    {
+      "value": "budget",
+      "label": "预算速览",
+      "description": "封面 + 系统 + 投资 + 交付，几页讲清预算，适合快速报价",
+      "audience": "预算敏感、正在比价的业主",
+      "occasion": "首次咨询后的快速报价、比价阶段",
+      "sections": [
+        "cover",
+        "system",
+        "investment",
+        "service"
+      ]
+    },
+    {
+      "value": "construction",
+      "label": "施工交底",
+      "description": "点位代号与清单，不含价格，给安装团队",
+      "audience": "安装团队、水电工与项目经理",
+      "occasion": "进场施工前交底、现场安装与验收核对",
+      "sections": []
+    }
+  ],
+  "themes": [
+    {
+      "id": "qixu",
+      "label": "栖序雅致",
+      "description": "暖白纸色、灰紫强调、细体大编号",
+      "coverLayout": "band",
+      "chapterStyle": "numeral",
+      "tableStyle": "dark",
+      "mood": "light",
+      "headline": "让家，懂你的生活。",
+      "tagline": "RESIDENTIAL INTELLIGENCE",
+      "coverTagline": "A HOME THAT UNDERSTANDS YOU",
+      "coverPhoto": "/proposal/photos/cover-qixu.jpg",
+      "colors": {
+        "paper": "#f8f7f4",
+        "ink": "#252523",
+        "muted": "#6b6b65",
+        "accent": "#6764a0",
+        "soft": "#e7dff4",
+        "softTo": "#d9e7f2",
+        "rule": "#dad8d1",
+        "headBg": "#333338",
+        "headFg": "#ffffff",
+        "stripe": "#efeee9"
+      }
+    },
+    {
+      "id": "noir",
+      "label": "墨金臻选",
+      "description": "深色画面、香槟金与衬线标题",
+      "coverLayout": "immersive",
+      "chapterStyle": "eyebrow",
+      "tableStyle": "gold",
+      "mood": "dark",
+      "headline": "静享不凡，智在无声。",
+      "tagline": "PRIVATE RESIDENCE",
+      "coverTagline": "PRIVATE RESIDENCE · SMART LIVING",
+      "coverPhoto": "/proposal/photos/cover-noir.jpg",
+      "colors": {
+        "paper": "#141416",
+        "ink": "#f1ebdf",
+        "muted": "#9b9588",
+        "accent": "#c9a86a",
+        "soft": "#2a2621",
+        "softTo": "#1c1b19",
+        "rule": "#34322d",
+        "headBg": "#1c1b19",
+        "headFg": "#c9a86a",
+        "stripe": "#18181a"
+      }
+    },
+    {
+      "id": "grove",
+      "label": "原木自然",
+      "description": "燕麦纸色、橄榄绿、圆角照片",
+      "coverLayout": "split",
+      "chapterStyle": "badge",
+      "tableStyle": "soft",
+      "mood": "light",
+      "headline": "让家，回到自然的节奏。",
+      "tagline": "NATURAL LIVING",
+      "coverTagline": "LIVING WITH NATURE",
+      "coverPhoto": "/proposal/photos/cover-grove.jpg",
+      "colors": {
+        "paper": "#f6f2ea",
+        "ink": "#2e2b25",
+        "muted": "#6d675b",
+        "accent": "#5e6e4f",
+        "soft": "#e6eadb",
+        "softTo": "#f0e9da",
+        "rule": "#ddd4c3",
+        "headBg": "#e3e8d7",
+        "headFg": "#3d4a33",
+        "stripe": "#efe9dd"
+      }
+    },
+    {
+      "id": "azure",
+      "label": "晨岚现代",
+      "description": "冷白纸色、深海蓝强调、细线卡片，适合现代简约住宅",
+      "coverLayout": "band",
+      "chapterStyle": "eyebrow",
+      "tableStyle": "dark",
+      "mood": "light",
+      "headline": "清爽有序，一切刚刚好。",
+      "tagline": "MODERN LIVING",
+      "coverTagline": "CLEAR · CALM · CONNECTED",
+      "coverPhoto": "/proposal/photos/cover-azure.jpg",
+      "colors": {
+        "paper": "#f8fafc",
+        "ink": "#1b2230",
+        "muted": "#64708a",
+        "accent": "#24508f",
+        "soft": "#e6edf6",
+        "softTo": "#f1f5fa",
+        "rule": "#dbe3ee",
+        "headBg": "#1d2b44",
+        "headFg": "#ffffff",
+        "stripe": "#f1f5fa"
+      }
+    },
+    {
+      "id": "terra",
+      "label": "陶土暖阳",
+      "description": "米杏纸色、陶土橙、圆角卡片，适合温暖的家庭住宅",
+      "coverLayout": "split",
+      "chapterStyle": "numeral",
+      "tableStyle": "soft",
+      "mood": "light",
+      "headline": "温暖的光，留给回家的人。",
+      "tagline": "WARM HOME",
+      "coverTagline": "A WARM PLACE TO COME HOME",
+      "coverPhoto": "/proposal/photos/dining.jpg",
+      "colors": {
+        "paper": "#fbf5ee",
+        "ink": "#3a2a22",
+        "muted": "#7c6658",
+        "accent": "#b5603a",
+        "soft": "#f4e3d7",
+        "softTo": "#f8ece1",
+        "rule": "#ead8c8",
+        "headBg": "#f1dccd",
+        "headFg": "#6e3a22",
+        "stripe": "#f7eee5"
+      }
+    },
+    {
+      "id": "mono",
+      "label": "素白极简",
+      "description": "纯白画面、黑色粗体编号与细线，信息清晰克制，适合商务汇报",
+      "coverLayout": "type",
+      "chapterStyle": "badge",
+      "tableStyle": "dark",
+      "mood": "light",
+      "headline": "少即是多，智能本应安静。",
+      "tagline": "ESSENTIAL",
+      "coverTagline": "LESS BUT BETTER",
+      "coverPhoto": "/proposal/photos/study.jpg",
+      "colors": {
+        "paper": "#ffffff",
+        "ink": "#111111",
+        "muted": "#6b6b6b",
+        "accent": "#111111",
+        "soft": "#f2f2f2",
+        "softTo": "#fafafa",
+        "rule": "#e3e3e3",
+        "headBg": "#111111",
+        "headFg": "#ffffff",
+        "stripe": "#f7f7f7"
+      }
+    },
+    {
+      "id": "dawn",
+      "label": "晨曦暖调",
+      "description": "奶油纸色与陶土橙、竖幅照片，以场景故事打动家庭用户",
+      "coverLayout": "split",
+      "chapterStyle": "numeral",
+      "tableStyle": "soft",
+      "mood": "light",
+      "headline": "每一个清晨，都被温柔唤醒。",
+      "tagline": "WARM HOME",
+      "coverTagline": "GOOD MORNING, HOME",
+      "coverPhoto": "/proposal/photos/cover-dawn.jpg",
+      "colors": {
+        "paper": "#fbf5ee",
+        "ink": "#3a2a22",
+        "muted": "#7c6658",
+        "accent": "#b5603a",
+        "soft": "#f4e3d7",
+        "softTo": "#f8ece1",
+        "rule": "#ead8c8",
+        "headBg": "#f1dccd",
+        "headFg": "#6e3a22",
+        "stripe": "#f7eee5"
+      }
+    },
+    {
+      "id": "jade",
+      "label": "东方雅韵",
+      "description": "宣纸色与青瓷绿、衬线标题，适合新中式与东方风住宅",
+      "coverLayout": "split",
+      "chapterStyle": "badge",
+      "tableStyle": "soft",
+      "mood": "light",
+      "headline": "雅致如瓷，静享东方。",
+      "tagline": "ORIENTAL LIVING",
+      "coverTagline": "ORIENTAL SERENITY",
+      "coverPhoto": "/proposal/photos/cover-jade.jpg",
+      "colors": {
+        "paper": "#f7f4ec",
+        "ink": "#2e2b25",
+        "muted": "#6d675b",
+        "accent": "#3f7f78",
+        "soft": "#dfece9",
+        "softTo": "#f0e9da",
+        "rule": "#ddd4c3",
+        "headBg": "#dde9e6",
+        "headFg": "#2c5a55",
+        "stripe": "#efe9dd"
+      }
+    }
+  ],
+  "templates": [
+    {
+      "slug": "qixu",
+      "name": "栖序雅致",
+      "kind": "owner",
+      "tier": "free",
+      "framework": "full",
+      "theme": "qixu",
+      "description": "暖白纸色、灰紫强调、细体大编号，忠于设计稿的 8 章完整提案",
+      "audience": "大多数改善型住宅业主（三房到大平层）",
+      "occasion": "方案深化后的正式汇报、签约前定稿",
+      "highlights": [
+        "暖白纸面",
+        "照片色带封面",
+        "8 章完整"
+      ],
+      "sections": [
+        "cover",
+        "plans",
+        "system",
+        "zones",
+        "scenes",
+        "rooms",
+        "investment",
+        "service"
+      ]
+    },
+    {
+      "slug": "noir",
+      "name": "墨金臻选",
+      "kind": "owner",
+      "tier": "pro",
+      "framework": "full",
+      "theme": "noir",
+      "description": "深色画面、香槟金与衬线标题，屏幕演示质感最强",
+      "audience": "别墅、大平层等高净值业主",
+      "occasion": "大屏投影或平板现场演示、高端项目提案",
+      "highlights": [
+        "深色画面",
+        "整幅照片封面",
+        "金线表头"
+      ],
+      "sections": [
+        "cover",
+        "plans",
+        "system",
+        "zones",
+        "scenes",
+        "rooms",
+        "investment",
+        "service"
+      ]
+    },
+    {
+      "slug": "grove",
+      "name": "原木自然",
+      "kind": "owner",
+      "tier": "free",
+      "framework": "full",
+      "theme": "grove",
+      "description": "燕麦纸色、橄榄绿、左文右图封面与圆角卡片",
+      "audience": "原木、日式、侘寂等自然风格的家庭",
+      "occasion": "与室内设计师联合提案、软装偏自然的项目",
+      "highlights": [
+        "燕麦纸面",
+        "分栏封面",
+        "圆角卡片"
+      ],
+      "sections": [
+        "cover",
+        "plans",
+        "system",
+        "zones",
+        "scenes",
+        "rooms",
+        "investment",
+        "service"
+      ]
+    },
+    {
+      "slug": "quick",
+      "name": "预算速览",
+      "kind": "owner",
+      "tier": "free",
+      "framework": "budget",
+      "theme": "qixu",
+      "description": "封面、系统、投资与交付 4 章，几页讲清预算",
+      "audience": "预算敏感、第一次咨询的业主",
+      "occasion": "首次沟通后当天出报价、比价阶段",
+      "highlights": [
+        "4 章精简",
+        "先讲预算",
+        "约 5 页"
+      ],
+      "sections": [
+        "cover",
+        "system",
+        "investment",
+        "service"
+      ]
+    },
+    {
+      "slug": "azure",
+      "name": "智域科技",
+      "kind": "owner",
+      "tier": "pro",
+      "framework": "story",
+      "theme": "azure",
+      "description": "冷白纸面、深海蓝强调与细线卡片，先讲生活场景再落到预算",
+      "audience": "年轻业主、数码爱好者与偏好科技感的家庭",
+      "occasion": "首次方案沟通，用场景打动业主",
+      "highlights": [
+        "场景先行",
+        "深海蓝细线",
+        "现代简约"
+      ],
+      "sections": [
+        "cover",
+        "scenes",
+        "zones",
+        "plans",
+        "system",
+        "investment",
+        "service"
+      ]
+    },
+    {
+      "slug": "mono",
+      "name": "素白极简",
+      "kind": "owner",
+      "tier": "pro",
+      "framework": "full",
+      "theme": "mono",
+      "description": "纯白纸面与黑色粗体，纯文字大字封面，克制高级",
+      "audience": "设计师工作室、极简风业主与商务客户",
+      "occasion": "与设计公司合作提案、需要打印装订的正式文本",
+      "highlights": [
+        "纯文字封面",
+        "黑白克制",
+        "打印友好"
+      ],
+      "sections": [
+        "cover",
+        "plans",
+        "system",
+        "zones",
+        "scenes",
+        "rooms",
+        "investment",
+        "service"
+      ]
+    },
+    {
+      "slug": "dawn",
+      "name": "晨曦暖调",
+      "kind": "owner",
+      "tier": "pro",
+      "framework": "story",
+      "theme": "dawn",
+      "description": "奶油纸色与陶土橙、竖幅照片，以场景故事打动家庭用户",
+      "audience": "有老人和孩子的家庭、偏爱温馨风格的业主",
+      "occasion": "首次方案沟通、全家一起看方案",
+      "highlights": [
+        "场景先行",
+        "陶土暖色",
+        "竖幅照片"
+      ],
+      "sections": [
+        "cover",
+        "scenes",
+        "zones",
+        "plans",
+        "system",
+        "investment",
+        "service"
+      ]
+    },
+    {
+      "slug": "jade",
+      "name": "东方雅韵",
+      "kind": "owner",
+      "tier": "team",
+      "framework": "full",
+      "theme": "jade",
+      "description": "宣纸色与青瓷绿、衬线标题，适合新中式与东方风住宅",
+      "audience": "新中式、东方风别墅与高端住宅业主",
+      "occasion": "顶奢项目正式提案、需要文化调性的汇报",
+      "highlights": [
+        "宣纸青瓷",
+        "衬线标题",
+        "东方意境"
+      ],
+      "sections": [
+        "cover",
+        "plans",
+        "system",
+        "zones",
+        "scenes",
+        "rooms",
+        "investment",
+        "service"
+      ]
+    },
+    {
+      "slug": "construction",
+      "name": "施工交底",
+      "kind": "construction",
+      "tier": "free",
+      "framework": "construction",
+      "theme": "qixu",
+      "description": "点位代号、安装位置、房间配置与逐点核对表，不含任何价格",
+      "audience": "安装团队、水电工与项目经理",
+      "occasion": "进场施工前交底、现场安装与验收核对",
+      "highlights": [
+        "不含价格",
+        "点位代号",
+        "逐点核对"
+      ],
+      "sections": []
+    }
+  ],
+  "sceneChapters": [
+    {
+      "value": "arrive",
+      "label": "回家与离家"
+    },
+    {
+      "value": "rest",
+      "label": "休息与睡眠"
+    },
+    {
+      "value": "care",
+      "label": "安全与关怀"
+    },
+    {
+      "value": "focus",
+      "label": "专注与休闲"
+    },
+    {
+      "value": "network",
+      "label": "网络与基础"
+    }
+  ],
+  "builtinScenes": [
+    {
+      "slug": "arrive-home",
+      "name": "回家模式",
+      "summary": "开锁后玄关灯、客厅灯依次亮起，窗帘自动打开",
+      "headline": "进门的那一刻，生活开始切换。",
+      "tagline": "ARRIVE",
+      "scope": "house",
+      "chapter": "arrive",
+      "roomTypes": [
+        "entrance",
+        "living"
+      ],
+      "requiredDevices": [],
+      "anyDevices": [
+        "smart-lock",
+        "touch-panel",
+        "switch-1",
+        "switch-2",
+        "switch-3",
+        "switch-4"
+      ],
+      "steps": [
+        "指纹 / 人脸开锁，或在玄关面板按「回家」",
+        "玄关灯先亮，客厅主灯随后亮起",
+        "窗帘打开，需要时空调开启"
+      ],
+      "photo": "/proposal/photos/scenes/arrive-home.jpg",
+      "credit": "Brian Babb / Unsplash"
+    },
+    {
+      "slug": "leave-home",
+      "name": "离家模式",
+      "summary": "一键关闭全屋灯光和窗帘，安防设备进入布防",
+      "headline": "出门一键，全屋安心。",
+      "tagline": "LEAVE",
+      "scope": "house",
+      "chapter": "arrive",
+      "roomTypes": [
+        "entrance",
+        "living"
+      ],
+      "requiredDevices": [],
+      "anyDevices": [
+        "touch-panel",
+        "switch-1",
+        "switch-2",
+        "switch-3",
+        "switch-4",
+        "smart-lock"
+      ],
+      "steps": [
+        "玄关面板或手机按「离家」",
+        "全屋灯光、窗帘关闭",
+        "摄像头、门磁进入布防状态"
+      ],
+      "photo": "/proposal/photos/scenes/leave-home.jpg",
+      "credit": "Felix Mulderrig / Unsplash"
+    },
+    {
+      "slug": "guest",
+      "name": "会客模式",
+      "summary": "主灯与筒灯全亮，窗帘打开，营造明亮待客氛围",
+      "headline": "客人来了，灯光先招呼。",
+      "tagline": "WELCOME",
+      "scope": "room",
+      "chapter": "focus",
+      "roomTypes": [
+        "living",
+        "dining"
+      ],
+      "requiredDevices": [],
+      "anyDevices": [
+        "downlight",
+        "ceiling-light",
+        "pendant-light",
+        "spotlight",
+        "panel-light"
+      ],
+      "steps": [
+        "客厅面板按「会客」",
+        "主灯、筒灯全亮",
+        "窗帘打开"
+      ],
+      "photo": "/proposal/photos/scenes/guest.jpg",
+      "credit": "Zac Gudakov / Unsplash"
+    },
+    {
+      "slug": "movie",
+      "name": "观影模式",
+      "summary": "主灯关闭，灯带保留柔和暖光，窗帘闭合",
+      "headline": "灯光退场，电影开场。",
+      "tagline": "MOVIE",
+      "scope": "room",
+      "chapter": "focus",
+      "roomTypes": [
+        "living",
+        "theater",
+        "leisure"
+      ],
+      "requiredDevices": [],
+      "anyDevices": [
+        "light-strip",
+        "curtain-track"
+      ],
+      "steps": [
+        "按「观影」或语音开启",
+        "主灯关闭，灯带 30% 暖光",
+        "窗帘闭合"
+      ],
+      "photo": "/proposal/photos/scenes/movie.jpg",
+      "credit": "Christian Lambert / Unsplash"
+    },
+    {
+      "slug": "night-up",
+      "name": "起夜模式",
+      "summary": "感应到有人起身，夜灯低亮度亮起，躺回后自动关闭",
+      "headline": "夜里起身，脚下有光。",
+      "tagline": "NIGHT",
+      "scope": "room",
+      "chapter": "rest",
+      "roomTypes": [
+        "bedroom",
+        "kids",
+        "corridor",
+        "bathroom"
+      ],
+      "requiredDevices": [
+        "motion-sensor"
+      ],
+      "anyDevices": [
+        "light-strip",
+        "downlight",
+        "other-light",
+        "wall-light"
+      ],
+      "steps": [
+        "夜间人体传感器感应到有人",
+        "夜灯 / 灯带 10% 亮起，不刺眼",
+        "无人后自动关闭"
+      ],
+      "photo": "/proposal/photos/scenes/night-up.jpg",
+      "credit": "Fabio Sasso / Unsplash"
+    },
+    {
+      "slug": "sleep",
+      "name": "睡眠模式",
+      "summary": "关闭卧室灯光，窗帘闭合，进入安静睡眠状态",
+      "headline": "把一天的忙碌，留在灯光之外。",
+      "tagline": "SLEEP",
+      "scope": "room",
+      "chapter": "rest",
+      "roomTypes": [
+        "bedroom",
+        "kids"
+      ],
+      "requiredDevices": [],
+      "anyDevices": [
+        "switch-1",
+        "switch-2",
+        "switch-3",
+        "switch-4",
+        "touch-panel",
+        "curtain-track"
+      ],
+      "steps": [
+        "床头开关按「睡眠」",
+        "灯光渐暗后关闭",
+        "窗帘闭合"
+      ],
+      "photo": "/proposal/photos/scenes/sleep.jpg",
+      "credit": "Jp Valery / Unsplash"
+    },
+    {
+      "slug": "kitchen-safety",
+      "name": "厨房安全",
+      "summary": "烟雾或燃气异常时立即推送手机，并发出声光提醒",
+      "headline": "烟火气里，也要安心。",
+      "tagline": "SAFETY",
+      "scope": "room",
+      "chapter": "care",
+      "roomTypes": [
+        "kitchen",
+        "dining"
+      ],
+      "requiredDevices": [],
+      "anyDevices": [
+        "smoke-sensor"
+      ],
+      "steps": [
+        "烟感检测到异常",
+        "本地声光报警",
+        "手机收到推送"
+      ],
+      "photo": "/proposal/photos/scenes/kitchen-safety.jpg",
+      "credit": "Lotus Design N Print / Unsplash"
+    },
+    {
+      "slug": "bathroom-leak",
+      "name": "卫生间防水",
+      "summary": "检测到积水立即推送手机，避免漏水扩大",
+      "headline": "漏水，第一时间知道。",
+      "tagline": "LEAK",
+      "scope": "room",
+      "chapter": "care",
+      "roomTypes": [
+        "bathroom",
+        "kitchen",
+        "balcony",
+        "utility"
+      ],
+      "requiredDevices": [
+        "water-sensor"
+      ],
+      "anyDevices": [],
+      "steps": [
+        "水浸探头检测到积水",
+        "手机立即收到推送"
+      ],
+      "photo": "/proposal/photos/scenes/bathroom-leak.jpg",
+      "credit": "Murad Kerimli / Unsplash"
+    },
+    {
+      "slug": "elder-care",
+      "name": "老人看护",
+      "summary": "长时间无人活动或夜间异常时通知家人",
+      "headline": "看不见的角落，也值得被关心。",
+      "tagline": "CARE",
+      "scope": "house",
+      "chapter": "care",
+      "roomTypes": [
+        "bedroom",
+        "bathroom",
+        "corridor"
+      ],
+      "requiredDevices": [
+        "motion-sensor"
+      ],
+      "anyDevices": [],
+      "steps": [
+        "人体传感器持续记录活动",
+        "设定时间内无活动时提醒家人"
+      ],
+      "photo": "/proposal/photos/scenes/elder-care.jpg",
+      "credit": "Keith Tanner / Unsplash"
+    },
+    {
+      "slug": "security-alarm",
+      "name": "安防报警",
+      "summary": "布防期间门窗被打开或有人闯入，立即推送并录像",
+      "headline": "门口的动静，看得见。",
+      "tagline": "SECURE",
+      "scope": "house",
+      "chapter": "care",
+      "roomTypes": [],
+      "requiredDevices": [],
+      "anyDevices": [
+        "camera",
+        "contact-sensor",
+        "doorbell",
+        "smart-lock"
+      ],
+      "steps": [
+        "离家后自动布防",
+        "门磁 / 摄像头发现异常",
+        "推送提醒并保存录像"
+      ],
+      "photo": "/proposal/photos/scenes/security-alarm.jpg",
+      "credit": "Alan J. Hendry / Unsplash"
+    },
+    {
+      "slug": "whole-wifi",
+      "name": "全屋 WiFi",
+      "summary": "AP 组网覆盖全屋，漫游无缝，智能设备稳定在线",
+      "headline": "每个房间，信号都满格。",
+      "tagline": "NETWORK",
+      "scope": "house",
+      "chapter": "network",
+      "roomTypes": [],
+      "requiredDevices": [],
+      "anyDevices": [
+        "ap-node",
+        "ceiling-ap",
+        "ac-router"
+      ],
+      "steps": [
+        "AC 路由统一管理",
+        "各房间 AP 覆盖，自动漫游"
+      ],
+      "photo": "/proposal/photos/scenes/whole-wifi.jpg",
+      "credit": "User_Pascal / Unsplash"
+    },
+    {
+      "slug": "motion-on",
+      "name": "人来灯亮",
+      "summary": "感应到有人自动亮灯，不用摸黑找开关",
+      "headline": "人到，灯就亮。",
+      "tagline": "AUTO ON",
+      "scope": "room",
+      "chapter": "arrive",
+      "roomTypes": [
+        "entrance",
+        "corridor",
+        "stairs",
+        "bathroom",
+        "closet",
+        "garage",
+        "utility"
+      ],
+      "requiredDevices": [
+        "motion-sensor"
+      ],
+      "anyDevices": [],
+      "steps": [
+        "人体传感器感应到有人",
+        "灯光自动亮起，夜间自动降低亮度"
+      ],
+      "photo": "/proposal/photos/scenes/motion-on.jpg",
+      "credit": "Franco Debartolo / Unsplash"
+    },
+    {
+      "slug": "motion-off",
+      "name": "人走灯灭",
+      "summary": "无人一段时间后自动关灯，避免忘关灯",
+      "headline": "人走，灯不留。",
+      "tagline": "AUTO OFF",
+      "scope": "room",
+      "chapter": "arrive",
+      "roomTypes": [
+        "entrance",
+        "corridor",
+        "stairs",
+        "bathroom",
+        "closet",
+        "garage",
+        "utility"
+      ],
+      "requiredDevices": [
+        "motion-sensor"
+      ],
+      "anyDevices": [],
+      "steps": [
+        "持续无人 3 分钟",
+        "灯光自动关闭"
+      ],
+      "photo": "/proposal/photos/scenes/motion-off.jpg",
+      "credit": "Spencer Plouzek / Unsplash"
+    },
+    {
+      "slug": "intercom",
+      "name": "家庭传声",
+      "summary": "通过智能音箱全屋广播或房间对讲",
+      "headline": "一句话，传到每个房间。",
+      "tagline": "VOICE",
+      "scope": "house",
+      "chapter": "focus",
+      "roomTypes": [],
+      "requiredDevices": [
+        "speaker"
+      ],
+      "anyDevices": [],
+      "steps": [
+        "对音箱说「广播：开饭了」",
+        "其他房间音箱同步播放"
+      ],
+      "photo": "/proposal/photos/scenes/intercom.jpg",
+      "credit": "Tim Schmidbauer / Unsplash"
+    }
+  ]
+}
