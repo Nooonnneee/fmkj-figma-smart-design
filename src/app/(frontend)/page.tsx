@@ -27,10 +27,11 @@ export const metadata: Metadata = {
 const DOC_STYLES = [MINIMAL_STYLE, ...PLUGIN_DOC_STYLES]
 
 /**
- * 首页：产品本身就是展示。数据来自系统内置的示例母版项目，
- * 按小时重新生成（示例母版很少改动；改动后最迟一小时生效）。
+ * 首页：产品本身就是展示。数据来自系统内置的示例母版项目。
+ * 必须在请求时读取数据库（构建阶段没有数据库，静态生成会拿不到示例项目，
+ * 导致上线后一段时间首页项目演示消失），因此强制动态渲染。
  */
-export const revalidate = 3600
+export const dynamic = 'force-dynamic'
 
 export default async function HomePage() {
   const [data, company] = await Promise.all([getLandingShowcase().catch(() => null), getCompanyInfo().catch(() => null)])
