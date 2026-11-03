@@ -186,6 +186,7 @@ export function LoginForm({
       }
       const response = await fetch('/auth/login', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: targetEmail.trim(), password: targetPassword }),
       })
@@ -196,7 +197,7 @@ export function LoginForm({
         return
       }
       rememberMethod('password')
-      window.location.assign(redirectTo)
+      window.location.replace(redirectTo)
     } catch {
       setError('网络错误，请稍后重试')
       setLoading(false)

@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import { cookies, headers } from 'next/headers'
 import { cache } from 'react'
 
@@ -9,12 +10,35 @@ const APP_SESSION_COOKIE = 'app-session'
 const SIGNED_OUT_SENTINEL = 'signed-out'
 /** 微信小程序 web-view 里打开网页（打印页）时的会话，由一次性票据换取，2 小时有效。 */
 const MP_WEB_COOKIE = 'mp-web-session'
+const PREVIEW_SESSION_FILE = '/tmp/fmkj-preview-session.json'
+
+type PreviewSessionState = { userId: string | 'signed-out' | null; at: number }
+
+function readPreviewSession(): PreviewSessionState | null {
+  if (!previewDemoEnabled()) return null
+  try {
+    if (!fs.existsSync(PREVIEW_SESSION_FILE)) return null
+    return JSON.parse(fs.readFileSync(PREVIEW_SESSION_FILE, 'utf8')) as PreviewSessionState
+  } catch {
+    return null
+  }
+}
+
+function writePreviewSession(userId: string | 'signed-out' | null) {
+  if (!previewDemoEnabled()) return
+  try {
+    fs.writeFileSync(PREVIEW_SESSION_FILE, JSON.stringify({ userId, at: Date.now() }))
+  } catch {
+    /* ignore */
+  }
+}
 
 /**
- * 只在 Figma Make 的开发预览（next dev）里启用：跨站 iframe 拦截 Cookie 时自动以演示账号进入，避免卡在登录页。
- * 正式发布（next build 后 NODE_ENV=production）和自托管服务器一律不启用。
+ * 只在 Figma Make 沙盒环境（FIGMA=1，含 next dev 与 deploy-preview 预览面板）启用：
+ * 跨站 iframe 拦截第三方 Cookie 时自动回退到服务端预览会话或默认演示账号，避免卡在登录页死循环。
+ * 自托管 Docker 服务器没有 FIGMA=1，一律严格校验真实 Cookie。
  */
-export const previewDemoEnabled = () => process.env.FIGMA === '1' && process.env.NODE_ENV !== 'production'
+export const previewDemoEnabled = () => process.env.FIGMA === '1'
 
 /**
  * Cookie 策略：
@@ -45,6 +69,16 @@ async function sessionCookieOptions() {
 async function resolvePreviewFallbackUser(): Promise<User | null> {
   if (!previewDemoEnabled()) return null
   const payload = await getPayloadClient()
+  const memUserId = readPreviewSession()?.userId
+  if (memUserId === SIGNED_OUT_SENTINEL) return null
+  if (memUserId) {
+    const memUser = await payload
+      .findByID({ collection: 'users', id: memUserId, depth: 0, overrideAccess: true })
+      .catch(() => null)
+    if (memUser && (memUser as User).status === 'active') {
+      return { ...(memUser as User), collection: 'users' } as User
+    }
+  }
   const preferred = await payload
     .find({
       collection: 'users',
@@ -76,16 +110,30 @@ async function resolvePreviewFallbackUser(): Promise<User | null> {
  */
 export function createAppAuth(appUserCollection: 'users') {
   const getCurrentUser = cache(async (): Promise<User | null> => {
+    // 必须在第一行调用 cookies()，确保所有鉴权路由在 Next.js 构建中始终保持 Dynamic (ƒ)，绝不被静态缓存
     const jar = await cookies()
-    const token = jar.get(APP_SESSION_COOKIE)?.value
-    if (token === SIGNED_OUT_SENTINEL) return null
-    if (token) {
+    // 浏览器中可能同时存在旧的非 Partitioned Cookie（如 signed-out）与新的 Partitioned JWT Cookie，遍历全部同名值优先取有效 JWT
+    const allTokens = jar.getAll(APP_SESSION_COOKIE).map((c) => c.value).filter(Boolean)
+    const jwtTokens = allTokens.filter((t) => t !== SIGNED_OUT_SENTINEL)
+    const hasSignedOutCookie = allTokens.includes(SIGNED_OUT_SENTINEL)
+
+    if (previewDemoEnabled()) {
+      const previewState = readPreviewSession()
+      if (previewState?.userId === SIGNED_OUT_SENTINEL && jwtTokens.length === 0) return null
+      if (previewState?.userId && previewState.userId !== SIGNED_OUT_SENTINEL) {
+        return resolvePreviewFallbackUser()
+      }
+    }
+
+    if (jwtTokens.length > 0) {
       const payload = await getPayloadClient()
-      const authHeaders = new Headers({ Authorization: `JWT ${token}` })
-      const { user } = await payload.auth({ headers: authHeaders })
-      if (user && user.collection === appUserCollection) {
-        const appUser = user as User & { collection: string }
-        return appUser.status === 'active' ? appUser : null
+      for (const token of jwtTokens.reverse()) {
+        const authHeaders = new Headers({ Authorization: `JWT ${token}` })
+        const { user } = await payload.auth({ headers: authHeaders }).catch(() => ({ user: null }))
+        if (user && user.collection === appUserCollection) {
+          const appUser = user as User & { collection: string }
+          if (appUser.status === 'active') return appUser
+        }
       }
     }
     const mpToken = jar.get(MP_WEB_COOKIE)?.value
@@ -93,6 +141,7 @@ export function createAppAuth(appUserCollection: 'users') {
       const mpUser = await userFromToken(mpToken, 'web')
       if (mpUser) return mpUser
     }
+    if (hasSignedOutCookie) return null
     return resolvePreviewFallbackUser()
   })
 
@@ -117,8 +166,10 @@ export function createAppAuth(appUserCollection: 'users') {
       if (!result.token || !result.user) return { ok: false, error: '邮箱或密码不正确' }
       if ((result.user as User).status !== 'active') return { ok: false, error: '该账号已停用，请联系管理员' }
 
+      writePreviewSession(String(result.user.id))
       const opts = await sessionCookieOptions()
-      ;(await cookies()).set(APP_SESSION_COOKIE, result.token, {
+      const jar = await cookies()
+      jar.set(APP_SESSION_COOKIE, result.token, {
         ...opts,
         expires: result.exp ? new Date(result.exp * 1000) : undefined,
       })
@@ -132,6 +183,7 @@ export function createAppAuth(appUserCollection: 'users') {
     const jar = await cookies()
     const opts = await sessionCookieOptions()
     if (previewDemoEnabled()) {
+      writePreviewSession(SIGNED_OUT_SENTINEL)
       jar.set(APP_SESSION_COOKIE, SIGNED_OUT_SENTINEL, { ...opts, maxAge: 60 * 60 * 12 })
     } else {
       jar.set(APP_SESSION_COOKIE, '', { ...opts, maxAge: 0 })
