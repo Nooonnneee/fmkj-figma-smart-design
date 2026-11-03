@@ -167,9 +167,15 @@ Page({
     })
   },
 
+  print() {
+    if (!this.data.contract) return
+    openDocument('/print/contracts/' + this.data.contract.id, '合同 ' + this.data.contract.number)
+  },
+
   more() {
     const c = this.data.contract
     const actions = []
+    if (c) actions.push({ label: '预览 / 导出合同 PDF', run: () => this.print() })
     if (c.quoteId) actions.push({ label: '查看依据的报价', run: () => wx.navigateTo({ url: '/pages/quote/index?id=' + c.quoteId }) })
     if (!this.data.signed && !this.data.readOnly) actions.push({ label: '删除合同', run: () => this.remove() })
     if (!actions.length) return

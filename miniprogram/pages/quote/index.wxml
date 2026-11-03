@@ -17,8 +17,18 @@
     <view class="row between small muted mt-8"><text>附加费用</text><text class="num">{{totals.fee}}</text></view>
     <view class="row between small muted mt-8"><text>优惠</text><text class="num">-{{totals.discount}}</text></view>
     <view class="divider" />
-    <view class="row between"><text class="title">合计</text><text class="big-num">{{totals.total}}</text></view>
-    <view wx:if="{{dirty}}" class="small muted mt-8 text-right">有未保存的修改</view>
+    <view class="row between">
+      <text class="title">合计</text>
+      <view class="row gap-16">
+        <text class="big-num">{{totals.total}}</text>
+      </view>
+    </view>
+    <view wx:if="{{printPath}}" class="row between mt-16">
+      <text class="small muted">{{dirty ? '有未保存的修改（预览时自动保存）' : '支持多套版式切换与导出 PDF / 长图'}}</text>
+      <button class="btn btn-outline btn-sm" hover-class="btn-hover" bindtap="print">
+        <image class="icon-sm" src="/assets/icons/printer.svg" />预览 / 导出 PDF
+      </button>
+    </view>
   </view>
 
   <view wx:if="{{canContract}}" class="card row between gap-16">
