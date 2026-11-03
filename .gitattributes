@@ -145,7 +145,6 @@
 *.nc                 filter=lfs diff=lfs merge=lfs -text
 *.mat                filter=lfs diff=lfs merge=lfs -text
 
-<<<<<<< main
 public/demo-flow/** -filter -diff -merge -text
 
 public/brand/** -filter -diff -merge -text
@@ -155,11 +154,6 @@ desktop/resources/*.png -filter -diff -merge -text
 public/point-icons/** -filter -diff -merge -text
 
 scripts/point-icons/** -filter -diff -merge -text
-=======
-# ---------------------------------------------------------------------------
-# 自部署核心静态底图与字体（免 Git LFS，直接以真实二进制入库）
-# ---------------------------------------------------------------------------
+
+# 自部署内置示例户型底图（直接以真实二进制入库，免 LFS）
 public/demo-plans/*.png -filter -diff -merge -text
-public/fonts/*.woff2    -filter -diff -merge -text
-src/fonts/*.woff2       -filter -diff -merge -text
->>>>>>> 9459a1187a231fd2343584592b96084ced19ea47
