@@ -16,7 +16,7 @@
     <view wx:for="{{items}}" wx:key="id" class="list-item" hover-class="list-item-hover" data-index="{{index}}" bindtap="onTap">
       <image class="thumb" src="{{item.imageUrl}}" mode="aspectFit" lazy-load />
       <view class="grow">
-        <view class="clamp-2">{{item.name}}</view>
+        <view class="truncate">{{item.name}}</view>
         <view class="row gap-8 mt-8 small muted">
           <view class="dot" style="background: {{item.type.color}}" />
           <text class="truncate">{{item.type.name}}{{item.brand ? ' · ' + item.brand : ''}}</text>
@@ -24,7 +24,6 @@
       </view>
       <view class="text-right shrink-0">
         <view class="num">{{item.priceText}}</view>
-        <view class="small muted mt-8">/{{item.unit}}</view>
       </view>
     </view>
     <view wx:if="{{!loading && !items.length}}" class="empty">
@@ -33,5 +32,4 @@
     </view>
     <view wx:if="{{loading}}" class="empty small">加载中…</view>
   </view>
-  <view wx:if="{{items.length && !hasMore}}" class="small muted text-center mt-24">共 {{total}} 款产品</view>
 </view>

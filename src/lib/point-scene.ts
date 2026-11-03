@@ -13,6 +13,7 @@
  * 只依赖同目录的纯模块，Node 脚本也能直接使用。
  */
 import { areaTypeLabel, inferAreaType, isAreaType, type AreaType } from './area-types'
+import { BUILTIN_DEMO_SHEETS } from './builtin-demo-sheets'
 import { categoryOfType, deviceTypeOf, isDeviceType } from './device-types'
 import { BLANK_SHEET_FILE_ID, BLANK_SHEET_URL, isMarkerFileId, markerFileId, markerUrl } from './point-markers'
 import { MARKER, SHEET, sheetOrigin } from './sheet-spec'
@@ -347,7 +348,15 @@ export function buildSheetElements(opts: { index: number; name: string; fileId: 
 export const AREA_STYLE = { stroke: '#64748b', label: '#475569', labelSize: 11 } as const
 
 /** 区域：实线框 + 左上角的区域名（矩形；多边形区域由点位图编辑器生成）。 */
-export function buildAreaElements(opts: { name: string; areaType?: string; x: number; y: number; width: number; height: number }): SceneEl[] {
+export function buildAreaElements(opts: {
+  name: string
+  areaType?: string
+  x: number
+  y: number
+  width: number
+  height: number
+  polygon?: [number, number][]
+}): SceneEl[] {
   const areaType = isAreaType(opts.areaType) ? opts.areaType : inferAreaType(opts.name)
   const group = randomId('ar-')
   return [
@@ -364,7 +373,12 @@ export function buildAreaElements(opts: { name: string; areaType?: string; x: nu
       strokeStyle: 'solid',
       roughness: 0,
       opacity: 70,
-      customData: { kind: 'area', name: opts.name, areaType },
+      customData: {
+        kind: 'area',
+        name: opts.name,
+        areaType,
+        ...(opts.polygon && opts.polygon.length >= 3 ? { polygon: opts.polygon } : {}),
+      },
     },
     {
       id: randomId(),
@@ -386,21 +400,80 @@ export function buildAreaElements(opts: { name: string; areaType?: string; x: nu
 
 export const markerFile = (type: string): SceneFile => ({ id: markerFileId(type), dataURL: markerUrl(type), mimeType: 'image/svg+xml' })
 
+const DEMO_MEDIA_URL_MAP: Record<string, string> = {
+  '/api/media/file/gy-1f-light-original.png': '/demo-plans/gy-1f-light.png',
+  '/api/media/file/gy-2f-light-original.png': '/demo-plans/gy-2f-light.png',
+  '/api/media/file/gy-3f-light-original.png': '/demo-plans/gy-3f-light.png',
+}
+
+function buildUpgradedDemoScene(): { elements: SceneEl[]; files: Record<string, SceneFile> } {
+  const elements: SceneEl[] = []
+  const files: Record<string, SceneFile> = {}
+  BUILTIN_DEMO_SHEETS.forEach((sheet, idx) => {
+    const fileId = `sheet-file-${sheet.id}`
+    files[fileId] = { id: fileId, dataURL: sheet.url, mimeType: 'image/png' }
+    elements.push(...buildSheetElements({ index: idx, name: sheet.name, fileId, sheetId: sheet.id }))
+    const origin = sheetOrigin(idx)
+    for (const a of sheet.areas) {
+      const ax = origin.x + Math.round(a.x0 * SHEET.width)
+      const ay = origin.y + Math.round(a.y0 * SHEET.height)
+      const aw = Math.max(20, Math.round((a.x1 - a.x0) * SHEET.width))
+      const ah = Math.max(20, Math.round((a.y1 - a.y0) * SHEET.height))
+      const polygon = a.poly
+        ? a.poly.map(([px, py]) => [Math.round((px - a.x0) * SHEET.width), Math.round((py - a.y0) * SHEET.height)] as [number, number])
+        : undefined
+      elements.push(...buildAreaElements({ name: a.name, x: ax, y: ay, width: aw, height: ah, polygon }))
+    }
+    for (const p of sheet.points) {
+      const mId = markerFileId(p.type)
+      files[mId] = markerFile(p.type)
+      elements.push(
+        ...buildPointElements({
+          deviceType: p.type,
+          cx: origin.x + Math.round(p.rx * SHEET.width),
+          cy: origin.y + Math.round(p.ry * SHEET.height),
+          code: p.code,
+          productId: null,
+        }),
+      )
+    }
+  })
+  return { elements, files }
+}
+
 /**
  * 打开点位图时整理场景：
  * - 点位统一换成当前版本的标记图标（修复旧版本保存时丢失的符号图片）；
  * - 旧版本上传的户型图补上图纸信息；
+ * - 自部署旧版内置示例场景（sh-demo-1f + blank-sheet.svg）自动升级为真实三层别墅户型图与 137 个点位；
  * - 返回无法自动修复的问题（例如户型图图片丢失）。
  */
 export function normalizeScene(scene: Partial<StoredScene> | null | undefined): StoredScene & { warnings: string[]; repaired: number } {
   // 忽略被清除（null）或格式不对的文件
-  const files: Record<string, SceneFile> = Object.fromEntries(
+  let files: Record<string, SceneFile> = Object.fromEntries(
     Object.entries((scene?.files ?? {}) as Record<string, SceneFile | null>).filter((e): e is [string, SceneFile] => !!e[1] && typeof e[1].dataURL === 'string'),
   )
-  const elements = ((scene?.elements ?? []) as SceneEl[]).filter((e) => e && typeof e === 'object' && !e.isDeleted)
+  let elements = ((scene?.elements ?? []) as SceneEl[]).filter((e) => e && typeof e === 'object' && !e.isDeleted)
   const warnings: string[] = []
   let sheetNo = 0
   let repaired = 0
+
+  // 检测自部署旧版空白示例母版（sh-demo-1f），自动替换为真实三层户型图与 137 个点位
+  if (files['sheet-file-sh-demo-1f'] || elements.some((e) => e.customData?.sheetId === 'sh-demo-1f')) {
+    const upgraded = buildUpgradedDemoScene()
+    files = upgraded.files
+    elements = upgraded.elements
+    repaired++
+  }
+
+  // 将示例项目里的云端媒体路径映射为内置静态户型图路径，确保自部署环境无须额外媒体文件即可显示
+  for (const [k, f] of Object.entries(files)) {
+    const mapped = DEMO_MEDIA_URL_MAP[f.dataURL]
+    if (mapped) {
+      files[k] = { ...f, dataURL: mapped }
+    }
+  }
+
   const out = elements.map((el) => {
     if (isPointElement(el)) {
       const type = isDeviceType(el.customData?.deviceType) ? (el.customData!.deviceType as string) : 'other'

@@ -144,3 +144,10 @@
 *.stl                filter=lfs diff=lfs merge=lfs -text
 *.nc                 filter=lfs diff=lfs merge=lfs -text
 *.mat                filter=lfs diff=lfs merge=lfs -text
+
+# ---------------------------------------------------------------------------
+# 自部署核心静态底图与字体（免 Git LFS，直接以真实二进制入库）
+# ---------------------------------------------------------------------------
+public/demo-plans/*.png -filter -diff -merge -text
+public/fonts/*.woff2    -filter -diff -merge -text
+src/fonts/*.woff2       -filter -diff -merge -text

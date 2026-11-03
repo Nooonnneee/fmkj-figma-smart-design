@@ -4,7 +4,9 @@
  * 首页是按小时重新生成的静态页；这里再缓存 10 分钟，避免同一次生成里重复查询。
  */
 import { floorTagFromSheetName } from '@/lib/area-analysis'
+import { BUILTIN_DEMO_SHEETS } from '@/lib/builtin-demo-sheets'
 import { getCatalog, resolveMediaUrl } from '@/lib/cached-data'
+import { ensureDemoTemplateProject } from '@/lib/demo-project'
 import { memoize } from '@/lib/memo-cache'
 import { getPayloadClient } from '@/lib/payload'
 import { normalizeScene, sceneAreas, scenePoints, sceneSheets, planAreaOf, type PlanAreaShape } from '@/lib/point-scene'
@@ -45,8 +47,15 @@ export type LandingShowcase = {
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
 const text = (v: unknown) => (typeof v === 'string' ? v : '')
 
-export const getLandingShowcase = memoize<LandingShowcase | null>('landing-showcase-v2', [], 10 * 60_000, async () => {
+const STATIC_SHEET_URL_MAP: Record<string, string> = {
+  '/api/media/file/gy-1f-light-original.png': '/demo-plans/gy-1f-light.png',
+  '/api/media/file/gy-2f-light-original.png': '/demo-plans/gy-2f-light.png',
+  '/api/media/file/gy-3f-light-original.png': '/demo-plans/gy-3f-light.png',
+}
+
+export const getLandingShowcase = memoize<LandingShowcase | null>('landing-showcase-v3', [], 10 * 60_000, async () => {
   const payload = await getPayloadClient()
+  await ensureDemoTemplateProject().catch(() => null)
   const res = await payload.find({
     collection: 'projects',
     where: { isDemoTemplate: { equals: true } },
@@ -64,13 +73,13 @@ export const getLandingShowcase = memoize<LandingShowcase | null>('landing-showc
   const points = scenePoints(scene.elements, allSheets, areas)
   const areaName = new Map(areas.map((a) => [a.id, a.name]))
 
-  const sheets: ShowcaseSheet[] = allSheets
+  const parsedSheets: ShowcaseSheet[] = allSheets
     .filter((s) => s.url)
     .map((s, i) => ({
       id: s.id,
       name: s.name,
       floor: floorTagFromSheetName(s.name) || `第${i + 1}层`,
-      url: s.url!,
+      url: STATIC_SHEET_URL_MAP[s.url!] ?? s.url!,
       points: points
         .filter((p) => p.sheetId === s.id && p.rx != null && p.ry != null)
         .map((p) => ({ id: p.id, type: p.deviceType, code: p.code, rx: p.rx!, ry: p.ry!, room: p.areaId ? (areaName.get(p.areaId) ?? null) : null })),
@@ -78,6 +87,14 @@ export const getLandingShowcase = memoize<LandingShowcase | null>('landing-showc
         .filter((a) => a.sheetId === s.id)
         .map((a) => planAreaOf(a, s)),
     }))
+  const parsedPointCount = parsedSheets.reduce((s, sh) => s + sh.points.length, 0)
+  const hasBlankSheet = parsedSheets.some((s) => s.url.includes('blank-sheet'))
+  const sheets: ShowcaseSheet[] =
+    parsedSheets.length >= 3 && parsedPointCount >= 100 && !hasBlankSheet ? parsedSheets : BUILTIN_DEMO_SHEETS
+  const totalRooms =
+    sheets === BUILTIN_DEMO_SHEETS
+      ? BUILTIN_DEMO_SHEETS.reduce((s, sh) => s + sh.areas.length, 0)
+      : new Set(points.map((p) => p.areaId).filter(Boolean)).size
 
   const [quotes, products, brands, catalog] = await Promise.all([
     payload.find({
@@ -141,7 +158,7 @@ export const getLandingShowcase = memoize<LandingShowcase | null>('landing-showc
     },
     sheets,
     pointCount: sheets.reduce((s, sh) => s + sh.points.length, 0),
-    roomCount: new Set(points.map((p) => p.areaId).filter(Boolean)).size,
+    roomCount: totalRooms,
     quote,
     library: { products: products.totalDocs, brands: brands.totalDocs },
   }

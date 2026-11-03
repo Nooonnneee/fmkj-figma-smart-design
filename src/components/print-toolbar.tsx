@@ -51,8 +51,18 @@ export function PrintToolbar({
   const [busy, setBusy] = useState<'pdf' | 'img' | null>(null)
   const [exportResult, setExportResult] = useState<ExportResultState | null>(null)
   const [copied, setCopied] = useState(false)
+  const [inMiniProgram, setInMiniProgram] = useState(false)
   const searchParams = useSearchParams()
   const autoTriggered = useRef(false)
+  const isMpView = searchParams.get('mp') === '1' || inMiniProgram
+
+  useEffect(() => {
+    const ua = navigator.userAgent || ''
+    const wxEnv = (window as unknown as { __wxjs_environment?: string }).__wxjs_environment
+    if (ua.includes('miniProgram') || wxEnv === 'miniprogram') {
+      setInMiniProgram(true)
+    }
+  }, [])
 
   const exportPdf = useCallback(async () => {
     setBusy('pdf')
@@ -211,9 +221,13 @@ export function PrintToolbar({
   return (
     <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur-xs print:hidden">
       <div className={cn('mx-auto flex h-11 items-center justify-between gap-2 px-3 sm:px-4', wide ? 'max-w-[1440px]' : 'max-w-[297mm]')}>
-        <Button asChild variant="ghost" size="sm" className="-ml-2 shrink-0 text-muted-foreground">
-          <Link href={back.href}><ChevronLeft className="size-4" />{back.label}</Link>
-        </Button>
+        {isMpView ? (
+          <span className="text-xs font-medium text-muted-foreground">预览与导出</span>
+        ) : (
+          <Button asChild variant="ghost" size="sm" className="-ml-2 shrink-0 text-muted-foreground">
+            <Link href={back.href}><ChevronLeft className="size-4" />{back.label}</Link>
+          </Button>
+        )}
 
         <div className="flex min-w-0 items-center gap-2">
           {note && !locked ? <span className="hidden rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground sm:inline-block">{note}</span> : null}
