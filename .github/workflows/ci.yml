@@ -1,0 +1,25 @@
+name: CI & Domain Knowledge Check
+
+on:
+  push:
+    branches: ['main']
+  pull_request:
+    branches: ['main']
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: TypeScript 类型检查
+        run: pnpm exec tsc --noEmit
+      - name: 领域知识库与规则回归测试
+        run: pnpm run knowledge:check

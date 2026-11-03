@@ -1,6 +1,7 @@
 import type { AiModelOption } from '@/components/ai/ai-elements'
 import { allAiSkillSpecs } from '@/plugins/ai-catalog'
 import type { PluginId } from '@/plugins/types'
+import type { ModelPricing } from './billing'
 
 /**
  * 受信任的 AI 渠道白名单：
@@ -117,6 +118,8 @@ export type AiModelConfig = AiModelOption & {
   enabled: boolean
   /** 是否为默认选中模型 */
   isDefault?: boolean
+  /** 模型真实价格（元/百万 tokens）；未配置时走旧倍率公式 */
+  pricing?: ModelPricing | null
 }
 
 export function inferModelTier(apiModel: string, reasoning?: boolean, cost?: number): { minTier: 'free' | 'pro' | 'team'; tierBadge: 'Go' | 'Plus' | 'Pro' } {
@@ -161,6 +164,10 @@ export const DEFAULT_AI_MODELS: AiModelConfig[] = [
     tierBadge: 'Go',
     enabled: true,
     isDefault: true,
+    pricing: {
+      peak: { input: 2, output: 8, cachedInput: 0.04 },
+      offPeak: { input: 1, output: 4, cachedInput: 0.02 },
+    },
   },
   {
     id: 'qwen-vl-plus',
@@ -177,6 +184,10 @@ export const DEFAULT_AI_MODELS: AiModelConfig[] = [
     tierBadge: 'Plus',
     enabled: true,
     isDefault: false,
+    pricing: {
+      peak: { input: 3, output: 9, cachedInput: 1.2 },
+      offPeak: { input: 3, output: 9, cachedInput: 1.2 },
+    },
   },
   {
     id: 'deepseek-r1-pro',
@@ -194,6 +205,10 @@ export const DEFAULT_AI_MODELS: AiModelConfig[] = [
     tierBadge: 'Pro',
     enabled: true,
     isDefault: false,
+    pricing: {
+      peak: { input: 4, output: 16, cachedInput: 1 },
+      offPeak: { input: 1, output: 4, cachedInput: 0.25 },
+    },
   },
 ]
 
@@ -397,6 +412,22 @@ export function parseAiModels(value: unknown, customChannels: AiCustomChannel[] 
     const validCost = Number.isInteger(costNum) && costNum >= 0 && costNum <= 100 ? costNum : 1
     const isReasoning = Boolean(r.reasoning)
     const tierInfo = resolveExplicitOrInferredTier(r.minTier, apiModel, isReasoning, validCost)
+    const num = (v: unknown) => {
+      const n = Number(v)
+      return Number.isFinite(n) && n >= 0 ? n : 0
+    }
+    const peak = {
+      input: num(r.peakInputPrice),
+      output: num(r.peakOutputPrice),
+      cachedInput: num(r.peakCachedInputPrice),
+    }
+    const offPeakRaw = {
+      input: num(r.offPeakInputPrice),
+      output: num(r.offPeakOutputPrice),
+      cachedInput: num(r.offPeakCachedInputPrice),
+    }
+    const offPeak = offPeakRaw.input || offPeakRaw.output || offPeakRaw.cachedInput ? offPeakRaw : peak
+    const pricing = peak.input || peak.output || peak.cachedInput ? { peak, offPeak } : null
     out.push({
       id,
       name,
@@ -415,6 +446,7 @@ export function parseAiModels(value: unknown, customChannels: AiCustomChannel[] 
       tierBadge: tierInfo.tierBadge,
       enabled: r.enabled !== false,
       isDefault: Boolean(r.isDefault),
+      pricing,
     })
   }
   if (out.length === 0) return DEFAULT_AI_MODELS.map((m) => ({ ...m }))

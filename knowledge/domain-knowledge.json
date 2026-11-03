@@ -3011,10 +3011,11 @@
   },
   "ai-tools": {
     "billing": {
+      "creditValueCny": 0.1,
       "inputPer1kTokens": 0.1,
       "outputPer1kTokens": 0.5,
       "defaultToolCost": 0.5,
-      "formula": "credits = ceil(model.cost * (inputTokens/1000 * inputPer1kTokens + outputTokens/1000 * outputPer1kTokens) + sum(toolCosts))",
+      "formula": "若模型配置了真实价格（元/百万 tokens，区分工作日 9:00-12:00 / 14:00-18:00 高峰与空闲、缓存命中与未命中）：credits = ceil(model.cost * costCny / 0.1 + sum(toolCosts))；未配置价格时回退旧公式：credits = ceil(model.cost * (inputTokens/1000 * 0.1 + outputTokens/1000 * 0.5) + sum(toolCosts))",
       "toolCosts": {
         "list_projects": 0.2,
         "create_project": 0.5,

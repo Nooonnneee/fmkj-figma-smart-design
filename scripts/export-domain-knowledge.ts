@@ -41,7 +41,7 @@ import {
   PLUGINS,
   validatePluginAiPermissions,
 } from '@/plugins'
-import { DEFAULT_TOOL_COST, INPUT_PER_1K, OUTPUT_PER_1K, TOOL_COSTS } from '@/plugins/ai-copilot/billing'
+import { CREDIT_VALUE_CNY, DEFAULT_TOOL_COST, INPUT_PER_1K, OUTPUT_PER_1K, TOOL_COSTS } from '@/plugins/ai-copilot/billing'
 import { DECK_THEMES } from '@/plugins/proposal/deck/themes'
 import { DECK_SECTIONS, normalizeSections, ORCHESTRATION_RULES, PROPOSAL_FRAMEWORKS } from '@/plugins/proposal/framework'
 import { BUILTIN_PROPOSAL_TEMPLATES, recommendTemplates } from '@/plugins/proposal/templates'
@@ -201,10 +201,12 @@ function buildKnowledgeBundle() {
 
   const aiTools = {
     billing: {
+      creditValueCny: CREDIT_VALUE_CNY,
       inputPer1kTokens: INPUT_PER_1K,
       outputPer1kTokens: OUTPUT_PER_1K,
       defaultToolCost: DEFAULT_TOOL_COST,
-      formula: 'credits = ceil(model.cost * (inputTokens/1000 * inputPer1kTokens + outputTokens/1000 * outputPer1kTokens) + sum(toolCosts))',
+      formula:
+        '若模型配置了真实价格（元/百万 tokens，区分工作日 9:00-12:00 / 14:00-18:00 高峰与空闲、缓存命中与未命中）：credits = ceil(model.cost * costCny / 0.1 + sum(toolCosts))；未配置价格时回退旧公式：credits = ceil(model.cost * (inputTokens/1000 * 0.1 + outputTokens/1000 * 0.5) + sum(toolCosts))',
       toolCosts: TOOL_COSTS,
     },
     permissions: AI_PERMISSIONS.map((p) => ({ ...p })),

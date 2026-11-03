@@ -28,3 +28,12 @@ logs/
 
 # 桌面客户端安装包（上传到服务器的 desktop-releases 目录，不提交）
 /desktop-releases/
+
+# Figma Make 调试 / 评审临时文件
+/.tmp/
+/.figaro/
+/.impeccable/
+/.export-artifacts/
+/.figma/README.md
+/.figma/make/*
+!/.figma/make/site.json

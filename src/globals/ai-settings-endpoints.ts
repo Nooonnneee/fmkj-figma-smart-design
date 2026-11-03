@@ -78,7 +78,16 @@ export const aiSettingsEndpoints: Endpoint[] = [
           ['-c', `credential.helper=${helper}`, 'push', 'https://github.com/lynnliuyu/fmkj-figma-smart-design.git', `${syncCommit}:refs/heads/main`],
           { stdio: 'pipe', timeout: 60_000 },
         )
-        return json({ ok: true, commit: syncCommit.slice(0, 7), sourceCommit: head, repo: 'lynnliuyu/fmkj-figma-smart-design', branch: 'main' })
+        const headsRaw = execFileSync(
+          'git',
+          ['-c', `credential.helper=${helper}`, 'ls-remote', '--heads', 'https://github.com/lynnliuyu/fmkj-figma-smart-design.git'],
+          { encoding: 'utf8', timeout: 30_000 },
+        ).trim()
+        const branches = headsRaw
+          .split('\n')
+          .filter(Boolean)
+          .map((line) => line.split('\t')[1]?.replace('refs/heads/', '') ?? line)
+        return json({ ok: true, commit: syncCommit.slice(0, 7), sourceCommit: head, repo: 'lynnliuyu/fmkj-figma-smart-design', branch: 'main', branches })
       } catch (e) {
         const msg = (e as { stderr?: Buffer; message?: string })?.stderr?.toString() || (e as Error)?.message || 'git push failed'
         const scrubbed = msg.replace(token, '***')

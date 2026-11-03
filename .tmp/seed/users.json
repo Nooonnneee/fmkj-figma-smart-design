@@ -1,1 +1,0 @@
-{"slug":"users","documents":[{"data":{"name":"演示管理员","email":"demo@fmkj.dev","password":"demo1234","role":"admin","status":"active"}},{"data":{"name":"销售小王","email":"sales@fmkj.dev","password":"demo1234","role":"sales","status":"active"}}]}

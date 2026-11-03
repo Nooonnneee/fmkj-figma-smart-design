@@ -2038,6 +2038,12 @@ export interface CompanySetting {
         enabled?: boolean | null;
         isDefault?: boolean | null;
         reasoning?: boolean | null;
+        peakInputPrice?: number | null;
+        peakOutputPrice?: number | null;
+        peakCachedInputPrice?: number | null;
+        offPeakInputPrice?: number | null;
+        offPeakOutputPrice?: number | null;
+        offPeakCachedInputPrice?: number | null;
         id?: string | null;
       }[]
     | null;
@@ -2111,6 +2117,12 @@ export interface AiSetting {
         enabled?: boolean | null;
         isDefault?: boolean | null;
         reasoning?: boolean | null;
+        peakInputPrice?: number | null;
+        peakOutputPrice?: number | null;
+        peakCachedInputPrice?: number | null;
+        offPeakInputPrice?: number | null;
+        offPeakOutputPrice?: number | null;
+        offPeakCachedInputPrice?: number | null;
         id?: string | null;
       }[]
     | null;
@@ -2201,6 +2213,12 @@ export interface CompanySettingsSelect<T extends boolean = true> {
         enabled?: T;
         isDefault?: T;
         reasoning?: T;
+        peakInputPrice?: T;
+        peakOutputPrice?: T;
+        peakCachedInputPrice?: T;
+        offPeakInputPrice?: T;
+        offPeakOutputPrice?: T;
+        offPeakCachedInputPrice?: T;
         id?: T;
       };
   createdBy?: T;
@@ -2237,6 +2255,12 @@ export interface AiSettingsSelect<T extends boolean = true> {
         enabled?: T;
         isDefault?: T;
         reasoning?: T;
+        peakInputPrice?: T;
+        peakOutputPrice?: T;
+        peakCachedInputPrice?: T;
+        offPeakInputPrice?: T;
+        offPeakOutputPrice?: T;
+        offPeakCachedInputPrice?: T;
         id?: T;
       };
   createdBy?: T;
