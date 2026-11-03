@@ -64,7 +64,36 @@ export const aiSettingsEndpoints: Endpoint[] = [
           { stdio: 'pipe', timeout: 60_000 },
         )
         const ghTree = execFileSync('git', ['rev-parse', 'refs/remotes/github/main^{tree}'], { encoding: 'utf8' }).trim()
-        const headTree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' }).trim()
+        // 使用临时索引构建推送到 GitHub 的树：剔除 Figma Make 沙盒专用的 .figma 内部脚本（仅保留 .figma/make/site.json）及任何临时目录
+        const tmpIdx = `/tmp/git-gh-index-${Date.now()}`
+        const envWithIdx = { ...process.env, GIT_INDEX_FILE: tmpIdx }
+        execFileSync('git', ['read-tree', 'HEAD'], { env: envWithIdx, stdio: 'pipe' })
+        execFileSync(
+          'git',
+          [
+            'rm',
+            '--cached',
+            '--ignore-unmatch',
+            '-r',
+            '.tmp',
+            '.figaro',
+            '.impeccable',
+            '.export-artifacts',
+            '.figma/README.md',
+            '.figma/make/analyze-routes',
+            '.figma/make/deploy',
+            '.figma/make/deploy-preview',
+            '.figma/make/dev',
+            '.figma/make/dev.json',
+            '.figma/make/format',
+            '.figma/make/install',
+            '.figma/make/langserver',
+            '.figma/make/template-transition.json',
+          ],
+          { env: envWithIdx, stdio: 'pipe' },
+        )
+        const headTree = execFileSync('git', ['write-tree'], { env: envWithIdx, encoding: 'utf8' }).trim()
+        execFileSync('rm', ['-f', tmpIdx], { stdio: 'pipe' })
         if (ghTree === headTree) {
           return json({ ok: true, commit: head, repo: 'lynnliuyu/fmkj-figma-smart-design', branch: 'main', note: 'GitHub 已是最新代码' })
         }
