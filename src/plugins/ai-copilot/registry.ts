@@ -132,8 +132,8 @@ export async function runTool(tools: AiTool[], call: LlmToolCall, ctx: ToolConte
   }
 
   try {
-    const { result, summary, href, hrefLabel } = await tool.run(args, ctx)
-    return { tool, output: result, summary, href, hrefLabel }
+    const { result, summary, href, hrefLabel, imageUrl } = await tool.run(args, ctx)
+    return { tool, output: result, summary, href, hrefLabel, imageUrl }
   } catch (error) {
     console.error('[ai] tool failed', call.function.name, error)
     return { tool, output: { error: `工具执行失败：${(error as Error)?.message ?? '未知错误'}` } }

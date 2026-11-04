@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   if (!isImageModelId(body?.model)) return NextResponse.json({ ok: false, error: '不支持的图像模型' }, { status: 400 })
 
   const model = IMAGE_MODELS.find((m) => m.id === body.model)!
-  const size = typeof body?.size === 'string' && model.sizes.includes(body.size) ? body.size : model.sizes[0]
+  const size = typeof body?.size === 'string' && (model.sizes as readonly string[]).includes(body.size) ? body.size : model.sizes[0]
   const payload = await getPayloadClient()
   const fresh = await payload.findByID({ collection: 'users', id: user.id, depth: 0, overrideAccess: true, select: { aiCredits: true } })
   if ((fresh.aiCredits ?? 0) < model.cost) {

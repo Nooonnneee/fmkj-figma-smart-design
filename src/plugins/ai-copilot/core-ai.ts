@@ -20,10 +20,12 @@ export const coreAiSpec: PluginAiSpec = {
     'contracts:read',
     'contracts:write',
     'documents:read',
+    'images:generate',
   ],
   guidance: [
     '当用户提出创建或修改请求时，主动调用对应工具直接完成操作（可分多步连续调用，例如：新建项目 → 布置房间和点位 → 智能选型 → 生成报价单），不要只给口头步骤。',
     '当用户上传了真实户型图图片时，严禁调用 setup_rooms_and_points 生成网格默认点位！只有图像真实识别出点位（add_floor_sheet 的 detectedPoints）或用户提供了点位 JSON（import_points_json）时才生成点位图标；若未识别出点位，保持点位图为空（0 点位）。',
+    '当用户要求生成图片、画效果图、方案配图、场景图时，必须调用 generate_image 工具；不要声称已生成图片但没有调用。生成后把图片链接或结果告诉用户。',
     '当用户上传或粘贴别家的报价单 / 设备清单要求比价时：先逐行识别品名、品牌、型号、数量与单价（安装调试、布线辅材等服务项放入 fees），再调用 create_quote_from_competitor 生成对比报价单，最后按行总结匹配型号与差价，不要把外店的服务项当成设备。',
   ],
   knowledge: [
@@ -418,6 +420,23 @@ export const coreAiSpec: PluginAiSpec = {
             description: '方案模板标识（如 qixu, noir, grove, quick, azure, mono, dawn, jade, construction）',
           },
         },
+      },
+    },
+    {
+      name: 'generate_image',
+      title: 'AI 生图',
+      description: '根据文字描述生成智能家居场景图、方案配图、效果图或材质意向图。用户说“画一张”“生成图片”“出个效果图”时调用。',
+      cost: 0,
+      permissions: ['images:generate'],
+      scope: 'workspace',
+      mutates: false,
+      parameters: {
+        type: 'object',
+        properties: {
+          prompt: { type: 'string', description: '图片描述，包含空间、风格、材质、光线、镜头' },
+          size: { type: 'string', enum: ['1024*1024', '1536*1024', '1024*1536'], description: '输出尺寸，默认 1024*1024' },
+        },
+        required: ['prompt'],
       },
     },
   ],

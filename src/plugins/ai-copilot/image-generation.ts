@@ -12,23 +12,9 @@ export const IMAGE_MODELS = [
   {
     id: 'qwen-image-3.0-pro',
     name: '千问图像 3.0 Pro',
-    description: '文生图 / 图生图，画面细节和文字表现更好',
+    description: '文生图 / 图生图，支持智能家居场景、方案配图与户型图风格化',
     sizes: ['1024*1024', '1536*1024', '1024*1536'],
     cost: 5,
-  },
-  {
-    id: 'wan2.7-image',
-    name: '万相 2.7 Image',
-    description: '万相图像生成，速度快、成本低',
-    sizes: ['1024*1024', '1280*720', '720*1280'],
-    cost: 3,
-  },
-  {
-    id: 'wan2.7-image-pro',
-    name: '万相 2.7 Image Pro',
-    description: '万相图像生成 Pro，质量更高',
-    sizes: ['1024*1024', '1280*720', '720*1280'],
-    cost: 8,
   },
 ] as const
 
@@ -52,7 +38,7 @@ export async function generateImage(opts: {
   if (!key) throw new ImageGenerationError('服务器尚未配置 AI_BAILIAN_TOKEN_PLAN_KEY')
   const model = IMAGE_MODELS.find((m) => m.id === opts.model)
   if (!model) throw new ImageGenerationError('不支持的图像模型')
-  const size = opts.size && model.sizes.includes(opts.size) ? opts.size : model.sizes[0]
+  const size = opts.size && (model.sizes as readonly string[]).includes(opts.size) ? opts.size : model.sizes[0]
 
   let res: Response
   try {

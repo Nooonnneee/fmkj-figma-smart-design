@@ -31,7 +31,7 @@ export type AiModelOption = {
 }
 export type AiConnectablePlugin = { id: string; name: string; description: string; status: 'ready' | 'coming-soon'; enabled: boolean; where: string; provides: string[] }
 export type AiProjectContext = { id: string; name: string; customerName: string | null; platform: string | null; pointCount: number }
-export type AiToolCall = { pluginId: string; pluginName: string; action: string; summary: string; details: string[]; href?: string; hrefLabel?: string }
+export type AiToolCall = { pluginId: string; pluginName: string; action: string; summary: string; details: string[]; href?: string; hrefLabel?: string; imageUrl?: string }
 export type AiAttachment = {
   id: string
   name: string
@@ -124,13 +124,21 @@ export function AiMessageBubble({ message, onRegenerate }: { message: AiChatMess
   return (
     <div className="group flex flex-col gap-1.5">
       {message.toolCalls?.map((c, i) => (
-        <div key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Blocks className="size-3" />
-          <span>{c.summary ? `${c.pluginName}：${c.summary}` : `已使用 ${c.pluginName}`}</span>
-          {c.href ? (
-            <Link href={c.href} className="underline-offset-4 hover:text-foreground hover:underline">
-              {c.hrefLabel ?? '查看'}
-            </Link>
+        <div key={i} className="flex flex-col gap-1.5 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <Blocks className="size-3" />
+            <span>{c.summary ? `${c.pluginName}：${c.summary}` : `已使用 ${c.pluginName}`}</span>
+            {c.href ? (
+              <Link href={c.href} className="underline-offset-4 hover:text-foreground hover:underline">
+                {c.hrefLabel ?? '查看'}
+              </Link>
+            ) : null}
+          </div>
+          {c.imageUrl ? (
+            <a href={c.imageUrl} target="_blank" rel="noreferrer" className="block w-fit">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={c.imageUrl} alt="AI 生成图片" className="max-h-64 max-w-full rounded-xl border object-contain" />
+            </a>
           ) : null}
         </div>
       ))}

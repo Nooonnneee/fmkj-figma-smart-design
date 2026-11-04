@@ -361,6 +361,7 @@ export function AiSidebarDock({
                   details: [],
                   href,
                   hrefLabel: ev.hrefLabel as string | undefined,
+                  imageUrl: typeof ev.imageUrl === 'string' ? ev.imageUrl : undefined,
                 },
               ],
             }))
