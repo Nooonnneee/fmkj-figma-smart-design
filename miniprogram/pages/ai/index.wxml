@@ -1,12 +1,16 @@
 <view class="ai">
   <view class="topbar">
-    <view class="chip project-chip" hover-class="btn-hover" bindtap="pickProject">
+    <view class="chip project-chip {{project ? 'project-chip-active' : ''}}" hover-class="btn-hover" bindtap="pickProject">
       <image class="icon-sm" src="/assets/icons/folder.svg" />
       <text class="truncate">{{project ? project.name : '未关联项目'}}</text>
-      <image class="icon-sm" src="/assets/icons/chevron-down-muted.svg" />
+      <image wx:if="{{project}}" class="icon-sm" src="/assets/icons/x-muted.svg" catchtap="clearProject" />
+      <image wx:else class="icon-sm" src="/assets/icons/chevron-down-muted.svg" />
     </view>
     <view class="row gap-8">
-      <text class="small muted">{{credits}} 积分</text>
+      <view class="credits-pill">
+        <image class="icon-xs" src="/assets/icons/sparkles.svg" />
+        <text class="num small">{{credits}}</text>
+      </view>
       <view class="icon-btn" hover-class="btn-hover" bindtap="openHistory"><image class="icon" src="/assets/icons/history.svg" /></view>
       <view class="icon-btn" hover-class="btn-hover" bindtap="newChat"><image class="icon" src="/assets/icons/message-plus.svg" /></view>
     </view>
@@ -18,9 +22,27 @@
   </view>
 
   <view wx:if="{{!messages.length}}" class="welcome">
-    <view class="h2">{{project ? '关于「' + project.name + '」，想做点什么？' : '有什么可以帮你？'}}</view>
-    <view class="small muted mt-8">可以直接新建项目、上传户型图、检查点位、智能选型、生成报价和合同，结果和网页版同步。</view>
-    <view class="prompts mt-32">
+    <view class="welcome-head">
+      <view class="welcome-icon">
+        <image class="icon" src="/assets/icons/sparkles.svg" />
+      </view>
+      <view class="h2 mt-16">{{project ? '关于「' + project.name + '」，想做点什么？' : '全屋智能 AI 设计助手'}}</view>
+      <view class="small muted mt-8">直接新建项目、上传户型图识图布点、智能配单、生成报价和合同，结果与电脑网页端实时同步。</view>
+    </view>
+
+    <view class="task-grid mt-24">
+      <view wx:for="{{quickTasks}}" wx:key="title" class="task-card" hover-class="list-item-hover" data-prompt="{{item.prompt}}" bindtap="useQuickTask">
+        <view class="row between">
+          <text class="task-tag">{{item.tag}}</text>
+          <image class="icon-sm" src="/assets/icons/chevron-right-muted.svg" />
+        </view>
+        <view class="task-title mt-8">{{item.title}}</view>
+        <view class="small muted mt-4">{{item.desc}}</view>
+      </view>
+    </view>
+
+    <view class="section-label mt-24">快捷指令</view>
+    <view class="prompts mt-12">
       <view wx:for="{{prompts}}" wx:key="*this" class="prompt" hover-class="list-item-hover" data-text="{{item}}" bindtap="usePrompt">{{item}}</view>
     </view>
   </view>
@@ -34,13 +56,27 @@
         <view wx:if="{{item.text}}" class="bubble">{{item.text}}</view>
       </block>
       <block wx:else>
+        <view wx:if="{{item.modelName}}" class="row gap-8 msg-meta">
+          <text wx:if="{{item.tierBadge}}" class="tier-pill {{item.tierBadge}}">{{item.tierBadge}}</text>
+          <text class="small muted">{{item.modelName}}</text>
+        </view>
         <view wx:for="{{item.tools}}" wx:for-item="t" wx:key="index" class="tool" hover-class="btn-hover" data-href="{{t.href}}" bindtap="openTool">
           <image class="icon-sm" src="/assets/icons/check.svg" />
           <text class="grow">{{t.name}}：{{t.summary}}</text>
           <text wx:if="{{t.href}}" class="small link">{{t.label || '查看'}}</text>
         </view>
+        <view wx:if="{{item.reasoning}}" class="reasoning-box">
+          <view class="row between reasoning-head" data-index="{{index}}" bindtap="toggleReasoning">
+            <view class="row gap-8">
+              <image class="icon-xs" src="/assets/icons/sparkles-muted.svg" />
+              <text class="small muted">{{item.pending && !item.html ? '深度思考中…' : '深度思考过程'}}</text>
+            </view>
+            <text class="small muted">{{item.reasoningCollapsed ? '展开' : '收起'}}</text>
+          </view>
+          <view wx:if="{{!item.reasoningCollapsed}}" class="reasoning-body">{{item.reasoning}}</view>
+        </view>
         <rich-text wx:if="{{item.html}}" class="answer {{item.error ? 'error' : ''}}" nodes="{{item.html}}" user-select />
-        <view wx:if="{{item.pending && !item.html}}" class="small muted thinking">{{item.tools.length ? '正在继续处理…' : '思考中…'}}</view>
+        <view wx:if="{{item.pending && !item.html && !item.reasoning}}" class="small muted thinking">{{item.tools.length ? '正在继续处理…' : '思考中…'}}</view>
         <view wx:if="{{!item.pending && item.text}}" class="row gap-16 msg-actions">
           <text class="small muted" data-index="{{index}}" bindtap="copy">复制</text>
           <text wx:if="{{item.cost}}" class="small muted">消耗 {{item.cost}} 积分</text>
@@ -61,8 +97,24 @@
         <image class="icon-sm" src="/assets/icons/x-muted.svg" data-id="{{item.id}}" bindtap="removeAttachment" />
       </view>
     </view>
+
+    <view class="composer-bar">
+      <view class="model-chip" hover-class="btn-hover" bindtap="openModelSheet">
+        <text class="tier-pill {{currentModel.tierBadge}}">{{currentModel.tierBadge || 'Go'}}</text>
+        <text class="model-chip-name truncate">{{currentModel.shortName}}</text>
+        <image class="icon-xs" src="/assets/icons/chevron-down-muted.svg" />
+      </view>
+      <view wx:if="{{templates.length}}" class="tool-chip" hover-class="btn-hover" bindtap="openTemplateSheet">
+        <image class="icon-xs" src="/assets/icons/wand.svg" />
+        <text>技能模板</text>
+      </view>
+      <view class="tool-chip" hover-class="btn-hover" bindtap="addImage">
+        <image class="icon-xs" src="/assets/icons/image-plus.svg" />
+        <text>传图纸</text>
+      </view>
+    </view>
+
     <view class="composer-box">
-      <view class="icon-btn" hover-class="btn-hover" bindtap="addImage"><image class="icon" src="/assets/icons/image-plus.svg" /></view>
       <textarea
         class="composer-input"
         value="{{input}}"
@@ -78,8 +130,105 @@
         <image class="icon" src="{{streaming ? '/assets/icons/stop-white.svg' : '/assets/icons/arrow-up-white.svg'}}" />
       </view>
     </view>
-    <view class="small muted text-center hint">AI 生成内容仅供参考，请核对后使用</view>
   </view>
+
+  <!-- 选择 AI 模型抽屉 -->
+  <block wx:if="{{showModelSheet}}">
+    <view class="mask" bindtap="closeModelSheet" />
+    <view class="sheet">
+      <view class="sheet-head">
+        <view>
+          <text class="title">选择 AI 模型</text>
+          <view class="small muted mt-4">Go 基础 · Plus 视觉多模态 · Pro 深度推理</view>
+        </view>
+        <image class="icon" src="/assets/icons/x-muted.svg" bindtap="closeModelSheet" />
+      </view>
+      <scroll-view scroll-y class="sheet-body model-sheet-body">
+        <view
+          wx:for="{{models}}"
+          wx:key="id"
+          class="model-card {{item.id === currentModel.id ? 'model-card-active' : ''}} {{item.locked ? 'model-card-locked' : ''}}"
+          hover-class="list-item-hover"
+          data-id="{{item.id}}"
+          bindtap="selectModel"
+        >
+          <view class="grow">
+            <view class="row gap-8 wrap">
+              <text class="model-name">{{item.cleanName}}</text>
+              <text class="tier-pill {{item.tierBadge}}">{{item.tierBadge}}</text>
+              <text wx:if="{{item.reasoning}}" class="badge">深度思考</text>
+              <view wx:if="{{item.locked}}" class="badge badge-warning row gap-8">
+                <image class="icon-xs" src="/assets/icons/lock-muted.svg" />
+                <text>需 {{item.tierBadge}} 会员</text>
+              </view>
+            </view>
+            <view class="small muted mt-8">{{item.provider ? item.provider + ' · ' : ''}}{{item.tag}} · {{item.cost > 1 ? '按量 ×' + item.cost : '标准计费'}}</view>
+            <view wx:if="{{item.description}}" class="small muted mt-4 clamp-2">{{item.description}}</view>
+          </view>
+          <image wx:if="{{item.id === currentModel.id}}" class="icon-sm shrink-0" src="/assets/icons/check.svg" />
+        </view>
+      </scroll-view>
+    </view>
+  </block>
+
+  <!-- 选择关联项目抽屉 -->
+  <block wx:if="{{showProjectSheet}}">
+    <view class="mask" bindtap="closeProjectSheet" />
+    <view class="sheet">
+      <view class="sheet-head">
+        <view>
+          <text class="title">关联项目上下文</text>
+          <view class="small muted mt-4">关联后 AI 可直接读取或修改该项目的点位、报价与合同</view>
+        </view>
+        <image class="icon" src="/assets/icons/x-muted.svg" bindtap="closeProjectSheet" />
+      </view>
+      <scroll-view scroll-y class="sheet-body history">
+        <view class="list-item" hover-class="list-item-hover" data-id="" bindtap="selectProject">
+          <view class="grow">
+            <view class="{{!project ? 'num' : ''}}">不关联项目（自由问答 / 新建项目）</view>
+            <view class="small muted mt-4">适合咨询产品选型或直接让 AI 创建新项目</view>
+          </view>
+          <image wx:if="{{!project}}" class="icon-sm shrink-0" src="/assets/icons/check.svg" />
+        </view>
+        <view wx:for="{{projects}}" wx:key="id" class="list-item" hover-class="list-item-hover" data-id="{{item.id}}" bindtap="selectProject">
+          <view class="grow">
+            <view class="row gap-8">
+              <text class="truncate {{project && project.id === item.id ? 'num' : ''}}">{{item.displayName}}</text>
+              <text wx:if="{{item.isDemo}}" class="badge badge-brand">示例</text>
+            </view>
+            <view class="small muted mt-4 truncate">{{item.metaLine}}</view>
+          </view>
+          <image wx:if="{{project && project.id === item.id}}" class="icon-sm shrink-0" src="/assets/icons/check.svg" />
+        </view>
+      </scroll-view>
+    </view>
+  </block>
+
+  <!-- 技能模板抽屉 -->
+  <block wx:if="{{showTemplateSheet}}">
+    <view class="mask" bindtap="closeTemplateSheet" />
+    <view class="sheet">
+      <view class="sheet-head">
+        <view>
+          <text class="title">AI 技能模板</text>
+          <view class="small muted mt-4">点选填入指令并自动匹配推荐模型</view>
+        </view>
+        <image class="icon" src="/assets/icons/x-muted.svg" bindtap="closeTemplateSheet" />
+      </view>
+      <scroll-view scroll-y class="sheet-body model-sheet-body">
+        <view wx:for="{{templates}}" wx:key="id" class="model-card" hover-class="list-item-hover" data-id="{{item.id}}" bindtap="selectTemplate">
+          <view class="grow">
+            <view class="row gap-8">
+              <text class="badge">{{item.category || '技能'}}</text>
+              <text class="model-name">{{item.name}}</text>
+            </view>
+            <view wx:if="{{item.description}}" class="small muted mt-8">{{item.description}}</view>
+          </view>
+          <image class="icon-sm shrink-0" src="/assets/icons/chevron-right-muted.svg" />
+        </view>
+      </scroll-view>
+    </view>
+  </block>
 
   <block wx:if="{{showHistory}}">
     <view class="mask" bindtap="closeHistory" />
@@ -94,9 +243,11 @@
             <view class="truncate {{item.id === conversationId ? 'num' : ''}}">{{item.title}}</view>
             <view class="small muted">{{item.time}}</view>
           </view>
+          <view class="icon-btn-sm" data-id="{{item.id}}" catchtap="deleteConversation">
+            <image class="icon-sm" src="/assets/icons/trash-muted.svg" />
+          </view>
         </view>
         <view wx:if="{{!conversations.length}}" class="empty small">还没有对话</view>
-        <view wx:else class="small muted text-center mt-16">长按可以删除对话</view>
       </scroll-view>
     </view>
   </block>

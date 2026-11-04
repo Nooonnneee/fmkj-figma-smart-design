@@ -1,5 +1,11 @@
 .radio { width: 40rpx; height: 40rpx; border-radius: 50%; border: 2rpx solid var(--rule); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .radio.on { background: var(--ink-primary); border-color: var(--ink-primary); }
+.mt-4 { margin-top: 4rpx; }
+.doc-card { border-top: 6rpx solid var(--ink-primary); }
+.doc-summary { padding: 16rpx 20rpx; border-radius: 16rpx; background: var(--paper-muted); font-size: 25rpx; }
+.doc-kv { display: flex; justify-content: space-between; align-items: center; gap: 16rpx; padding: 10rpx 0; border-top: 1rpx solid var(--rule); }
+.doc-kv:first-child { border-top: none; padding-top: 0; }
+.doc-kv:last-child { padding-bottom: 0; }
 .pay { padding: 24rpx 28rpx; border-top: 1rpx solid var(--rule); }
 .pay:first-child { border-top: none; }
 .pct { width: 140rpx; flex: none; text-align: right; }

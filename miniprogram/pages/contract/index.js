@@ -26,6 +26,7 @@ Page({
     percentTotal: 0,
     percentOk: true,
     showTerms: false,
+    editingInfo: false,
     saving: false,
   },
 
@@ -124,6 +125,9 @@ Page({
   },
   toggleTerms() {
     this.setData({ showTerms: !this.data.showTerms })
+  },
+  toggleEditInfo() {
+    this.setData({ editingInfo: !this.data.editingInfo })
   },
 
   async save() {

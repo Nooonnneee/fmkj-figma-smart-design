@@ -5,11 +5,15 @@
 page {
   --ink: #0a0a0a;
   --ink-primary: #171717;
+  --ink-secondary: #404040;
   --paper: #ffffff;
   --paper-muted: #f5f5f5;
   --canvas: #f4f4f5;
   --pencil: #737373;
   --rule: #e5e5e5;
+  --rule-strong: #d4d4d8;
+  --brand: #3f3bdb;
+  --brand-bg: #eef0ff;
   --green: #1f7a46;
   --green-bg: #ebf6ef;
   --amber: #8f6400;
@@ -56,7 +60,7 @@ button::after { border: none; }
 .clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
 /* 卡片与列表 */
-.card { background: var(--paper); border: 1rpx solid var(--rule); border-radius: 28rpx; padding: 28rpx; }
+.card { background: var(--paper); border: 1rpx solid var(--rule); border-radius: 24rpx; padding: 28rpx; box-shadow: 0 2rpx 6rpx rgba(10, 10, 10, 0.03); }
 .card + .card, .card + .section-title, .section + .section { margin-top: 24rpx; }
 .card-flush { padding: 0; overflow: hidden; }
 .section-title { display: flex; align-items: center; justify-content: space-between; padding: 8rpx 4rpx 16rpx; margin-top: 32rpx; }
@@ -85,10 +89,14 @@ button::after { border: none; }
 
 /* 标签：状态色只在这里出现 */
 .badge { display: inline-flex; align-items: center; height: 40rpx; padding: 0 16rpx; border-radius: 999rpx; font-size: 22rpx; font-weight: 500; background: var(--paper-muted); color: var(--pencil); white-space: nowrap; }
+.badge-brand { background: var(--brand-bg); color: var(--brand); }
 .badge-success { background: var(--green-bg); color: var(--green); }
 .badge-warning { background: var(--amber-bg); color: var(--amber); }
 .badge-danger { background: var(--red-bg); color: var(--red-strong); }
 .badge-ink { background: var(--ink-primary); color: #ffffff; }
+.tier-pill { display: inline-flex; align-items: center; justify-content: center; height: 34rpx; padding: 0 12rpx; border-radius: 8rpx; font-size: 20rpx; font-weight: 600; background: var(--paper-muted); color: var(--pencil); flex-shrink: 0; }
+.tier-pill.Plus { background: var(--brand-bg); color: var(--brand); }
+.tier-pill.Pro { background: var(--amber-bg); color: var(--amber); }
 .dot { width: 14rpx; height: 14rpx; border-radius: 50%; flex-shrink: 0; }
 .chip { display: inline-flex; align-items: center; gap: 8rpx; height: 56rpx; padding: 0 22rpx; border-radius: 999rpx; background: var(--paper); border: 1rpx solid var(--rule); font-size: 24rpx; white-space: nowrap; }
 .chip.active { background: var(--ink-primary); border-color: var(--ink-primary); color: #ffffff; }

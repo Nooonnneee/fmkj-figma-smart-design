@@ -1,8 +1,19 @@
 <view wx:if="{{p}}" class="page page-pad-bottom">
   <view class="card">
     <view class="row between gap-16">
-      <view class="h2 grow">{{p.name}}</view>
-      <text class="badge shrink-0">{{p.statusLabel}}</text>
+      <view class="row gap-8 grow">
+        <view class="h2 truncate">{{p.displayName}}</view>
+        <text wx:if="{{p.isDemo}}" class="badge badge-brand shrink-0">示例</text>
+      </view>
+      <text class="badge {{p.stageBadge}} shrink-0">{{p.stageLabel}}</text>
+    </view>
+    <view class="progress-wrap mt-24">
+      <view class="steps">
+        <view wx:for="{{p.steps}}" wx:key="index" class="step {{item ? 'done' : ''}}" />
+      </view>
+      <view class="step-labels mt-8">
+        <text wx:for="{{stepLabels}}" wx:key="*this" class="small {{p.steps[index] ? '' : 'muted'}}">{{item}}</text>
+      </view>
     </view>
     <view class="mt-16">
       <view class="kv">
@@ -21,6 +32,11 @@
       <view class="kv"><text class="muted">负责人</text><text>{{owner ? owner.name : '—'}}</text></view>
     </view>
     <view wx:if="{{p.notes}}" class="notice mt-16">{{p.notes}}</view>
+    <view wx:if="{{!archived}}" class="ai-entry mt-24" hover-class="list-item-hover" bindtap="openAiWithProject">
+      <image class="icon-sm" src="/assets/icons/sparkles.svg" />
+      <text class="grow small">在 AI 助手中关联此项目（点位审查 / 智能选型 / 改价）</text>
+      <image class="icon-sm" src="/assets/icons/chevron-right-muted.svg" />
+    </view>
   </view>
 
   <view class="section-title"><text class="title">点位与预算</text></view>

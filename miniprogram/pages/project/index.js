@@ -44,11 +44,12 @@ Page({
   async load() {
     try {
       const d = await api.get('/projects/' + this.data.id)
-      wx.setNavigationBarTitle({ title: d.project.name })
+      const p = decorate.project(d.project)
+      wx.setNavigationBarTitle({ title: p.displayName })
       const c = d.contract
       this.setData({
         loading: false,
-        p: decorate.project(d.project),
+        p,
         owner: d.owner,
         archived: d.project.status === 'archived',
         summary: Object.assign({}, d.summary, { totalText: yuan(d.summary.total) }),
@@ -79,6 +80,14 @@ Page({
   },
   openDoc(e) {
     openDocument(e.currentTarget.dataset.path, e.currentTarget.dataset.title)
+  },
+  openAiWithProject() {
+    if (!this.data.p) return
+    getApp().globalData.pending = {
+      action: 'bind-project',
+      project: { id: this.data.id, name: this.data.p.displayName || this.data.p.name },
+    }
+    wx.switchTab({ url: '/pages/ai/index' })
   },
 
   /** 打开模板抽屉：按缩略图、适合客户与会员等级挑选交付方案模板 */

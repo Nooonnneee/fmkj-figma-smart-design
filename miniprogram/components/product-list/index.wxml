@@ -12,18 +12,26 @@
   </scroll-view>
   <view wx:else class="small muted mt-16">只显示「{{typeName}}」类型的在售产品</view>
 
-  <view class="card card-flush mt-24">
+  <view class="row between mt-20">
+    <text class="small muted">共 {{total}} 款在售产品</text>
+    <view class="sort-bar">
+      <view wx:for="{{sorts}}" wx:key="value" class="sort-item {{sort === item.value ? 'active' : ''}}" data-value="{{item.value}}" bindtap="onSort">{{item.label}}</view>
+    </view>
+  </view>
+
+  <view class="card card-flush mt-16">
     <view wx:for="{{items}}" wx:key="id" class="list-item" hover-class="list-item-hover" data-index="{{index}}" bindtap="onTap">
       <image class="thumb" src="{{item.imageUrl}}" mode="aspectFit" lazy-load />
       <view class="grow">
         <view class="truncate">{{item.name}}</view>
         <view class="row gap-8 mt-8 small muted">
           <view class="dot" style="background: {{item.type.color}}" />
-          <text class="truncate">{{item.type.name}}{{item.brand ? ' · ' + item.brand : ''}}</text>
+          <text class="truncate">{{item.type.name}}{{item.brand ? ' · ' + item.brand : ''}}{{item.sku ? ' · ' + item.sku : ''}}</text>
         </view>
       </view>
       <view class="text-right shrink-0">
         <view class="num">{{item.priceText}}</view>
+        <view wx:if="{{item.unit}}" class="small muted">/{{item.unit}}</view>
       </view>
     </view>
     <view wx:if="{{!loading && !items.length}}" class="empty">
