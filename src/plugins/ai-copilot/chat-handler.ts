@@ -114,7 +114,7 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
               const r = await runTool(tools, call, ctx)
               if (r.tool) meter.tool(call.function.name)
               if (r.tool) {
-                const entry = { pluginId: r.tool.pluginId ?? 'core', pluginName: r.tool.pluginName, summary: r.summary ?? '', href: r.href, hrefLabel: r.hrefLabel }
+                const entry = { pluginId: r.tool.pluginId ?? 'core', pluginName: r.tool.pluginName, summary: r.summary ?? '', href: r.href, hrefLabel: r.hrefLabel, imageUrl: r.imageUrl }
                 toolLog.push(entry)
                 send({ type: 'tool', ...entry })
               }

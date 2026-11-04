@@ -22,6 +22,7 @@ export const AI_PERMISSIONS = [
   { value: 'contracts:write', label: '创建或修改施工合同与分期节点', mutates: true },
   { value: 'documents:read', label: '生成打印与导出文档直达链接', mutates: false },
   { value: 'templates:read', label: '读取方案模板、适用客户与推荐匹配', mutates: false },
+  { value: 'images:generate', label: '调用 AI 生成图片', mutates: true },
 ] as const
 
 export type AiPermission = (typeof AI_PERMISSIONS)[number]['value']

@@ -24,6 +24,8 @@ export type ToolRunResult = {
   summary: string
   href?: string
   hrefLabel?: string
+  /** AI 生图返回的媒体 URL，聊天里直接展示 */
+  imageUrl?: string
 }
 
 export type AiToolHandler = (args: Record<string, unknown>, ctx: ToolContext) => Promise<ToolRunResult>
