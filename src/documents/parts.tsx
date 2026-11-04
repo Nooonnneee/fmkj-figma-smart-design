@@ -29,7 +29,7 @@ export function DocArticle({ children, className }: { children: React.ReactNode;
     <article
       data-export-page="flow"
       className={cn(
-        'mx-auto mt-6 max-w-[210mm] bg-doc-paper px-[14mm] py-[14mm] text-[12.5px] leading-relaxed shadow-sm print:mt-0 print:max-w-none print:p-0 print:shadow-none',
+        'mx-auto mt-6 w-[210mm] min-w-[210mm] shrink-0 bg-doc-paper px-[14mm] py-[14mm] text-[12.5px] leading-relaxed shadow-sm print:mt-0 print:w-auto print:min-w-0 print:max-w-none print:p-0 print:shadow-none',
         className,
       )}
     >
@@ -43,7 +43,7 @@ export function DocSheetPage({ children, className }: { children: React.ReactNod
   return (
     <section
       data-export-page
-      className={cn('relative mx-auto flex h-[210mm] w-[297mm] flex-col overflow-hidden bg-doc-paper px-[12mm] py-[9mm] shadow-sm break-after-page last:break-after-auto print:h-[209mm] print:shadow-none', className)}
+      className={cn('relative mx-auto flex h-[210mm] w-[297mm] min-w-[297mm] shrink-0 flex-col overflow-hidden bg-doc-paper px-[12mm] py-[9mm] shadow-sm break-after-page last:break-after-auto print:h-[209mm] print:shadow-none', className)}
     >
       {children}
     </section>

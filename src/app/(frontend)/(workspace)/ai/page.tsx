@@ -86,10 +86,6 @@ export default async function AiPage({
   return (
     // 视口高度减去 48px 顶栏和 main 的上下内边距
     <div className="mx-auto flex h-[calc(100svh-5.5rem)] w-full max-w-3xl flex-col md:h-[calc(100svh-6.5rem)]">
-      <div className="flex items-center justify-between pb-2">
-        <span className="text-xs font-medium tracking-[0.18em] text-muted-foreground">AI 对话</span>
-        <Button asChild size="sm" variant="outline"><Link href="/ai/image">AI 生图 →</Link></Button>
-      </div>
       <AiSidebarDock plugins={plugins} projects={projects} credits={user.aiCredits ?? 0} configured={aiConfigured(activeModels)} models={activeModels} initialInput={initialInput} />
     </div>
   )

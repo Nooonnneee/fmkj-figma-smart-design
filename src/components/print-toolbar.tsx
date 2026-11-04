@@ -67,6 +67,32 @@ export function PrintToolbar({
     }
   }, [])
 
+  // 手机 / 小程序窄屏预览时：将固定宽度的 A4 纸张（210mm / 297mm）或 1440px 方案页等比缩放到屏幕宽度居中展示，
+  // 避免在窄屏下被挤压变形或只能看局部；点击导出时 export-pdf.ts 会临时将 zoom 还原为 1 按原始高清尺寸渲染。
+  useEffect(() => {
+    const root = document.documentElement
+    const applyMobileFit = () => {
+      const vw = Math.min(
+        window.innerWidth || 9999,
+        document.documentElement.clientWidth || 9999,
+        window.visualViewport?.width || 9999,
+        window.screen?.width || 9999,
+      )
+      const fitFor = (w: number) => (vw > 0 && vw < w + 16 ? Math.max(0.22, (vw - 16) / w).toFixed(4) : '1')
+      root.style.setProperty('--paper-zoom', fitFor(794))
+      root.style.setProperty('--sheet-zoom', fitFor(1123))
+      root.style.setProperty('--deck-zoom', fitFor(1440))
+    }
+    applyMobileFit()
+    window.addEventListener('resize', applyMobileFit)
+    return () => {
+      window.removeEventListener('resize', applyMobileFit)
+      root.style.removeProperty('--paper-zoom')
+      root.style.removeProperty('--sheet-zoom')
+      root.style.removeProperty('--deck-zoom')
+    }
+  }, [searchParams])
+
   const exportPdf = useCallback(async () => {
     setBusy('pdf')
     try {
@@ -144,7 +170,7 @@ export function PrintToolbar({
       for (const [i, url] of urls.entries()) {
         const a = document.createElement('a')
         a.href = url
-        a.download = pages.length > 1 ? `${exportName}-${String(i + 1).padStart(2, '0')}.png` : `${exportName}.png`
+        a.download = urls.length > 1 ? `${exportName}-${String(i + 1).padStart(2, '0')}.jpg` : `${exportName}.jpg`
         a.style.display = 'none'
         document.body.appendChild(a)
         a.click()
@@ -154,7 +180,7 @@ export function PrintToolbar({
       setCopied(false)
       setExportResult({
         kind: 'img',
-        fileName: `${exportName}.png`,
+        fileName: `${exportName}.jpg`,
         pageCount: urls.length,
         sizeKb: 0,
         blob: null,
@@ -162,7 +188,7 @@ export function PrintToolbar({
         previewUrl: null,
         previewImages: urls,
       })
-      toast.success(pages.length > 1 ? `已导出 ${pages.length} 张图片` : '已导出图片')
+      toast.success(urls.length > 1 ? `已生成 ${urls.length} 页高清图片` : '已生成高清图片')
     } catch {
       toast.error('导出失败，请稍后重试')
     } finally {
@@ -172,6 +198,10 @@ export function PrintToolbar({
 
   const savePdfWithPicker = async () => {
     if (!exportResult?.blob) return
+    if (isMpView && exportResult.downloadUrl) {
+      await copyDownloadUrl()
+      return
+    }
     const picker = (window as unknown as { showSaveFilePicker?: (opts: unknown) => Promise<{ createWritable: () => Promise<{ write: (b: Blob) => Promise<void>; close: () => Promise<void> }> }> }).showSaveFilePicker
     if (typeof picker === 'function') {
       try {
@@ -215,16 +245,14 @@ export function PrintToolbar({
 
   return (
     <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur-xs print:hidden">
-      <div className={cn('mx-auto flex h-11 items-center justify-between gap-2 px-3 sm:px-4', wide ? 'max-w-[1440px]' : 'max-w-[297mm]')}>
-        {isMpView ? (
-          <span className="text-xs font-medium text-muted-foreground">预览与导出</span>
-        ) : (
+      <div className={cn('mx-auto flex h-11 items-center justify-between gap-1.5 overflow-x-auto px-2.5 [scrollbar-width:none] sm:gap-2 sm:px-4', wide ? 'max-w-[1440px]' : 'max-w-[297mm]')}>
+        {isMpView ? null : (
           <Button asChild variant="ghost" size="sm" className="-ml-2 shrink-0 text-muted-foreground">
             <Link href={back.href}><ChevronLeft className="size-4" />{back.label}</Link>
           </Button>
         )}
 
-        <div className="flex min-w-0 items-center gap-2">
+        <div className={cn('flex min-w-0 items-center gap-1.5 sm:gap-2', isMpView && 'w-full justify-between')}>
           {note && !locked ? <span className="hidden rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground sm:inline-block">{note}</span> : null}
           {locked ? (
             <span className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
@@ -280,6 +308,12 @@ export function PrintToolbar({
             </Popover>
           ) : null}
 
+          {isMpView ? (
+            <Button size="sm" className="ml-auto h-8 shrink-0 gap-1.5 px-2.5 text-xs" disabled={busy !== null || Boolean(locked)} onClick={() => void exportPdf()}>
+              {busy !== null ? <Loader2 className="size-3.5 animate-spin" /> : <FileDown className="size-3.5" />}
+              {busy ? '生成中…' : '导出 PDF'}
+            </Button>
+          ) : (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" className="h-8" disabled={busy !== null || Boolean(locked)}>
@@ -299,6 +333,7 @@ export function PrintToolbar({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          )}
         </div>
       </div>
 
@@ -316,10 +351,12 @@ export function PrintToolbar({
           <div className="space-y-2.5 rounded-xl border bg-muted/35 p-3.5 text-xs leading-relaxed">
             <p className="font-medium text-foreground">文件导出到哪里了？</p>
             <ul className="list-disc space-y-1.5 pl-4 text-muted-foreground">
+              {!isMpView ? (
               <li>
                 <strong className="text-foreground">电脑浏览器</strong>：已自动下载到系统默认的
                 <strong className="text-foreground">「下载 (Downloads)」文件夹</strong>（可在浏览器右上角下载图标中查看，或点击下方「选择位置另存为」指定目录）。
               </li>
+              ) : null}
               <li>
                 <strong className="text-foreground">微信小程序 / 手机端</strong>：受微信内置浏览器限制无法直接静默写入系统文件夹。您可以点击下方
                 <strong className="text-foreground">「复制 PDF 下载链接」</strong>发到微信聊天/手机浏览器打开保存，或直接
@@ -330,17 +367,19 @@ export function PrintToolbar({
 
           {exportResult?.kind === 'pdf' ? (
             <div className="flex flex-wrap gap-2">
+              {!isMpView ? (
               <Button type="button" size="sm" onClick={() => void savePdfWithPicker()}>
                 <FolderDown className="size-4" />
                 下载 / 选择位置另存为
               </Button>
+              ) : null}
               {exportResult.downloadUrl ? (
-                <Button type="button" variant="secondary" size="sm" onClick={() => void copyDownloadUrl()}>
+                <Button type="button" variant={isMpView ? 'default' : 'secondary'} size="sm" onClick={() => void copyDownloadUrl()}>
                   {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
                   {copied ? '已复制下载链接' : '复制 PDF 下载链接'}
                 </Button>
               ) : null}
-              {exportResult.previewUrl ? (
+              {!isMpView && exportResult.previewUrl ? (
                 <Button asChild variant="outline" size="sm">
                   <a href={exportResult.previewUrl} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="size-4" />
@@ -356,7 +395,7 @@ export function PrintToolbar({
               <p className="text-xs font-medium text-muted-foreground">
                 页面高清预览（手机 / 小程序内可直接长按下方图片保存到相册或转发给微信好友）：
               </p>
-              <div className="max-h-64 space-y-2.5 overflow-y-auto rounded-xl border bg-muted/20 p-2.5">
+              <div className={cn('space-y-2.5 overflow-y-auto rounded-xl border bg-muted/20 p-2.5', isMpView ? 'max-h-[48vh]' : 'max-h-64')}>
                 {exportResult.previewImages.map((src, idx) => (
                   <div key={idx} className="overflow-hidden rounded-lg border bg-white shadow-2xs">
                     {/* eslint-disable-next-line @next/next/no-img-element */}

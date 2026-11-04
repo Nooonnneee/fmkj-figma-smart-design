@@ -298,15 +298,16 @@ async function fetchImageAsDataUrl(rawUrl: string): Promise<string> {
 
 /**
  * 导出前把节点内的 <img> 与 SVG <image> 全部转为合法的 data:image/... 地址，
- * 并临时展开因窄屏响应式（如 max-sm:hidden）被隐藏的导出节点，导出后恢复原状。
+ * 并临时展开因窄屏响应式被隐藏的导出节点、清除窄屏预览 zoom/transform，确保 100% 按原始 A4 / 1440px 物理尺寸导出。
  */
 async function prepareNodeForExport(el: HTMLElement): Promise<() => void> {
   const restores: (() => void)[] = []
 
-  // 1. 若节点或其祖先因响应式样式处于 display:none，临时展开以便测量与截图
+  // 1. 若节点或其祖先因响应式样式处于 display:none 或带有窄屏预览 zoom，临时还原为 1:1 物理尺寸
   let cur: HTMLElement | null = el
   while (cur && cur !== document.body) {
-    if (window.getComputedStyle(cur).display === 'none') {
+    const cs = window.getComputedStyle(cur)
+    if (cs.display === 'none') {
       const target = cur
       const prev = target.style.getPropertyValue('display')
       const prevPrio = target.style.getPropertyPriority('display')
@@ -316,7 +317,37 @@ async function prepareNodeForExport(el: HTMLElement): Promise<() => void> {
         else target.style.removeProperty('display')
       })
     }
+    if (cur === el || (cs.zoom && cs.zoom !== '1')) {
+      const target = cur
+      const prevZoom = target.style.zoom
+      target.style.zoom = '1'
+      restores.push(() => {
+        if (prevZoom) target.style.zoom = prevZoom
+        else target.style.removeProperty('zoom')
+      })
+    }
+    if (cs.transform && cs.transform !== 'none') {
+      const target = cur
+      const prevTransform = target.style.transform
+      target.style.transform = 'none'
+      restores.push(() => {
+        if (prevTransform) target.style.transform = prevTransform
+        else target.style.removeProperty('transform')
+      })
+    }
     cur = cur.parentElement
+  }
+
+  // 若是纵向长文档（flow）但受外层窄屏限制宽度不足 A4（794px），临时固定为 210mm 标准宽度
+  if (el.dataset.exportPage === 'flow' && el.offsetWidth < 740) {
+    const prevW = el.style.width
+    const prevMinW = el.style.minWidth
+    el.style.width = '210mm'
+    el.style.minWidth = '210mm'
+    restores.push(() => {
+      el.style.width = prevW
+      el.style.minWidth = prevMinW
+    })
   }
 
   // 2. 预内联所有 <img>，避免 html-to-image 遇到 ?v=5 参数、lazy 图片或 404 图片时报错中断
@@ -474,26 +505,11 @@ export async function renderPagesToJpegs(elements: HTMLElement[]): Promise<PageJ
   return pdfPages
 }
 
-/** 把页面元素安全渲染为高清 PNG Data URL 列表（供「导出图片」使用，复用防坏图与字体回退管线） */
+/** 把页面元素按标准分页安全渲染为高清图片 Data URL 列表（供「导出图片」与小程序内长按存图使用） */
 export async function renderPagesToPngDataUrls(elements: HTMLElement[]): Promise<string[]> {
   await waitForPageAssets(elements)
-  const urls: string[] = []
-  for (const el of elements) {
-    const restore = await prepareNodeForExport(el)
-    try {
-      const isSlide = el.dataset.exportPage === 'slide' || el.offsetWidth === 1440
-      const canvas = await renderElementToCanvas(el, {
-        pixelRatio: 2,
-        width: isSlide ? 1440 : undefined,
-        height: isSlide ? 960 : undefined,
-        isSlide,
-      })
-      urls.push(canvas.toDataURL('image/png'))
-    } finally {
-      restore()
-    }
-  }
-  return urls
+  const pdfPages = await renderPagesToJpegs(elements)
+  return pdfPages.map((p) => bytesToDataUrl(p.bytes, 'image/jpeg'))
 }
 
 /**

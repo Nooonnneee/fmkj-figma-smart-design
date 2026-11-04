@@ -5,6 +5,7 @@
  */
 import { Fragment } from 'react'
 
+import { ScaledStack } from '@/components/scaled-frame'
 import { DocRoot } from '@/documents/parts'
 import type { ProjectDocsData } from '@/lib/project-docs'
 
@@ -107,9 +108,17 @@ function deckPageRenders(d: ProjectDocsData, theme: DeckTheme, opts: { markers: 
 export function DeckRoot({ theme, children, bare = false }: { theme: DeckTheme; children: React.ReactNode; bare?: boolean }) {
   return (
     <DocRoot style={theme.style} className="overflow-x-auto print:overflow-visible">
-      <div style={deckVars(theme)} className={bare ? 'w-[1440px] space-y-0' : 'min-w-[1440px] space-y-6 py-6 print:min-w-0 print:space-y-0 print:py-0'}>
-        {children}
-      </div>
+      {bare ? (
+        <div style={deckVars(theme)} className="w-[1440px] space-y-0">
+          {children}
+        </div>
+      ) : (
+        <ScaledStack width={1440} className="mx-auto max-w-[1440px] px-2 sm:px-0">
+          <div style={deckVars(theme)} className="w-[1440px] space-y-6 py-6 print:min-w-0 print:space-y-0 print:py-0">
+            {children}
+          </div>
+        </ScaledStack>
+      )}
     </DocRoot>
   )
 }

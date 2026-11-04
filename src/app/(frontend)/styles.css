@@ -600,3 +600,12 @@ html:has([data-landing]) {
     transform: translateY(6px);
   }
 }
+/* 手机与小程序窄屏预览打印页时，按屏幕宽度等比缩放纸张（导出 PDF / 图片时通过行内 zoom:1 还原 1:1 高清尺寸） */
+@media screen and (max-width: 1460px) {
+  article[data-export-page="flow"] {
+    zoom: var(--paper-zoom, 1);
+  }
+  section[data-export-page]:not([data-figma-frame]) {
+    zoom: var(--sheet-zoom, 1);
+  }
+}

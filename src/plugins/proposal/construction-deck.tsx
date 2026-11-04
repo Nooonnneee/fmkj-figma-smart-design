@@ -25,7 +25,7 @@ function Page({ ctx, title, no, children }: { ctx: Ctx; title?: string; no: numb
     <section
       data-export-page
       className={cn(
-        'relative mx-auto flex h-[210mm] w-[297mm] flex-col overflow-hidden bg-white px-[14mm] py-[11mm] text-neutral-900 shadow-sm break-after-page last:break-after-auto print:h-[209mm] print:shadow-none',
+        'relative mx-auto flex h-[210mm] w-[297mm] min-w-[297mm] shrink-0 flex-col overflow-hidden bg-white px-[14mm] py-[11mm] text-neutral-900 shadow-sm break-after-page last:break-after-auto print:h-[209mm] print:shadow-none',
       )}
     >
       {title ? (
