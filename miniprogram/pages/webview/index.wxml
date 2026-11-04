@@ -1,2 +1,22 @@
-<web-view src="{{src}}" />
+<web-view
+  wx:if="{{src && !failed}}"
+  src="{{src}}"
+  bindload="onWebLoad"
+  binderror="onWebError"
+/>
+
+<view wx:elif="{{failed}}" class="fallback">
+  <view class="fallback-emoji">📄</view>
+  <view class="fallback-title">文档页面打不开</view>
+  <view class="fallback-desc">请检查网络，或确认已在微信公众平台配置业务域名；票据有效期 2 分钟，过期后请重新打开。</view>
+  <view class="fallback-actions">
+    <button class="fallback-btn primary" size="mini" bindtap="retry">重试</button>
+    <button class="fallback-btn" size="mini" bindtap="copyLink">复制链接</button>
+  </view>
+</view>
+
+<view wx:else class="fallback">
+  <view class="fallback-title">没有可打开的文档</view>
+</view>
+
 <privacy-popup id="privacy-popup" />

@@ -16,12 +16,28 @@ function mapHref(href) {
   return null
 }
 
-/** 打开打印页：先换一次性票据，在 web-view 里打开（需要在小程序后台配置业务域名）。 */
+/**
+ * 打开打印页：先换一次性票据，在 web-view 里打开（需要在小程序后台配置业务域名）。
+ * 票据 2 分钟内可重入，失败时给出明确提示，避免 loading 结束后无反馈。
+ */
 async function openDocument(path, title) {
-  wx.showLoading({ title: '正在打开' })
+  wx.showLoading({ title: '正在打开', mask: true })
   try {
     const data = await api.post('/web-ticket', { path })
-    wx.navigateTo({ url: '/pages/webview/index?title=' + encodeURIComponent(title || '文档') + '&src=' + encodeURIComponent(config.BASE_URL + data.url) })
+    const ticketUrl = data && data.url ? String(data.url) : ''
+    if (!ticketUrl) throw new Error('未获取到文档地址')
+    const url = '/pages/webview/index?title=' + encodeURIComponent(title || '文档') + '&src=' + encodeURIComponent(config.BASE_URL + ticketUrl)
+    await new Promise((resolve, reject) => {
+      wx.navigateTo({ url, success: resolve, fail: reject })
+    })
+  } catch (err) {
+    console.error('[openDocument]', path, err)
+    wx.showModal({
+      title: '打开失败',
+      content: '文档暂时打不开，请检查网络后重试。',
+      showCancel: false,
+      confirmText: '知道了',
+    })
   } finally {
     wx.hideLoading()
   }
