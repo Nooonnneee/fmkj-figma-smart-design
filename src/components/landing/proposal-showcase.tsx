@@ -119,6 +119,10 @@ export function ProposalShowcase({
   const [zoomOpen, setZoomOpen] = useState(false)
   const theme = DECK_THEMES[themeId] ?? DECK_THEMES.qixu
   const activeFramework = FRAMEWORKS.find((f) => f.value === frameworkId) ?? FRAMEWORKS[0]!
+  const activeChapters = useMemo(
+    () => (data.sheets.length ? activeFramework.chapters : activeFramework.chapters.filter((c) => c !== 'plan' && c !== 'zone')),
+    [activeFramework.chapters, data.sheets.length],
+  )
 
   const viewportRef = useRef<HTMLDivElement | null>(null)
   const [scale, setScale] = useState(0.55)
@@ -165,7 +169,7 @@ export function ProposalShowcase({
         <div className="mt-6 space-y-2">
           <div className="flex items-baseline justify-between text-xs">
             <span className="font-medium text-foreground">方案结构</span>
-            <span className="text-muted-foreground">{activeFramework.chapters.length} 页</span>
+            <span className="text-muted-foreground">{activeChapters.length} 页</span>
           </div>
           <Tabs value={frameworkId} onValueChange={(v) => setFrameworkId(v as 'full' | 'story' | 'budget')}>
             <TabsList aria-label="方案结构" className="grid h-auto w-full grid-cols-3 gap-1 p-1 group-data-horizontal/tabs:h-auto">
@@ -231,9 +235,9 @@ export function ProposalShowcase({
           aria-label={`方案演示样张（${activeFramework.label} · ${theme.label}）`}
         >
           <DocRoot style={theme.style} className="space-y-4 overflow-hidden sm:space-y-6">
-            {activeFramework.chapters.map((chapterId, index) => {
+            {activeChapters.map((chapterId, index) => {
               const pageNo = String(index + 1).padStart(2, '0')
-              const pageTotal = String(activeFramework.chapters.length).padStart(2, '0')
+              const pageTotal = String(activeChapters.length).padStart(2, '0')
               return (
                 <div
                   key={chapterId}
@@ -311,9 +315,9 @@ export function ProposalShowcase({
           <div className="min-h-0 flex-1 overflow-y-auto bg-muted/60 p-4 sm:p-8">
             <div ref={modalViewportRef} className="mx-auto max-w-[1240px]">
               <DocRoot style={theme.style} className="space-y-6 overflow-hidden">
-                {activeFramework.chapters.map((chapterId, index) => {
+                {activeChapters.map((chapterId, index) => {
                   const pageNo = String(index + 1).padStart(2, '0')
-                  const pageTotal = String(activeFramework.chapters.length).padStart(2, '0')
+                  const pageTotal = String(activeChapters.length).padStart(2, '0')
                   return (
                     <div
                       key={chapterId}
@@ -986,18 +990,17 @@ function PlanSlide({ data, theme, no }: { data: LandingShowcase; theme: DeckThem
       <div className="flex min-h-0 flex-1 items-stretch gap-[28px] overflow-hidden">
         <div className="relative flex-1 overflow-hidden rounded-(--deck-radius) border border-(--deck-card-border) bg-white p-4">
           <img src={sheet.url} alt={sheet.name} className="size-full object-contain opacity-75" />
-          <svg viewBox="0 0 1200 800" className="absolute inset-0 size-full">
+          <div className="pointer-events-none absolute inset-0">
             {sheet.points.map((p) => (
-              <image
+              <img
                 key={p.id}
-                href={markerSrc(p.type)}
-                x={p.rx * 1200 - 15}
-                y={p.ry * 800 - 15}
-                width={30}
-                height={30}
+                src={markerSrc(p.type)}
+                alt=""
+                className=" absolute size-[22px] -translate-x-1/2 -translate-y-1/2 object-contain"
+                style={{ left: `${(p.rx * 100).toFixed(2)}%`, top: `${(p.ry * 100).toFixed(2)}%` }}
               />
             ))}
-          </svg>
+          </div>
         </div>
         <div className="flex w-[520px] shrink-0 flex-col gap-[12px]">
           <div className="flex items-baseline justify-between">

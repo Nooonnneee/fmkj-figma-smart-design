@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { COLLECT_MESSAGE, type CollectResult } from '@/lib/doc-collect'
-import { downloadBlob, exportPagesAsPdfBundle, renderPagesToJpegs, waitForPageAssets } from '@/lib/export-pdf'
+import { downloadBlob, exportPagesAsPdfBundle, renderPagesToJpegs, renderPagesToPngDataUrls, waitForPageAssets } from '@/lib/export-pdf'
 import { cn } from '@/lib/utils'
 
 type Option = { value: string; label: string; href: string }
@@ -139,17 +139,9 @@ export function PrintToolbar({
   const exportImages = async () => {
     setBusy('img')
     try {
-      const { toPng } = await import('html-to-image')
       const pages = [...document.querySelectorAll<HTMLElement>('[data-export-page]')]
-      const urls: string[] = []
-      for (const [i, el] of pages.entries()) {
-        const url = await toPng(el, {
-          pixelRatio: 2,
-          backgroundColor: '#ffffff',
-          cacheBust: false,
-          style: { margin: '0', boxShadow: 'none' },
-        })
-        urls.push(url)
+      const urls = await renderPagesToPngDataUrls(pages)
+      for (const [i, url] of urls.entries()) {
         const a = document.createElement('a')
         a.href = url
         a.download = pages.length > 1 ? `${exportName}-${String(i + 1).padStart(2, '0')}.png` : `${exportName}.png`

@@ -7,6 +7,12 @@
 
 export type PageJpeg = { bytes: Uint8Array; widthPx: number; heightPx: number; widthPt: number; heightPt: number }
 
+/** 1×1 透明 PNG：当某张图片 404、跨域或损坏时作为兜底占位，避免整份 PDF 导出失败 */
+const TRANSPARENT_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIAAAUAAeImBZsAAAAASUVORK5CYII='
+
+const inlineUrlCache = new Map<string, string>()
+
 function dataUrlToBytes(dataUrl: string): Uint8Array {
   const b64 = dataUrl.split(',')[1] ?? ''
   const bin = atob(b64)
@@ -113,7 +119,8 @@ function isStripMostlyBlank(ctx: CanvasRenderingContext2D, width: number, startY
 function slicePortraitCanvas(source: HTMLCanvasElement, domEl: HTMLElement, scale: number): PageJpeg[] {
   const W_PT = 595.28
   const H_PT = 841.89
-  const fullPageH = Math.round(source.width * (H_PT / W_PT))
+  const safeWidth = Math.max(8, source.width)
+  const fullPageH = Math.max(12, Math.round(safeWidth * (H_PT / W_PT)))
   const padY = Math.round(fullPageH * 0.035)
   const contentH = fullPageH - padY * 2
   const srcCtx = source.getContext('2d', { willReadFrequently: true })!
@@ -124,7 +131,7 @@ function slicePortraitCanvas(source: HTMLCanvasElement, domEl: HTMLElement, scal
   const pages: PageJpeg[] = []
   let y = 0
   while (y < source.height - 8) {
-    if (pages.length > 0 && isStripMostlyBlank(srcCtx, source.width, y, source.height, bg)) {
+    if (pages.length > 0 && isStripMostlyBlank(srcCtx, safeWidth, y, source.height, bg)) {
       break
     }
     const isFirst = y === 0
@@ -148,17 +155,17 @@ function slicePortraitCanvas(source: HTMLCanvasElement, domEl: HTMLElement, scal
           }
         }
       }
-      nextY = findSafeCutY(srcCtx, source.width, nextY, Math.max(minCut, nextY - Math.round(48 * scale)), bg)
+      nextY = findSafeCutY(srcCtx, safeWidth, nextY, Math.max(minCut, nextY - Math.round(48 * scale)), bg)
     }
     const sliceH = Math.max(1, nextY - y)
     const pageCanvas = document.createElement('canvas')
-    pageCanvas.width = source.width
+    pageCanvas.width = safeWidth
     pageCanvas.height = fullPageH
     const pCtx = pageCanvas.getContext('2d')!
     // 续页上下留白用纸张底色填充，有底色的风格不会出现白边
     pCtx.fillStyle = `rgb(${bg[0]}, ${bg[1]}, ${bg[2]})`
     pCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height)
-    pCtx.drawImage(source, 0, y, source.width, sliceH, 0, isFirst ? 0 : padY, source.width, sliceH)
+    pCtx.drawImage(source, 0, y, safeWidth, sliceH, 0, isFirst ? 0 : padY, safeWidth, sliceH)
     pages.push({
       bytes: dataUrlToBytes(pageCanvas.toDataURL('image/jpeg', 0.92)),
       widthPx: pageCanvas.width,
@@ -245,49 +252,248 @@ export function buildPdfFromJpegs(pages: PageJpeg[]): Blob {
   return new Blob(chunks as BlobPart[], { type: 'application/pdf' })
 }
 
+function inferMimeFromUrl(url: string, headerType?: string | null): string {
+  const ct = (headerType ?? '').split(';')[0]?.trim().toLowerCase() ?? ''
+  if (ct.startsWith('image/')) return ct
+  const clean = url.split('?')[0]?.split('#')[0]?.toLowerCase() ?? ''
+  if (clean.endsWith('.svg')) return 'image/svg+xml'
+  if (clean.endsWith('.jpg') || clean.endsWith('.jpeg')) return 'image/jpeg'
+  if (clean.endsWith('.webp')) return 'image/webp'
+  if (clean.endsWith('.gif')) return 'image/gif'
+  return 'image/png'
+}
+
+async function fetchImageAsDataUrl(rawUrl: string): Promise<string> {
+  if (!rawUrl || rawUrl.startsWith('data:')) return rawUrl || TRANSPARENT_PNG
+  const abs = new URL(rawUrl, window.location.href).href
+  const hit = inlineUrlCache.get(abs)
+  if (hit) return hit
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 8000)
+  try {
+    const res = await fetch(abs, { signal: ctrl.signal, credentials: 'same-origin' })
+    if (!res.ok) return TRANSPARENT_PNG
+    const ct = res.headers.get('Content-Type') ?? ''
+    if (ct && !ct.toLowerCase().startsWith('image/') && !ct.toLowerCase().includes('octet-stream')) {
+      return TRANSPARENT_PNG
+    }
+    const blob = await res.blob()
+    if (!blob.size) return TRANSPARENT_PNG
+    const mime = inferMimeFromUrl(abs, ct)
+    const normalizedBlob = blob.type === mime ? blob : new Blob([blob], { type: mime })
+    const dataUrl = await new Promise<string>((resolve) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(typeof reader.result === 'string' && reader.result.startsWith('data:image/') ? reader.result : TRANSPARENT_PNG)
+      reader.onerror = () => resolve(TRANSPARENT_PNG)
+      reader.readAsDataURL(normalizedBlob)
+    })
+    if (dataUrl !== TRANSPARENT_PNG) inlineUrlCache.set(abs, dataUrl)
+    return dataUrl
+  } catch {
+    return TRANSPARENT_PNG
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
+ * 导出前把节点内的 <img> 与 SVG <image> 全部转为合法的 data:image/... 地址，
+ * 并临时展开因窄屏响应式（如 max-sm:hidden）被隐藏的导出节点，导出后恢复原状。
+ */
+async function prepareNodeForExport(el: HTMLElement): Promise<() => void> {
+  const restores: (() => void)[] = []
+
+  // 1. 若节点或其祖先因响应式样式处于 display:none，临时展开以便测量与截图
+  let cur: HTMLElement | null = el
+  while (cur && cur !== document.body) {
+    if (window.getComputedStyle(cur).display === 'none') {
+      const target = cur
+      const prev = target.style.getPropertyValue('display')
+      const prevPrio = target.style.getPropertyPriority('display')
+      target.style.setProperty('display', 'block', 'important')
+      restores.push(() => {
+        if (prev) target.style.setProperty('display', prev, prevPrio)
+        else target.style.removeProperty('display')
+      })
+    }
+    cur = cur.parentElement
+  }
+
+  // 2. 预内联所有 <img>，避免 html-to-image 遇到 ?v=5 参数、lazy 图片或 404 图片时报错中断
+  const imgs = [...el.querySelectorAll<HTMLImageElement>('img')]
+  await Promise.all(
+    imgs.map(async (img) => {
+      const origSrc = img.getAttribute('src') ?? ''
+      const origSrcset = img.getAttribute('srcset')
+      const origLoading = img.getAttribute('loading')
+      const targetUrl = img.currentSrc || origSrc
+      const dataUrl = await fetchImageAsDataUrl(targetUrl)
+      img.loading = 'eager'
+      if (origSrcset !== null) img.removeAttribute('srcset')
+      img.src = dataUrl
+      await new Promise<void>((r) => {
+        if (img.complete) return r()
+        img.addEventListener('load', () => r(), { once: true })
+        img.addEventListener('error', () => r(), { once: true })
+        setTimeout(r, 600)
+      })
+      restores.push(() => {
+        if (origLoading !== null) img.setAttribute('loading', origLoading)
+        else img.removeAttribute('loading')
+        if (origSrcset !== null) img.setAttribute('srcset', origSrcset)
+        if (origSrc) img.setAttribute('src', origSrc)
+      })
+    }),
+  )
+
+  // 3. 预内联所有 SVG <image>
+  const svgImgs = [...el.querySelectorAll<SVGImageElement>('image')]
+  await Promise.all(
+    svgImgs.map(async (svgImg) => {
+      const href = svgImg.getAttribute('href') || svgImg.getAttribute('xlink:href') || ''
+      if (!href || href.startsWith('data:')) return
+      const dataUrl = await fetchImageAsDataUrl(href)
+      svgImg.setAttribute('href', dataUrl)
+      restores.push(() => svgImg.setAttribute('href', href))
+    }),
+  )
+
+  return () => {
+    for (const fn of restores.reverse()) {
+      try {
+        fn()
+      } catch {
+        // ignore restore errors
+      }
+    }
+  }
+}
+
+function loadSvgDataUrl(svgDataUrl: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      if (typeof img.decode === 'function') {
+        img.decode().catch(() => null).finally(() => resolve(img))
+      } else {
+        resolve(img)
+      }
+    }
+    img.onerror = () => reject(new Error('SVG 图像解码失败'))
+    img.src = svgDataUrl
+  })
+}
+
+async function renderElementToCanvas(
+  el: HTMLElement,
+  opts: { width?: number; height?: number; pixelRatio: number; isSlide: boolean },
+): Promise<HTMLCanvasElement> {
+  const { toSvg, toCanvas } = await import('html-to-image')
+  const w = opts.width || Math.max(1, el.offsetWidth || Math.round(el.getBoundingClientRect().width) || 794)
+  const h = opts.height || Math.max(1, el.offsetHeight || Math.round(el.getBoundingClientRect().height) || 1123)
+  const baseOptions = {
+    pixelRatio: opts.pixelRatio,
+    width: w,
+    height: h,
+    backgroundColor: '#ffffff',
+    cacheBust: false,
+    includeQueryParams: true,
+    imagePlaceholder: TRANSPARENT_PNG,
+    style: {
+      margin: '0',
+      boxShadow: 'none',
+      ...(opts.isSlide ? { transform: 'none', transformOrigin: 'top left' } : {}),
+    },
+  }
+
+  const drawSvgToCanvas = async (skipFonts: boolean) => {
+    const svgUrl = await toSvg(el, { ...baseOptions, skipFonts })
+    const img = await loadSvgDataUrl(svgUrl)
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(w * opts.pixelRatio)
+    canvas.height = Math.round(h * opts.pixelRatio)
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+    return canvas
+  }
+
+  try {
+    return await drawSvgToCanvas(false)
+  } catch {
+    try {
+      return await drawSvgToCanvas(true)
+    } catch {
+      return await toCanvas(el, { ...baseOptions, skipFonts: true })
+    }
+  }
+}
+
 /**
  * 把页面元素渲染成 PDF 页（JPEG）：
  * - data-export-page="flow" 的纵向长文（报价单、合同、交底清单）按 A4 自动分页；
  * - 其余元素（方案页、点位图页）每个一页，按自身比例成页；只有一个元素时按宽高比判断。
  */
 export async function renderPagesToJpegs(elements: HTMLElement[]): Promise<PageJpeg[]> {
-  const { toCanvas } = await import('html-to-image')
   const pdfPages: PageJpeg[] = []
   const pixelRatio = 2
   for (const el of elements) {
-    const isSlide = el.dataset.exportPage === 'slide' || el.offsetWidth === 1440
-    const naturalW = isSlide ? el.offsetWidth || 1440 : undefined
-    const naturalH = isSlide ? el.offsetHeight || 960 : undefined
-    // 清零外层 mx-auto / mt-6 的计算边距，避免导出画布整体右偏被裁切
-    const canvas = await toCanvas(el, {
-      pixelRatio,
-      ...(naturalW ? { width: naturalW } : {}),
-      ...(naturalH ? { height: naturalH } : {}),
-      backgroundColor: '#ffffff',
-      cacheBust: false,
-      style: {
-        margin: '0',
-        boxShadow: 'none',
-        ...(isSlide ? { transform: 'none', transformOrigin: 'top left' } : {}),
-      },
-    })
-    const flow = el.dataset.exportPage === 'flow' || Boolean(el.closest('#quote-preview'))
-    const isLandscapeCard = isSlide || (!flow && (elements.length > 1 || canvas.width > canvas.height * 1.15))
-    if (isLandscapeCard) {
-      // 横版卡片按自身比例成页（A4 比例的卡片仍是标准 A4；3:2 的方案页不会被压扁）
-      pdfPages.push({
-        bytes: dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.92)),
-        widthPx: canvas.width,
-        heightPx: canvas.height,
-        widthPt: 841.89,
-        heightPt: Math.round(841.89 * (canvas.height / Math.max(1, canvas.width)) * 100) / 100,
+    const restore = await prepareNodeForExport(el)
+    try {
+      const isSlide = el.dataset.exportPage === 'slide' || el.offsetWidth === 1440
+      const naturalW = isSlide ? 1440 : undefined
+      const naturalH = isSlide ? 960 : undefined
+      const canvas = await renderElementToCanvas(el, {
+        pixelRatio,
+        width: naturalW,
+        height: naturalH,
+        isSlide,
       })
-    } else {
-      const scale = canvas.height / Math.max(1, el.offsetHeight || el.getBoundingClientRect().height)
-      pdfPages.push(...slicePortraitCanvas(canvas, el, scale))
+      const flow = el.dataset.exportPage === 'flow' || Boolean(el.closest('#quote-preview'))
+      const isLandscapeCard = isSlide || (!flow && (elements.length > 1 || canvas.width > canvas.height * 1.15))
+      if (isLandscapeCard) {
+        // 横版卡片按自身比例成页（A4 比例的卡片仍是标准 A4；3:2 的方案页不会被压扁）
+        pdfPages.push({
+          bytes: dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.92)),
+          widthPx: canvas.width,
+          heightPx: canvas.height,
+          widthPt: 841.89,
+          heightPt: Math.round(841.89 * (canvas.height / Math.max(1, canvas.width)) * 100) / 100,
+        })
+      } else {
+        const domH = Math.max(1, el.offsetHeight || el.getBoundingClientRect().height)
+        const scale = canvas.height / domH
+        pdfPages.push(...slicePortraitCanvas(canvas, el, scale))
+      }
+    } finally {
+      restore()
     }
   }
   return pdfPages
+}
+
+/** 把页面元素安全渲染为高清 PNG Data URL 列表（供「导出图片」使用，复用防坏图与字体回退管线） */
+export async function renderPagesToPngDataUrls(elements: HTMLElement[]): Promise<string[]> {
+  await waitForPageAssets(elements)
+  const urls: string[] = []
+  for (const el of elements) {
+    const restore = await prepareNodeForExport(el)
+    try {
+      const isSlide = el.dataset.exportPage === 'slide' || el.offsetWidth === 1440
+      const canvas = await renderElementToCanvas(el, {
+        pixelRatio: 2,
+        width: isSlide ? 1440 : undefined,
+        height: isSlide ? 960 : undefined,
+        isSlide,
+      })
+      urls.push(canvas.toDataURL('image/png'))
+    } finally {
+      restore()
+    }
+  }
+  return urls
 }
 
 /**
@@ -331,8 +537,15 @@ export async function exportPagesAsPdf(elements: HTMLElement[], fileName: string
 export async function exportPagesAsPdfBundle(elements: HTMLElement[], fileName: string): Promise<ExportedPdfBundle> {
   await waitForPageAssets(elements)
   const pdfPages = await renderPagesToJpegs(elements)
+  if (!pdfPages.length) {
+    throw new Error('没有可导出的页面内容')
+  }
   const blob = buildPdfFromJpegs(pdfPages)
-  downloadBlob(blob, `${fileName}.pdf`)
+  try {
+    downloadBlob(blob, `${fileName}.pdf`)
+  } catch {
+    // 部分内置 WebView 拦截自动下载时忽略异常，由结果弹窗提供链接下载与长图保存
+  }
   const previewDataUrls = pdfPages.slice(0, 12).map((p) => bytesToDataUrl(p.bytes))
   return {
     blob,

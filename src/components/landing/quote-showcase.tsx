@@ -117,6 +117,10 @@ export function QuoteShowcase({
         >
           <QuoteSheet style={active} layout={layoutId} quote={quote} data={data} company={company} />
         </div>
+        {/* 专供「下载方案与报价 PDF」使用的完整展开版（固定标准桌面 A4 宽度，包含全部系统与全部设备明细） */}
+        <div aria-hidden className="pointer-events-none fixed top-0 -left-[9999px] -z-10 w-[794px] opacity-0">
+          <QuoteSheet style={active} layout={layoutId} quote={quote} data={data} company={company} expanded exportPage />
+        </div>
       </div>
 
       <Dialog open={zoomOpen} onOpenChange={setZoomOpen}>
@@ -168,6 +172,7 @@ function QuoteSheet({
   data,
   company,
   expanded = false,
+  exportPage = false,
 }: {
   style: DocStyle
   layout: string
@@ -175,6 +180,7 @@ function QuoteSheet({
   data: LandingShowcase
   company: CompanyInfo
   expanded?: boolean
+  exportPage?: boolean
 }) {
   const t = docTable(style)
   const address = [data.project.community, data.project.address].filter(Boolean).join(' ') || data.project.name
@@ -251,10 +257,11 @@ function QuoteSheet({
   const folded = expanded ? 0 : quote.lines.length - mobileRows
   const visibleSystems = expanded ? systems : systems.slice(0, 3)
   const visibleFloors = expanded ? floors : floors.slice(0, 2)
+  const deskCell = exportPage ? 'table-cell' : 'hidden sm:table-cell'
 
   return (
     <DocRoot style={style} className={cn('mx-auto overflow-hidden rounded-md shadow-sm ring-1 ring-foreground/10', expanded ? 'max-w-4xl' : 'max-w-3xl')}>
-      <div data-export-page={expanded ? undefined : 'flow'} className="bg-doc-paper p-4 text-xs leading-relaxed sm:p-8">
+      <div data-export-page={exportPage ? 'flow' : undefined} className={cn('bg-doc-paper text-xs leading-relaxed', exportPage ? 'p-8' : 'p-4 sm:p-8')}>
         <DocHeader style={style} company={company} meta="报价单样张" />
         <div className="mt-6">
           <DocTitle
@@ -287,10 +294,10 @@ function QuoteSheet({
                   <thead>
                     <tr className={t.head}>
                       <th className={t.th}>系统</th>
-                      <th className={cn(t.th, 'hidden w-16 text-right sm:table-cell')}>行数</th>
+                      <th className={cn(t.th, deskCell, 'w-16 text-right')}>行数</th>
                       <th className={cn(t.th, 'w-16 text-right')}>数量</th>
                       <th className={cn(t.th, 'w-24 text-right')}>小计</th>
-                      <th className={cn(t.th, 'hidden w-32 sm:table-cell')}>占比</th>
+                      <th className={cn(t.th, deskCell, 'w-32')}>占比</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -302,10 +309,10 @@ function QuoteSheet({
                             {g.name}
                           </span>
                         </td>
-                        <td className={cn(t.td, 'hidden py-1.5 text-right tabular-nums sm:table-cell')}>{g.rows.length}</td>
+                        <td className={cn(t.td, deskCell, 'py-1.5 text-right tabular-nums')}>{g.rows.length}</td>
                         <td className={cn(t.td, 'py-1.5 text-right tabular-nums')}>{g.quantity}</td>
                         <td className={cn(t.td, 'py-1.5 text-right tabular-nums')}>{yuan(g.subtotal)}</td>
-                        <td className={cn(t.td, 'hidden py-1.5 sm:table-cell')}>
+                        <td className={cn(t.td, deskCell, 'py-1.5')}>
                           <span className="flex items-center gap-2">
                             <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-doc-stripe">
                               <span className="block h-full rounded-full" style={{ width: share(g.subtotal), backgroundColor: g.color }} />
@@ -334,8 +341,8 @@ function QuoteSheet({
                   <table className="w-full table-fixed border-collapse text-[11.5px]">
                     <thead>
                       <tr className={t.head}>
-                        <th className={cn(t.th, 'hidden w-11 whitespace-nowrap sm:table-cell')}>序号</th>
-                        {showImages ? <th className={cn(t.th, 'hidden w-12 whitespace-nowrap sm:table-cell')}>图片</th> : null}
+                        <th className={cn(t.th, deskCell, 'w-11 whitespace-nowrap')}>序号</th>
+                        {showImages ? <th className={cn(t.th, deskCell, 'w-12 whitespace-nowrap')}>图片</th> : null}
                         <th className={t.th}>产品</th>
                         {expanded ? <th className={cn(t.th, 'w-36 whitespace-nowrap')}>型号</th> : null}
                         <th className={cn(t.th, 'w-20 text-right whitespace-nowrap')}>单价</th>
@@ -346,9 +353,9 @@ function QuoteSheet({
                     <tbody>
                       {g.rows.map(({ item, i }, k) => (
                         <tr key={`${item.sku}-${i}`} className={t.row(k)}>
-                          <td className={cn(t.td, 'hidden py-1.5 text-doc-muted tabular-nums sm:table-cell')}>{i + 1}</td>
+                          <td className={cn(t.td, deskCell, 'py-1.5 text-doc-muted tabular-nums')}>{i + 1}</td>
                           {showImages ? (
-                            <td className={cn(t.td, 'hidden py-1 sm:table-cell')}>
+                            <td className={cn(t.td, deskCell, 'py-1')}>
                               <ProductThumb src={item.image} alt={item.name} className="size-8" />
                             </td>
                           ) : null}
@@ -561,8 +568,8 @@ function QuoteSheet({
             <table className={cn('w-full table-fixed border-collapse', layout === 'compact' ? 'text-[11px]' : 'text-[11.5px]')}>
               <thead>
                 <tr className={t.head}>
-                  <th className={cn(t.th, 'hidden w-11 whitespace-nowrap sm:table-cell')}>序号</th>
-                  {showImages ? <th className={cn(t.th, 'hidden w-12 whitespace-nowrap sm:table-cell')}>图片</th> : null}
+                  <th className={cn(t.th, deskCell, 'w-11 whitespace-nowrap')}>序号</th>
+                  {showImages ? <th className={cn(t.th, deskCell, 'w-12 whitespace-nowrap')}>图片</th> : null}
                   <th className={t.th}>产品</th>
                   {expanded ? <th className={cn(t.th, 'w-36 whitespace-nowrap')}>型号</th> : null}
                   <th className={cn(t.th, 'w-20 text-right whitespace-nowrap')}>单价</th>
@@ -573,9 +580,9 @@ function QuoteSheet({
               <tbody>
                 {quote.lines.map((item, i) => (
                   <tr key={`${item.sku}-${i}`} className={cn(t.row(i), i >= mobileRows && 'max-sm:hidden')}>
-                    <td className={cn(t.td, 'hidden text-doc-muted tabular-nums sm:table-cell', layout === 'compact' ? 'py-1' : 'py-2')}>{i + 1}</td>
+                    <td className={cn(t.td, deskCell, 'text-doc-muted tabular-nums', layout === 'compact' ? 'py-1' : 'py-2')}>{i + 1}</td>
                     {showImages ? (
-                      <td className={cn(t.td, 'hidden py-1 sm:table-cell')}>
+                      <td className={cn(t.td, deskCell, 'py-1')}>
                         <ProductThumb src={item.image} alt={item.name} className="size-8" />
                       </td>
                     ) : null}
