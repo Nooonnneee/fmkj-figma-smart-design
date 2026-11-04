@@ -9,6 +9,7 @@ import type { PluginFlags } from '@/plugins/state'
 import type { PluginId } from '@/plugins/types'
 
 import { coreToolHandlers } from './tools/core-handlers'
+import { competitorQuoteHandlers } from './tools/competitor-quote'
 import type { AiTool, AiToolHandler, ToolContext } from './tools/context'
 
 export type { ActiveProjectUpdate, AiTool, AiToolHandler, ToolContext, ToolRunResult } from './tools/context'
@@ -19,6 +20,7 @@ export type LlmToolCall = { id: string; type: 'function'; function: { name: stri
 /** 汇总各插件自己注册的工具执行函数（去中心化维护，按工具名映射） */
 const HANDLER_MAP: Record<string, AiToolHandler> = {
   ...coreToolHandlers,
+  ...competitorQuoteHandlers,
   ...roomInsightsHandlers,
   ...smartSelectHandlers,
   ...proposalHandlers,

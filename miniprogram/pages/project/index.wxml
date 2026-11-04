@@ -89,6 +89,28 @@
   </view>
 
   <view class="section-title"><text class="title">资料导出</text></view>
+  <block wx:if="{{proposal}}">
+    <view class="card tpl-card" hover-class="list-item-hover" bindtap="openTemplates">
+      <image class="tpl-cover" src="{{proposal.thumbUrl}}" mode="aspectFill" />
+      <view class="grow tpl-meta">
+        <view class="row gap-8">
+          <text class="title truncate">{{proposal.label}}</text>
+          <text class="badge shrink-0">{{proposal.tierBadge}}</text>
+        </view>
+        <view class="small muted mt-8 clamp-2">适合：{{proposal.audience}}</view>
+        <view class="small muted mt-8">{{proposal.chosen ? '已设为交付方案模板' : '默认模板 · 共 ' + proposal.count + ' 套可选'}}</view>
+      </view>
+      <image class="icon-sm shrink-0" src="/assets/icons/chevron-right-muted.svg" />
+    </view>
+    <view class="row gap-16 mt-16 tpl-actions">
+      <button class="btn btn-outline grow" hover-class="btn-hover" bindtap="openTemplates">
+        <image class="icon-sm" src="/assets/icons/layers.svg" />切换模板
+      </button>
+      <button class="btn btn-primary grow" hover-class="btn-hover" bindtap="previewProposal">
+        <image class="icon-sm" src="/assets/icons/file-white.svg" />预览方案
+      </button>
+    </view>
+  </block>
   <view class="card card-flush">
     <view wx:for="{{documents}}" wx:key="key" class="list-item" hover-class="list-item-hover" data-path="{{item.path}}" data-title="{{item.title}}" bindtap="openDoc">
       <image class="icon" src="/assets/icons/printer.svg" />
@@ -108,6 +130,49 @@
       <image class="icon-sm" src="/assets/icons/pencil-white.svg" />编辑资料
     </button>
   </view>
+
+  <block wx:if="{{tplSheet}}">
+    <view class="mask" bindtap="closeTemplates" />
+    <view class="sheet">
+      <view class="sheet-head">
+        <view>
+          <text class="title">选择交付方案模板</text>
+          <view class="small muted mt-8">点卡片切换，点「预览」先看套用效果</view>
+        </view>
+        <image class="icon" src="/assets/icons/x-muted.svg" bindtap="closeTemplates" />
+      </view>
+      <scroll-view scroll-y class="sheet-body">
+        <view wx:if="{{tplLoading}}" class="empty small">加载中…</view>
+        <view
+          wx:for="{{templates}}"
+          wx:key="slug"
+          class="tpl-item {{item.slug === tplCurrent ? 'tpl-item-active' : ''}}"
+          hover-class="list-item-hover"
+          data-slug="{{item.slug}}"
+          bindtap="pickTemplate"
+        >
+          <image class="tpl-thumb" src="{{item.thumbUrl}}" mode="aspectFill" lazy-load />
+          <view class="grow tpl-meta">
+            <view class="row gap-8 wrap">
+              <text class="tpl-name">{{item.label}}</text>
+              <text class="badge">{{item.tierBadge}}</text>
+              <text wx:if="{{item.slug === tplCurrent}}" class="badge badge-success">当前</text>
+              <view wx:if="{{item.locked}}" class="badge badge-warning row gap-8">
+                <image class="tpl-lock" src="/assets/icons/lock-muted.svg" />需升级
+              </view>
+            </view>
+            <view class="small muted mt-8 clamp-2">适合：{{item.audience}}</view>
+            <view class="small muted mt-8 clamp-2">时机：{{item.occasion}}</view>
+            <view wx:if="{{item.highlights.length}}" class="row gap-8 wrap mt-16">
+              <text wx:for="{{item.highlights}}" wx:for-item="h" wx:key="*this" class="tpl-tag">{{h}}</text>
+            </view>
+          </view>
+          <view class="tpl-preview" data-slug="{{item.slug}}" catchtap="previewTemplate">预览</view>
+        </view>
+        <view wx:if="{{!tplLoading && !templates.length}}" class="empty small">暂无可用模板</view>
+      </scroll-view>
+    </view>
+  </block>
 </view>
 <view wx:elif="{{loading}}" class="empty">加载中…</view>
 <privacy-popup id="privacy-popup" />

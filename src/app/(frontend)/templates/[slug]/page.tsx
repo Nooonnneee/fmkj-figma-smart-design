@@ -20,9 +20,13 @@ import { Swatches, TierPill } from '@/plugins/proposal/template-picker'
 
 import { TemplateCard } from '@/components/proposal-template-card'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 3600
 /** 后台新增的模板第一次访问时生成，之后按小时或保存时刷新 */
 export const dynamicParams = true
+
+export async function generateStaticParams() {
+  return [{ slug: 'qixu' }]
+}
 
 /** 有静态缩略图（scripts/generate-template-thumbnails.mjs 生成）时用作分享卡片 */
 const staticThumb = (slug: string) => {

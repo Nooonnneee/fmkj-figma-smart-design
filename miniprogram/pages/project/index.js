@@ -1,4 +1,4 @@
-const { api, upload, toast } = require('../../utils/request')
+const { api, upload, toast, absUrl } = require('../../utils/request')
 const { yuan, quoteBadge, contractBadge } = require('../../utils/format')
 const { openDocument } = require('../../utils/route')
 const { pickImage } = require('../../utils/pick')
@@ -6,7 +6,25 @@ const { getMeta } = require('../../utils/meta')
 const decorate = require('../../utils/decorate')
 
 Page({
-  data: { id: '', loading: true, p: null, owner: null, summary: null, quotes: [], contract: null, documents: [], archived: false, stepLabels: ['信息', '点位', '报价', '合同', '归档'] },
+  data: {
+    id: '',
+    loading: true,
+    p: null,
+    owner: null,
+    summary: null,
+    quotes: [],
+    contract: null,
+    documents: [],
+    archived: false,
+    stepLabels: ['信息', '点位', '报价', '合同', '归档'],
+    // 交付方案模板：当前模板卡片 + 底部抽屉
+    proposal: null,
+    tplSheet: false,
+    tplLoading: false,
+    templates: [],
+    tplCurrent: '',
+    tplEditable: false,
+  },
   version: -1,
 
   onLoad(query) {
@@ -37,6 +55,7 @@ Page({
         quotes: d.quotes.map((q) => Object.assign({}, q, { totalText: yuan(q.total), badge: quoteBadge(q.status) })),
         contract: c ? Object.assign({}, c, { amountText: yuan(c.amount), badge: contractBadge(c.status), received: c.payments.filter((x) => x.received).length }) : null,
         documents: d.documents,
+        proposal: d.proposal ? Object.assign({}, d.proposal, { thumbUrl: absUrl(d.proposal.thumb) }) : null,
       })
     } catch (e) {
       this.setData({ loading: false })
@@ -60,6 +79,54 @@ Page({
   },
   openDoc(e) {
     openDocument(e.currentTarget.dataset.path, e.currentTarget.dataset.title)
+  },
+
+  /** 打开模板抽屉：按缩略图、适合客户与会员等级挑选交付方案模板 */
+  async openTemplates() {
+    this.setData({ tplSheet: true, tplLoading: true })
+    try {
+      const d = await api.get('/projects/' + this.data.id + '/template')
+      this.setData({
+        tplLoading: false,
+        tplEditable: d.editable,
+        tplCurrent: d.current ? d.current.slug : '',
+        templates: d.options.map((t) => Object.assign({}, t, { thumbUrl: absUrl(t.thumb) })),
+      })
+    } catch (e) {
+      this.setData({ tplLoading: false, tplSheet: false })
+    }
+  },
+  closeTemplates() {
+    this.setData({ tplSheet: false })
+  },
+  async pickTemplate(e) {
+    const slug = e.currentTarget.dataset.slug
+    const t = this.data.templates.find((x) => x.slug === slug)
+    if (!t || slug === this.data.tplCurrent) return this.closeTemplates()
+    if (t.locked) return toast('「' + t.label + '」是 ' + t.tierBadge + ' 模板，升级会员后可用')
+    if (!this.data.tplEditable) return toast(this.data.archived ? '项目已归档，恢复后才能切换模板' : '你对该项目仅有查看权限')
+    wx.showLoading({ title: '正在切换', mask: true })
+    try {
+      await api.put('/projects/' + this.data.id + '/template', { template: slug })
+      wx.hideLoading()
+      toast('已切换为「' + t.label + '」')
+      this.setData({ tplSheet: false, tplCurrent: slug })
+      getApp().touchData()
+      this.load()
+    } catch (err) {
+      wx.hideLoading()
+    }
+  },
+  /** 在抽屉里预览某个模板套用本项目数据的效果（不切换） */
+  previewTemplate(e) {
+    const slug = e.currentTarget.dataset.slug
+    const t = this.data.templates.find((x) => x.slug === slug)
+    openDocument('/print/projects/' + this.data.id + '/proposal?template=' + encodeURIComponent(slug), (t ? t.label : '方案') + ' · 预览')
+  },
+  previewProposal() {
+    const p = this.data.proposal
+    if (!p) return
+    openDocument('/print/projects/' + this.data.id + '/proposal?template=' + encodeURIComponent(p.slug), p.label + ' · 方案预览')
   },
 
   nextStep() {

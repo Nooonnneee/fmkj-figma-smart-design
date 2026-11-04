@@ -110,7 +110,7 @@ export function MembershipDialog({
                 <Crown className="size-3.5 text-primary" />
                 当前：{currentBadge}
               </span>
-              <span className="text-border">|</span>
+              <span aria-hidden className="text-muted-foreground/60">|</span>
               <span className="flex items-center gap-1 font-medium tabular-nums">
                 <Coins className="size-3.5 text-primary" />
                 {credits.toLocaleString('zh-CN')} 积分
@@ -128,7 +128,7 @@ export function MembershipDialog({
               <div
                 key={tier.value}
                 className={cn(
-                  'relative flex flex-col justify-between rounded-2xl border p-4 transition-all',
+                  'relative flex flex-col justify-between rounded-xl border p-4 transition-all',
                   isPro ? 'border-primary bg-primary/[0.03] shadow-sm ring-1 ring-primary/25' : 'bg-card',
                 )}
               >
@@ -199,7 +199,7 @@ export function MembershipDialog({
           })}
         </div>
 
-        <div className="flex flex-col gap-3 rounded-2xl border bg-muted/25 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-xl border bg-muted/25 p-4 sm:flex-row sm:items-center sm:justify-between">
           <form onSubmit={handleRedeem} className="flex flex-1 items-center gap-2">
             <Input
               ref={inputRef}

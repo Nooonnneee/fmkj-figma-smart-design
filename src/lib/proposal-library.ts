@@ -18,7 +18,41 @@ export type LibraryStatus = {
   scenes: { builtin: number; existing: number; missing: string[] }
 }
 
+let autoSeedPromise: Promise<void> | null = null
+
+/**
+ * 确保后台「方案模板」与「场景库」至少已初始化内置记录（新部署的自建服务器首次访问时自动幂等补齐，无需人工进后台点击）。
+ */
+export async function ensureBuiltinLibrarySeeded(payload: Payload): Promise<void> {
+  if (autoSeedPromise) return autoSeedPromise
+  autoSeedPromise = (async () => {
+    try {
+      const [tpl, scn] = await Promise.all([
+        payload.find({ collection: 'proposal-templates', limit: 200, depth: 0, overrideAccess: true, select: { slug: true } }),
+        payload.find({ collection: 'scenes', limit: 200, depth: 0, overrideAccess: true, select: { slug: true } }),
+      ])
+      const tplSlugs = new Set(tpl.docs.map((d) => d.slug))
+      const scnSlugs = new Set(scn.docs.map((d) => d.slug))
+      const missingTpl = BUILTIN_PROPOSAL_TEMPLATES.some((t) => !tplSlugs.has(t.value))
+      const missingScn = BUILTIN_SCENES.some((s) => !scnSlugs.has(s.slug))
+      if (tpl.totalDocs === 0 || missingTpl) {
+        await seedBuiltinTemplates(payload, { fill: true })
+      }
+      if (scn.totalDocs === 0 || missingScn) {
+        await seedBuiltinScenes(payload, {
+          origin: process.env.NEXT_PUBLIC_SITE_URL || process.env.PUBLIC_URL || process.env.FIGMA_PUBLIC_URL,
+        })
+      }
+    } catch {
+      // 忽略并发或只读构建阶段异常，下次请求可重试
+      autoSeedPromise = null
+    }
+  })()
+  return autoSeedPromise
+}
+
 export async function proposalLibraryStatus(payload: Payload): Promise<LibraryStatus> {
+  await ensureBuiltinLibrarySeeded(payload)
   const [tpl, scn] = await Promise.all([
     payload.find({ collection: 'proposal-templates', limit: 500, depth: 0, overrideAccess: true, select: { slug: true } }),
     payload.find({ collection: 'scenes', limit: 500, depth: 0, overrideAccess: true, select: { slug: true } }),

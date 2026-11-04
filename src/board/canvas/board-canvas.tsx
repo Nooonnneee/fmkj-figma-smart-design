@@ -13,7 +13,7 @@ import { symbolGeom, type SymbolGeom } from '../core/symbols'
 import type { AreaObj, BoardDoc, BoardFile, BoardTool, Box, SheetObj, SymbolObj, SymbolTemplate, Vec, Viewport, ViewSettings } from '../core/types'
 import { panBy, toScene, visibleBox, zoomAt, type Size } from '../core/viewport'
 import { edgeMidpoints, HANDLE_CURSOR, hitTest, rotateHandle, type Hit } from './hit'
-import { AreaView, RawView, SheetView, SymbolLabel, SymbolView } from './layers'
+import { AreaView, OverlayView, RawView, SheetView, SymbolLabel, SymbolView } from './layers'
 
 export type CanvasContext = { hit: Hit | null; scene: Vec; local: Vec; wrap: Size }
 
@@ -129,6 +129,12 @@ export function BoardCanvas(props: BoardCanvasProps) {
   }, [shown, pack, view])
   const geomsRef = useRef(geoms)
   geomsRef.current = geoms
+
+  // 系统包的辅助图层（覆盖圈、开关控灯关联……）：只在打开时计算
+  const overlayShapes = useMemo(
+    () => (pack.overlays ?? []).filter((o) => view.overlays?.[o.id]).map((o) => ({ id: o.id, shapes: o.build(shown) })),
+    [pack, view.overlays, shown],
+  )
 
   useEffect(() => {
     const el = wrapRef.current
@@ -496,7 +502,7 @@ export function BoardCanvas(props: BoardCanvasProps) {
   const sheets = objs.filter((o): o is SheetObj => o.kind === 'sheet')
   const activeSheet = sheets.find((s) => s.sheetId === props.activeSheetId) ?? sheets[0] ?? null
   const cursor = gesture.current?.t === 'pan' ? 'grabbing' : space ? 'grab' : hover.cursor
-  const accent = dark ? '#60a5fa' : '#2563eb'
+  const sheetStyle = view.sheetStyle ?? 'cad'
   const ghost = props.armed && hover.pos ? (() => {
     const o: SymbolObj = { kind: 'symbol', id: '__ghost', x: hover.pos!.x, y: hover.pos!.y, code: '', angle: props.armed!.angle ?? 0, ...props.armed! }
     const look = pack.look(o)
@@ -510,8 +516,9 @@ export function BoardCanvas(props: BoardCanvasProps) {
       role="application"
       aria-label="画板"
       tabIndex={0}
-      className={cn('relative size-full touch-none overflow-hidden outline-none select-none', dark ? 'bg-neutral-900' : 'bg-neutral-100', props.className)}
-      style={{ cursor, ['--board-accent' as string]: accent, ['--board-accent-soft' as string]: dark ? 'rgba(96,165,250,0.08)' : 'rgba(37,99,235,0.05)' }}
+      className={cn('relative size-full touch-none overflow-hidden bg-canvas outline-none select-none', props.className)}
+      // 选中框、区域高亮跟随主题强调色（繁梦紫 / 青碧 / 经典），深浅色由 CSS 变量切换，服务端与客户端首帧一致
+      style={{ cursor, ['--board-accent' as string]: 'var(--primary)', ['--board-accent-soft' as string]: 'color-mix(in oklch, var(--primary) 9%, transparent)' }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={(e) => finish(e)}
@@ -536,18 +543,37 @@ export function BoardCanvas(props: BoardCanvasProps) {
       <svg className={cn('absolute inset-0 size-full transition-opacity', props.ready === false && 'opacity-0')} aria-hidden>
         <defs>
           <filter id="board-paper-shadow" x="-5%" y="-5%" width="110%" height="110%">
-            <feDropShadow dx="0" dy="2" stdDeviation="5" floodColor="#000" floodOpacity={dark ? 0.5 : 0.12} />
+            <feDropShadow dx="0" dy="2" stdDeviation="6" floodColor="#0f172a" floodOpacity={dark ? 0.48 : 0.08} />
+          </filter>
+          <filter id="board-sheet-warm" colorInterpolationFilters="sRGB">
+            <feColorMatrix
+              type="matrix"
+              values="0.96 0.03 0.00 0 0.01  0.02 0.93 0.02 0 0.00  0.00 0.02 0.86 0 -0.02  0 0 0 1 0"
+            />
+          </filter>
+          <filter id="board-sheet-modern" colorInterpolationFilters="sRGB">
+            <feColorMatrix
+              type="matrix"
+              values="0.93 0.04 0.03 0 0.01  0.02 0.94 0.04 0 0.01  0.02 0.04 0.98 0 0.02  0 0 0 1 0"
+            />
+          </filter>
+          <filter id="board-sheet-blueprint" colorInterpolationFilters="sRGB">
+            <feColorMatrix
+              type="matrix"
+              values="0.82 0.06 0.08 0 0.04  0.04 0.88 0.08 0 0.06  0.06 0.10 0.98 0 0.10  0 0 0 1 0"
+            />
           </filter>
         </defs>
         <g transform={`scale(${z}) translate(${viewport.scrollX} ${viewport.scrollY})`}>
           {view.layers.sheet
-            ? sheets.map((s) => <SheetView key={s.id} s={s} href={s.fileId ? (files[s.fileId]?.dataURL ?? null) : null} opacity={view.sheetOpacity} titleColor={dark ? '#d4d4d8' : '#404040'} />)
+            ? sheets.map((s) => <SheetView key={s.id} s={s} href={s.fileId ? (files[s.fileId]?.dataURL ?? null) : null} opacity={view.sheetOpacity} titleColor={dark ? '#d4d4d8' : '#3f3f46'} sheetStyle={sheetStyle} />)
             : null}
           {view.grid ? sheets.map((s) => <Grid key={s.id} sheet={s} vis={vis} zoom={z} />) : null}
-          {view.layers.area ? objs.map((o) => (o.kind === 'area' ? <AreaView key={o.id} a={o} selected={selection.has(o.id)} /> : null)) : null}
+          {view.layers.area ? objs.map((o) => (o.kind === 'area' ? <AreaView key={o.id} a={o} selected={selection.has(o.id)} sheetStyle={sheetStyle} /> : null)) : null}
           {view.layers.shape
             ? objs.map((o) => (o.kind === 'raw' ? <RawView key={o.id} el={o.el} href={typeof o.el.fileId === 'string' ? (files[o.el.fileId]?.dataURL ?? null) : null} /> : null))
             : null}
+          {view.layers.symbol ? overlayShapes.map((ov) => <OverlayView key={ov.id} shapes={ov.shapes} zoom={z} />) : null}
           {view.layers.symbol
             ? objs.map((o) => {
                 if (o.kind !== 'symbol' || hidden.has(o.id)) return null

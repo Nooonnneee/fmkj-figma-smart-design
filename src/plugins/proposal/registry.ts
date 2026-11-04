@@ -2,6 +2,7 @@ import { cache } from 'react'
 
 import { isMembershipTier } from '@/lib/membership'
 import { getPayloadClient } from '@/lib/payload'
+import { ensureBuiltinLibrarySeeded } from '@/lib/proposal-library'
 import type { User } from '@/payload-types'
 
 import { isDeckTheme } from './deck/themes'
@@ -18,6 +19,7 @@ import { BUILTIN_PROPOSAL_TEMPLATES, CONSTRUCTION_TEMPLATE, type ProposalTemplat
  */
 export const loadProposalTemplates = cache(async (user: User | null): Promise<ProposalTemplateDef[]> => {
   const payload = await getPayloadClient()
+  await ensureBuiltinLibrarySeeded(payload)
   const access = user ? { user, overrideAccess: false } : { overrideAccess: true }
   const res = await payload
     .find({ collection: 'proposal-templates', sort: 'sortOrder', limit: 100, depth: 1, ...access })

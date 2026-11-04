@@ -254,7 +254,7 @@ function QuoteSheet({
 
   return (
     <DocRoot style={style} className={cn('mx-auto overflow-hidden rounded-md shadow-sm ring-1 ring-foreground/10', expanded ? 'max-w-4xl' : 'max-w-3xl')}>
-      <div className="bg-doc-paper p-4 text-xs leading-relaxed sm:p-8">
+      <div data-export-page={expanded ? undefined : 'flow'} className="bg-doc-paper p-4 text-xs leading-relaxed sm:p-8">
         <DocHeader style={style} company={company} meta="报价单样张" />
         <div className="mt-6">
           <DocTitle

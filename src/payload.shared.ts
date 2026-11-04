@@ -9,6 +9,7 @@ import { AiCreditLedger } from './collections/AiCreditLedger'
 import { AiMessages } from './collections/AiMessages'
 import { Brands } from './collections/Brands'
 import { Categories } from './collections/Categories'
+import { ClientFeedback } from './collections/ClientFeedback'
 import { Contracts } from './collections/Contracts'
 import { Media } from './collections/Media'
 import { Folders } from './collections/Folders'
@@ -19,6 +20,7 @@ import { Scenes } from './collections/Scenes'
 import { Projects } from './collections/Projects'
 import { Quotes } from './collections/Quotes'
 import { RedemptionCodes } from './collections/RedemptionCodes'
+import { ServiceRecords } from './collections/ServiceRecords'
 import { Tags } from './collections/Tags'
 import { Users } from './collections/Users'
 import { WechatAccounts } from './collections/WechatAccounts'
@@ -63,6 +65,8 @@ export const sharedConfig = {
     Projects,
     Quotes,
     Contracts,
+    ServiceRecords,
+    ClientFeedback,
     Products,
     Scenes,
     ProposalTemplates,

@@ -255,15 +255,24 @@ export async function renderPagesToJpegs(elements: HTMLElement[]): Promise<PageJ
   const pdfPages: PageJpeg[] = []
   const pixelRatio = 2
   for (const el of elements) {
+    const isSlide = el.dataset.exportPage === 'slide' || el.offsetWidth === 1440
+    const naturalW = isSlide ? el.offsetWidth || 1440 : undefined
+    const naturalH = isSlide ? el.offsetHeight || 960 : undefined
     // 清零外层 mx-auto / mt-6 的计算边距，避免导出画布整体右偏被裁切
     const canvas = await toCanvas(el, {
       pixelRatio,
+      ...(naturalW ? { width: naturalW } : {}),
+      ...(naturalH ? { height: naturalH } : {}),
       backgroundColor: '#ffffff',
       cacheBust: false,
-      style: { margin: '0', boxShadow: 'none' },
+      style: {
+        margin: '0',
+        boxShadow: 'none',
+        ...(isSlide ? { transform: 'none', transformOrigin: 'top left' } : {}),
+      },
     })
-    const flow = el.dataset.exportPage === 'flow'
-    const isLandscapeCard = !flow && (elements.length > 1 || canvas.width > canvas.height * 1.15)
+    const flow = el.dataset.exportPage === 'flow' || Boolean(el.closest('#quote-preview'))
+    const isLandscapeCard = isSlide || (!flow && (elements.length > 1 || canvas.width > canvas.height * 1.15))
     if (isLandscapeCard) {
       // 横版卡片按自身比例成页（A4 比例的卡片仍是标准 A4；3:2 的方案页不会被压扁）
       pdfPages.push({
@@ -274,7 +283,7 @@ export async function renderPagesToJpegs(elements: HTMLElement[]): Promise<PageJ
         heightPt: Math.round(841.89 * (canvas.height / Math.max(1, canvas.width)) * 100) / 100,
       })
     } else {
-      const scale = canvas.height / Math.max(1, el.getBoundingClientRect().height)
+      const scale = canvas.height / Math.max(1, el.offsetHeight || el.getBoundingClientRect().height)
       pdfPages.push(...slicePortraitCanvas(canvas, el, scale))
     }
   }
@@ -320,7 +329,7 @@ export async function exportPagesAsPdf(elements: HTMLElement[], fileName: string
 }
 
 export async function exportPagesAsPdfBundle(elements: HTMLElement[], fileName: string): Promise<ExportedPdfBundle> {
-  await waitForPageAssets()
+  await waitForPageAssets(elements)
   const pdfPages = await renderPagesToJpegs(elements)
   const blob = buildPdfFromJpegs(pdfPages)
   downloadBlob(blob, `${fileName}.pdf`)
@@ -333,9 +342,18 @@ export async function exportPagesAsPdfBundle(elements: HTMLElement[], fileName: 
 }
 
 /** 等页面里的字体和图片都加载完（导出前调用，避免缺字、缺图） */
-export async function waitForPageAssets(timeoutMs = 15000) {
-  const imgs = [...document.images].filter((img) => !img.complete)
-  const svgImages = [...document.querySelectorAll('image')]
+export async function waitForPageAssets(scopes?: HTMLElement[], timeoutMs = 2500) {
+  const roots: ParentNode[] = scopes && scopes.length ? scopes : [document]
+  const imgs = roots
+    .flatMap((r) => [...r.querySelectorAll<HTMLImageElement>('img')])
+    .filter((img) => {
+      if (!img.complete) {
+        img.loading = 'eager'
+        return true
+      }
+      return false
+    })
+  const svgImages = roots.flatMap((r) => [...r.querySelectorAll('image')])
   await Promise.race([
     Promise.all([
       document.fonts?.ready,

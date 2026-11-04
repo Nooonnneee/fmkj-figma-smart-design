@@ -35,6 +35,17 @@ export function parseShareConfig(raw: unknown): ShareConfig {
 }
 
 /**
+ * 业主分享链接凭证的严格比对：项目必须已保存分享配置、未关闭链接，且凭证完全一致。
+ * 与 parseShareConfig 不同，这里不会为缺失的配置临时生成新凭证。
+ */
+export function shareLinkMatches(raw: unknown, token: unknown): boolean {
+  if (typeof token !== 'string' || token.trim().length < 12) return false
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false
+  const r = raw as Record<string, unknown>
+  return r.enabled !== false && typeof r.token === 'string' && r.token.trim() === token.trim()
+}
+
+/**
  * 计算当前成员在指定项目上的角色：
  * - owner：项目创建者（或旧数据未记录 owner 的项目）
  * - edit：可编辑协作者

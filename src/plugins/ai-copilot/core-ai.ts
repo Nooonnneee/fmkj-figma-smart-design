@@ -24,6 +24,7 @@ export const coreAiSpec: PluginAiSpec = {
   guidance: [
     '当用户提出创建或修改请求时，主动调用对应工具直接完成操作（可分多步连续调用，例如：新建项目 → 布置房间和点位 → 智能选型 → 生成报价单），不要只给口头步骤。',
     '当用户上传了真实户型图图片时，严禁调用 setup_rooms_and_points 生成网格默认点位！只有图像真实识别出点位（add_floor_sheet 的 detectedPoints）或用户提供了点位 JSON（import_points_json）时才生成点位图标；若未识别出点位，保持点位图为空（0 点位）。',
+    '当用户上传或粘贴别家的报价单 / 设备清单要求比价时：先逐行识别品名、品牌、型号、数量与单价（安装调试、布线辅材等服务项放入 fees），再调用 create_quote_from_competitor 生成对比报价单，最后按行总结匹配型号与差价，不要把外店的服务项当成设备。',
   ],
   knowledge: [
     {
@@ -46,7 +47,23 @@ export const coreAiSpec: PluginAiSpec = {
       ],
     },
   ],
-  skills: [],
+  skills: [
+    {
+      id: 'tpl-competitor-quote',
+      name: '竞品报价单识图转配单',
+      category: '选型报价',
+      description: '上传外店报价单截图或粘贴 Excel 表格，AI 逐行识别并匹配本平台同级型号，在当前项目生成对比报价单与差价分析',
+      modelHint: 'vision',
+      recommendedModelId: 'qwen-vl-plus',
+      requiredPlugins: [],
+      variables: [
+        { key: 'strategy', label: '匹配策略', defaultValue: '同级优先', options: ['同级优先', '同品牌优先', '性价比优先'] },
+        { key: 'brand', label: '优先品牌', defaultValue: '不限', options: ['不限', 'Aqara', '小米', '领普', '易来', '华为'] },
+      ],
+      promptTemplate:
+        '我上传了客户从别家拿来的报价单（截图或粘贴的表格）。请先逐行识别品名、品牌、型号、数量和单价，安装调试、线材辅材等服务项单独列为费用；然后按【{strategy}】策略（优先品牌：{brand}）调用「竞品报价单转配单」工具，在当前项目生成对比报价单。最后用表格列出每行匹配到的型号、单价差和整单差价，并给出 3 条向业主解释我们方案优势的话术。',
+    },
+  ],
   tools: [
     {
       name: 'list_projects',
@@ -296,6 +313,54 @@ export const coreAiSpec: PluginAiSpec = {
           },
           notes: { type: 'string', description: '报价单备注说明' },
         },
+      },
+    },
+    {
+      name: 'create_quote_from_competitor',
+      title: '竞品报价单转配单',
+      description:
+        '把客户提供的外店报价单（识图结果或粘贴的 Excel 表格）逐行匹配到本平台产品库的同级型号，在当前关联项目生成一份对比报价单（草稿）。传入每行的品名、品牌、型号、数量和外店单价；返回逐行匹配结果、本店合计、外店合计与差价。安装调试等服务项请放在 fees。',
+      cost: 2,
+      permissions: ['catalog:read', 'quotes:write'],
+      scope: 'project',
+      mutates: true,
+      parameters: {
+        type: 'object',
+        properties: {
+          competitorName: { type: 'string', description: '外店名称（可选，如 某某智能家居）' },
+          title: { type: 'string', description: '新报价单标题（可选，默认「竞品对比配单（外店名）」）' },
+          competitorTotal: { type: 'number', description: '外店报价单上的合计金额（可选，用于计算差价）' },
+          preferBrand: { type: 'string', description: '优先匹配的品牌（可选，如 Aqara、小米）' },
+          items: {
+            type: 'array',
+            description: '外店报价单的设备明细（不含服务项）',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: '品名（如 智能开关三键、电动窗帘电机、人体存在传感器）' },
+                brand: { type: 'string', description: '品牌（可选）' },
+                model: { type: 'string', description: '型号 / 规格（可选）' },
+                deviceType: { type: 'string', description: '设备类型代号（可选，如 switch-3, curtain-track, downlight, motion-sensor）' },
+                quantity: { type: 'number', description: '数量' },
+                unitPrice: { type: 'number', description: '外店单价（元，可选）' },
+              },
+              required: ['name', 'quantity'],
+            },
+          },
+          fees: {
+            type: 'array',
+            description: '外店报价里的服务项（如安装调试费、线材辅材费）',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: '费用名称' },
+                amount: { type: 'number', description: '金额（元）' },
+              },
+              required: ['name', 'amount'],
+            },
+          },
+        },
+        required: ['items'],
       },
     },
     {

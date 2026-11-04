@@ -8,8 +8,12 @@ import { loadPublicProposalTemplates } from '@/plugins/proposal/registry'
 import { resolveProposalTemplate } from '@/plugins/proposal/templates'
 
 export const metadata: Metadata = { title: '模板样张', robots: { index: false, follow: false } }
-export const dynamic = 'force-dynamic'
+export const revalidate = 3600
 export const dynamicParams = true
+
+export async function generateStaticParams() {
+  return [{ slug: 'qixu' }]
+}
 
 /**
  * 只有方案页面的样张（无页头页脚、无留白，第一屏就是 1440 × 960 的封面）：

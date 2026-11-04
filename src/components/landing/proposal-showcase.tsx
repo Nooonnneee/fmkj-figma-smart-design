@@ -246,6 +246,7 @@ export function ProposalShowcase({
                   )}
                 >
                   <div
+                    data-export-page="slide"
                     style={{
                       ...deckVars(theme),
                       width: SLIDE_W,

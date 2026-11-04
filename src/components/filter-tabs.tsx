@@ -12,7 +12,7 @@ export type FilterTab = { label: React.ReactNode; href: string; active: boolean;
 export function FilterTabs({ items, label, className }: { items: FilterTab[]; label: string; className?: string }) {
   return (
     <nav aria-label={label} className={cn('-mx-1 max-w-full overflow-x-auto px-1 [scrollbar-width:none]', className)}>
-      <div className="inline-flex h-9 items-center gap-0.5 rounded-lg border bg-muted/50 p-0.5">
+      <div className="inline-flex h-8 items-center gap-0.5 rounded-lg bg-muted p-0.5">
         {items.map((it, i) => (
           <Link
             key={it.key ?? i}
@@ -20,14 +20,27 @@ export function FilterTabs({ items, label, className }: { items: FilterTab[]; la
             scroll={false}
             aria-current={it.active ? 'true' : undefined}
             className={cn(
-              'relative inline-flex h-full shrink-0 items-center gap-1.5 rounded-md px-3 text-sm whitespace-nowrap transition-colors duration-150',
-              'focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-              it.active ? 'bg-background font-medium text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+              'relative inline-flex h-full shrink-0 items-center gap-1.5 rounded-md px-2.5 text-[13px] font-medium whitespace-nowrap transition-[color,background-color,box-shadow] duration-150 ease-out-quart',
+              'focus-visible:ring-3 focus-visible:ring-ring/35 focus-visible:outline-none',
+              it.active
+                ? 'bg-background text-foreground shadow-xs dark:bg-accent'
+                : 'text-muted-foreground hover:text-foreground',
             )}
           >
             <LinkPending />
             {it.label}
-            {typeof it.count === 'number' ? <span className={cn('text-xs tabular-nums', it.active ? 'text-primary' : 'text-muted-foreground')}>{it.count}</span> : null}
+            {typeof it.count === 'number' ? (
+              <span
+                className={cn(
+                  'min-w-5 rounded-full px-1.5 text-center text-[11px] leading-[18px] font-medium tabular-nums',
+                  it.active
+                    ? 'bg-primary/10 text-primary'
+                    : 'bg-foreground/[0.06] text-muted-foreground dark:bg-foreground/10',
+                )}
+              >
+                {it.count}
+              </span>
+            ) : null}
           </Link>
         ))}
       </div>

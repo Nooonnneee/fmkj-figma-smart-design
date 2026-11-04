@@ -347,7 +347,7 @@ export function MembershipClient({
                       <span className="font-medium">{row.reason}</span>
                       {row.model ? <span className="ml-2 text-xs text-muted-foreground">{row.model}</span> : null}
                     </TableCell>
-                    <TableCell className={cn('text-right font-medium tabular-nums', row.delta > 0 ? 'text-emerald-600' : 'text-foreground')}>
+                    <TableCell className={cn('text-right font-medium tabular-nums', row.delta > 0 ? 'text-success' : 'text-foreground')}>
                       {row.delta > 0 ? `+${row.delta}` : row.delta}
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground tabular-nums">{row.balanceAfter}</TableCell>

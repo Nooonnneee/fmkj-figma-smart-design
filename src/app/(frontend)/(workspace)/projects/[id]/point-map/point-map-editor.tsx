@@ -9,9 +9,12 @@ import {
   Check,
   ChevronDown,
   CircleAlert,
-  Eye,
+  Download,
+  Eraser,
+  FileJson,
   FilePlus2,
   FileUp,
+  ImageDown,
   ImagePlus,
   Info,
   Layers,
@@ -19,39 +22,44 @@ import {
   MapPinned,
   Maximize2,
   Minimize2,
+  MapPinPlus,
   Minus,
+  Palette,
+  PencilLine,
   Plus,
   ReceiptText,
+  Redo2,
   RotateCcw,
   RotateCw,
   Ruler,
-  Save,
   Sparkles,
   Trash2,
   Undo2,
   X,
-  ChevronLeft,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useSidebar } from '@/components/ui/sidebar'
 import { Switch } from '@/components/ui/switch'
+import { Kbd } from '@/components/ui/kbd'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { BoardCanvas, type CanvasContext } from '@/board/canvas/board-canvas'
 import { download, exportSheetPng } from '@/board/canvas/export'
+import { SHEET_STYLE_META } from '@/board/canvas/layers'
 import { useViewSettings } from '@/board/canvas/use-view-settings'
 import { fromDeg, toDeg, unionBox } from '@/board/core/geometry'
 import { useBoardHistory } from '@/board/core/history'
 import { moveObjects, rawBox, removeObjects, rotateSymbols, sheetsOf } from '@/board/core/ops'
 import type { CheckIssue } from '@/board/core/pack'
-import type { BoardFile, BoardObj, BoardTool, Box, SheetObj, SymbolObj, SymbolTemplate, Vec, Viewport } from '@/board/core/types'
+import type { BoardFile, BoardObj, BoardTool, Box, SheetObj, SheetStyle, SymbolObj, SymbolTemplate, Vec, Viewport } from '@/board/core/types'
 import { fitBox, lerpViewport, toScene, zoomAt, type Size } from '@/board/core/viewport'
 import { smartHomePack } from '@/board/packs/smart-home'
 import { analyzeDoc, decodeScene, encodeDoc, exportBoardJson, parseBoardJson } from '@/board/packs/smart-home/codec'
@@ -68,7 +76,7 @@ import { cn } from '@/lib/utils'
 
 import { createQuoteFromProject, syncQuoteFromPointMap } from '../quotes/actions'
 
-import { BoardToolbar } from './board-toolbar'
+import { BOARD_TOOLS, BoardViewPopover } from './board-toolbar'
 import { AreasPanel, DRAG_TYPE, PlacePanel, PointMapContextMenu, SelectedArea, SelectedPoint, TypeDefaultRow, yuan, type CanvasContextMenuTarget, type PointProduct } from './editor-panels'
 import { LightingPanel } from './lighting-panel'
 import { SheetCropper } from './sheet-cropper'
@@ -77,6 +85,22 @@ export type { PointProduct } from './editor-panels'
 
 /** 图纸铺满画布时四周留一点边：这个状态显示为 100% */
 const FIT = 0.96
+/** 彩平风格的代表色（工具栏与菜单里的小色点） */
+const STYLE_DOT: Record<SheetStyle, string> = { cad: '#f4f4f5', warm: '#d6b48c', modern: '#a5b4fc', blueprint: '#3b82f6' }
+
+/** 工具栏图标按钮：幽灵样式 + 悬停提示 */
+function ToolbarIconButton({ label, pressed, className, children, ...props }: React.ComponentProps<typeof Button> & { label: string; pressed?: boolean }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label={label} aria-pressed={pressed} className={cn('text-muted-foreground', pressed && 'bg-muted text-foreground', className)} {...props}>
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{label}</TooltipContent>
+    </Tooltip>
+  )
+}
 const pack = smartHomePack
 
 type ProjectQuoteSummary = { id: string; title: string; status: string; total: number }
@@ -84,6 +108,8 @@ type ProjectQuoteSummary = { id: string; title: string; status: string; total: n
 export type PointMapPlugins = { aiImport: boolean; smartSelect: boolean; dwg: boolean; roomInsights: boolean; proposal: boolean }
 type InitialFocus = { quoteId: string | null; sheet: string | null; area: string | null; point: string | null; scope: PointScope | null }
 type Draft = { v: 1; base: string | null; at: number; scene: StoredScene }
+/** 右栏只有一层分段：设备 / 灯光 / 区域 / 统计（只读时只有区域与统计） */
+type PanelTab = 'devices' | 'lighting' | 'areas' | 'summary'
 
 const draftKey = (projectId: string) => `fmkj:pointmap:draft:${projectId}`
 const deviceTpl = (deviceType: string): SymbolTemplate => ({ symbolId: deviceType, sizeCm: null, real: false, data: { deviceType } })
@@ -126,6 +152,8 @@ export function PointMapEditor({
   const dwgEnabled = plugins.dwg
   const router = useRouter()
   const { resolvedTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
   const sidebar = useSidebar()
   const board = useBoardHistory(() => decodeScene(initialScene))
   const { doc, commit } = board
@@ -144,7 +172,6 @@ export function PointMapEditor({
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [mobilePlaceOpen, setMobilePlaceOpen] = useState(false)
   const editorRootRef = useRef<HTMLDivElement>(null)
-  const [placeTab, setPlaceTab] = useState<'devices' | 'lighting'>('devices')
   const [ctxMenu, setCtxMenu] = useState<CanvasContextMenuTarget | null>(null)
   const [cropFile, setCropFile] = useState<File | null>(null)
   const [defaults] = useState<ProjectDefaults>(initialDefaults)
@@ -155,7 +182,7 @@ export function PointMapEditor({
   const [notices, setNotices] = useState<string[]>(warnings)
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
-  const [tab, setTab] = useState(readOnly ? 'summary' : 'place')
+  const [tab, setTab] = useState<PanelTab>(readOnly ? 'summary' : 'devices')
   const [calib, setCalib] = useState<{ sheetId: string; units: number; value: string } | null>(null)
   const [autoGenOpen, setAutoGenOpen] = useState(false)
   const [autoGenScope, setAutoGenScope] = useState<'current' | 'all'>('current')
@@ -223,8 +250,16 @@ export function PointMapEditor({
     [setViewport],
   )
 
-  // 顶部浮动工具条约 44px 高，适配视图时让图纸标题落在工具条下方
-  const insets = useMemo(() => ({ top: (view.rulers ? 28 : 8) + 48, left: view.rulers ? 28 : 8, right: 8, bottom: 8 }), [view.rulers])
+  // 画布内边距：扣除左上标尺与底部轻量显示范围胶囊，保证彩平图和点位完全不被遮挡
+  const insets = useMemo(
+    () => ({
+      top: (view.rulers ? 22 : 6) + 8,
+      left: (view.rulers ? 22 : 6) + 10,
+      right: 10,
+      bottom: 12,
+    }),
+    [view.rulers],
+  )
   const fitSheet = useCallback(
     (sheetId: string | null, animate = true) => {
       const d = board.current.current.doc
@@ -907,12 +942,33 @@ export function PointMapEditor({
   const missingSheets = snap.sheets.filter((s) => s.missing).length
   const armedDevice = armed && armed.symbolId === armed.data.deviceType ? String(armed.data.deviceType) : null
   const armedLabel = armed ? pack.look({ symbolId: armed.symbolId, data: armed.data }).name : ''
+  const sheetStyle: SheetStyle = view.sheetStyle ?? 'cad'
+  const isStylized = sheetStyle !== 'cad'
+  /**
+   * 顶部主操作状态机：
+   * 1. 没有户型图 → 突出「上传户型图」
+   * 2. 有户型图但尚未彩平风格化 → 突出「风格化」
+   * 3. 已开启彩平风格化 → 突出「生成点位」
+   */
+  const primaryAction: 'upload' | 'stylize' | 'generate' = !snap.sheets.length ? 'upload' : !isStylized ? 'stylize' : 'generate'
+
+  const applySheetStyle = useCallback(
+    (nextStyle: SheetStyle) => {
+      setView({ sheetStyle: nextStyle })
+      toast.success(
+        nextStyle === 'cad'
+          ? '已恢复原始 CAD 底图'
+          : `已切换为「${SHEET_STYLE_META[nextStyle].label}」彩平效果`,
+      )
+    },
+    [setView],
+  )
 
   return (
     <div
       ref={editorRootRef}
       className={cn(
-        'full-bleed-page flex flex-col bg-background',
+        'full-bleed-page flex flex-col bg-canvas text-foreground',
         isFullscreen
           ? 'fixed inset-0 z-50 m-0 h-svh w-screen'
           : '-mx-4 -mt-6 -mb-5 h-[calc(100svh-5.5rem)] md:-mx-8 md:-mb-7 md:h-[calc(100svh-3rem)]',
@@ -926,73 +982,360 @@ export function PointMapEditor({
       <input ref={dwgInput} type="file" accept=".dwg" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void importDwg(f); e.target.value = '' }} />
       <input ref={jsonInput} type="file" accept=".json,.excalidraw,application/json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void importJson(f); e.target.value = '' }} />
 
-      <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2 md:px-4">
-        <span className="flex items-center gap-1.5 text-sm font-medium">
-          <MapPinned className="size-4 text-muted-foreground" />
-          点位图
-          <span className="text-xs font-normal text-muted-foreground tabular-nums">{scopedPoints.length} 个点位</span>
-        </span>
-        {readOnly ? <Badge variant="secondary">只读</Badge> : dirty ? <Badge variant="outline">未保存</Badge> : null}
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+      {/* ==================== 顶部工具栏（唯一的操作入口）：左（楼层 · 工具 · 历史）｜中（当前步骤的主操作）｜右（显示 · 缩放 · 导出 · 报价 · 保存状态） ==================== */}
+      <div className="flex h-12 shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-background px-2.5 [scrollbar-width:none]">
+        <div className="flex min-w-max flex-1 items-center gap-1">
+          {/* 楼层切换：切换 / 总览 / 当前图纸的重命名、清除标定、删除都在这一个菜单里；添加图纸用中间的「上传户型图」 */}
+          {snap.sheets.length ? (
+            <>
+              <DropdownMenu>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 max-w-44 shrink-0 gap-1.5 px-2 text-xs font-medium data-[state=open]:bg-muted" aria-label={`楼层图纸：当前「${activeSheet?.name ?? '全部楼层'}」`}>
+                        <Layers className="size-4 text-muted-foreground" />
+                        <span className="truncate">{activeSheet?.name ?? '全部楼层'}</span>
+                        {missingSheets ? <AlertTriangle className="size-3.5 text-warning" /> : null}
+                        <ChevronDown className="size-3.5 text-muted-foreground" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">楼层图纸</TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent align="start" className="w-64">
+                  <DropdownMenuLabel className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                    楼层图纸
+                    <span className="font-normal tabular-nums">{snap.sheets.length} 张</span>
+                  </DropdownMenuLabel>
+                  {snap.sheets.map((s, idx) => {
+                    const obj = sheetObjs.find((o) => o.sheetId === s.id)
+                    const active = s.id === activeSheetId
+                    return (
+                      <DropdownMenuItem key={s.id} onSelect={() => fitSheet(s.id)} className="gap-2">
+                        <span className={cn('inline-flex h-5 min-w-7 shrink-0 items-center justify-center rounded px-1 text-[10px] font-semibold tabular-nums', active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>
+                          {idx + 1}F
+                        </span>
+                        <span className={cn('min-w-0 flex-1 truncate', active && 'font-semibold')}>{s.name}</span>
+                        {s.missing ? <AlertTriangle className="size-3.5 text-warning" aria-label="图片丢失" /> : null}
+                        {obj?.mmPerUnit ? <Ruler className="size-3 text-muted-foreground" aria-label="已标定比例" /> : null}
+                        <span className="text-xs text-muted-foreground tabular-nums">{scopedPoints.filter((p) => p.sheetId === s.id).length}</span>
+                      </DropdownMenuItem>
+                    )
+                  })}
+                  {snap.sheets.length > 1 ? (
+                    <DropdownMenuItem onSelect={() => fitSheet(null)}>
+                      <Maximize2 />
+                      查看全部楼层总览
+                    </DropdownMenuItem>
+                  ) : null}
+                  {readOnly || !activeSheet ? null : (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel className="truncate text-xs font-normal text-muted-foreground">当前图纸「{activeSheet.name}」</DropdownMenuLabel>
+                      <DropdownMenuItem onSelect={() => setRenaming({ id: activeSheet.sheetId, name: activeSheet.name })}>
+                        <PencilLine />
+                        重命名
+                      </DropdownMenuItem>
+                      {activeSheet.mmPerUnit ? (
+                        <DropdownMenuItem onSelect={() => commit((d) => updateSheet(d, activeSheet.sheetId, { mmPerUnit: null }))}>
+                          <Eraser />
+                          清除比例标定
+                        </DropdownMenuItem>
+                      ) : null}
+                      <DropdownMenuItem variant="destructive" onSelect={() => setConfirmDelete(activeSheet.sheetId)}>
+                        <Trash2 />
+                        删除图纸
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-border" />
+            </>
+          ) : null}
+          <div className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5" role="toolbar" aria-label="画布编辑工具">
+            {BOARD_TOOLS.filter((t) => !t.edit || !readOnly).map((t) => {
+              const active = tool === t.id && !armed
+              return (
+                <Tooltip key={t.id}>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-pressed={active}
+                      aria-label={t.label}
+                      onClick={() => {
+                        setArmed(null)
+                        if (t.id === 'calibrate') startCalibrate()
+                        else setTool(t.id)
+                      }}
+                      className={cn(
+                        'inline-flex size-7 items-center justify-center rounded-md transition-[color,background-color,box-shadow] duration-150 ease-out-quart focus-visible:ring-3 focus-visible:ring-ring/35 focus-visible:outline-none',
+                        active ? 'bg-background text-foreground shadow-xs dark:bg-accent' : 'text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      <t.icon className="size-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    {t.label}
+                    <Kbd>{t.key}</Kbd>
+                  </TooltipContent>
+                </Tooltip>
+              )
+            })}
+          </div>
           {readOnly ? null : (
             <>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={!snap.sheets.length || !!cropFile}
-                onClick={() => setAutoGenOpen(true)}
-                title="根据房间区域智能生成全屋点位（会覆盖当前点位，支持一键撤销）"
-              >
-                <Sparkles className="size-4 text-primary" />
-                <span>智能生成点位</span>
-              </Button>
-              {board.canUndo ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={board.undo}
-                  title="撤销上一步操作（Ctrl/⌘ + Z）"
-                >
-                  <Undo2 className="size-4" />
-                  <span className="hidden sm:inline">撤销</span>
-                </Button>
-              ) : null}
-              <Button variant="outline" size="sm" disabled={!!cropFile} onClick={() => fileInput.current?.click()} aria-label="添加图纸" title="添加图纸"><ImagePlus className="size-4" /><span className="hidden sm:inline">添加图纸</span></Button>
-              {dwgEnabled ? (
-                <Button variant="outline" size="sm" disabled={converting || !!cropFile} onClick={() => dwgInput.current?.click()} aria-label="导入 DWG" title="导入 DWG">
-                  {converting ? <Loader2 className="size-4 animate-spin" /> : <FileUp className="size-4" />}<span className="hidden sm:inline">导入 DWG</span>
-                </Button>
-              ) : null}
+              <ToolbarIconButton label="撤销（Ctrl/⌘ + Z）" disabled={!board.canUndo} onClick={board.undo}>
+                <Undo2 />
+              </ToolbarIconButton>
+              <ToolbarIconButton label="重做（Ctrl/⌘ + Shift + Z）" disabled={!board.canRedo} onClick={board.redo}>
+                <Redo2 />
+              </ToolbarIconButton>
             </>
           )}
+        </div>
+
+        {/* 中：随当前状态只突出一个主操作——上传户型图 → 风格化 → 生成点位 */}
+        {readOnly ? (
+          <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+            <MapPinned className="size-3.5" />
+            <span className="font-medium text-fg-secondary">{activeSheet?.name ?? '点位图'}</span>
+            <Badge variant="secondary">只读</Badge>
+          </div>
+        ) : (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <div className="flex items-center">
+              {/* 还没有图纸时它是主操作，带文字；有图纸后退为图标（新增楼层），只让当前步骤带文字 */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={primaryAction === 'upload' ? 'default' : 'outline'}
+                    size={snap.sheets.length ? 'icon' : 'default'}
+                    disabled={!!cropFile}
+                    onClick={() => fileInput.current?.click()}
+                    aria-label={snap.sheets.length ? '上传户型图（新增楼层）' : undefined}
+                    className={cn(dwgEnabled && 'rounded-r-none')}
+                  >
+                    <ImagePlus />
+                    {snap.sheets.length ? null : '上传户型图'}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{snap.sheets.length ? '上传户型图，新增一个楼层' : '上传 PNG / JPG 户型图，自动裁切'}</TooltipContent>
+              </Tooltip>
+              {dwgEnabled ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant={primaryAction === 'upload' ? 'default' : 'outline'}
+                      size="icon"
+                      disabled={converting || !!cropFile}
+                      aria-label="更多图纸导入方式"
+                      className={cn('w-7 rounded-l-none', primaryAction === 'upload' ? 'border-l-primary-foreground/20' : '-ml-px')}
+                    >
+                      {converting ? <Loader2 className="animate-spin" /> : <ChevronDown />}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="center">
+                    <DropdownMenuItem onSelect={() => fileInput.current?.click()}>
+                      <ImagePlus />
+                      上传图片户型图（PNG / JPG）
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => dwgInput.current?.click()}>
+                      <FileUp />
+                      导入 CAD 图纸（.dwg）
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
+            </div>
+
+            <div className="flex items-center">
+              <Button
+                variant={primaryAction === 'stylize' ? 'default' : 'outline'}
+                disabled={!snap.sheets.length || !!cropFile}
+                onClick={() => applySheetStyle(isStylized ? 'cad' : 'warm')}
+                className="rounded-r-none"
+                title={isStylized ? `当前：${SHEET_STYLE_META[sheetStyle].label}，点击恢复原始 CAD 底图` : '将户型底图与房间区域一键渲染为彩平图'}
+              >
+                {isStylized ? <span aria-hidden className="size-2.5 rounded-full ring-1 ring-black/10" style={{ background: STYLE_DOT[sheetStyle] }} /> : <Palette />}
+                {isStylized ? SHEET_STYLE_META[sheetStyle].label : '风格化'}
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant={primaryAction === 'stylize' ? 'default' : 'outline'}
+                    size="icon"
+                    disabled={!snap.sheets.length || !!cropFile}
+                    aria-label="选择彩平图风格"
+                    className={cn('w-7 rounded-l-none', primaryAction === 'stylize' ? 'border-l-primary-foreground/20' : '-ml-px')}
+                  >
+                    <ChevronDown />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="center" className="w-56">
+                  {(['warm', 'modern', 'blueprint', 'cad'] as SheetStyle[]).map((st) => (
+                    <DropdownMenuItem key={st} onSelect={() => applySheetStyle(st)} className="gap-2.5">
+                      <span aria-hidden className="size-3 shrink-0 rounded-full ring-1 ring-black/10" style={{ background: STYLE_DOT[st] }} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium">{SHEET_STYLE_META[st].label}</span>
+                        <span className="block text-xs text-muted-foreground">{SHEET_STYLE_META[st].desc}</span>
+                      </span>
+                      {sheetStyle === st ? <Check className="text-primary" /> : null}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            <Button
+              variant={primaryAction === 'generate' ? 'default' : 'outline'}
+              disabled={!snap.sheets.length || !!cropFile}
+              onClick={() => setAutoGenOpen(true)}
+              title="根据房间区域智能生成全屋点位（会覆盖当前点位，支持一键撤销）"
+            >
+              <Sparkles />
+              生成点位
+            </Button>
+          </div>
+        )}
+
+        <div className="flex min-w-max flex-1 items-center justify-end gap-1">
+          {readOnly ? null : (
+            <ToolbarIconButton label={mobilePlaceOpen ? '收起设备面板' : '放置设备'} pressed={mobilePlaceOpen} className="lg:hidden" onClick={() => setMobilePlaceOpen((v) => !v)}>
+              <MapPinPlus />
+            </ToolbarIconButton>
+          )}
+          <BoardViewPopover view={view} onView={setView} pack={pack} highlighted={scope !== 'all'}>
+            <section className="space-y-2 border-b border-border px-3 py-3 text-xs">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">显示范围</span>
+                <span className="text-[11px] text-muted-foreground tabular-nums">{scopedPoints.length} 个点位</span>
+              </div>
+              <div className="grid grid-cols-4 gap-0.5 rounded-lg bg-muted p-0.5" role="radiogroup" aria-label="显示范围">
+                {POINT_SCOPES.map(({ value: v, label }) => (
+                  <button
+                    key={v}
+                    type="button"
+                    role="radio"
+                    aria-checked={scope === v}
+                    className={cn(
+                      'h-6 rounded-md px-1 text-[11px] whitespace-nowrap transition-all',
+                      scope === v ? 'bg-background font-semibold text-primary shadow-2xs' : 'text-muted-foreground hover:text-foreground',
+                    )}
+                    onClick={() => {
+                      setScope(v)
+                      setSelection(new Set())
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="px-1 text-[11px] text-muted-foreground">只显示所选专业的点位，同步报价也按这个范围。</p>
+            </section>
+          </BoardViewPopover>
+          <div className="hidden items-center rounded-lg bg-muted p-0.5 md:flex">
+            <Button variant="ghost" size="icon-xs" className="size-7 text-muted-foreground hover:bg-background" aria-label="缩小" onClick={() => zoomBy(1 / 1.2)}>
+              <Minus className="size-3.5" />
+            </Button>
+            <button
+              type="button"
+              onClick={() => fitSheet(activeSheetId)}
+              title="图纸铺满画布（100%，Ctrl/⌘ + 0）"
+              className="h-7 min-w-11 rounded-md px-1 text-center text-xs font-medium text-fg-secondary tabular-nums transition-colors hover:bg-background hover:text-foreground"
+            >
+              {zoomPct}%
+            </button>
+            <Button variant="ghost" size="icon-xs" className="size-7 text-muted-foreground hover:bg-background" aria-label="放大" onClick={() => zoomBy(1.2)}>
+              <Plus className="size-3.5" />
+            </Button>
+          </div>
+          <ToolbarIconButton label={isFullscreen ? '退出全屏' : '全屏画布'} onClick={() => void toggleFullscreen()}>
+            {isFullscreen ? <Minimize2 /> : <Maximize2 />}
+          </ToolbarIconButton>
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="text-muted-foreground data-[state=open]:bg-muted data-[state=open]:text-foreground" aria-label="导出 / 导入">
+                    <Download />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">导出 / 导入</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end" className="w-60">
+              <DropdownMenuItem onSelect={() => void exportPng()}>
+                <ImageDown />
+                导出当前图纸 PNG（{pack.paper}，含图例）
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={exportJson}>
+                <FileJson />
+                导出画板 JSON
+              </DropdownMenuItem>
+              {readOnly ? null : (
+                <DropdownMenuItem onSelect={() => jsonInput.current?.click()}>
+                  <FileUp />
+                  导入画板 JSON
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <span aria-hidden className="mx-1 h-5 w-px bg-border" />
           {readOnly ? (
-            activeQuote ? <Button variant="outline" size="sm" onClick={() => void switchToQuote()}><ReceiptText className="size-4" />查看报价</Button> : null
+            activeQuote ? (
+              <Button variant="outline" onClick={() => void switchToQuote()}>
+                <ReceiptText />
+                查看报价
+              </Button>
+            ) : null
           ) : (
             <>
               <div className="flex items-center">
-                <Button variant="outline" size="sm" className={quotes.length ? 'rounded-r-none border-r-0' : undefined} disabled={saving || syncingQuote || !scopedPoints.length} onClick={() => void switchToQuote()} title={activeQuote ? `把点位同步到「${activeQuote.title}」并打开` : undefined}>
-                  {syncingQuote ? <Loader2 className="size-4 animate-spin" /> : activeQuote ? <ArrowLeftRight className="size-4" /> : <FilePlus2 className="size-4" />}
-                  {activeQuote ? `同步到报价${scope === 'all' ? '' : `（${pointScopeLabel(scope)}）`}` : scope === 'all' ? '生成报价' : `生成报价（${pointScopeLabel(scope)}）`}
+                <Button
+                  variant="outline"
+                  className={cn(quotes.length && 'rounded-r-none')}
+                  disabled={saving || syncingQuote || !scopedPoints.length}
+                  onClick={() => void switchToQuote()}
+                  title={activeQuote ? `把${scope === 'all' ? '全部' : `「${pointScopeLabel(scope)}」`}点位同步到「${activeQuote.title}」并打开` : '按当前点位生成报价'}
+                >
+                  {syncingQuote ? <Loader2 className="animate-spin" /> : activeQuote ? <ArrowLeftRight /> : <FilePlus2 />}
+                  {activeQuote ? '同步报价' : '生成报价'}
                 </Button>
                 {quotes.length ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="rounded-l-none px-1.5" disabled={saving || syncingQuote} aria-label="选择要同步的报价，或新建报价"><ChevronDown className="size-3.5" /></Button>
+                      <Button variant="outline" size="icon" className="-ml-px w-7 rounded-l-none" disabled={saving || syncingQuote} aria-label="选择要同步的报价，或新建报价">
+                        <ChevronDown />
+                      </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align="end" className="w-72">
                       {quotes.map((q) => (
                         <DropdownMenuItem key={q.id} disabled={!scopedPoints.length} onSelect={() => void switchToQuote(q.id)}>
-                          <span className={cn('flex-1 truncate', q.id === activeQuote?.id && 'font-semibold')}>同步到「{q.title}」</span>
+                          <span className={cn('min-w-0 flex-1 truncate', q.id === activeQuote?.id && 'font-semibold')}>同步到「{q.title}」</span>
                           <span className="ml-3 text-xs text-muted-foreground tabular-nums">{yuan(q.total)}</span>
                         </DropdownMenuItem>
                       ))}
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem disabled={!scopedPoints.length} onSelect={() => void createNewQuote()}><FilePlus2 className="size-4" />新建一份报价（{pointScopeLabel(scope)}）</DropdownMenuItem>
+                      <DropdownMenuItem disabled={!scopedPoints.length} onSelect={() => void createNewQuote()}>
+                        <FilePlus2 />
+                        新建一份报价（{pointScopeLabel(scope)}）
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : null}
               </div>
-              <Button size="sm" disabled={saving} onClick={() => void save()}>{saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}保存</Button>
+              <Button
+                variant={dirty ? 'outline' : 'ghost'}
+                disabled={saving || (!dirty && !saving)}
+                onClick={() => void save()}
+                className={cn('min-w-20', !dirty && 'text-muted-foreground disabled:opacity-100')}
+                title={dirty ? '保存点位图（Ctrl/⌘ + S）' : '所有修改已保存'}
+              >
+                {saving ? <Loader2 className="animate-spin" /> : dirty ? <span aria-hidden className="size-1.5 rounded-full bg-warning" /> : <Check className="text-success" />}
+                {saving ? '保存中' : dirty ? '保存' : '已保存'}
+              </Button>
             </>
           )}
         </div>
@@ -1000,68 +1343,10 @@ export function PointMapEditor({
 
       {cropFile ? <SheetCropper file={cropFile} onCancel={cancelCrop} onConfirm={addSheet} /> : null}
 
+      {/* ==================== 主体：户型图画布 + 右栏（设备与属性） ==================== */}
       <div className={cn('flex min-h-0 flex-1 flex-col lg:flex-row', cropFile && 'hidden')}>
+        {/* 中央主视野：户型图画布 */}
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex items-center gap-1 overflow-x-auto border-b px-3 py-1.5">
-            <span className="mr-1 flex shrink-0 items-center gap-1 text-xs text-muted-foreground"><Layers className="size-3.5" />图纸</span>
-            {snap.sheets.map((s) => {
-              const obj = sheetObjs.find((o) => o.sheetId === s.id)
-              return renaming?.id === s.id ? (
-                <Input key={s.id} autoFocus value={renaming.name} maxLength={40} aria-label="图纸名称" className="h-7 w-44" onChange={(e) => setRenaming({ id: s.id, name: e.target.value })} onBlur={() => renameSheet(s.id, renaming.name)} onKeyDown={(e) => { if (e.key === 'Enter') renameSheet(s.id, renaming.name); if (e.key === 'Escape') setRenaming(null) }} />
-              ) : (
-                <div key={s.id} className={cn('flex shrink-0 items-center rounded-md', s.id === activeSheetId && 'bg-secondary')}>
-                  <Button variant="ghost" size="sm" className={cn('pr-1.5', s.id === activeSheetId && 'font-semibold')} onClick={() => fitSheet(s.id)}>
-                    {s.missing ? <AlertTriangle className="size-3.5 text-warning" /> : null}
-                    {s.name}
-                    {obj?.mmPerUnit ? <Ruler className="size-3 text-muted-foreground" aria-label="已标定" /> : null}
-                    <span className="text-xs font-normal text-muted-foreground tabular-nums">{scopedPoints.filter((p) => p.sheetId === s.id).length}</span>
-                  </Button>
-                  {readOnly ? null : (
-                    <DropdownMenu onOpenChange={(open) => !open && setConfirmDelete(null)}>
-                      <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-xs" aria-label={`图纸「${s.name}」的操作`}><ChevronDown /></Button></DropdownMenuTrigger>
-                      <DropdownMenuContent align="start">
-                        <DropdownMenuItem onSelect={() => setRenaming({ id: s.id, name: s.name })}>重命名</DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => { fitSheet(s.id); startCalibrate() }}>{obj?.mmPerUnit ? '重新标定比例' : '标定比例'}</DropdownMenuItem>
-                        {obj?.mmPerUnit ? <DropdownMenuItem onSelect={() => commit((d) => updateSheet(d, s.id, { mmPerUnit: null }))}>清除标定</DropdownMenuItem> : null}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem variant="destructive" onSelect={(e) => { if (confirmDelete !== s.id) { e.preventDefault(); setConfirmDelete(s.id) } else deleteSheet(s.id) }}>
-                          {confirmDelete === s.id ? <><Check />确认删除（含 {snap.points.filter((p) => p.sheetId === s.id).length} 个点位）</> : '删除图纸'}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-              )
-            })}
-            {readOnly ? null : <Button variant="ghost" size="sm" className="shrink-0 text-muted-foreground" onClick={() => fileInput.current?.click()}><Plus className="size-4" />添加</Button>}
-            <div className="ml-auto flex shrink-0 items-center gap-0.5 pl-2">
-              {!readOnly ? (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="mr-1 lg:hidden"
-                  onClick={() => setMobilePlaceOpen((v) => !v)}
-                >
-                  <Plus className="size-4" />
-                  放置设备
-                </Button>
-              ) : null}
-              <Button variant="ghost" size="icon-sm" aria-label="缩小" onClick={() => zoomBy(1 / 1.2)}><Minus className="size-4" /></Button>
-              <Button variant="ghost" size="sm" className="min-w-14 tabular-nums" title="图纸铺满画布（100%，Ctrl/⌘ + 0）" onClick={() => fitSheet(activeSheetId)}>{zoomPct}%</Button>
-              <Button variant="ghost" size="icon-sm" aria-label="放大" onClick={() => zoomBy(1.2)}><Plus className="size-4" /></Button>
-              {snap.sheets.length > 1 ? <Button variant="ghost" size="sm" onClick={() => fitSheet(null)}><Maximize2 className="size-4" />全部</Button> : null}
-              <Button
-                variant={isFullscreen ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => void toggleFullscreen()}
-                title={isFullscreen ? '退出全屏' : '全屏画布（手机端自动尝试横屏）'}
-              >
-                {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-                <span className="hidden sm:inline">{isFullscreen ? '退出全屏' : '全屏'}</span>
-              </Button>
-            </div>
-          </div>
-
           <div className="point-map-canvas relative min-h-0 flex-1">
             <BoardCanvas
               doc={doc}
@@ -1080,7 +1365,7 @@ export function PointMapEditor({
               }}
               hidden={hidden}
               readOnly={readOnly}
-              dark={resolvedTheme === 'dark'}
+              dark={mounted && resolvedTheme === 'dark'}
               ready={ready}
               activeSheetId={activeSheetId}
               onCommit={commit}
@@ -1091,27 +1376,6 @@ export function PointMapEditor({
               onContextMenu={onContextMenu}
               dropType={DRAG_TYPE}
               onDrop={onDrop}
-            />
-            <BoardToolbar
-              tool={tool}
-              onTool={(t) => {
-                setArmed(null)
-                if (t === 'calibrate') startCalibrate()
-                else setTool(t)
-              }}
-              view={view}
-              onView={setView}
-              pack={pack}
-              readOnly={readOnly}
-              canUndo={board.canUndo}
-              canRedo={board.canRedo}
-              onUndo={board.undo}
-              onRedo={board.redo}
-              onAutoGenerate={!readOnly && snap.sheets.length ? () => setAutoGenOpen(true) : undefined}
-              onExportPng={() => void exportPng()}
-              onExportJson={exportJson}
-              onImportJson={() => jsonInput.current?.click()}
-              offset={view.rulers}
             />
             {armed || tool === 'area' || tool === 'calibrate' ? (
               <div className="absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-primary/30 bg-background/95 px-3 py-1.5 text-xs shadow-sm">
@@ -1137,16 +1401,6 @@ export function PointMapEditor({
                 onFitSheet={() => fitSheet(activeSheetId)}
               />
             ) : null}
-            {snap.points.length ? (
-              <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-xl border bg-background/95 p-1 pl-2.5 shadow-sm">
-                <Eye className="size-3.5 text-muted-foreground" />
-                <div className="flex rounded-lg bg-muted p-0.5" role="radiogroup" aria-label="显示范围">
-                  {POINT_SCOPES.map(({ value: v, label }) => (
-                    <Button key={v} size="xs" variant="ghost" role="radio" aria-checked={scope === v} className={cn('h-6 rounded-md px-2', scope === v && 'bg-background shadow-sm')} onClick={() => { setScope(v); setSelection(new Set()) }}>{label}</Button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
             {draft ? (
               <div className="absolute top-16 left-1/2 z-10 flex max-w-xl -translate-x-1/2 items-center gap-2 rounded-lg border border-primary/30 bg-background px-3 py-2 text-xs shadow-sm">
                 <Info className="size-4 shrink-0 text-primary" />
@@ -1163,15 +1417,13 @@ export function PointMapEditor({
             ) : null}
             {ready && !snap.sheets.length && !readOnly ? (
               <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center p-6">
-                <div className="pointer-events-auto flex max-w-sm flex-col items-center gap-3 rounded-xl border border-dashed bg-background/95 p-6 text-center shadow-sm">
-                  <ImagePlus className="size-8 text-muted-foreground" />
+                <div className="flex max-w-sm flex-col items-center gap-3 rounded-xl border border-dashed border-border-strong bg-background/95 p-6 text-center shadow-xs">
+                  <ImagePlus className="size-8 text-primary" />
                   <div className="space-y-1">
                     <p className="text-sm font-semibold">先添加户型图</p>
-                    <p className="text-xs text-muted-foreground">支持 PNG / JPG 户型图，自动裁切适配标准图纸。</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={() => fileInput.current?.click()}><ImagePlus className="size-4" />添加图纸</Button>
-                    {dwgEnabled ? <Button size="sm" variant="outline" onClick={() => dwgInput.current?.click()}><FileUp className="size-4" />导入 DWG</Button> : null}
+                    <p className="text-xs text-muted-foreground">
+                      点顶部的「上传户型图」添加 PNG / JPG 户型图{dwgEnabled ? '，或从旁边的箭头导入 DWG 图纸' : ''}，会自动裁切适配标准图纸。
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1179,18 +1431,20 @@ export function PointMapEditor({
           </div>
         </div>
 
+        {/* 右栏：设备与属性检查器 */}
         <aside
           className={cn(
-            'point-map-aside flex w-full shrink-0 flex-col border-t bg-background lg:max-h-none lg:w-84 lg:border-t-0 lg:border-l',
+            'point-map-aside flex w-full shrink-0 flex-col border-t border-border bg-background lg:max-h-none lg:w-72 lg:border-t-0 lg:border-l',
             mobilePlaceOpen ? 'fixed inset-x-0 bottom-0 z-40 max-h-[70svh] rounded-t-2xl border shadow-xl lg:static lg:z-auto lg:rounded-none lg:shadow-none' : 'hidden lg:flex',
           )}
         >
-          <div className="flex items-center justify-between border-b px-4 py-2 lg:hidden">
+          <div className="flex items-center justify-between border-b border-border px-4 py-2 lg:hidden">
             <span className="text-xs font-semibold">选择要放置的设备</span>
             <Button variant="ghost" size="icon-xs" onClick={() => setMobilePlaceOpen(false)} aria-label="关闭放置面板">
               <X className="size-4" />
             </Button>
           </div>
+          {/* 置顶上下文属性面板 */}
           {selectedPoint && selectedSymbol ? (
             <>
               <SelectedPoint
@@ -1203,13 +1457,13 @@ export function PointMapEditor({
                 onDelete={() => removeIds([selectedPoint.id])}
               />
               {readOnly ? null : (
-                <div className="space-y-2.5 border-b bg-muted/40 px-4 pb-4">
+                <div className="space-y-2.5 border-b border-border bg-subtle/80 px-3.5 pb-3.5">
                   {variant ? (
                     <div className="grid gap-1.5">
-                      <div className="text-xs font-medium text-muted-foreground">{variant.family.name} · 尺寸</div>
+                      <div className="text-[11px] font-medium text-muted-foreground">{variant.family.name} · 尺寸</div>
                       <div className="flex gap-2">
                         <Select value={selectedSymbol.symbolId} onValueChange={(id) => { const v = variant.family.variants.find((x) => x.id === id); if (v) commit((d) => setPointVariant(d, selectedSymbol.id, v, selectedSymbol.real)) }}>
-                          <SelectTrigger className="flex-1 bg-background"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="h-8 flex-1 border-border bg-background text-xs"><SelectValue /></SelectTrigger>
                           <SelectContent>{variant.family.variants.map((v) => <SelectItem key={v.id} value={v.id}>{v.label}</SelectItem>)}</SelectContent>
                         </Select>
                         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -1220,15 +1474,15 @@ export function PointMapEditor({
                     </div>
                   ) : null}
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-muted-foreground">旋转</span>
-                    <Button variant="outline" size="icon-sm" aria-label="逆时针旋转 90°" onClick={() => rotate([selectedSymbol.id], -90)}><RotateCcw className="size-3.5" /></Button>
-                    <Button variant="outline" size="icon-sm" aria-label="顺时针旋转 90°（R）" title="顺时针 90°（R）" onClick={() => rotate([selectedSymbol.id], 90)}><RotateCw className="size-3.5" /></Button>
+                    <span className="text-[11px] font-medium text-muted-foreground">旋转</span>
+                    <Button variant="outline" size="icon-sm" className="size-7 border-border bg-background" aria-label="逆时针旋转 90°" onClick={() => rotate([selectedSymbol.id], -90)}><RotateCcw className="size-3.5" /></Button>
+                    <Button variant="outline" size="icon-sm" className="size-7 border-border bg-background" aria-label="顺时针旋转 90°（R）" title="顺时针 90°（R）" onClick={() => rotate([selectedSymbol.id], 90)}><RotateCw className="size-3.5" /></Button>
                     <Input
                       key={`${selectedSymbol.id}-${selectedSymbol.angle}`}
                       defaultValue={toDeg(selectedSymbol.angle)}
                       inputMode="numeric"
                       aria-label="旋转角度"
-                      className="h-8 w-16 bg-background text-xs tabular-nums"
+                      className="h-7 w-14 border-border bg-background text-xs tabular-nums"
                       onBlur={(e) => { const v = Number(e.target.value); if (Number.isFinite(v)) commit((d) => rotateSymbols(d, [selectedSymbol.id], { absolute: fromDeg(v) })) }}
                       onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()}
                     />
@@ -1240,8 +1494,8 @@ export function PointMapEditor({
           ) : selectedArea ? (
             <SelectedArea area={selectedArea} analysis={analysis.get(selectedArea.id)} readOnly={readOnly} onChange={(patch) => updateArea(selectedArea.id, patch)} onDelete={() => removeIds([selectedArea.id])} onClose={closeSelectedArea} />
           ) : selectedIds.length > 1 ? (
-            <div className="flex items-center justify-between gap-2 border-b bg-muted/40 p-4 text-sm">
-              <span>已选 {selectedIds.length} 个对象</span>
+            <div className="flex items-center justify-between gap-2 border-b border-border bg-subtle/80 p-3.5 text-xs font-medium">
+              <span className="text-primary">已选 {selectedIds.length} 个对象</span>
               {readOnly ? null : (
                 <div className="flex gap-1">
                   <Button variant="ghost" size="xs" onClick={() => rotate(selectedIds, 90)}><RotateCw className="size-3.5" />旋转</Button>
@@ -1251,39 +1505,36 @@ export function PointMapEditor({
             </div>
           ) : null}
 
-          <Tabs value={tab} onValueChange={setTab} className="min-h-0 flex-1 gap-0">
-            {/* 放置是主要工作，独占侧栏；区域和统计不常用，收在放置面板底部，打开后可一键返回 */}
-            {readOnly ? (
-              <TabsList className="mx-4 mt-3 grid w-auto grid-cols-2">
-                <TabsTrigger value="areas" className="text-xs">区域</TabsTrigger>
-                <TabsTrigger value="summary" className="text-xs">统计</TabsTrigger>
+          {/* 右栏主体：一层分段（设备 / 灯光 / 区域 / 统计）；同步报价只在顶栏 */}
+          <Tabs value={tab} onValueChange={(v) => setTab(v as PanelTab)} className="min-h-0 flex-1 gap-0">
+            <div className="border-b border-border px-3 py-2.5">
+              <TabsList className={cn('grid w-full', readOnly ? 'grid-cols-2' : 'grid-cols-4')} aria-label="设备与属性">
+                {readOnly ? null : (
+                  <>
+                    <TabsTrigger value="devices" className="text-xs">设备</TabsTrigger>
+                    <TabsTrigger value="lighting" className="text-xs">灯光</TabsTrigger>
+                  </>
+                )}
+                <TabsTrigger value="areas" className="gap-1 text-xs">
+                  区域
+                  <span className="text-[11px] font-normal text-muted-foreground tabular-nums">{snap.areas.length}</span>
+                </TabsTrigger>
+                <TabsTrigger value="summary" className="gap-1 text-xs">
+                  统计
+                  {issues.some((i) => i.level !== 'info') ? <span aria-label="有需要处理的检查项" className="size-1.5 rounded-full bg-warning" /> : null}
+                </TabsTrigger>
               </TabsList>
-            ) : tab !== 'place' ? (
-              <div className="mx-4 mt-3 flex items-center justify-between">
-                <Button variant="ghost" size="xs" onClick={() => setTab('place')}><ChevronLeft className="size-3.5" />返回放置</Button>
-                <span className="text-xs font-medium">{tab === 'areas' ? '区域' : '统计'}</span>
-              </div>
-            ) : null}
+            </div>
 
             {readOnly ? null : (
-              <TabsContent value="place" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                <div className="mx-4 mt-3 flex rounded-lg bg-muted p-0.5" role="radiogroup" aria-label="符号库">
-                  {(['devices', 'lighting'] as const).map((t) => (
-                    <Button key={t} size="xs" variant="ghost" role="radio" aria-checked={placeTab === t} className={cn('h-7 flex-1 rounded-md', placeTab === t && 'bg-background shadow-sm')} onClick={() => setPlaceTab(t)}>{t === 'devices' ? '智能设备' : '灯光设计'}</Button>
-                  ))}
-                </div>
-                {placeTab === 'devices' ? (
+              <>
+                <TabsContent value="devices" className="flex min-h-0 flex-1 flex-col overflow-hidden">
                   <PlacePanel groups={filteredGroups} query={query} onQuery={setQuery} counts={summary.byType} armed={armedDevice} onArm={(t) => { setTool('select'); setArmed(t ? deviceTpl(t) : null); setMobilePlaceOpen(false) }} disabled={!snap.sheets.length} />
-                ) : (
+                </TabsContent>
+                <TabsContent value="lighting" className="flex min-h-0 flex-1 flex-col overflow-hidden">
                   <LightingPanel armedId={armed && !armedDevice ? armed.symbolId : null} onArm={(tpl) => { setTool('select'); setArmed(tpl); setMobilePlaceOpen(false) }} disabled={!snap.sheets.length} calibrated={!!activeSheet?.mmPerUnit} />
-                )}
-                <div className="mt-auto flex gap-1 border-t px-3 py-2">
-                  <Button variant="ghost" size="xs" className="flex-1 text-muted-foreground" onClick={() => setTab('areas')}>区域</Button>
-                  <Button variant="ghost" size="xs" className="flex-1 text-muted-foreground" onClick={() => setTab('summary')}>
-                    统计{issues.some((i) => i.level !== 'info') ? <span className="size-1.5 rounded-full bg-warning" /> : null}
-                  </Button>
-                </div>
-              </TabsContent>
+                </TabsContent>
+              </>
             )}
 
             <TabsContent value="areas" className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -1292,12 +1543,12 @@ export function PointMapEditor({
 
             <TabsContent value="summary" className="flex min-h-0 flex-1 flex-col overflow-hidden">
               <ScrollArea className="min-h-0 flex-1">
-                <div className="space-y-2 p-4">
+                <div className="space-y-2 p-3.5">
                   {issues.length ? (
                     <section className="mb-3 space-y-1">
-                      <h2 className="text-sm font-semibold">图纸检查</h2>
+                      <h2 className="text-xs font-semibold text-fg-secondary">图纸检查</h2>
                       {issues.map((i) => (
-                        <button key={i.id} type="button" onClick={() => focusTargets(i.targets)} className="flex w-full items-start gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition-colors hover:bg-accent">
+                        <button key={i.id} type="button" onClick={() => focusTargets(i.targets)} className="flex w-full items-start gap-2 rounded-lg border border-border bg-background px-2.5 py-2 text-left text-xs transition-colors hover:bg-subtle">
                           {i.level === 'info' ? <Info className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" /> : <CircleAlert className={cn('mt-0.5 size-3.5 shrink-0', i.level === 'error' ? 'text-destructive' : 'text-warning')} />}
                           <span className="min-w-0">
                             <span className="block font-medium">{i.title}</span>
@@ -1308,27 +1559,59 @@ export function PointMapEditor({
                     </section>
                   ) : null}
                   <div className="flex items-baseline justify-between">
-                    <h2 className="text-sm font-semibold">设备统计{scope !== 'all' ? ` · ${pointScopeLabel(scope)}` : ''}</h2>
-                    <span className="text-xs text-muted-foreground tabular-nums">共 {scopedPoints.length} 个点位</span>
+                    <h2 className="text-xs font-semibold text-fg-secondary">设备统计{scope !== 'all' ? ` · ${pointScopeLabel(scope)}` : ''}</h2>
+                    <span className="text-[11px] text-muted-foreground tabular-nums">共 {scopedPoints.length} 个点位</span>
                   </div>
                   {typesInUse.length === 0 ? <p className="text-xs text-muted-foreground">还没有放置设备</p> : null}
                   {typesInUse.map((t) => (
-                    <TypeDefaultRow key={t} type={t} count={summary.byType.get(t) ?? 0} readOnly={readOnly} onArm={(dt) => { setArmed(deviceTpl(dt)); setPlaceTab('devices'); setTab('place') }} />
+                    <TypeDefaultRow key={t} type={t} count={summary.byType.get(t) ?? 0} readOnly={readOnly} onArm={(dt) => { setArmed(deviceTpl(dt)); setTab('devices') }} />
                   ))}
                 </div>
               </ScrollArea>
-              {readOnly ? null : (
-                <div className="border-t p-4">
-                  <Button className="w-full" size="sm" disabled={saving || syncingQuote || !scopedPoints.length} onClick={() => void switchToQuote()}>
-                    {syncingQuote ? <Loader2 className="size-4 animate-spin" /> : activeQuote ? <ArrowLeftRight className="size-4" /> : <FilePlus2 className="size-4" />}
-                    {activeQuote ? `同步并打开报价单${scope === 'all' ? '' : `（${pointScopeLabel(scope)}）`}` : scope === 'all' ? '生成报价' : `生成报价（${pointScopeLabel(scope)}）`}
-                  </Button>
-                </div>
-              )}
             </TabsContent>
           </Tabs>
         </aside>
       </div>
+
+      <Dialog open={!!renaming} onOpenChange={(o) => !o && setRenaming(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>重命名图纸</DialogTitle>
+            <DialogDescription>名称显示在楼层菜单、导出图纸和报价的区域分组里。</DialogDescription>
+          </DialogHeader>
+          <form
+            id="rename-sheet"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (renaming) renameSheet(renaming.id, renaming.name)
+            }}
+          >
+            <Input autoFocus value={renaming?.name ?? ''} maxLength={40} aria-label="图纸名称" onChange={(e) => setRenaming((r) => (r ? { ...r, name: e.target.value } : r))} />
+          </form>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenaming(null)}>取消</Button>
+            <Button type="submit" form="rename-sheet" disabled={!renaming?.name.trim()}>保存</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>删除图纸「{snap.sheets.find((x) => x.id === confirmDelete)?.name ?? ''}」？</DialogTitle>
+            <DialogDescription>
+              图纸上的 {snap.points.filter((p) => p.sheetId === confirmDelete).length} 个点位会一起删除。删除后可以按 Ctrl/⌘ + Z 撤销。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDelete(null)}>取消</Button>
+            <Button variant="destructive" onClick={() => confirmDelete && deleteSheet(confirmDelete)}>
+              <Trash2 />
+              删除图纸
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!calib} onOpenChange={(o) => !o && setCalib(null)}>
         <DialogContent className="sm:max-w-sm">

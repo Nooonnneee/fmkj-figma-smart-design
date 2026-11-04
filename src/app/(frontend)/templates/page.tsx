@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 }
 
 /** 模板与示例项目很少变动：按小时重新生成；后台修改模板、场景或图片时立即刷新（见 lib/revalidate-templates.ts） */
-export const dynamic = 'force-dynamic'
+export const revalidate = 3600
 
 export default async function TemplatesPage() {
   const [templates, docs, company] = await Promise.all([loadPublicProposalTemplates(), getTemplatePreviewDocs().catch(() => null), getCompanyInfo().catch(() => null)])
@@ -37,7 +37,6 @@ export default async function TemplatesPage() {
       <main>
         <section aria-labelledby="templates-title" className="px-4 pt-20 sm:px-6 sm:pt-28 lg:px-8">
           <div className="mx-auto max-w-6xl">
-            <p className="text-sm font-medium text-muted-foreground">方案模板库</p>
             <h1 id="templates-title" className="mt-4 max-w-3xl text-display font-medium">
               一份点位，{owner.length + construction.length} 种讲法。
             </h1>

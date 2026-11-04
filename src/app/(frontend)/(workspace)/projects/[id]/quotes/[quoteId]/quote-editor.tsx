@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, ArrowLeftRight, ArrowRight, ChevronDown, ChevronLeft, FileSignature, ImageIcon, Layers, Loader2, Lock, MapPinned, Plus, RefreshCw, RotateCcw, Save, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowLeftRight, ArrowRight, CheckSquare, ChevronDown, ChevronLeft, Eye, EyeOff, FileSignature, ImageIcon, Layers, ListFilter, Loader2, Lock, MapPinned, Percent, Plus, RefreshCw, RotateCcw, Save, Search, Sparkles, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { DeviceSymbol } from '@/components/device-symbol'
@@ -14,6 +14,7 @@ import { ProductThumb } from '@/components/product-thumb'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
@@ -28,6 +29,7 @@ import { registerLeaveGuard } from '@/lib/leave-guard'
 import { inferScopeFromTitle, POINT_SCOPES, type PointScope } from '@/lib/point-scopes'
 import type { StoredScene } from '@/lib/point-scene'
 import { buildQuoteFloorGroups } from '@/lib/quote-areas'
+import { DEFAULT_COST_SETTINGS, marginSummary, rateLabel, unitCostOf, type CostProduct, type CostSettings, type MarginSummary, type UnitCost } from '@/lib/quote-costs'
 import { QUOTE_STATUSES, quoteTotals, yuan } from '@/lib/quotes'
 import { cn } from '@/lib/utils'
 
@@ -65,6 +67,8 @@ type Fee = { key: string; name: string; amount: number }
 type QuoteState = { id: string; title: string; status: string; discount: number; notes: string; items: Line[]; fees: Fee[] }
 
 const toNum = (v: string) => (v.trim() === '' ? 0 : Number(v))
+/** 表格单元格里的数字输入：平时像文字，悬停 / 聚焦时才显示输入框（行内编辑） */
+const INLINE_NUM = 'border-transparent bg-transparent shadow-none hover:border-input hover:bg-background focus-visible:bg-background dark:bg-transparent dark:hover:bg-input/20'
 
 /** 受控数字输入框：输入时保持原始文本（方便输入小数点），失焦或外部变更时同步数值 */
 function EditableNumber({
@@ -117,6 +121,7 @@ export function QuoteEditor({
   projectDefaults,
   products,
   costs,
+  costSettings = DEFAULT_COST_SETTINGS,
   readOnly,
   lockReason = null,
   contract = null,
@@ -130,6 +135,8 @@ export function QuoteEditor({
   products: ProductOption[]
   /** 产品成本（内部参考，不会打印）；为 null 时不显示成本与毛利。 */
   costs: Record<string, number> | null
+  /** 查看者自己的拿货折扣与毛利率底线（设置 → 报价成本与毛利） */
+  costSettings?: CostSettings
   readOnly: boolean
   /** 只读原因：项目已归档，或报价已用于已签订的合同 */
   lockReason?: string | null
@@ -143,19 +150,22 @@ export function QuoteEditor({
   const [dirty, setDirty] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [swapKey, setSwapKey] = useState<string | null>(null)
+  const [lineQuery, setLineQuery] = useState('')
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set())
   const [saving, startSaving] = useTransition()
   const [syncing, setSyncing] = useState(false)
 
   useEffect(() => {
     setQuote(initial)
     setDirty(false)
+    setSelectedKeys(new Set())
   }, [initial])
 
   const floorGroups = useMemo(
     () => buildQuoteFloorGroups(projectScene, projectDefaults, products, quote.items),
     [projectScene, projectDefaults, products, quote.items],
   )
-  const [viewMode, setViewMode] = useState<'floors' | 'summary'>(() => (floorGroups.length > 0 ? 'floors' : 'summary'))
+  const [viewMode, setViewMode] = useState<'floors' | 'summary'>('summary')
   const [planMode, setPlanMode] = useState<'symbol' | 'product' | 'hide'>('symbol')
   const currentScope = useMemo(() => inferScopeFromTitle(quote.title), [quote.title])
 
@@ -208,19 +218,112 @@ export function QuoteEditor({
   }
 
   const totals = useMemo(() => quoteTotals(quote.items, quote.fees, quote.discount), [quote])
-  const unitCost = (l: Line) => (costs && l.product ? costs[l.product] : undefined)
-  const margin = useMemo(() => {
-    if (!costs) return null
-    let cost = 0
-    let missing = 0
-    for (const l of quote.items) {
-      const c = l.product ? costs[l.product] : undefined
-      if (c === undefined) missing++
-      else cost += c * l.quantity
+  const totalQuantity = useMemo(() => quote.items.reduce((sum, l) => sum + (l.quantity || 0), 0), [quote.items])
+  const filteredItems = useMemo(() => {
+    const q = lineQuery.trim().toLowerCase()
+    if (!q) return quote.items
+    return quote.items.filter((l) => `${l.name} ${l.sku} ${l.deviceType ? deviceTypeLabel(l.deviceType) : ''}`.toLowerCase().includes(q))
+  }, [quote.items, lineQuery])
+  const activeSelectedKeys = useMemo(
+    () => new Set([...selectedKeys].filter((k) => quote.items.some((l) => l.key === k))),
+    [selectedKeys, quote.items],
+  )
+  const selectedSubtotal = useMemo(
+    () => quote.items.filter((l) => activeSelectedKeys.has(l.key)).reduce((s, l) => s + l.price * l.quantity, 0),
+    [quote.items, activeSelectedKeys],
+  )
+  const allFilteredSelected = filteredItems.length > 0 && filteredItems.every((l) => activeSelectedKeys.has(l.key))
+
+  const toggleSelectAllFiltered = (checked: boolean) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev)
+      for (const l of filteredItems) {
+        if (checked) next.add(l.key)
+        else next.delete(l.key)
+      }
+      return next
+    })
+  }
+
+  const toggleSelectLine = (key: string, checked: boolean) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(key)
+      else next.delete(key)
+      return next
+    })
+  }
+
+  const applyBatchDiscount = (rate: number) => {
+    if (!activeSelectedKeys.size) return
+    update({
+      items: quote.items.map((l) => {
+        if (!activeSelectedKeys.has(l.key)) return l
+        const base = catalogPriceOf(l.product) ?? l.price
+        return { ...l, price: Math.round(base * rate * 100) / 100 }
+      }),
+    })
+    toast.success(`已对所选 ${activeSelectedKeys.size} 项设备应用 ${Math.round(rate * 100) / 10} 折`)
+  }
+
+  const restoreBatchOriginPrice = () => {
+    if (!activeSelectedKeys.size) return
+    update({
+      items: quote.items.map((l) => {
+        if (!activeSelectedKeys.has(l.key)) return l
+        const origin = catalogPriceOf(l.product)
+        return origin !== undefined ? { ...l, price: origin } : l
+      }),
+    })
+    toast.success(`已恢复所选 ${activeSelectedKeys.size} 项设备的目录原价`)
+  }
+
+  const deleteBatchSelected = () => {
+    if (!activeSelectedKeys.size) return
+    const count = activeSelectedKeys.size
+    update({ items: quote.items.filter((l) => !activeSelectedKeys.has(l.key)) })
+    setSelectedKeys(new Set())
+    toast.success(`已删除所选 ${count} 项设备`)
+  }
+
+  const roundDownTotal = (unit: 100 | 1000) => {
+    const gross = totals.productTotal + totals.feeTotal
+    if (gross <= unit) return
+    const target = Math.floor(gross / unit) * unit
+    const nextDiscount = Math.max(0, Math.round((gross - target) * 100) / 100)
+    update({ discount: nextDiscount })
+    toast.success(`已自动抹零至 ${yuan(target)}（优惠 ${yuan(nextDiscount)}）`)
+  }
+
+  // 内部成本：品牌拿货折扣 → 产品库成本价 → 默认折扣（见 src/lib/quote-costs.ts）；只在报价台显示，不打印
+  const costProducts = useMemo(
+    () => new Map<string, CostProduct>(products.map((p) => [p.id, { id: p.id, price: p.price, cost: costs?.[p.id] ?? null, brandSlug: p.brand?.slug ?? null }])),
+    [products, costs],
+  )
+  const unitCost = (l: Line): UnitCost | null => (costs && l.product ? unitCostOf(costProducts.get(l.product), costSettings) : null)
+  const margin = useMemo(
+    () => (costs ? marginSummary(quote.items, costProducts, totals.feeTotal, totals.total, costSettings) : null),
+    [costs, quote.items, costProducts, totals.feeTotal, totals.total, costSettings],
+  )
+  // 防窥：当着业主的面打开报价台时，一键隐藏全部内部成本信息（按浏览器记住）
+  const [hideInternal, setHideInternal] = useState(false)
+  useEffect(() => {
+    try {
+      setHideInternal(localStorage.getItem('fmkj:quote:hide-internal') === '1')
+    } catch {
+      /* 存储不可用时默认显示 */
     }
-    const profit = totals.total - cost
-    return { cost, profit, rate: totals.total > 0 ? profit / totals.total : 0, missing }
-  }, [costs, quote.items, totals.total])
+  }, [])
+  const toggleInternal = () =>
+    setHideInternal((v) => {
+      try {
+        localStorage.setItem('fmkj:quote:hide-internal', v ? '0' : '1')
+      } catch {
+        /* 忽略 */
+      }
+      return !v
+    })
+  const showCosts = Boolean(costs) && !hideInternal
 
   useEffect(() => {
     if (!dirty) return
@@ -313,7 +416,7 @@ export function QuoteEditor({
   )
 
   return (
-    <section className="mx-auto flex w-full max-w-5xl flex-col gap-5">
+    <section className="mx-auto flex w-full max-w-6xl flex-col gap-5">
       <SwapProductDialog
         open={Boolean(swapLine)}
         onOpenChange={(o) => !o && setSwapKey(null)}
@@ -323,19 +426,20 @@ export function QuoteEditor({
         canSetDefault={Boolean(project)}
         onConfirm={applySwap}
       />
+      {/* 顶栏操作区（Untitled UI 面包屑 + 主次按钮） */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-1">
-          <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Button asChild variant="ghost" size="sm" className="-ml-2 h-8 text-xs font-medium text-muted-foreground hover:text-foreground">
             <GuardedLink href={`/projects/${project.id}/quotes`}><ChevronLeft className="size-4" />全部报价</GuardedLink>
           </Button>
           {projectQuotes.length > 1 ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" aria-label="切换到项目里的其他报价">
-                  切换<ChevronDown className="size-3.5" />
+                <Button type="button" variant="outline" size="sm" className="h-8 border-border bg-background text-xs font-medium text-fg-secondary shadow-2xs" aria-label="切换到项目里的其他报价">
+                  切换报价 ({projectQuotes.length})<ChevronDown className="size-3.5 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
+              <DropdownMenuContent align="start" className="w-64">
                 {projectQuotes.map((q) => (
                   <DropdownMenuItem
                     key={q.id}
@@ -346,7 +450,7 @@ export function QuoteEditor({
                       else go()
                     }}
                   >
-                    <span className={cn('flex-1 truncate', q.id === quote.id && 'font-semibold')}>{q.title}</span>
+                    <span className={cn('flex-1 truncate', q.id === quote.id && 'font-semibold text-primary')}>{q.title}</span>
                     <span className="ml-3 text-xs text-muted-foreground tabular-nums">{yuan(q.total)}</span>
                   </DropdownMenuItem>
                 ))}
@@ -355,13 +459,13 @@ export function QuoteEditor({
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {readOnly ? <Badge variant="secondary"><Lock className="size-3" />只读</Badge> : dirty ? <Badge variant="outline">未保存</Badge> : null}
-          <Button variant="outline" size="sm" disabled={saving || syncing} onClick={() => switchToPointMap()}>
-            <MapPinned className="size-4" />调整点位
+          {readOnly ? <Badge variant="secondary"><Lock className="size-3" />只读</Badge> : dirty ? <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300">未保存修改</Badge> : null}
+          <Button variant="outline" size="sm" className="h-8 border-border bg-background text-xs font-medium shadow-2xs" disabled={saving || syncing} onClick={() => switchToPointMap()}>
+            <MapPinned className="size-3.5 text-primary" />调整点位图
           </Button>
           {readOnly ? null : (
-            <Button size="sm" disabled={saving} onClick={() => save()}>
-              {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}保存
+            <Button size="sm" className="h-8 bg-primary text-xs font-medium text-primary-foreground shadow-xs hover:bg-primary/90" disabled={saving} onClick={() => save()}>
+              {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}保存报价
             </Button>
           )}
         </div>
@@ -374,21 +478,56 @@ export function QuoteEditor({
         </div>
       ) : null}
 
-      <header className="grid gap-4 md:grid-cols-[1fr_12rem]">
-        <div className="grid gap-2">
-          <Label htmlFor="title">报价名称</Label>
-          <Input id="title" value={quote.title} disabled={readOnly} onChange={(e) => update({ title: e.target.value })} className="text-base font-semibold" />
+      {/* Untitled UI + IBM Carbon 顶部报价概览与 4 格 KPI 指标条 */}
+      <div className="overflow-hidden rounded-xl border border-border bg-background shadow-2xs">
+        <div className="grid gap-4 border-b border-border p-4 sm:p-5 md:grid-cols-[1fr_11rem]">
+          <div className="grid gap-1.5">
+            <Label htmlFor="title" className="text-xs font-medium text-muted-foreground">报价方案名称</Label>
+            <Input
+              id="title"
+              value={quote.title}
+              disabled={readOnly}
+              onChange={(e) => update({ title: e.target.value })}
+              className="h-9 border-border bg-subtle/50 text-base font-semibold text-foreground focus-visible:bg-background"
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="status" className="text-xs font-medium text-muted-foreground">报价状态</Label>
+            <Select value={quote.status} onValueChange={(v) => update({ status: v })} disabled={readOnly}>
+              <SelectTrigger id="status" className="h-9 w-full border-border bg-subtle/50 text-xs font-medium"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {QUOTE_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <div className="grid gap-2">
-          <Label htmlFor="status">状态</Label>
-          <Select value={quote.status} onValueChange={(v) => update({ status: v })} disabled={readOnly}>
-            <SelectTrigger id="status" className="w-full"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {QUOTE_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
+
+        {/* 4 格核心数据指标条 */}
+        <div className="grid grid-cols-2 divide-x divide-y divide-border bg-subtle/50 sm:grid-cols-4 sm:divide-y-0">
+          <div className="px-4 py-3 sm:px-5">
+            <div className="text-xs font-medium text-muted-foreground">设备总件数</div>
+            <div className="mt-1 flex items-baseline gap-1.5">
+              <span className="text-lg font-semibold text-foreground tabular-nums">{totalQuantity}</span>
+              <span className="text-xs text-muted-foreground">件 · {quote.items.length} 项型号</span>
+            </div>
+          </div>
+          <div className="px-4 py-3 sm:px-5">
+            <div className="text-xs font-medium text-muted-foreground">设备产品小计</div>
+            <div className="mt-1 text-lg font-semibold text-foreground tabular-nums">{yuan(totals.productTotal)}</div>
+          </div>
+          <div className="px-4 py-3 sm:px-5">
+            <div className="text-xs font-medium text-muted-foreground">附加费与优惠</div>
+            <div className="mt-1 flex items-baseline gap-2 text-sm font-medium tabular-nums">
+              <span className="text-fg-secondary">+{yuan(totals.feeTotal)}</span>
+              {quote.discount > 0 ? <span className="text-success">-{yuan(quote.discount)}</span> : null}
+            </div>
+          </div>
+          <div className="bg-subtle px-4 py-3 sm:px-5">
+            <div className="text-xs font-medium text-muted-foreground">报价总额</div>
+            <div className="mt-0.5 text-xl font-semibold tracking-tight text-foreground tabular-nums">{yuan(totals.total)}</div>
+          </div>
         </div>
-      </header>
+      </div>
 
       {contract?.usesThisQuote ? (
         <p className="-mt-2 text-sm text-muted-foreground">
@@ -414,20 +553,78 @@ export function QuoteEditor({
         </div>
       ) : null}
 
-      <Card className="gap-0 py-0">
-        <CardHeader className="flex flex-wrap items-center justify-between gap-2 border-b py-4">
-          <div className="flex items-center gap-3">
-            <CardTitle className="shrink-0 text-base whitespace-nowrap">产品明细</CardTitle>
+      <Card className="gap-0 overflow-hidden border-border py-0 shadow-2xs">
+        {/* IBM Carbon 数据表格工具条（当勾选行时切换为品牌蓝紫批量操作条） */}
+        {activeSelectedKeys.size > 0 && viewMode === 'summary' && !readOnly ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary bg-primary px-4 py-2.5 text-primary-foreground sm:px-6">
+            <div className="flex items-center gap-3 text-xs font-medium">
+              <span className="inline-flex items-center gap-1.5 font-semibold">
+                <CheckSquare className="size-4" />
+                已选 {activeSelectedKeys.size} 项设备
+              </span>
+              <span className="h-3.5 w-px bg-primary-foreground/30" />
+              <span className="text-primary-foreground/90 tabular-nums">选中行小计 {yuan(selectedSubtotal)}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="xs" variant="secondary" className="h-7 gap-1 bg-primary-foreground/15 px-2.5 text-xs font-medium text-primary-foreground hover:bg-primary-foreground/25">
+                    <Percent className="size-3.5" />
+                    批量折扣
+                    <ChevronDown className="size-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => applyBatchDiscount(0.95)}>按目录价 9.5 折计算</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => applyBatchDiscount(0.9)}>按目录价 9.0 折计算</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => applyBatchDiscount(0.85)}>按目录价 8.5 折计算</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => applyBatchDiscount(0.8)}>按目录价 8.0 折计算</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button
+                size="xs"
+                variant="secondary"
+                onClick={restoreBatchOriginPrice}
+                className="h-7 gap-1 bg-primary-foreground/15 px-2.5 text-xs font-medium text-primary-foreground hover:bg-primary-foreground/25"
+              >
+                <RotateCcw className="size-3.5" />
+                恢复原价
+              </Button>
+              <Button
+                size="xs"
+                variant="secondary"
+                onClick={deleteBatchSelected}
+                className="h-7 gap-1 bg-primary-foreground/15 px-2.5 text-xs font-medium text-primary-foreground hover:bg-red-500/80"
+              >
+                <Trash2 className="size-3.5" />
+                批量删除
+              </Button>
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={() => setSelectedKeys(new Set())}
+                className="h-7 px-2 text-xs text-primary-foreground/85 hover:bg-primary-foreground/15 hover:text-primary-foreground"
+              >
+                <X className="size-3.5" />
+                取消选择
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        <CardHeader className="flex flex-wrap items-center justify-between gap-2.5 border-b border-border bg-subtle/40 px-4 py-3 sm:px-6">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <CardTitle className="shrink-0 text-sm font-semibold whitespace-nowrap text-foreground">设备明细清单</CardTitle>
             {floorGroups.length > 0 ? (
               <div className="flex flex-wrap items-center gap-2">
-                <div className="flex rounded-lg bg-muted p-0.5" role="tablist" aria-label="明细视图">
+                <div className="flex rounded-lg border border-border bg-muted/90 p-0.5" role="tablist" aria-label="明细视图">
                   <Button
                     type="button"
                     size="xs"
                     variant="ghost"
                     role="tab"
                     aria-selected={viewMode === 'floors'}
-                    className={cn('h-7 rounded-md px-2.5 text-xs', viewMode === 'floors' && 'bg-background shadow-sm')}
+                    className={cn('h-7 rounded-md px-2.5 text-xs', viewMode === 'floors' && 'bg-background font-semibold text-primary shadow-2xs')}
                     onClick={() => setViewMode('floors')}
                   >
                     <Layers className="size-3.5" />按房间（{floorGroups.reduce((s, f) => s + f.rooms.length, 0)}）
@@ -438,14 +635,14 @@ export function QuoteEditor({
                     variant="ghost"
                     role="tab"
                     aria-selected={viewMode === 'summary'}
-                    className={cn('h-7 rounded-md px-2.5 text-xs', viewMode === 'summary' && 'bg-background shadow-sm')}
+                    className={cn('h-7 rounded-md px-2.5 text-xs', viewMode === 'summary' && 'bg-background font-semibold text-primary shadow-2xs')}
                     onClick={() => setViewMode('summary')}
                   >
                     整单汇总
                   </Button>
                 </div>
                 {viewMode === 'floors' ? (
-                  <div className="flex rounded-lg bg-muted p-0.5" role="radiogroup" aria-label="点位图显示">
+                  <div className="flex rounded-lg border border-border bg-muted/90 p-0.5" role="radiogroup" aria-label="点位图显示">
                     {(
                       [
                         ['symbol', '设备图标'],
@@ -460,13 +657,36 @@ export function QuoteEditor({
                         variant="ghost"
                         role="radio"
                         aria-checked={planMode === v}
-                        className={cn('h-7 rounded-md px-2 text-xs', planMode === v && 'bg-background shadow-sm')}
+                        className={cn('h-7 rounded-md px-2 text-xs', planMode === v && 'bg-background font-semibold text-primary shadow-2xs')}
                         onClick={() => setPlanMode(v)}
                       >
                         {label}
                       </Button>
                     ))}
                   </div>
+                ) : null}
+              </div>
+            ) : null}
+            {/* 整单汇总模式下的实时筛选框（IBM Carbon Table Search） */}
+            {viewMode === 'summary' && quote.items.length > 0 ? (
+              <div className="relative w-48 sm:w-56">
+                <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={lineQuery}
+                  onChange={(e) => setLineQuery(e.target.value)}
+                  placeholder="筛选型号、SKU 或分类…"
+                  aria-label="筛选报价明细"
+                  className="h-8 border-border bg-background pl-8 text-xs"
+                />
+                {lineQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => setLineQuery('')}
+                    aria-label="清空筛选"
+                    className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="size-3.5" />
+                  </button>
                 ) : null}
               </div>
             ) : null}
@@ -550,13 +770,13 @@ export function QuoteEditor({
                     <div className="text-sm font-semibold tabular-nums">楼层小计 {yuan(floor.subtotal)}</div>
                   </div>
                   {planMode !== 'hide' && floor.sheetUrl ? (
-                    <div className="overflow-hidden rounded-xl border bg-white">
+                    <div className="overflow-hidden rounded-xl border border-border bg-background">
                       <PlanFigure
                         sheetUrl={floor.sheetUrl}
                         points={floor.planPoints}
                         areas={floor.planAreas}
                         mode={planMode}
-                        className="w-full"
+                        className="mx-auto max-h-80 w-full"
                       />
                     </div>
                   ) : null}
@@ -616,7 +836,7 @@ export function QuoteEditor({
                                         </span>
                                       ) : null}
                                       {!readOnly && line.lineKey ? (
-                                        <Button variant="link" size="xs" className="h-auto p-0 text-xs" onClick={() => setSwapKey(line.lineKey)}>
+                                        <Button variant="link" size="xs" className="h-auto p-0 text-xs text-muted-foreground no-underline hover:text-primary hover:no-underline" onClick={() => setSwapKey(line.lineKey)}>
                                           <ArrowLeftRight className="size-3" />更换型号
                                         </Button>
                                       ) : null}
@@ -630,7 +850,7 @@ export function QuoteEditor({
                                       value={line.price}
                                       disabled={readOnly || !line.lineKey}
                                       label={`${room.name} ${line.name} 单价`}
-                                      className="h-6 w-20 px-1.5 text-xs"
+                                      className={cn('h-6 w-20 px-1.5 text-xs', INLINE_NUM)}
                                       onChange={(n) => line.lineKey && updateLine(line.lineKey, { price: n })}
                                     />
                                     <span>× {line.quantity}{line.unit || '个'}</span>
@@ -684,7 +904,7 @@ export function QuoteEditor({
                         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                           <span>{[l.deviceType ? deviceTypeLabel(l.deviceType) : null, l.sku, l.unit && `单位：${l.unit}`].filter(Boolean).join(' · ')}</span>
                           {!readOnly && l.deviceType ? (
-                            <Button variant="link" size="xs" className="h-auto p-0 text-xs" onClick={() => setSwapKey(l.key)}>
+                            <Button variant="link" size="xs" className="h-auto p-0 text-xs text-muted-foreground no-underline hover:text-primary hover:no-underline" onClick={() => setSwapKey(l.key)}>
                               <ArrowLeftRight className="size-3" />更换型号
                             </Button>
                           ) : null}
@@ -727,25 +947,51 @@ export function QuoteEditor({
                 </div>
               </div>
 
-              {/* 平板与桌面端（>= md）保持表格布局 */}
+              {/* 平板与桌面端（>= md）IBM Carbon 高密度数据表格 */}
               <div className="hidden md:block">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="pl-6">产品</TableHead>
-                      {costs ? <TableHead className="text-right">成本</TableHead> : null}
-                      <TableHead className="text-right">单价</TableHead>
+                      {readOnly ? null : (
+                        <TableHead className="w-10 pl-5">
+                          <Checkbox
+                            checked={allFilteredSelected}
+                            onCheckedChange={(v) => toggleSelectAllFiltered(Boolean(v))}
+                            aria-label="全选当前列表中的设备"
+                          />
+                        </TableHead>
+                      )}
+                      <TableHead className={cn('text-xs font-semibold text-muted-foreground', readOnly && 'pl-6')}>设备型号与规格</TableHead>
+                      {showCosts ? <TableHead className="text-right">内部成本</TableHead> : null}
+                      <TableHead className="text-right">零售单价</TableHead>
                       <TableHead className="text-right">数量</TableHead>
-                      <TableHead className="text-right">小计</TableHead>
+                      <TableHead className="text-right">小计金额</TableHead>
                       {readOnly ? null : <TableHead className="w-10 pr-4" />}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {quote.items.map((l) => (
-                      <TableRow key={l.key}>
-                        <TableCell className="pl-6 whitespace-normal">
+                    {filteredItems.map((l) => {
+                      const isSelected = activeSelectedKeys.has(l.key)
+                      return (
+                      <TableRow
+                        key={l.key}
+                        className={cn(
+                          'transition-colors',
+                          isSelected && 'bg-primary/[0.04] hover:bg-primary/[0.07]',
+                        )}
+                      >
+                        {readOnly ? null : (
+                          <TableCell className="pl-5">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={(v) => toggleSelectLine(l.key, Boolean(v))}
+                              aria-label={`选择 ${l.name}`}
+                            />
+                          </TableCell>
+                        )}
+                        <TableCell className={cn('whitespace-normal', readOnly && 'pl-6')}>
                           <div className="flex items-center gap-3">
-                            <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted">
+                            <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background">
                               {l.image ? (
                                 <Image src={l.image} alt="" width={44} height={44} className="size-full bg-white object-contain" />
                               ) : l.deviceType ? (
@@ -760,21 +1006,17 @@ export function QuoteEditor({
                                 {[l.deviceType ? deviceTypeLabel(l.deviceType) : null, l.sku, l.unit && `单位：${l.unit}`].filter(Boolean).join(' · ')}
                               </div>
                               {!readOnly && l.deviceType ? (
-                                <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setSwapKey(l.key)}>
+                                <Button variant="link" size="sm" className="h-auto p-0 text-xs text-muted-foreground no-underline hover:text-primary hover:no-underline" onClick={() => setSwapKey(l.key)}>
                                   <ArrowLeftRight className="size-3" />更换型号
                                 </Button>
                               ) : null}
                             </div>
                           </div>
                         </TableCell>
-                        {costs ? (
-                          <TableCell className="text-right text-sm text-muted-foreground tabular-nums">
-                            {unitCost(l) === undefined ? '—' : yuan(unitCost(l))}
-                          </TableCell>
-                        ) : null}
+                        {showCosts ? <CostCell cost={unitCost(l)} /> : null}
                         <TableCell className="text-right">
                           <div className="flex flex-col items-end gap-0.5">
-                            {numInput(l.price, (n) => updateLine(l.key, { price: n }), `${l.name} 单价`, 'ml-auto w-28')}
+                            {numInput(l.price, (n) => updateLine(l.key, { price: n }), `${l.name} 单价`, cn('ml-auto w-28', INLINE_NUM))}
                         {(() => {
                           const originPrice = catalogPriceOf(l.product)
                           if (originPrice === undefined || Math.abs(originPrice - l.price) <= 0.001) return null
@@ -791,7 +1033,7 @@ export function QuoteEditor({
                         })()}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">{numInput(l.quantity, (n) => updateLine(l.key, { quantity: n }), `${l.name} 数量`, 'ml-auto w-20')}</TableCell>
+                    <TableCell className="text-right">{numInput(l.quantity, (n) => updateLine(l.key, { quantity: n }), `${l.name} 数量`, cn('ml-auto w-20', INLINE_NUM))}</TableCell>
                     <TableCell className="text-right font-medium tabular-nums">{yuan(l.price * l.quantity)}</TableCell>
                     {readOnly ? null : (
                       <TableCell className="pr-4">
@@ -801,12 +1043,12 @@ export function QuoteEditor({
                       </TableCell>
                     )}
                   </TableRow>
-                ))}
+                    )})}
               </TableBody>
               <TableFooter>
                 <TableRow>
-                  <TableCell className="pl-6" colSpan={costs ? 4 : 3}>产品小计</TableCell>
-                  <TableCell className="text-right font-semibold tabular-nums">{yuan(totals.productTotal)}</TableCell>
+                  <TableCell className="pl-6 font-medium" colSpan={(showCosts ? 4 : 3) + (readOnly ? 0 : 1)}>产品小计</TableCell>
+                  <TableCell className="text-right font-bold text-foreground tabular-nums">{yuan(totals.productTotal)}</TableCell>
                   {readOnly ? null : <TableCell />}
                 </TableRow>
               </TableFooter>
@@ -818,7 +1060,7 @@ export function QuoteEditor({
       </Card>
 
       <div className="grid items-start gap-5 md:grid-cols-2">
-        <Card>
+        <Card className="border-border shadow-2xs">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">附加费用</CardTitle>
             {readOnly ? null : (
@@ -827,7 +1069,30 @@ export function QuoteEditor({
               </Button>
             )}
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-2.5">
+            {!readOnly ? (
+              <div className="flex flex-wrap items-center gap-1.5 pb-1">
+                <span className="text-xs text-muted-foreground">快捷填入：</span>
+                {[
+                  { name: '全屋设备安装调试费', amount: Math.max(800, Math.round(totals.productTotal * 0.08 / 100) * 100) },
+                  { name: '强弱电布线技术交底', amount: 600 },
+                  { name: '专属场景定制与一年上门维保', amount: 0 },
+                ].map((preset) => (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    onClick={() =>
+                      update({
+                        fees: [...quote.fees, { key: crypto.randomUUID(), name: preset.name, amount: preset.amount }],
+                      })
+                    }
+                    className="rounded-md border border-border bg-subtle/80 px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/6 hover:text-primary"
+                  >
+                    + {preset.name}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             {quote.fees.length === 0 ? <p className="text-sm text-muted-foreground">如安装调试费、布线费、上门费等</p> : null}
             {quote.fees.map((f) => (
               <div key={f.key} className="flex items-center gap-2">
@@ -843,8 +1108,37 @@ export function QuoteEditor({
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader><CardTitle className="text-base">合计</CardTitle></CardHeader>
+        <Card className="border-border shadow-2xs">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-base">结算汇总</CardTitle>
+            {!readOnly && totals.productTotal + totals.feeTotal > 100 ? (
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => roundDownTotal(100)}
+                  className="h-6 px-2 text-xs text-primary hover:bg-primary/8 hover:text-primary"
+                  title="自动计算优惠金额，使报价总额抹去零头至整百"
+                >
+                  <Sparkles className="size-3" />
+                  抹零至百位
+                </Button>
+                {totals.productTotal + totals.feeTotal > 1000 ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => roundDownTotal(1000)}
+                    className="h-6 px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+                    title="自动计算优惠金额，使报价总额抹去零头至整千"
+                  >
+                    抹零至千位
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+          </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">产品小计</span><span className="tabular-nums">{yuan(totals.productTotal)}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">附加费用</span><span className="tabular-nums">{yuan(totals.feeTotal)}</span></div>
@@ -856,18 +1150,7 @@ export function QuoteEditor({
               <span className="font-medium">报价总额</span>
               <span className="text-2xl font-bold tabular-nums">{yuan(totals.total)}</span>
             </div>
-            {margin ? (
-              <div className="mt-3 space-y-1.5 rounded-lg bg-muted/60 p-3">
-                <div className="flex justify-between"><span className="text-muted-foreground">内部成本（不打印）</span><span className="tabular-nums">{yuan(margin.cost)}</span></div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">毛利</span>
-                  <span className={`font-semibold tabular-nums ${margin.profit < 0 ? 'text-destructive-strong' : 'text-success'}`}>
-                    {yuan(margin.profit)}（{(margin.rate * 100).toFixed(1)}%）
-                  </span>
-                </div>
-                {margin.missing ? <p className="text-xs text-warning">{margin.missing} 行未设置成本</p> : null}
-              </div>
-            ) : null}
+            {margin && !hideInternal ? <MarginBreakdown margin={margin} settings={costSettings} className="mt-3 rounded-lg bg-muted/60 p-3" /> : null}
           </CardContent>
         </Card>
       </div>
@@ -876,6 +1159,134 @@ export function QuoteEditor({
         <Label htmlFor="notes">报价备注</Label>
         <Textarea id="notes" rows={3} value={quote.notes} disabled={readOnly} placeholder="例如：报价有效期 30 天；含一年免费上门维护" onChange={(e) => update({ notes: e.target.value })} />
       </div>
+
+      {margin ? <MarginCapsule margin={margin} settings={costSettings} hidden={hideInternal} onToggle={toggleInternal} /> : null}
     </section>
+  )
+}
+
+const pct = (r: number) => `${(r * 100).toFixed(1)}%`
+type MarginTone = 'ok' | 'near' | 'below'
+const toneOf = (m: MarginSummary, s: CostSettings): MarginTone => (m.belowFloor || m.profit < 0 ? 'below' : m.rate * 100 < s.minMarginPercent + 5 ? 'near' : 'ok')
+const COST_SOURCE: Record<UnitCost['source'], string> = { brand: '品牌拿货折扣', catalog: '产品库成本价', default: '默认拿货折扣' }
+
+/** 单价成本单元格：鼠标悬停显示成本依据 */
+function CostCell({ cost }: { cost: UnitCost | null }) {
+  return (
+    <TableCell className="text-right text-sm text-muted-foreground tabular-nums" title={cost ? `${COST_SOURCE[cost.source]}${cost.rate ? ` · ${rateLabel(cost.rate)}` : ''}` : '未设置成本：在「设置 → 报价成本与毛利」里填写品牌折扣'}>
+      {cost ? (
+        <span className="inline-flex items-center gap-1">
+          {cost.source !== 'catalog' ? <span className="rounded bg-muted px-1 text-[10px] leading-4">{cost.rate ? rateLabel(cost.rate) : '估'}</span> : null}
+          {yuan(cost.cost)}
+        </span>
+      ) : (
+        '—'
+      )}
+    </TableCell>
+  )
+}
+
+/** 内部核算明细：成本构成、毛利、底线价与还能让利的空间 */
+function MarginBreakdown({ margin, settings, className }: { margin: MarginSummary; settings: CostSettings; className?: string }) {
+  const tone = toneOf(margin, settings)
+  return (
+    <div className={cn('space-y-1.5 text-sm', className)}>
+      <div className="flex justify-between">
+        <span className="text-muted-foreground">产品成本</span>
+        <span className="tabular-nums">{yuan(margin.productCost)}</span>
+      </div>
+      {margin.feeCost ? (
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">附加费用成本（{settings.feeCostPercent}%）</span>
+          <span className="tabular-nums">{yuan(margin.feeCost)}</span>
+        </div>
+      ) : null}
+      <div className="flex justify-between">
+        <span className="text-muted-foreground">内部成本合计（不打印）</span>
+        <span className="tabular-nums">{yuan(margin.cost)}</span>
+      </div>
+      <div className="flex justify-between">
+        <span className="text-muted-foreground">毛利</span>
+        <span className={cn('font-semibold tabular-nums', tone === 'below' ? 'text-destructive-strong' : tone === 'near' ? 'text-warning' : 'text-success')}>
+          {yuan(margin.profit)}（{pct(margin.rate)}）
+        </span>
+      </div>
+      <div className="flex justify-between border-t border-border/70 pt-1.5">
+        <span className="text-muted-foreground">底线价（毛利率 {settings.minMarginPercent}%）</span>
+        <span className="tabular-nums">{yuan(margin.floorPrice)}</span>
+      </div>
+      <div className="flex justify-between">
+        <span className="text-muted-foreground">{margin.headroom >= 0 ? '还可让利' : '已低于底线'}</span>
+        <span className={cn('font-medium tabular-nums', margin.headroom >= 0 ? 'text-foreground' : 'text-destructive-strong')}>{yuan(Math.abs(margin.headroom))}</span>
+      </div>
+      {margin.missing ? (
+        <p className="text-xs text-warning">
+          {margin.missing} 行未设置成本，未计入合计。
+          <GuardedLink href="/settings#cost" className="ml-1 underline underline-offset-2">
+            设置品牌折扣
+          </GuardedLink>
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
+/** 右下角浮动的内部毛利胶囊：滚动到哪里都能看到毛利率；点开看明细；一键隐藏防止业主看到 */
+function MarginCapsule({ margin, settings, hidden, onToggle }: { margin: MarginSummary; settings: CostSettings; hidden: boolean; onToggle: () => void }) {
+  const tone = toneOf(margin, settings)
+  if (hidden) {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        onClick={onToggle}
+        className="fixed right-4 bottom-4 z-30 size-10 rounded-full bg-background shadow-lg md:right-6 md:bottom-6 print:hidden"
+        aria-label="显示内部成本与毛利"
+        title="显示内部成本与毛利"
+      >
+        <EyeOff className="size-4" />
+      </Button>
+    )
+  }
+  return (
+    <div className="fixed right-4 bottom-4 z-30 flex items-center rounded-full bg-foreground text-background shadow-xl md:right-6 md:bottom-6 print:hidden">
+      <Popover>
+        <PopoverTrigger asChild>
+          <button type="button" className="flex h-10 items-center gap-2.5 rounded-l-full pr-2 pl-4 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none" aria-label="查看内部毛利核算">
+            <span aria-hidden className={cn('size-2 rounded-full', tone === 'below' ? 'bg-destructive' : tone === 'near' ? 'bg-warning' : 'bg-success')} />
+            <span className="text-background/70">毛利</span>
+            <span className="font-semibold tabular-nums">{yuan(margin.profit)}</span>
+            <span className="tabular-nums text-background/80">{pct(margin.rate)}</span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent side="top" align="end" className="w-80">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-sm font-medium">内部毛利核算</p>
+            <Badge variant={tone === 'below' ? 'destructive' : tone === 'near' ? 'warning' : 'success'}>
+              {tone === 'below' ? '低于底线' : tone === 'near' ? '接近底线' : '毛利健康'}
+            </Badge>
+          </div>
+          <MarginBreakdown margin={margin} settings={settings} />
+          <p className="mt-3 text-xs text-muted-foreground">
+            成本依据：{[margin.sources.brand ? `品牌折扣 ${margin.sources.brand} 行` : null, margin.sources.catalog ? `产品库成本 ${margin.sources.catalog} 行` : null, margin.sources.default ? `默认折扣 ${margin.sources.default} 行` : null].filter(Boolean).join(' · ') || '暂无'}
+            。仅你自己可见，不会打印或出现在分享页。
+          </p>
+          <GuardedLink href="/settings#cost" className="mt-2 inline-flex text-xs font-medium underline-offset-4 hover:underline">
+            调整拿货折扣与毛利率底线 →
+          </GuardedLink>
+        </PopoverContent>
+      </Popover>
+      <span aria-hidden className="h-5 w-px bg-background/20" />
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex h-10 items-center rounded-r-full pr-3.5 pl-2.5 text-background/70 transition-colors hover:text-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        aria-label="隐藏内部成本（防止业主看到）"
+        title="隐藏内部成本（防止业主看到）"
+      >
+        <Eye className="size-4" />
+      </button>
+    </div>
   )
 }

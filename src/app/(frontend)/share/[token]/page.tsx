@@ -16,13 +16,16 @@ import { relId } from '@/lib/access'
 import { floorTagFromSheetName } from '@/lib/area-analysis'
 import { APP_NAME } from '@/lib/brand'
 import { getCatalog, getCompanyInfo, resolveMediaUrl } from '@/lib/cached-data'
+import { clientVisibleQuoteIds, mainQuoteId } from '@/lib/client-feedback'
+import { categoryOfType } from '@/lib/device-types'
 import type { LandingShowcase, ShowcaseQuote } from '@/lib/landing-showcase'
 import { getPayloadClient } from '@/lib/payload'
 import { normalizeScene, planAreaOf, sceneAreas, scenePoints, sceneSheets } from '@/lib/point-scene'
-import { projectDisplayName } from '@/lib/project-name'
+import { projectDisplayName, quoteShortTitle } from '@/lib/project-name'
 import type { Media, Project } from '@/payload-types'
 import { PLUGIN_DOC_STYLES } from '@/plugins/doc-styles/styles'
 
+import { ClientDecisionPanel, type CompareQuote } from './client-decision-panel'
 import { ShareExportButton } from './share-export-button'
 
 export const metadata: Metadata = {
@@ -157,6 +160,44 @@ async function loadSharedShowcase(token: string) {
     }
   }
 
+  // 业主可见的方案（主方案 + 已发送 / 已确认的报价），用于方案对比与意向确认；按总价从低到高排列
+  const mainId = mainQuoteId(docs.map((q) => ({ id: String(q.id), status: text(q.status) })), finalQuoteId)
+  const visibleIds = clientVisibleQuoteIds(docs.map((q) => ({ id: String(q.id), status: text(q.status) })), mainId)
+  const compare: CompareQuote[] = visibleIds
+    .map((qid) => docs.find((q) => String(q.id) === qid))
+    .filter((q): q is Record<string, unknown> => Boolean(q))
+    .map((q) => {
+      const items = (Array.isArray(q.items) ? q.items : []) as Record<string, unknown>[]
+      return {
+        id: String(q.id),
+        title: quoteShortTitle(text(q.title), project.name) || text(q.title),
+        total: num(q.total),
+        productTotal: num(q.productTotal),
+        feeTotal: num(q.feeTotal),
+        discount: num(q.discount),
+        isMain: String(q.id) === mainId,
+        lines: items
+          .filter((i) => typeof i.id === 'string' && i.id)
+          .map((i) => {
+            const pid = typeof i.product === 'string' ? i.product : i.product && typeof i.product === 'object' ? String((i.product as { id?: unknown }).id ?? '') : ''
+            const catProd = pid ? catalogById.get(pid) : undefined
+            const cat = categoryOfType(text(i.deviceType) || catProd?.deviceType || 'other')
+            return {
+              itemId: String(i.id),
+              category: cat?.slug ?? 'other',
+              categoryName: cat?.name ?? '其他',
+              name: text(i.name) || catProd?.name || '',
+              sku: text(i.sku) || catProd?.sku || '',
+              unit: text(i.unit) || catProd?.unit || '个',
+              qty: num(i.quantity),
+              amount: Math.round(num(i.price) * num(i.quantity) * 100) / 100,
+              brandName: catProd?.brand?.name ?? null,
+            }
+          }),
+      }
+    })
+    .sort((a, b) => a.total - b.total)
+
   const data: LandingShowcase = {
     project: {
       name: projectDisplayName(project.name),
@@ -172,15 +213,16 @@ async function loadSharedShowcase(token: string) {
     library: { products: catalog.length, brands: 27 },
   }
 
-  return { data, company }
+  // 演示链接（/share/demo）只能浏览，不能提交意向
+  return { data, company, compare, canSubmit: trimmed !== 'demo' }
 }
 
-/** 业主免登录只读预览页：展示交互式点位图、横版方案与定稿报价单，不含内部成本与管理后台入口。 */
+/** 业主免登录只读预览页：展示交互式点位图、横版方案与定稿报价单，支持一键导出方案与报价 PDF。 */
 export default async function ClientSharePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
   const shared = await loadSharedShowcase(token)
   if (!shared) notFound()
-  const { data, company } = shared
+  const { data, company, compare, canSubmit } = shared
   const address = [data.project.community, data.project.address].filter(Boolean).join(' ')
 
   return (
@@ -205,6 +247,11 @@ export default async function ClientSharePage({ params }: { params: Promise<{ to
             ) : null}
             <Badge variant="outline" className="hidden sm:inline-flex">业主方案预览</Badge>
             <ShareExportButton projectName={data.project.name} />
+            {compare.length ? (
+              <Button asChild size="sm" className="rounded-full">
+                <a href="#decide">确认意向</a>
+              </Button>
+            ) : null}
           </div>
         </div>
       </header>
@@ -250,6 +297,10 @@ export default async function ClientSharePage({ params }: { params: Promise<{ to
           <Section id="quote" labelledBy="quote-title" className="pt-20 sm:pt-28">
             <QuoteShowcase data={data} quote={data.quote} styles={DOC_STYLES} layouts={DOC_KINDS.quote.layouts} company={company} />
           </Section>
+        ) : null}
+
+        {compare.length ? (
+          <ClientDecisionPanel shareToken={token} quotes={compare} companyName={company.name} defaultName={data.project.customer} canSubmit={canSubmit} />
         ) : null}
       </main>
 

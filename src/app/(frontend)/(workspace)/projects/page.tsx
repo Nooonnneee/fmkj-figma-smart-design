@@ -66,7 +66,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
       user,
       overrideAccess: false,
       // 列表只取显示用的字段，不读取点位图
-      select: { name: true, customerName: true, community: true, status: true, pointCount: true, updatedAt: true },
+      select: { name: true, customerName: true, community: true, platform: true, status: true, pointCount: true, updatedAt: true },
     }),
     payload.count({ collection: 'projects', where: { status: { not_equals: 'archived' } }, user, overrideAccess: false }),
     payload.count({ collection: 'projects', where: { status: { equals: 'archived' } }, user, overrideAccess: false }),
@@ -136,10 +136,16 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   // 账号名下（含已归档）没有示例项目时，提供「领取示例项目」
   const demoCount = await payload.count({ collection: 'projects', where: { and: [{ owner: { equals: user.id } }, { name: { like: '【示例】' } }] }, overrideAccess: false, user })
   const canClaimDemo = demoCount.totalDocs === 0
+  const totalPoints = projects.reduce((sum, p) => sum + (p.pointCount ?? 0), 0)
+  const totalQuoteAmount = projects.reduce((sum, p) => {
+    const a = amountOf(String(p.id))
+    return sum + (a?.value ?? 0)
+  }, 0)
+  const signedContractsCount = contracts.docs.filter((c) => c.status === 'signed').length
   const claimButton = canClaimDemo ? (
     <form action={claimDemoProject}>
       <Button type="submit" variant="outline">
-        <Sparkles className="size-4" />
+        <Sparkles />
         领取示例项目
       </Button>
     </form>
@@ -148,22 +154,56 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-col gap-5">
       <PageHeader
-        title="项目"
+        title="项目工作台"
         description={
           keyword ? (
             <>匹配「{keyword}」共 <span className="font-medium text-foreground tabular-nums">{projects.length}</span> 个</>
-          ) : undefined
+          ) : (
+            '管理全屋智能设计项目、户型彩平点位图、多版本报价与交付归档'
+          )
         }
         actions={
           <div className="flex items-center gap-2">
             {claimButton}
-            {/* 桌面端侧栏已有「新建项目」，这里只在手机上显示 */}
-            <Button asChild className="md:hidden">
+            <Button asChild>
               <Link href="/projects/new"><Plus className="size-4" />新建项目</Link>
             </Button>
           </div>
         }
       />
+
+      {/* Untitled UI 顶部 4 格业务数据概览卡片 */}
+      {projects.length > 0 ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-xl bg-card p-4 shadow-xs ring-1 ring-border">
+            <div className="text-xs font-medium text-muted-foreground">{archived ? '已归档项目' : '进行中项目'}</div>
+            <div className="mt-1.5 flex items-baseline gap-2">
+              <span className="text-2xl font-semibold tracking-tight text-foreground tabular-nums">{projects.length}</span>
+              <span className="text-xs text-muted-foreground">个项目</span>
+            </div>
+          </div>
+          <div className="rounded-xl bg-card p-4 shadow-xs ring-1 ring-border">
+            <div className="text-xs font-medium text-muted-foreground">累计设计点位</div>
+            <div className="mt-1.5 flex items-baseline gap-2">
+              <span className="text-2xl font-semibold tracking-tight text-foreground tabular-nums">{totalPoints.toLocaleString('zh-CN')}</span>
+              <span className="text-xs text-muted-foreground">个智能点位</span>
+            </div>
+          </div>
+          <div className="rounded-xl bg-card p-4 shadow-xs ring-1 ring-border">
+            <div className="text-xs font-medium text-muted-foreground">方案报价总额</div>
+            <div className="mt-1.5 flex items-baseline gap-2">
+              <span className="text-2xl font-semibold tracking-tight text-foreground tabular-nums">{yuan(totalQuoteAmount)}</span>
+            </div>
+          </div>
+          <div className="rounded-xl bg-card p-4 shadow-xs ring-1 ring-border">
+            <div className="text-xs font-medium text-muted-foreground">已生成报价 / 签约</div>
+            <div className="mt-1.5 flex items-baseline gap-2">
+              <span className="text-2xl font-semibold tracking-tight text-foreground tabular-nums">{quotes.docs.length}</span>
+              <span className="text-xs text-muted-foreground">份报价 · {signedContractsCount} 份已签合同</span>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <FilterTabs
@@ -177,14 +217,14 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
           {archived ? <input type="hidden" name="view" value="archived" /> : null}
           <div className="relative flex-1 sm:w-72 sm:flex-none">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input name="q" defaultValue={q} placeholder="搜索项目、客户、小区或电话" aria-label="搜索项目" className="pl-9" />
+            <Input name="q" defaultValue={q} placeholder="搜索项目、客户、小区或电话" aria-label="搜索项目" className="h-9 border-border bg-background pl-9 text-xs shadow-2xs" />
           </div>
           <SearchSubmit />
         </Form>
       </div>
 
       {projects.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed px-6 py-16 text-center">
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border-strong bg-background px-6 py-16 text-center">
           <span className="mb-1 flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
             <FolderKanban className="size-6" />
           </span>
@@ -200,44 +240,62 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
           ) : null}
         </div>
       ) : (
-        <Card className="py-0">
+        <Card className="overflow-hidden border-border py-0 shadow-2xs">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="pl-4 sm:pl-6">项目</TableHead>
+                <TableHead className="pl-4 sm:pl-6">项目名称与客户</TableHead>
+                <TableHead className="hidden w-32 md:table-cell">生态平台</TableHead>
                 <TableHead className="w-24 text-right">点位</TableHead>
-                <TableHead className="hidden text-right sm:table-cell">金额</TableHead>
-                <TableHead className="hidden pr-6 text-right md:table-cell">更新</TableHead>
+                <TableHead className="hidden text-right sm:table-cell">方案报价 / 合同</TableHead>
+                <TableHead className="hidden pr-6 text-right md:table-cell">最近更新</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {projects.map((p) => {
                 const pid = String(p.id)
                 const amount = amountOf(pid)
+                const display = projectDisplayName(p.name)
                 return (
-                  <TableRow key={pid} className="relative">
-                    <TableCell className="max-w-0 pl-4 sm:pl-6">
+                  <TableRow key={pid} className="group relative transition-colors hover:bg-subtle/80">
+                    <TableCell className="max-w-0 py-3 pl-4 sm:pl-6">
                       <div className="flex min-w-0 items-center gap-2">
-                        <Link href={`/projects/${pid}`} className="truncate font-medium after:absolute after:inset-0 hover:underline">
-                          {projectDisplayName(p.name)}
+                        <Link href={`/projects/${pid}`} className="truncate text-sm font-semibold text-foreground after:absolute after:inset-0">
+                          {display}
                         </Link>
-                        {isDemo(p.name) ? <Badge variant="secondary" className="shrink-0">示例</Badge> : null}
+                        {isDemo(p.name) ? <Badge variant="brand" className="h-4.5 shrink-0 px-1.5 text-[11px]">示例</Badge> : null}
                       </div>
                       <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {[p.customerName, p.community].filter(Boolean).join(' · ') || '未填写客户'}
+                        {[p.customerName, p.community].filter(Boolean).join(' · ') || '未填写客户与楼盘'}
                       </div>
                     </TableCell>
-                    <TableCell className="w-24 text-right text-sm text-muted-foreground tabular-nums">
-                      {p.pointCount ? `${p.pointCount}` : '—'}
+                    <TableCell className="hidden w-32 md:table-cell">
+                      {p.platform ? (
+                        <Badge variant="outline" className="rounded-md">
+                          {p.platform}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </TableCell>
-                    <TableCell className="hidden w-36 text-right sm:table-cell">
+                    <TableCell className="w-28 text-right tabular-nums">
+                      {p.pointCount ? (
+                        <span className="text-sm font-medium text-foreground tabular-nums">{p.pointCount}</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">未布点</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="hidden w-40 text-right sm:table-cell">
                       {amount ? (
-                        <span className="text-sm font-semibold tabular-nums">{yuan(amount.value)}</span>
+                        <div>
+                          <div className="text-sm font-semibold text-foreground tabular-nums">{yuan(amount.value)}</div>
+                          <div className="text-[11px] text-muted-foreground">{amount.caption}</div>
+                        </div>
                       ) : (
                         <span className="text-sm text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="hidden w-28 pr-6 text-right text-sm text-muted-foreground tabular-nums md:table-cell">{fmtDate(p.updatedAt)}</TableCell>
+                    <TableCell className="hidden w-28 pr-6 text-right text-xs text-muted-foreground tabular-nums md:table-cell">{fmtDate(p.updatedAt)}</TableCell>
                   </TableRow>
                 )
               })}

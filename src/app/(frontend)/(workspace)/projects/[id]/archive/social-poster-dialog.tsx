@@ -126,7 +126,7 @@ export function SocialPosterDialog({ data }: { data: SocialPosterData }) {
               ref={cardRef}
               style={{ width: 360, height: 480 }}
               className={cn(
-                'relative flex shrink-0 flex-col justify-between overflow-hidden rounded-2xl p-5 shadow-md select-none',
+                'relative flex shrink-0 flex-col justify-between overflow-hidden rounded-xl p-5 shadow-md select-none',
                 isDark ? 'bg-[#141413] text-[#F5F2EB]' : 'bg-[#FAF8F5] text-[#1C1B18]',
               )}
             >

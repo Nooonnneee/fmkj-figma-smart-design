@@ -67,29 +67,41 @@ export function PlacePanel({
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="space-y-2 p-4 pb-2">
+      <div className="space-y-2 px-3.5 pt-3 pb-2">
         {armed ? (
-          <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+          <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/8 px-3 py-2 text-xs text-foreground">
             <PointMarker type={armed} className="size-5" />
-            <span className="min-w-0 flex-1">点击图纸放置「{deviceTypeOf(armed)?.name}」</span>
+            <span className="min-w-0 flex-1 font-medium">点击图纸放置「{deviceTypeOf(armed)?.name}」</span>
             <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => onArm(null)}>Esc 结束</Button>
           </div>
         ) : null}
         <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={query} onChange={(e) => onQuery(e.target.value)} placeholder="搜索设备（点击或拖拽放置）" aria-label="搜索设备" className="pl-9" />
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => onQuery(e.target.value)}
+            placeholder="搜索设备（点击或拖拽放置）"
+            aria-label="搜索设备"
+            className="h-8 border-border bg-subtle/70 pl-8 text-xs"
+          />
         </div>
       </div>
       <ScrollArea className="min-h-0 flex-1">
-        <div className="space-y-4 p-4 pt-2">
+        <div className="space-y-4 px-3.5 pt-1.5 pb-4">
           {groups.map(({ category, types }) => {
             const placed = types.reduce((s, t) => s + (counts.get(t.value) ?? 0), 0)
             return (
               <section key={category.slug}>
-                <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold">
+                <div className="mb-1.5 flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1.5 font-semibold text-fg-secondary">
                   <span className="size-2 rounded-full" style={{ backgroundColor: category.color }} />
                   {category.name}
-                  {placed ? <span className="font-normal text-muted-foreground tabular-nums">{placed}</span> : null}
+                  </span>
+                  {placed ? (
+                    <span className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground tabular-nums">
+                      {placed}
+                    </span>
+                  ) : null}
                 </div>
                 <div className="grid grid-cols-3 gap-1.5">
                   {types.map((t) => {
@@ -109,11 +121,18 @@ export function PlacePanel({
                         onClick={() => onArm(active ? null : t.value)}
                         aria-pressed={active}
                         title={`放置${deviceTypeLabel(t.value)}`}
-                        className={cn('relative h-auto min-w-0 flex-col gap-1 px-1.5 py-2 text-center text-xs font-normal whitespace-normal', active && 'border-primary bg-primary/5 ring-2 ring-primary/30')}
+                        className={cn(
+                          'relative h-auto min-w-0 flex-col gap-1 rounded-lg border-border bg-background px-1.5 py-2 text-center text-xs font-normal whitespace-normal text-fg-secondary shadow-none hover:border-border-strong hover:bg-subtle',
+                          active && 'border-primary bg-primary/8 font-medium text-primary ring-2 ring-primary/20',
+                        )}
                       >
-                        <PointMarker type={t.value} className="size-7" />
-                        <span className="w-full truncate leading-tight">{t.name}</span>
-                        {n ? <span className="absolute top-1 right-1 rounded-full bg-primary px-1.5 text-xs leading-4 font-medium text-primary-foreground tabular-nums">{n}</span> : null}
+                        <PointMarker type={t.value} className="size-6.5" />
+                        <span className="w-full truncate text-[11px] leading-tight">{t.name}</span>
+                        {n ? (
+                          <span className="absolute top-1 right-1 rounded-full bg-primary px-1.5 text-[10px] leading-4 font-semibold text-primary-foreground tabular-nums">
+                            {n}
+                          </span>
+                        ) : null}
                       </Button>
                     )
                   })}
@@ -121,7 +140,7 @@ export function PlacePanel({
               </section>
             )
           })}
-          {groups.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">没有匹配的设备</p> : null}
+          {groups.length === 0 ? <p className="py-6 text-center text-xs text-muted-foreground">没有匹配的设备</p> : null}
         </div>
       </ScrollArea>
     </div>
@@ -162,36 +181,42 @@ export function AreasPanel({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {readOnly ? null : (
-        <div className="border-b p-4">
+        <div className="border-b border-border px-3.5 py-3">
           <div className="flex gap-2">
             <Select value={type} onValueChange={setType}>
-              <SelectTrigger size="sm" className="flex-1"><SelectValue /></SelectTrigger>
+              <SelectTrigger size="sm" className="h-8 flex-1 border-border bg-subtle/70 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {AREA_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Button size="sm" disabled={!sheets.length} onClick={() => onAdd(type)}><Plus className="size-4" />添加区域</Button>
+            <Button size="sm" className="h-8 bg-primary text-xs text-primary-foreground hover:bg-primary/90" disabled={!sheets.length} onClick={() => onAdd(type)}>
+              <Plus className="size-3.5" />添加区域
+            </Button>
           </div>
         </div>
       )}
       <ScrollArea className="min-h-0 flex-1">
-        <div className="space-y-4 p-4">
-          {groups.length === 0 ? <p className="text-xs text-muted-foreground">添加区域并拖动边框框选房间，点位将自动归类。</p> : null}
+        <div className="space-y-3.5 p-3.5">
+          {groups.length === 0 ? <p className="text-xs text-muted-foreground">添加区域并拖动顶点框选房间轮廓，点位将自动归类。</p> : null}
           {groups.map((g) => (
             <section key={g.key} className="space-y-1.5">
-              <h3 className="text-xs font-semibold text-muted-foreground">{g.name}</h3>
+              <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{g.name}</h3>
               {g.items.map((a) => {
                 const r = analysis.get(a.id)
+                const selected = selectedAreaId === a.id
                 return (
                   <Button
                     key={a.id}
                     variant="outline"
                     onClick={() => onFocus(a.id)}
-                    className={cn('h-auto w-full justify-start gap-2 px-2.5 py-2 text-left font-normal', selectedAreaId === a.id && 'border-primary bg-primary/5')}
+                    className={cn(
+                      'h-auto w-full justify-start gap-2 rounded-lg border-border bg-background px-2.5 py-2 text-left font-normal shadow-none hover:bg-subtle',
+                      selected && 'border-primary bg-primary/8 ring-1 ring-primary/20',
+                    )}
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">{a.name}</span>
-                      <span className="block text-xs text-muted-foreground">
+                      <span className={cn('block truncate text-xs font-semibold', selected ? 'text-primary' : 'text-foreground')}>{a.name}</span>
+                      <span className="block text-[11px] text-muted-foreground">
                         {areaTypeLabel(a.areaType)} · {r?.total ?? 0} 个点位{r && r.missing.filter((m) => m.level !== 'optional').length ? ` · 建议补充 ${r.missing.filter((m) => m.level !== 'optional').length} 项` : ''}
                       </span>
                     </span>
@@ -221,31 +246,32 @@ export function SelectedArea({ area, analysis, onChange, onDelete, onClose, read
     else setName(area.name)
   }
   return (
-    <div className="space-y-3 border-b bg-muted/40 p-4">
+    <div className="space-y-2.5 border-b border-border bg-subtle/80 p-3.5">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><MousePointerClick className="size-3.5" />选中的区域</div>
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+          <MousePointerClick className="size-3.5" />区域属性
+        </div>
         <div className="flex items-center gap-1">
           {analysis ? <ScoreBadge score={analysis.score} /> : null}
-          {/* 取消选中，回到下方的放置 / 区域列表（也可以按 Esc 或点画布空白处） */}
           <Button variant="ghost" size="icon-xs" aria-label="取消选中区域" title="取消选中" onClick={onClose}>
             <X />
           </Button>
         </div>
       </div>
       <div className="grid grid-cols-[1fr_7rem] gap-2">
-        <Input value={name} disabled={readOnly} maxLength={30} aria-label="区域名称" onChange={(e) => setName(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()} className="bg-background" />
+        <Input value={name} disabled={readOnly} maxLength={30} aria-label="区域名称" onChange={(e) => setName(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()} className="h-8 border-border bg-background text-xs" />
         <Select value={area.areaType} disabled={readOnly} onValueChange={(v) => onChange({ areaType: v })}>
-          <SelectTrigger className="w-full bg-background"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-8 w-full border-border bg-background text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>{AREA_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
         </Select>
       </div>
-      {readOnly ? null : <p className="text-xs text-muted-foreground">拖动顶点改形状 · 拖动边的中点加顶点 · 双击顶点删除</p>}
+      {readOnly ? null : <p className="text-[11px] text-muted-foreground">拖动顶点改形状 · 拖动边中点加顶点 · 双击顶点删除</p>}
       {analysis ? (
         <div className="space-y-1.5 text-xs">
           {analysis.devices.length ? (
             <div className="flex flex-wrap gap-1">
               {analysis.devices.map((d) => (
-                <span key={d.deviceType} className="inline-flex items-center gap-1 rounded-md border bg-background px-1.5 py-0.5">
+                <span key={d.deviceType} className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 text-[11px]">
                   <PointMarker type={d.deviceType} className="size-3.5" />
                   {deviceTypeOf(d.deviceType)?.name} <span className="tabular-nums text-muted-foreground">×{d.count}</span>
                 </span>
@@ -279,15 +305,15 @@ export function TypeDefaultRow({
   onArm?: (deviceType: string) => void
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2">
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background px-2.5 py-1.5">
       <div className="flex items-center gap-2">
-        <PointMarker type={type} className="size-6" />
-        <span className="min-w-0 flex-1 truncate text-sm font-medium">{deviceTypeLabel(type)}</span>
+        <PointMarker type={type} className="size-5.5" />
+        <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">{deviceTypeLabel(type)}</span>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <span className="text-sm text-muted-foreground tabular-nums">× {count}</span>
+        <span className="text-xs font-semibold text-muted-foreground tabular-nums">× {count}</span>
         {!readOnly && onArm ? (
-          <Button type="button" variant="ghost" size="xs" className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground" onClick={() => onArm(type)}>
+          <Button type="button" variant="ghost" size="xs" className="h-6 px-1.5 text-[11px] text-primary hover:bg-primary/8 hover:text-primary" onClick={() => onArm(type)}>
             <Plus className="size-3" />继续放
           </Button>
         ) : null}
@@ -316,9 +342,11 @@ export function SelectedPoint({
   onDelete: () => void
 }) {
   return (
-    <div className="space-y-3 border-b bg-muted/40 p-4">
+    <div className="space-y-2.5 border-b border-border bg-subtle/80 p-3.5">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Hand className="size-3.5" />选中的点位</div>
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+          <Hand className="size-3.5" />点位属性
+        </div>
         {readOnly ? null : (
           <div className="-mr-1.5 flex items-center gap-1">
             {onDuplicate ? (
@@ -332,17 +360,17 @@ export function SelectedPoint({
           </div>
         )}
       </div>
-      <div className="flex items-center gap-3">
-        <PointMarker type={deviceType} className="size-9" />
+      <div className="flex items-center gap-2.5">
+        <PointMarker type={deviceType} className="size-8" />
         <div className="min-w-0">
-          <div className="font-semibold">{code} · {deviceTypeOf(deviceType)?.name ?? '其他设备'}</div>
-          <div className="text-xs text-muted-foreground">{deviceTypeLabel(deviceType)}{areaName ? ` · ${areaName}` : ''}</div>
+          <div className="text-xs font-semibold text-foreground">{code} · {deviceTypeOf(deviceType)?.name ?? '其他设备'}</div>
+          <div className="text-[11px] text-muted-foreground">{deviceTypeLabel(deviceType)}{areaName ? ` · ${areaName}` : ''}</div>
         </div>
       </div>
       <div className="grid gap-1.5">
-        <div className="text-xs font-medium text-muted-foreground">设备类型</div>
+        <div className="text-[11px] font-medium text-muted-foreground">设备类型</div>
         <Select value={deviceType} disabled={readOnly} onValueChange={onChangeType}>
-          <SelectTrigger className="w-full max-w-full min-w-0 overflow-hidden bg-background"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-8 w-full max-w-full min-w-0 overflow-hidden border-border bg-background text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
             {DEVICE_GROUPS.map(({ category, types }) => (
               <SelectGroup key={category.slug}>

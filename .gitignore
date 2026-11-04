@@ -13,7 +13,6 @@ logs/
 .claude-replay.*
 .figma/runtime/
 .tmp-*
-/.figma/design-context/
 
 # Platform-managed agentplat state, not project source. In the
 # client-initiated single-repo workspace layout (make's `Path: "."` spec) the
@@ -34,6 +33,3 @@ logs/
 /.figaro/
 /.impeccable/
 /.export-artifacts/
-/.figma/README.md
-/.figma/make/*
-!/.figma/make/site.json

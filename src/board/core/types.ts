@@ -97,6 +97,9 @@ export type BoardTool = 'select' | 'pan' | 'area' | 'calibrate'
 
 export type SymbolStyle = 'plan' | 'marker'
 
+/** 户型底图彩平风格：cad = 原始图纸；warm = 暖木彩平；modern = 现代极简彩平；blueprint = 工程蓝图 */
+export type SheetStyle = 'cad' | 'warm' | 'modern' | 'blueprint'
+
 /** 视图设置：只影响显示，不写进图纸数据 */
 export type ViewSettings = {
   grid: boolean
@@ -108,7 +111,11 @@ export type ViewSettings = {
   symbolSize: number
   /** 底图不透明度 0–1 */
   sheetOpacity: number
+  /** 户型底图与房间分区的彩平风格化模式 */
+  sheetStyle?: SheetStyle
   layers: Record<LayerId, boolean>
+  /** 系统包辅助图层的开关（按图层 ID，例如信号覆盖圈、开关控灯关联） */
+  overlays: Record<string, boolean>
 }
 
 /** 放置中的符号（点击 / 拖入画布时生成对象用的模板） */

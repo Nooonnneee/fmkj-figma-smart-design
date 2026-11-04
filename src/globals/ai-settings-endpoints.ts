@@ -125,6 +125,89 @@ export const aiSettingsEndpoints: Endpoint[] = [
     },
   },
   {
+    /**
+     * 清理 GitHub 上的历史临时分支（服务端执行，PAT 不离开 Next.js 进程）：
+     * - body.delete 为空或 dryRun=true 时只列出各分支的合并情况，不做任何修改；
+     * - 已合并到 main 的分支直接删除；未完全合并的分支先打上 archive/<分支名> 标签保留全部提交，再删除分支；
+     * - main 与 desktop-release 永不删除。
+     */
+    path: '/github-branches',
+    method: 'post',
+    handler: async (req) => {
+      const localSecret = req.headers.get('x-local-sync-token')
+      if (!isCmsAdmin(req) && localSecret !== process.env.PAYLOAD_SECRET) {
+        return json({ error: '无权限' }, 403)
+      }
+      const token = (process.env.GITHUB_PAT || process.env.GITHUB_TOKEN || '').trim()
+      if (!token) return json({ ok: false, error: '服务端未读取到 GITHUB_PAT 环境变量' }, 400)
+      let body: { delete?: unknown; dryRun?: unknown } = {}
+      try {
+        body = ((await req.json?.()) ?? {}) as typeof body
+      } catch {
+        body = {}
+      }
+      const repo = 'https://github.com/lynnliuyu/fmkj-figma-smart-design.git'
+      const PROTECTED = new Set(['main', 'desktop-release'])
+      const helper = `!f() { echo "username=x-access-token"; echo "password=${token}"; }; f`
+      const git = (args: string[], timeout = 60_000) =>
+        execFileSync('git', ['-c', `credential.helper=${helper}`, ...args], { encoding: 'utf8', stdio: 'pipe', timeout }).trim()
+      const local = (args: string[]) => execFileSync('git', args, { encoding: 'utf8', stdio: 'pipe' }).trim()
+      const listHeads = () =>
+        git(['ls-remote', '--heads', repo], 30_000)
+          .split('\n')
+          .filter(Boolean)
+          .map((line) => {
+            const [sha, ref] = line.split('\t')
+            return { sha: sha ?? '', branch: (ref ?? '').replace('refs/heads/', '') }
+          })
+      const wanted = new Set(Array.isArray(body.delete) ? body.delete.filter((b): b is string => typeof b === 'string') : [])
+      const dryRun = body.dryRun === true || wanted.size === 0
+      try {
+        git(['fetch', '--no-tags', repo, '+refs/heads/main:refs/remotes/github/main'])
+        const results: { branch: string; sha?: string; protected?: boolean; merged?: boolean; ahead?: number; archivedTag?: string | null; deleted?: boolean }[] = []
+        for (const h of listHeads()) {
+          if (PROTECTED.has(h.branch)) {
+            results.push({ branch: h.branch, sha: h.sha.slice(0, 7), protected: true })
+            continue
+          }
+          if (!/^[A-Za-z0-9._/-]+$/.test(h.branch)) {
+            results.push({ branch: h.branch, sha: h.sha.slice(0, 7), deleted: false })
+            continue
+          }
+          git(['fetch', '--no-tags', repo, `+refs/heads/${h.branch}:refs/remotes/github-cleanup/${h.branch}`])
+          let merged = false
+          try {
+            local(['merge-base', '--is-ancestor', h.sha, 'refs/remotes/github/main'])
+            merged = true
+          } catch {
+            merged = false
+          }
+          const ahead = Number(local(['rev-list', '--count', `refs/remotes/github/main..${h.sha}`])) || 0
+          const entry = { branch: h.branch, sha: h.sha.slice(0, 7), merged, ahead, archivedTag: null as string | null, deleted: false }
+          if (!dryRun && wanted.has(h.branch)) {
+            if (!merged) {
+              const tag = `archive/${h.branch.replace(/\//g, '-')}`
+              git(['push', repo, `${h.sha}:refs/tags/${tag}`])
+              entry.archivedTag = tag
+            }
+            git(['push', repo, `:refs/heads/${h.branch}`])
+            entry.deleted = true
+          }
+          try {
+            local(['update-ref', '-d', `refs/remotes/github-cleanup/${h.branch}`])
+          } catch {
+            /* 临时引用清理失败不影响结果 */
+          }
+          results.push(entry)
+        }
+        return json({ ok: true, dryRun, results, remaining: listHeads().map((h) => h.branch) })
+      } catch (e) {
+        const msg = (e as { stderr?: Buffer | string; message?: string })?.stderr?.toString() || (e as Error)?.message || 'git failed'
+        return json({ ok: false, error: msg.split(token).join('***').slice(0, 300) }, 500)
+      }
+    },
+  },
+  {
     // 查询所有内置渠道与自定义渠道的密钥配置状态 + 当前已配置的模型列表摘要
     path: '/status',
     method: 'get',

@@ -27,7 +27,14 @@ export function ShareExportButton({ projectName }: { projectName: string }) {
     if (busy) return
     setBusy(true)
     try {
-      const pages = [...document.querySelectorAll<HTMLElement>('[data-export-page]')]
+      const explicit = [...document.querySelectorAll<HTMLElement>('[data-export-page]')]
+      const pages = explicit.length
+        ? explicit
+        : [
+            ...document.querySelectorAll<HTMLElement>(
+              '#proposal-slide-preview [style*="1440px"], #quote-preview .bg-doc-paper',
+            ),
+          ]
       if (!pages.length) {
         toast.error('未找到可导出的方案或报价页面')
         return

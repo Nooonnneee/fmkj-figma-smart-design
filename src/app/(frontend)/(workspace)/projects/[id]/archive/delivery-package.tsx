@@ -19,7 +19,7 @@ import { zipFiles } from '@/lib/zip'
 import { setDeliverables } from './actions'
 
 export type DeliveryDoc = {
-  key: 'plans' | 'checklist' | 'quote' | 'proposal' | 'contract' | 'construction' | 'wiring' | 'procurement' | 'survey' | 'handover'
+  key: 'plans' | 'checklist' | 'quote' | 'proposal' | 'contract' | 'construction' | 'wiring' | 'procurement' | 'survey' | 'handover' | 'after-sales'
   title: string
   note: string
   /** 打印页地址；null = 还不能生成（例如没有点位、没有合同） */
@@ -146,7 +146,7 @@ export function DeliveryPackage({
   }
 
   return (
-    <section aria-labelledby="package-title" className="rounded-xl bg-card shadow-sm ring-1 ring-foreground/5 dark:ring-foreground/10">
+    <section aria-labelledby="package-title" className="rounded-xl bg-card shadow-xs ring-1 ring-border">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4">
         <div className="flex min-w-0 items-center gap-2">
           <h3 id="package-title" className="text-base font-semibold">交付资料包</h3>
@@ -206,7 +206,7 @@ export function DeliveryPackage({
                   className={cn(
                     'inline-flex items-center rounded px-1.5 py-0.2 text-[10px] font-semibold',
                     d.tierBadge === 'Pro'
-                      ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+                      ? 'bg-amber-500/12 text-amber-800 dark:text-amber-400'
                       : 'bg-primary/12 text-primary',
                   )}
                 >

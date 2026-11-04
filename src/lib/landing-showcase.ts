@@ -65,16 +65,7 @@ export const getLandingShowcase = memoize<LandingShowcase | null>('landing-showc
     select: { name: true, customerName: true, community: true, address: true, platform: true, pointMap: true } as never,
   })
   const project = res.docs[0] as unknown as Record<string, unknown> | undefined
-  if (!project) {
-    return {
-      project: { name: '湖山赋别墅全屋智能', customer: '林先生', community: '湖山赋', address: '', platform: '米家' },
-      sheets: BUILTIN_DEMO_SHEETS,
-      pointCount: BUILTIN_DEMO_SHEETS.reduce((s, sh) => s + sh.points.length, 0),
-      roomCount: BUILTIN_DEMO_SHEETS.reduce((s, sh) => s + sh.areas.length, 0),
-      quote: null,
-      library: { products: 0, brands: 0 },
-    }
-  }
+  if (!project) return null
 
   const scene = normalizeScene(project.pointMap as never)
   const allSheets = sceneSheets(scene.elements, scene.files)

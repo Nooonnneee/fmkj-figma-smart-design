@@ -31,10 +31,10 @@ export function LightingPanel({ armedId, onArm, disabled, calibrated }: { armedI
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <ScrollArea className="min-h-0 flex-1">
-        <div className="space-y-4 p-4 pt-2">
+        <div className="space-y-4 px-3.5 pt-2.5 pb-4">
           {LIGHTING_GROUPS.map((g) => (
             <section key={g.name}>
-              <div className="mb-1.5 text-xs font-semibold">{g.name}</div>
+              <div className="mb-1.5 text-xs font-semibold text-fg-secondary">{g.name}</div>
               <div className="grid grid-cols-3 gap-1.5">
                 {g.families.map((f) => (
                   <Button
@@ -53,9 +53,12 @@ export function LightingPanel({ armedId, onArm, disabled, calibrated }: { armedI
                       onArm(inFam && f.id === famId ? null : variantTemplate(f, defaultVariant(f).id, real))
                     }}
                     aria-pressed={f.id === famId}
-                    className={cn('h-auto flex-col gap-1 px-1 py-2 text-xs font-normal', f.id === famId && 'border-primary bg-primary/5')}
+                    className={cn(
+                      'h-auto flex-col gap-1 rounded-lg border-border bg-background px-1 py-2 text-[11px] font-normal text-fg-secondary shadow-none hover:border-border-strong hover:bg-subtle',
+                      f.id === famId && 'border-primary bg-primary/8 font-medium text-primary ring-2 ring-primary/20',
+                    )}
                   >
-                    <Art id={f.cover} className="size-8" />
+                    <Art id={f.cover} className="size-7" />
                     <span className="leading-tight">{f.name}</span>
                   </Button>
                 ))}
@@ -64,9 +67,9 @@ export function LightingPanel({ armedId, onArm, disabled, calibrated }: { armedI
           ))}
         </div>
       </ScrollArea>
-      <div className="space-y-2 border-t p-4">
+      <div className="space-y-2 border-t border-border bg-subtle/50 p-3.5">
         <div className="flex items-center justify-between gap-2 text-xs">
-          <span className="font-semibold">{fam.name} · 尺寸</span>
+          <span className="font-semibold text-foreground">{fam.name} · 尺寸档</span>
           <label className="flex items-center gap-1.5 text-muted-foreground">
             按比例
             <Switch
@@ -88,7 +91,12 @@ export function LightingPanel({ armedId, onArm, disabled, calibrated }: { armedI
               size="xs"
               variant={armedId === v.id ? 'default' : 'outline'}
               disabled={disabled}
-              className="h-7 gap-1 px-2 text-xs"
+              className={cn(
+                'h-6.5 gap-1 px-2 text-[11px] shadow-none',
+                armedId === v.id
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  : 'border-border bg-background text-fg-secondary hover:bg-subtle',
+              )}
               onClick={() => onArm(armedId === v.id ? null : variantTemplate(fam, v.id, real))}
             >
               {fam.variants.some((x) => x.art !== v.art) ? <Art id={v.art} className="size-4" /> : null}
@@ -96,7 +104,7 @@ export function LightingPanel({ armedId, onArm, disabled, calibrated }: { armedI
             </Button>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-[11px] text-muted-foreground">
           {real && !calibrated ? '当前图纸未标定，按比例的灯具先按固定大小示意；标定后自动换成真实尺寸。' : `计入报价：按设备类型统计（${fam.variants.length} 个尺寸档）。`}
         </p>
       </div>

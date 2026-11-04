@@ -350,7 +350,7 @@ export function DocsClient({ manual }: { manual: ManualData }) {
             <Link href="/" className="shrink-0">
               <BrandLogo className="h-6 w-auto" />
             </Link>
-            <span className="text-border">/</span>
+            <span aria-hidden className="text-muted-foreground/60">/</span>
             <button
               type="button"
               onClick={() => selectSection('overview')}

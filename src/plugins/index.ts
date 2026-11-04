@@ -151,12 +151,13 @@ const RAW_PLUGINS: AppPlugin[] = [
     id: 'after-sales',
     stage: 'after',
     tier: 'team',
+    entry: { label: '售后维保', href: (id) => `/projects/${id}/after-sales` },
     tagline: '质保、检修与配置备份都有记录',
     name: '售后维保记录',
-    description: '管理质保期、设备更换与上门检修记录，留存项目配置备份。',
-    status: 'coming-soon',
-    where: '项目 → 归档 / 售后维保',
-    provides: ['质保台账', '检修记录', '配置备份'],
+    description: '按合同质保期自动倒计时，登记交付验收、巡检、上门检修与设备更换，留存全屋设备台账作为配置备份，并打印售后维保卡。',
+    status: 'ready',
+    where: '项目 → 归档 →「售后维保」、项目工具箱',
+    provides: ['质保倒计时', '维保记录', '配置备份', '售后维保卡'],
   },
 ]
 

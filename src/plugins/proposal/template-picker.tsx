@@ -25,7 +25,7 @@ export function TierPill({ t, className }: { t: Pick<PickerTemplate, 'tier' | 't
     <span
       className={cn(
         'inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-none font-semibold',
-        t.tier === 'team' ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' : t.tier === 'pro' ? 'bg-primary/12 text-primary' : 'bg-muted text-muted-foreground',
+        t.tier === 'team' ? 'bg-amber-500/12 text-amber-800 dark:text-amber-400' : t.tier === 'pro' ? 'bg-primary/12 text-primary' : 'bg-muted text-muted-foreground',
         className,
       )}
       title={t.meets ? `${t.tierBadge} 模板` : `${t.tierBadge} 模板 · 当前会员可预览，导出需升级`}

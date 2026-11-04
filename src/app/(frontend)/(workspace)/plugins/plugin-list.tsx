@@ -113,7 +113,7 @@ export function PluginList({ items, stages, selectedId, upgradeHint }: { items: 
                 className={cn(
                   'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold',
                   p.tierBadge === 'Pro'
-                    ? 'bg-amber-500/15 text-amber-700 ring-1 ring-amber-500/30 dark:text-amber-400'
+                    ? 'bg-amber-500/12 text-amber-800 ring-1 ring-amber-500/30 dark:text-amber-400'
                     : p.tierBadge === 'Plus'
                       ? 'bg-primary/12 text-primary ring-1 ring-primary/25'
                       : 'bg-muted text-muted-foreground',

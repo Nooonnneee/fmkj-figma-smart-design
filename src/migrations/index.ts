@@ -9,6 +9,7 @@ import * as migration_20261101_172228_ai_settings_sync from './20261101_172228_a
 import * as migration_20261102_081320_scenes_templates_delivery_sync from './20261102_081320_scenes_templates_delivery_sync';
 import * as migration_20261102_140755_model_pricing from './20261102_140755_model_pricing';
 import * as migration_20261103_120000_templates_meta_and_ai_min_tier from './20261103_120000_templates_meta_and_ai_min_tier';
+import * as migration_20261104_032108_after_sales_feedback_costs from './20261104_032108_after_sales_feedback_costs';
 
 export const migrations = [
   {
@@ -59,11 +60,16 @@ export const migrations = [
   {
     up: migration_20261102_140755_model_pricing.up,
     down: migration_20261102_140755_model_pricing.down,
-    name: '20261102_140755_model_pricing'
+    name: '20261102_140755_model_pricing',
   },
   {
     up: migration_20261103_120000_templates_meta_and_ai_min_tier.up,
     down: migration_20261103_120000_templates_meta_and_ai_min_tier.down,
     name: '20261103_120000_templates_meta_and_ai_min_tier',
+  },
+  {
+    up: migration_20261104_032108_after_sales_feedback_costs.up,
+    down: migration_20261104_032108_after_sales_feedback_costs.down,
+    name: '20261104_032108_after_sales_feedback_costs'
   },
 ];

@@ -85,6 +85,8 @@ export interface Config {
     projects: Project;
     quotes: Quote;
     contracts: Contract;
+    'service-records': ServiceRecord;
+    'client-feedback': ClientFeedback;
     products: Product;
     scenes: Scene;
     'proposal-templates': ProposalTemplate;
@@ -112,6 +114,8 @@ export interface Config {
     projects: ProjectsSelect<false> | ProjectsSelect<true>;
     quotes: QuotesSelect<false> | QuotesSelect<true>;
     contracts: ContractsSelect<false> | ContractsSelect<true>;
+    'service-records': ServiceRecordsSelect<false> | ServiceRecordsSelect<true>;
+    'client-feedback': ClientFeedbackSelect<false> | ClientFeedbackSelect<true>;
     products: ProductsSelect<false> | ProductsSelect<true>;
     scenes: ScenesSelect<false> | ScenesSelect<true>;
     'proposal-templates': ProposalTemplatesSelect<false> | ProposalTemplatesSelect<true>;
@@ -281,6 +285,18 @@ export interface User {
       | boolean
       | null;
     disabledPlugins?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+    /**
+     * 在系统「设置 → 报价成本与毛利」里修改：品牌拿货折扣、附加费用成本占比与毛利率底线，仅本人在报价台可见
+     */
+    costSettings?:
       | {
           [k: string]: unknown;
         }
@@ -795,6 +811,102 @@ export interface Contract {
       }[]
     | null;
   terms?: string | null;
+  createdBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "service-records".
+ */
+export interface ServiceRecord {
+  id: string;
+  title: string;
+  project: string | Project;
+  type: 'acceptance' | 'inspection' | 'repair' | 'replacement' | 'remote' | 'backup';
+  serviceDate: string;
+  status: 'open' | 'scheduled' | 'done';
+  nextVisitAt?: string | null;
+  detail?: string | null;
+  devices?: string | null;
+  billing: 'warranty' | 'paid' | 'free';
+  fee?: number | null;
+  technician?: string | null;
+  snapshot?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  createdBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'admins';
+        value: string | Admin;
+      } | null)
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null);
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "client-feedback".
+ */
+export interface ClientFeedback {
+  id: string;
+  customerName: string;
+  customerPhone?: string | null;
+  project: string | Project;
+  quote: string | Quote;
+  quoteTitle?: string | null;
+  decision: 'confirm' | 'revise';
+  quoteTotal?: number | null;
+  intentTotal?: number | null;
+  message?: string | null;
+  deferredItems?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  signature?: string | null;
+  status: 'new' | 'handled';
+  handledAt?: string | null;
+  handledBy?: (string | null) | User;
   createdBy?:
     | ({
         relationTo: 'admins';
@@ -1344,6 +1456,14 @@ export interface PayloadLockedDocument {
         value: string | Contract;
       } | null)
     | ({
+        relationTo: 'service-records';
+        value: string | ServiceRecord;
+      } | null)
+    | ({
+        relationTo: 'client-feedback';
+        value: string | ClientFeedback;
+      } | null)
+    | ({
         relationTo: 'products';
         value: string | Product;
       } | null)
@@ -1525,6 +1645,7 @@ export interface UsersSelect<T extends boolean = true> {
         printProductImages?: T;
         documentDefaults?: T;
         disabledPlugins?: T;
+        costSettings?: T;
       };
   createdBy?: T;
   updatedBy?: T;
@@ -1643,6 +1764,52 @@ export interface ContractsSelect<T extends boolean = true> {
         id?: T;
       };
   terms?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "service-records_select".
+ */
+export interface ServiceRecordsSelect<T extends boolean = true> {
+  title?: T;
+  project?: T;
+  type?: T;
+  serviceDate?: T;
+  status?: T;
+  nextVisitAt?: T;
+  detail?: T;
+  devices?: T;
+  billing?: T;
+  fee?: T;
+  technician?: T;
+  snapshot?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "client-feedback_select".
+ */
+export interface ClientFeedbackSelect<T extends boolean = true> {
+  customerName?: T;
+  customerPhone?: T;
+  project?: T;
+  quote?: T;
+  quoteTitle?: T;
+  decision?: T;
+  quoteTotal?: T;
+  intentTotal?: T;
+  message?: T;
+  deferredItems?: T;
+  signature?: T;
+  status?: T;
+  handledAt?: T;
+  handledBy?: T;
   createdBy?: T;
   updatedBy?: T;
   updatedAt?: T;
@@ -2315,6 +2482,8 @@ export interface CollectionQueryWidget {
       | 'projects'
       | 'quotes'
       | 'contracts'
+      | 'service-records'
+      | 'client-feedback'
       | 'products'
       | 'scenes'
       | 'proposal-templates'
@@ -2357,6 +2526,8 @@ export interface ActivityWidget {
           | 'projects'
           | 'quotes'
           | 'contracts'
+          | 'service-records'
+          | 'client-feedback'
           | 'products'
           | 'scenes'
           | 'proposal-templates'

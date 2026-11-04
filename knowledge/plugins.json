@@ -60,7 +60,8 @@
         ],
         "guidance": [
           "当用户提出创建或修改请求时，主动调用对应工具直接完成操作（可分多步连续调用，例如：新建项目 → 布置房间和点位 → 智能选型 → 生成报价单），不要只给口头步骤。",
-          "当用户上传了真实户型图图片时，严禁调用 setup_rooms_and_points 生成网格默认点位！只有图像真实识别出点位（add_floor_sheet 的 detectedPoints）或用户提供了点位 JSON（import_points_json）时才生成点位图标；若未识别出点位，保持点位图为空（0 点位）。"
+          "当用户上传了真实户型图图片时，严禁调用 setup_rooms_and_points 生成网格默认点位！只有图像真实识别出点位（add_floor_sheet 的 detectedPoints）或用户提供了点位 JSON（import_points_json）时才生成点位图标；若未识别出点位，保持点位图为空（0 点位）。",
+          "当用户上传或粘贴别家的报价单 / 设备清单要求比价时：先逐行识别品名、品牌、型号、数量与单价（安装调试、布线辅材等服务项放入 fees），再调用 create_quote_from_competitor 生成对比报价单，最后按行总结匹配型号与差价，不要把外店的服务项当成设备。"
         ],
         "knowledge": [
           {
@@ -94,10 +95,13 @@
           "set_project_defaults",
           "get_project_details",
           "create_or_update_quote",
+          "create_quote_from_competitor",
           "create_or_update_contract",
           "get_document_links"
         ],
-        "skills": []
+        "skills": [
+          "tpl-competitor-quote"
+        ]
       }
     },
     {
@@ -512,14 +516,15 @@
       "name": "售后维保记录",
       "stage": "after",
       "tier": "team",
-      "status": "coming-soon",
+      "status": "ready",
       "tagline": "质保、检修与配置备份都有记录",
-      "description": "管理质保期、设备更换与上门检修记录，留存项目配置备份。",
-      "where": "项目 → 归档 / 售后维保",
+      "description": "按合同质保期自动倒计时，登记交付验收、巡检、上门检修与设备更换，留存全屋设备台账作为配置备份，并打印售后维保卡。",
+      "where": "项目 → 归档 →「售后维保」、项目工具箱",
       "provides": [
-        "质保台账",
-        "检修记录",
-        "配置备份"
+        "质保倒计时",
+        "维保记录",
+        "配置备份",
+        "售后维保卡"
       ],
       "ai": {
         "permissions": [
@@ -527,15 +532,18 @@
           "contracts:read"
         ],
         "guidance": [
-          "解答售后质保问题时，优先读取项目合同中的质保月数（warrantyMonths）与签约日期计算质保到期日。"
+          "解答售后质保问题时：质保起算日优先取项目「交付验收」维保记录的日期，没有时取合同签订日期；质保月数取合同 warrantyMonths（未填写按 12 个月）。",
+          "用户需要登记检修、设备更换或留存配置备份时，引导其打开项目的售后维保页（/projects/[id]/after-sales）；交付时可提供售后维保卡打印链接（/print/projects/[id]/after-sales）。"
         ],
         "knowledge": [
           {
             "id": "after-sales-policy",
             "title": "售后维保与配置备份规范",
-            "summary": "按合同质保期追踪设备更换与上门检修记录",
+            "summary": "按合同质保期自动倒计时，记录交付验收、巡检、检修、设备更换、远程调试与配置备份",
             "rules": [
-              "标准合同默认提供 12 个月设备质保与上门联调服务，归档时留存点位图与报价快照作为维保基准。"
+              "标准合同默认提供 12 个月设备质保与上门联调服务；登记「交付验收」后质保从验收日起算，否则从合同签订日起算，到期前 30 天提示安排巡检。",
+              "维保记录类型：交付验收、定期巡检、上门检修、设备更换、远程调试、配置备份；收费方式分质保内免费、保外收费（记录金额）与赠送服务。",
+              "配置备份会把当时的点位图与定稿报价整理成全屋设备台账（代号、位置、设备类型、型号）留存，后续更换设备时以此为基准核对。"
             ]
           }
         ],

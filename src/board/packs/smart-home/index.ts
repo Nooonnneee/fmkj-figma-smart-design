@@ -12,6 +12,7 @@ import { DEVICE_TYPE_ORDER, deviceTypeOf } from '@/lib/device-types'
 
 import { analyzeDoc } from './codec'
 import { lightingVariant, lookOf } from './look'
+import { SMART_HOME_OVERLAYS, unswitchedLights } from './overlays'
 
 function check(doc: BoardDoc): CheckIssue[] {
   const issues: CheckIssue[] = []
@@ -36,6 +37,26 @@ function check(doc: BoardDoc): CheckIssue[] {
     if (un.length) issues.push({ id: 'no-area', level: 'warning', title: `${un.length} 个点位不在任何区域内`, detail: '不在区域内的点位不会按房间统计', targets: un.map((p) => p.id) })
     const empty = areas.filter((a) => !points.some((p) => p.areaId === a.id))
     if (empty.length) issues.push({ id: 'empty-area', level: 'info', title: `${empty.length} 个区域还没有点位`, detail: empty.slice(0, 6).map((a) => a.name).join('、'), targets: empty.map((a) => a.id) })
+    // 有灯具却没有开关、门外附近也没有开关（也没有人体传感器 / 中控屏）的房间：灯装上了却没法控制
+    const dark = new Map<string, { name: string; lights: string[] }>()
+    for (const { light, area } of unswitchedLights(doc)) {
+      const key = area?.id ?? '__none'
+      const g = dark.get(key) ?? { name: area?.name ?? '区域外', lights: [] }
+      g.lights.push(light.id)
+      dark.set(key, g)
+    }
+    if (dark.size) {
+      issues.push({
+        id: 'no-switch',
+        level: 'warning',
+        title: `${dark.size} 个房间的灯具没有开关控制`,
+        detail: `${[...dark.values()]
+          .slice(0, 6)
+          .map((g) => g.name)
+          .join('、')}：补开关或人体传感器；打开「开关控灯关联」可在图上查看`,
+        targets: [...dark.values()].flatMap((g) => g.lights),
+      })
+    }
   }
   const uncal = syms.filter((s) => s.real && s.sizeCm && !sheetAt(doc, s.x, s.y)?.mmPerUnit)
   if (uncal.length) issues.push({ id: 'uncalibrated', level: 'warning', title: `${uncal.length} 个按比例的灯具所在图纸未标定`, detail: '标定图纸比例后才按真实尺寸显示，现在按固定大小示意', targets: uncal.map((s) => s.id) })
@@ -72,4 +93,5 @@ export const smartHomePack: SystemPack = {
   check,
   legend,
   export: { title: '智能家居点位图', note: '平面符号素材仅限内部使用，对外交付前请确认授权' },
+  overlays: SMART_HOME_OVERLAYS,
 }

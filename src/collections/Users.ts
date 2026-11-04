@@ -131,6 +131,13 @@ export const Users: CollectionConfig = {
           label: '已关闭的插件',
           type: 'json',
         },
+        {
+          // { brandRates: [{ brand: 品牌标识, rate: 0.65 }], defaultRate, feeCostPercent, minMarginPercent }，见 src/lib/quote-costs.ts
+          name: 'costSettings',
+          label: '报价成本与毛利设置',
+          type: 'json',
+          admin: { description: '在系统「设置 → 报价成本与毛利」里修改：品牌拿货折扣、附加费用成本占比与毛利率底线，仅本人在报价台可见' },
+        },
       ],
     },
   ],

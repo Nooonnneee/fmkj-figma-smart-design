@@ -17,7 +17,7 @@ export function ProjectToolbox({ projectId, flags, membership, strict }: { proje
   const ready = PLUGINS.filter((p) => p.status === 'ready')
   const groups = PLUGIN_STAGES.map((s, i) => ({ ...s, step: s.key === 'global' ? null : i + 1, plugins: ready.filter((p) => p.stage === s.key) })).filter((g) => g.plugins.length)
   return (
-    <section aria-labelledby="toolbox-title" className="rounded-xl bg-card shadow-sm ring-1 ring-foreground/5 dark:ring-foreground/10">
+    <section aria-labelledby="toolbox-title" className="rounded-xl bg-card shadow-xs ring-1 ring-border">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-3.5">
         <h2 id="toolbox-title" className="text-base font-semibold">项目工具箱</h2>
         <Button asChild variant="ghost" size="sm" className="text-muted-foreground">

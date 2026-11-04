@@ -4,16 +4,102 @@ import { memo } from 'react'
 
 import { toDeg } from '../core/geometry'
 import { areaPoly } from '../core/ops'
+import type { OverlayShapes } from '../core/pack'
 import { LABEL_SIZE, type SymbolGeom, type SymbolLook } from '../core/symbols'
-import type { AreaObj, RawEl, SheetObj, SymbolObj } from '../core/types'
+import type { AreaObj, RawEl, SheetObj, SheetStyle, SymbolObj } from '../core/types'
 import { AREA_LABEL, areaLabelAnchor } from './hit'
 
-export const SheetView = memo(function SheetView({ s, href, opacity, titleColor }: { s: SheetObj; href: string | null; opacity: number; titleColor: string }) {
+export const SHEET_STYLE_META: Record<SheetStyle, { label: string; desc: string; paperFill: string; filterId?: string }> = {
+  cad: { label: '原始 CAD', desc: '白底黑线工程底图', paperFill: '#ffffff' },
+  warm: { label: '暖木彩平', desc: '暖色木地板与功能区着色', paperFill: '#fbf8f3', filterId: 'board-sheet-warm' },
+  modern: { label: '现代极简', desc: '冷灰石材感与雅致分区着色', paperFill: '#f8fafc', filterId: 'board-sheet-modern' },
+  blueprint: { label: '工程蓝图', desc: '深蓝晒图质感底图', paperFill: '#eff6ff', filterId: 'board-sheet-blueprint' },
+}
+
+function areaStyleColors(areaType: string, style: SheetStyle = 'cad'): { fill: string; stroke: string; labelColor: string } {
+  if (style === 'cad') {
+    return {
+      fill: 'rgba(100,116,139,0.035)',
+      stroke: '#64748b',
+      labelColor: '#475569',
+    }
+  }
+  if (style === 'warm') {
+    switch (areaType) {
+      case 'living':
+      case 'dining':
+      case 'hallway':
+        return { fill: 'rgba(235, 206, 168, 0.42)', stroke: '#b58952', labelColor: '#5c3d1e' }
+      case 'master_bedroom':
+      case 'bedroom':
+      case 'study':
+      case 'cloakroom':
+        return { fill: 'rgba(224, 182, 142, 0.46)', stroke: '#9c6b3e', labelColor: '#543518' }
+      case 'kitchen':
+      case 'bathroom':
+        return { fill: 'rgba(186, 214, 226, 0.45)', stroke: '#568296', labelColor: '#234757' }
+      case 'balcony':
+      case 'courtyard':
+        return { fill: 'rgba(182, 220, 188, 0.45)', stroke: '#4f8758', labelColor: '#254f2c' }
+      default:
+        return { fill: 'rgba(222, 208, 190, 0.38)', stroke: '#8a7358', labelColor: '#4a3b2a' }
+    }
+  }
+  if (style === 'modern') {
+    switch (areaType) {
+      case 'living':
+      case 'dining':
+        return { fill: 'rgba(199, 210, 254, 0.38)', stroke: '#6366f1', labelColor: '#3730a3' }
+      case 'master_bedroom':
+      case 'bedroom':
+      case 'study':
+        return { fill: 'rgba(221, 214, 254, 0.40)', stroke: '#7c3aed', labelColor: '#4c1d95' }
+      case 'kitchen':
+      case 'bathroom':
+        return { fill: 'rgba(186, 230, 253, 0.40)', stroke: '#0284c7', labelColor: '#075985' }
+      case 'balcony':
+      case 'courtyard':
+        return { fill: 'rgba(167, 243, 208, 0.38)', stroke: '#059669', labelColor: '#065f46' }
+      default:
+        return { fill: 'rgba(226, 232, 240, 0.42)', stroke: '#64748b', labelColor: '#334155' }
+    }
+  }
+  // blueprint
+  return {
+    fill: 'rgba(191, 219, 254, 0.38)',
+    stroke: '#3b82f6',
+    labelColor: '#1d4ed8',
+  }
+}
+
+export const SheetView = memo(function SheetView({
+  s,
+  href,
+  opacity,
+  titleColor,
+  sheetStyle = 'cad',
+}: {
+  s: SheetObj
+  href: string | null
+  opacity: number
+  titleColor: string
+  sheetStyle?: SheetStyle
+}) {
+  const meta = SHEET_STYLE_META[sheetStyle] ?? SHEET_STYLE_META.cad
   return (
     <g>
-      <rect x={s.x} y={s.y} width={s.w} height={s.h} fill="#ffffff" filter="url(#board-paper-shadow)" />
+      <rect x={s.x} y={s.y} width={s.w} height={s.h} fill={meta.paperFill} filter="url(#board-paper-shadow)" />
       {href ? (
-        <image href={href} x={s.x} y={s.y} width={s.w} height={s.h} opacity={opacity} preserveAspectRatio="none" />
+        <image
+          href={href}
+          x={s.x}
+          y={s.y}
+          width={s.w}
+          height={s.h}
+          opacity={opacity}
+          filter={meta.filterId ? `url(#${meta.filterId})` : undefined}
+          preserveAspectRatio="none"
+        />
       ) : (
         <text x={s.x + s.w / 2} y={s.y + s.h / 2} textAnchor="middle" fontSize={28} fill="#b45309">图纸图片已丢失，请删除后重新添加</text>
       )}
@@ -23,22 +109,25 @@ export const SheetView = memo(function SheetView({ s, href, opacity, titleColor 
 })
 
 /** 区域：实线轮廓（多边形或矩形）+ 最上方顶点处的区域名；选中时描边加粗并带浅色底 */
-export const AreaView = memo(function AreaView({ a, selected }: { a: AreaObj; selected: boolean }) {
+export const AreaView = memo(function AreaView({ a, selected, sheetStyle = 'cad' }: { a: AreaObj; selected: boolean; sheetStyle?: SheetStyle }) {
   const label = areaLabelAnchor(a)
+  const palette = areaStyleColors(a.areaType, sheetStyle)
   return (
     <g>
       <polygon
         points={areaPoly(a)
           .map((q) => `${q.x},${q.y}`)
           .join(' ')}
-        fill={selected ? 'var(--board-accent-soft)' : 'rgba(100,116,139,0.035)'}
-        stroke={selected ? 'var(--board-accent)' : '#64748b'}
-        strokeOpacity={selected ? 1 : 0.85}
+        fill={selected ? 'var(--board-accent-soft)' : palette.fill}
+        stroke={selected ? 'var(--board-accent)' : palette.stroke}
+        strokeOpacity={selected ? 1 : sheetStyle === 'cad' ? 0.85 : 0.65}
         strokeWidth={selected ? 2 : 1.4}
+        strokeDasharray={sheetStyle !== 'cad' && !selected ? '5 3' : undefined}
         strokeLinejoin="round"
         vectorEffect="non-scaling-stroke"
+        style={sheetStyle !== 'cad' && !selected ? { mixBlendMode: 'multiply' } : undefined}
       />
-      <text x={label.x + 4} y={label.y + 3 + AREA_LABEL * 0.95} fontSize={AREA_LABEL} fontWeight={600} fill="#475569" stroke="#ffffff" strokeWidth={3} paintOrder="stroke" strokeLinejoin="round">
+      <text x={label.x + 4} y={label.y + 3 + AREA_LABEL * 0.95} fontSize={AREA_LABEL} fontWeight={600} fill={selected ? 'var(--board-accent)' : palette.labelColor} stroke="#ffffff" strokeWidth={3} paintOrder="stroke" strokeLinejoin="round">
         {a.name}
       </text>
     </g>
@@ -77,6 +166,37 @@ export const SymbolLabel = memo(function SymbolLabel({ o, g, color }: { o: Symbo
     <text x={o.x} y={g.labelY} textAnchor="middle" fontSize={LABEL_SIZE} fontWeight={700} fill={color} stroke="#ffffff" strokeWidth={2.2} paintOrder="stroke" strokeLinejoin="round" pointerEvents="none">
       {o.code}
     </text>
+  )
+})
+
+/**
+ * 系统包的辅助图层：覆盖圈（半透明填充 + 描边，估算时用虚线）、关联连线（虚线）、提示圈。
+ * 线宽不随缩放变化；文字按缩放反向放大，保证任何缩放下都清楚。
+ */
+export const OverlayView = memo(function OverlayView({ shapes, zoom }: { shapes: OverlayShapes; zoom: number }) {
+  const fs = 11 / zoom
+  return (
+    <g pointerEvents="none">
+      {shapes.circles?.map((c) => (
+        <g key={`c-${c.id}`}>
+          <circle cx={c.x} cy={c.y} r={c.r} fill={c.color} fillOpacity={0.07} stroke={c.color} strokeOpacity={0.55} strokeWidth={1.4} strokeDasharray={c.estimated ? '6 5' : undefined} vectorEffect="non-scaling-stroke" />
+          <circle cx={c.x} cy={c.y} r={c.r * 0.5} fill="none" stroke={c.color} strokeOpacity={0.25} strokeWidth={1} strokeDasharray="2 4" vectorEffect="non-scaling-stroke" />
+          {c.label ? (
+            <text x={c.x} y={c.y - c.r + fs * 1.4} textAnchor="middle" fontSize={fs} fontWeight={600} fill={c.color} stroke="#ffffff" strokeWidth={3 / zoom} paintOrder="stroke">
+              {c.label}
+            </text>
+          ) : null}
+        </g>
+      ))}
+      {shapes.links?.map((l) => (
+        <line key={`l-${l.id}`} x1={l.from.x} y1={l.from.y} x2={l.to.x} y2={l.to.y} stroke={l.color} strokeOpacity={0.6} strokeWidth={1.2} strokeDasharray="5 4" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+      ))}
+      {shapes.marks?.map((m) => (
+        <circle key={`m-${m.id}`} cx={m.x} cy={m.y} r={18 / Math.max(zoom, 0.4)} fill="none" stroke={m.color} strokeWidth={1.8} strokeDasharray="3 3" vectorEffect="non-scaling-stroke">
+          {m.title ? <title>{m.title}</title> : null}
+        </circle>
+      ))}
+    </g>
   )
 })
 

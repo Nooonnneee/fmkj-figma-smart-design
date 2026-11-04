@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { AlertCircle, ChevronDown, Loader2, Maximize2, MoreHorizontal, SquarePen, Trash2, Upload } from 'lucide-react'
+import { AlertCircle, ArrowRight, ChevronDown, Loader2, Maximize2, MoreHorizontal, Sparkles, SquarePen, Trash2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 
 import {
@@ -489,17 +489,29 @@ export function AiSidebarDock({
         {loadingHistory ? (
           <Loader2 className="m-auto size-4 animate-spin text-muted-foreground" />
         ) : messages.length === 0 ? (
-          <div className="m-auto w-full space-y-4 text-center">
-            <p className="text-base font-medium">{project ? `关于「${project.name}」，想做点什么？` : '有什么可以帮你？'}</p>
-            <div className="flex flex-col gap-1.5">
+          <div className="m-auto w-full max-w-xl animate-enter space-y-6">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <span aria-hidden className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20 ring-inset">
+                <Sparkles className="size-5" />
+              </span>
+              <div className="space-y-1">
+                <p className="text-lg font-semibold tracking-tight text-foreground">{project ? `关于「${project.name}」，想做点什么？` : '有什么可以帮你？'}</p>
+                <p className="text-sm text-muted-foreground">选择一个常用任务，或直接描述需求、拖入户型图与清单</p>
+              </div>
+            </div>
+            <div className="grid gap-2">
               {DEFAULT_AI_TEMPLATES.slice(0, 3).map((t) => (
                 <button
                   key={t.id}
                   type="button"
                   onClick={() => pickTemplate(t.id)}
-                  className="rounded-xl border px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
+                  className="group flex items-center gap-3 rounded-xl bg-card px-3.5 py-3 text-left shadow-xs ring-1 ring-border transition-[box-shadow,background-color] duration-150 ease-out-quart hover:bg-subtle hover:ring-border-strong focus-visible:ring-3 focus-visible:ring-ring/35 focus-visible:outline-none"
                 >
-                  {t.name}
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-foreground">{t.name}</span>
+                    {t.description ? <span className="mt-0.5 line-clamp-1 block text-xs text-muted-foreground">{t.description}</span> : null}
+                  </span>
+                  <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-out-quart group-hover:translate-x-0.5 group-hover:text-foreground" />
                 </button>
               ))}
             </div>

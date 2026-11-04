@@ -119,10 +119,11 @@ export function createAppAuth(appUserCollection: 'users') {
 
     if (previewDemoEnabled()) {
       const previewState = readPreviewSession()
-      if (previewState?.userId === SIGNED_OUT_SENTINEL && jwtTokens.length === 0) return null
       if (previewState?.userId && previewState.userId !== SIGNED_OUT_SENTINEL) {
-        return resolvePreviewFallbackUser()
+        const fallback = await resolvePreviewFallbackUser()
+        if (fallback) return fallback
       }
+      if (previewState?.userId === SIGNED_OUT_SENTINEL && jwtTokens.length === 0) return null
     }
 
     if (jwtTokens.length > 0) {
@@ -132,7 +133,12 @@ export function createAppAuth(appUserCollection: 'users') {
         const { user } = await payload.auth({ headers: authHeaders }).catch(() => ({ user: null }))
         if (user && user.collection === appUserCollection) {
           const appUser = user as User & { collection: string }
-          if (appUser.status === 'active') return appUser
+          if (appUser.status === 'active') {
+            if (previewDemoEnabled() && readPreviewSession()?.userId === SIGNED_OUT_SENTINEL) {
+              writePreviewSession(String(appUser.id))
+            }
+            return appUser
+          }
         }
       }
     }
@@ -166,7 +172,10 @@ export function createAppAuth(appUserCollection: 'users') {
       if (!result.token || !result.user) return { ok: false, error: '邮箱或密码不正确' }
       if ((result.user as User).status !== 'active') return { ok: false, error: '该账号已停用，请联系管理员' }
 
-      writePreviewSession(String(result.user.id))
+      // 忽略自动化冒烟测试临时账号，避免覆盖预览面板当前登录的真实/演示账号
+      if (!/^preview_\d+@example\.com$/i.test(email)) {
+        writePreviewSession(String(result.user.id))
+      }
       const opts = await sessionCookieOptions()
       const jar = await cookies()
       jar.set(APP_SESSION_COOKIE, result.token, {

@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils'
 import { redirectToLogin } from '@/lib/login-redirect'
 
 import { ProductsResizableLayout } from './resizable-filter-layout'
+import { SortToggle } from './sort-toggle'
 
 export const metadata = { title: pageTitle('产品库') }
 
@@ -135,7 +136,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       {label}
     </Link>
   )
-  const seg = (items: readonly { value: string; label: string }[], current: string, key: 'status' | 'img' | 'sort', label: string) => (
+  const seg = (items: readonly { value: string; label: string }[], current: string, key: 'status' | 'img', label: string) => (
     <FilterTabs label={label} items={items.map((it) => ({ key: it.label, label: it.label, href: href({ [key]: it.value }), active: current === it.value }))} />
   )
   const section = (title: string, children: React.ReactNode) => (
@@ -166,6 +167,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
     <section className="mx-auto flex w-full max-w-7xl flex-col gap-6">
       <PageHeader
         title="产品库"
+        description={<><span className="tabular-nums">{byStatus.length}</span> 个{f.status === "inactive" ? "下架" : f.status === "all" ? "" : "在售"}产品 · <span className="tabular-nums">{brands.length}</span> 个品牌，点位与报价共用同一套设备分类</>}
         actions={
           <Form action="/products" className="flex flex-wrap items-center gap-2">
             {KEYS.filter((k) => !['q', 'min', 'max', 'page'].includes(k) && f[k]).map((k) => <input key={k} type="hidden" name={k} value={f[k]} />)}
@@ -244,7 +246,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                   <Link href={f.sort ? `/products?sort=${f.sort}` : '/products'}><X className="size-4" />清除筛选</Link>
                 </Button>
               ) : null}
-              {seg(SORTS, f.sort, 'sort', '排序')}
+              <SortToggle items={SORTS.map((it) => ({ value: it.value, label: it.label, href: href({ sort: it.value }), active: f.sort === it.value }))} />
             </div>
           </div>
 

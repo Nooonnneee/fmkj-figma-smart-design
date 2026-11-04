@@ -408,7 +408,7 @@ export function AiPromptComposer({
                     className={cn(
                       'rounded px-1 py-0.2 text-[10px] font-semibold',
                       selectedModel.tierBadge === 'Pro'
-                        ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+                        ? 'bg-amber-500/12 text-amber-800 dark:text-amber-400'
                         : selectedModel.tierBadge === 'Plus'
                           ? 'bg-primary/15 text-primary'
                           : 'bg-muted text-muted-foreground',
@@ -432,7 +432,7 @@ export function AiPromptComposer({
                         className={cn(
                           'shrink-0 rounded px-1.5 py-0.2 text-[10px] font-semibold',
                           m.tierBadge === 'Pro'
-                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+                            ? 'bg-amber-500/12 text-amber-800 dark:text-amber-400'
                             : m.tierBadge === 'Plus'
                               ? 'bg-primary/15 text-primary'
                               : 'bg-muted text-muted-foreground',

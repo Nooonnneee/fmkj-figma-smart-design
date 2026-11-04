@@ -7,8 +7,10 @@ import { relId } from '@/lib/access'
 import { resolveFinalQuote } from '@/lib/deliverables'
 import { fmtDate } from '@/lib/projects'
 import { quoteStatusLabel, quoteStatusVariant, yuan } from '@/lib/quotes'
+import { loadProjectFeedback } from '@/lib/services/client-feedback-service'
 
 import { getProject, getProjectDeals } from '../project-data'
+import { ClientFeedbackList, type FeedbackItem } from './client-feedback-list'
 import { DeleteQuoteButton, GenerateQuoteForm } from './quote-controls'
 import { SetFinalQuoteButton } from './set-final-button'
 import { quoteShortTitle } from '@/lib/project-name'
@@ -17,8 +19,13 @@ import { quoteShortTitle } from '@/lib/project-name'
 export default async function ProjectQuotesPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string }> }) {
   const { id } = await params
   const { error } = await searchParams
-  const [{ project, readOnly }, { quotes, contract }] = await Promise.all([getProject(id), getProjectDeals(id)])
+  const [{ user, project, readOnly, role }, { quotes, contract }] = await Promise.all([getProject(id), getProjectDeals(id)])
   const pid = String(project.id)
+  // 业主在分享页提交的意向反馈（归档后仍可查看；仅查看的协作者不能处理）
+  const feedback: FeedbackItem[] = (await loadProjectFeedback(user, pid)).map((f) => ({
+    ...f,
+    createdLabel: new Date(f.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }),
+  }))
   const points = project.pointCount ?? 0
   const contractQuoteId = relId(contract?.quote)
   // 定稿：合同依据 → 手动设为定稿 → 已接受 → 最新；交付资料包与方案默认用它
@@ -26,7 +33,7 @@ export default async function ProjectQuotesPage({ params, searchParams }: { para
   const finalId = final.quote ? String(final.quote.id) : null
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
           <h2 className="text-xl font-semibold tracking-tight">报价</h2>
@@ -44,6 +51,8 @@ export default async function ProjectQuotesPage({ params, searchParams }: { para
         </div>
       ) : null}
 
+      {feedback.length ? <ClientFeedbackList projectId={pid} items={feedback} readOnly={role === 'read'} canCreateQuote={!readOnly} /> : null}
+
       {quotes.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed px-6 py-14 text-center">
           <FileText className="size-8 text-muted-foreground" />
@@ -58,27 +67,27 @@ export default async function ProjectQuotesPage({ params, searchParams }: { para
           )}
         </div>
       ) : (
-        <ul className="divide-y overflow-hidden rounded-xl bg-card shadow-sm ring-1 ring-foreground/5 dark:ring-foreground/10">
+        <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-background shadow-2xs">
           {quotes.map((q) => {
             const qid = String(q.id)
             const usedByContract = qid === contractQuoteId
             const isFinal = qid === finalId
             return (
-              <li key={qid} className="group relative flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/40 sm:px-5">
+              <li key={qid} className="group relative flex items-center gap-3 px-4 py-4 transition-colors hover:bg-subtle/80 sm:px-5">
                 <div className="min-w-0 flex-1">
-                  <Link href={`/projects/${pid}/quotes/${qid}`} className="block truncate font-medium after:absolute after:inset-0 hover:underline">
+                  <Link href={`/projects/${pid}/quotes/${qid}`} className="block truncate text-sm font-semibold text-foreground after:absolute after:inset-0 group-hover:text-primary">
                     {quoteShortTitle(q.title, project.name)}
                   </Link>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    {isFinal && quotes.length > 1 ? <Badge>定稿</Badge> : null}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    {isFinal && quotes.length > 1 ? <Badge className="bg-primary text-primary-foreground">定稿</Badge> : null}
                     <Badge variant={quoteStatusVariant(q.status)}>{quoteStatusLabel(q.status)}</Badge>
                     {usedByContract ? <span>已用于合同 {contract?.number}</span> : null}
                     <span className="tabular-nums">更新于 {fmtDate(q.updatedAt)}</span>
                   </div>
                 </div>
-                <span className="text-right text-base font-semibold tabular-nums">{yuan(q.total)}</span>
+                <span className="text-right text-lg font-bold text-foreground tabular-nums">{yuan(q.total)}</span>
                 {readOnly || usedByContract ? null : (
-                  <div className="flex items-center gap-1">
+                  <div className="relative z-10 flex items-center gap-1">
                     {!isFinal && !contractQuoteId ? <SetFinalQuoteButton projectId={pid} quoteId={qid} /> : null}
                     <DeleteQuoteButton quoteId={qid} title={q.title} />
                   </div>

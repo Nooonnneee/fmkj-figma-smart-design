@@ -31,7 +31,7 @@ const DOC_STYLES = [MINIMAL_STYLE, ...PLUGIN_DOC_STYLES]
  * 首页：产品本身就是展示。数据来自系统内置的示例母版项目，
  * 按小时重新生成（示例母版很少改动；改动后最迟一小时生效）。
  */
-export const dynamic = 'force-dynamic'
+export const revalidate = 3600
 
 export default async function HomePage() {
   const [data, company] = await Promise.all([getLandingShowcase().catch(() => null), getCompanyInfo().catch(() => null)])

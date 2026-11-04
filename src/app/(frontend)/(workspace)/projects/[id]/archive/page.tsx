@@ -24,13 +24,20 @@ import { CopyClientLinkButton } from './copy-client-link'
 import { DeliveryPackage, type DeliveryDoc } from './delivery-package'
 import { SocialPosterDialog, type SocialPosterData } from './social-poster-dialog'
 import { ArchiveTemplatePicker } from './template-picker-field'
+import { AfterSalesSummary } from './after-sales-summary'
+import { loadAfterSales } from '@/lib/services/after-sales-service'
 import { parseShareConfig } from '@/lib/project-access'
 
 /** 归档：核对资料 → 确认定稿（一份报价、一份方案）→ 打包交付资料 → 归档（项目转为只读）。 */
 export default async function ProjectArchivePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const [{ user, payload, project, archived, role, readOnly }, { quotes, contract }] = await Promise.all([getProject(id), getProjectDeals(id)])
-  const rawShare = (project as unknown as { shareConfig?: unknown }).shareConfig
+  // 分享配置只有 CMS 管理员有字段读权限：成员身份读到的项目里没有这个字段，必须以系统身份读取，
+  // 否则每次打开归档页都会误判为「没有链接」而重新生成，已经发给业主的预览链接就失效了
+  const shareDoc = await payload
+    .findByID({ collection: 'projects', id: project.id, depth: 0, overrideAccess: true, select: { shareConfig: true } as never })
+    .catch(() => null)
+  const rawShare = (shareDoc as { shareConfig?: unknown } | null)?.shareConfig
   const shareConfig = parseShareConfig(rawShare)
   if (!rawShare || typeof (rawShare as { token?: unknown })?.token !== 'string') {
     await payload.update({ collection: 'projects', id: project.id, data: { shareConfig } as never, overrideAccess: true, depth: 0 }).catch(() => null)
@@ -48,6 +55,8 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
   const points = project.pointCount ?? 0
   const final = resolveFinalQuote(quotes, { contractQuoteId: relId(contract?.quote), finalQuoteId: relId(project.finalQuote) })
   const finalQuote = final.quote
+  // 售后维保插件：质保倒计时与维保记录摘要（项目归档后仍持续使用）
+  const afterSales = flags['after-sales'] ? await loadAfterSales(user, pid).catch(() => null) : null
 
   // 组装「小红书 / 朋友圈 3:4 案例晒单海报」数据（自动脱敏，只用小区名或项目简称，不暴露业主姓名电话）
   const normalized = normalizeScene(fullSceneDoc?.pointMap as never)
@@ -210,6 +219,18 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
           },
         ]
       : []),
+    ...(flags['after-sales']
+      ? [
+          {
+            key: 'after-sales' as const,
+            title: '售后维保卡',
+            note: afterSales?.warranty.end ? `质保至 ${afterSales.warranty.end}` : '质保权益、设备台账与报修方式',
+            url: `/print/projects/${pid}/after-sales`,
+            defaultOn: false,
+            tierBadge: 'Pro' as const,
+          },
+        ]
+      : []),
   ]
   const pkg = featureAccess(access.membership, FEATURE_TIERS.package, access.strict)
   const otherQuotes = quotes.filter((q) => String(q.id) !== String(finalQuote?.id ?? ''))
@@ -264,6 +285,8 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
         }}
         access={{ meets: pkg.meets, allowed: pkg.allowed, badge: tierBadge(FEATURE_TIERS.package), hint: access.upgradeHint }}
       />
+
+      {afterSales ? <AfterSalesSummary projectId={pid} data={afterSales} /> : null}
 
       {role !== 'read' ? (
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed px-5 py-4">

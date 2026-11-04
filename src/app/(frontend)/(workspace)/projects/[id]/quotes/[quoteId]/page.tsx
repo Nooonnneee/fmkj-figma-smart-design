@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { relId } from '@/lib/access'
 import { getCatalog, resolveMediaUrl } from '@/lib/cached-data'
 import type { StoredScene } from '@/lib/point-scene'
+import { loadCostSettings } from '@/lib/services/cost-settings-service'
 import type { Media, Project } from '@/payload-types'
 
 import { getProject, getProjectDeals } from '../../project-data'
@@ -18,7 +19,7 @@ export default async function QuotePage({
   const { id, quoteId } = await params
   const { pending } = await searchParams
   const { user, payload, project, archived, role } = await getProject(id)
-  const [quote, deals, catalog] = await Promise.all([
+  const [quote, deals, catalog, costSettings] = await Promise.all([
     payload
       .findByID({
         collection: 'quotes',
@@ -31,6 +32,8 @@ export default async function QuotePage({
       .catch(() => null),
     getProjectDeals(id),
     getCatalog(),
+    // 成本按当前查看者自己的拿货折扣核算（仅本人可见）
+    loadCostSettings(user),
   ])
   if (!quote) notFound()
   // 报价不属于这个项目（例如旧链接）时跳到它所在的项目
@@ -102,6 +105,7 @@ export default async function QuotePage({
       projectDefaults={populated?.defaultProducts ?? null}
       products={options}
       costs={costs}
+      costSettings={costSettings}
       readOnly={Boolean(lockReason)}
       lockReason={lockReason}
       contract={contract ? { number: contract.number, status: contract.status, usesThisQuote } : null}

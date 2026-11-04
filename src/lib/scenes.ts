@@ -3,6 +3,7 @@ import type { Payload } from 'payload'
 import type { User } from '@/payload-types'
 
 import { BUILTIN_SCENES } from './builtin-scenes'
+import { ensureBuiltinLibrarySeeded } from './proposal-library'
 
 /** 场景库里的一条场景（只取方案需要的字段） */
 export type ManagedScene = {
@@ -23,6 +24,7 @@ export type ManagedScene = {
 
 /** 读取后台场景库里启用的场景；user 为 null 时按系统身份读取（模板库示例方案用） */
 export async function loadScenes(payload: Payload, user: User | null): Promise<ManagedScene[]> {
+  await ensureBuiltinLibrarySeeded(payload)
   const access = user ? { user, overrideAccess: false } : { overrideAccess: true }
   const res = await payload.find({ collection: 'scenes', where: { enabled: { equals: true } }, sort: 'sortOrder', limit: 200, depth: 1, ...access })
   return res.docs.map((d) => {
