@@ -3,7 +3,17 @@ import type { loadProjectDocs } from '@/lib/project-docs'
 import type { PluginFlags } from '@/plugins/state'
 
 import { activePluginPromptLines, availableTools, runTool, type ActiveProjectUpdate, type AiTool, type LlmToolCall, type ToolContext } from './registry'
-import { AI_PROVIDER_CHANNELS, CUSTOM_KEY_ENV_RE, DEFAULT_AI_MODELS, enabledAiModels, isAiProviderChannelId, normalizeCustomBaseUrl, type AiModelConfig } from './templates'
+import {
+  AI_PROVIDER_CHANNELS,
+  AUTO_AI_MODEL,
+  CUSTOM_KEY_ENV_RE,
+  DEFAULT_AI_MODELS,
+  enabledAiModels,
+  isAiProviderChannelId,
+  isVisionCapableModel,
+  normalizeCustomBaseUrl,
+  type AiModelConfig,
+} from './templates'
 
 export { availableTools, runTool, type ActiveProjectUpdate, type AiTool, type LlmToolCall, type ToolContext }
 
@@ -97,19 +107,117 @@ export function stripDsml(text: string | null | undefined): string {
 }
 
 export const aiConfigured = (models?: AiModelConfig[]) => {
-  if (models?.length) return models.some((m) => m.enabled && Boolean(resolveModelApiKey(m)))
+  if (models?.length) return models.some((m) => m.enabled && m.id !== 'auto' && Boolean(resolveModelApiKey(m)))
   return Boolean(resolveModelApiKey({ channelId: 'deepseek' }))
 }
 
 export const findModel = (id: unknown, models: AiModelConfig[] = DEFAULT_AI_MODELS): AiModelConfig => {
+  if (id === 'auto') return AUTO_AI_MODEL
   const list = enabledAiModels(models)
-  return list.find((m) => m.id === id) ?? list[0] ?? DEFAULT_AI_MODELS[0]
+  return list.find((m) => m.id === id) ?? list.find((m) => m.id !== 'auto') ?? DEFAULT_AI_MODELS[0]
 }
 
+export type LlmContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } }
+
 export type LlmMessage =
-  | { role: 'system' | 'user'; content: string }
+  | { role: 'system'; content: string }
+  | { role: 'user'; content: string | LlmContentPart[] }
   | { role: 'assistant'; content: string | null; tool_calls?: LlmToolCall[] }
   | { role: 'tool'; content: string; tool_call_id: string }
+
+/** 专业重型工具集合：调用这些工具或对这些工具结果做工程分析时，Auto 模式自动升级到 Qwen-3.x / GLM-5.3 等专业强模型 */
+export const PRO_EXPERT_TOOLS = new Set([
+  'add_floor_sheet',
+  'import_points_json',
+  'smart_select',
+  'set_project_defaults',
+  'room_insights',
+  'recommend_proposal_template',
+  'create_or_update_quote',
+  'create_or_update_contract',
+  'analyze_competitor_quote',
+])
+
+const EXPERT_INTENT_RE =
+  /已上传附件|\[图片\]|点位图|户型图|开关布置|识图|智能选型|一键选型|全屋选型|回路审查|完整度审查|生成报价|报价单|竞品|合同|方案模板/i
+
+/**
+ * Auto 模式智能路由：
+ * - scene = 'vision'（含上传户型图/CAD图）：优先选择 qwen-3.8 / 3.7 / 3.6 / glm-5.3 / qwen-vl 等多模态视觉模型
+ * - scene = 'expert'（专业重型工具调用或工程方案规划）：优先选择 qwen-3.8 / glm-5.3 / qwen-3.7 / qwen-3.6 / deepseek-r1 等强专业模型
+ * - scene = 'fast'（日常对话与轻量项目查询）：优先选择 deepseek-flash (1017) / deepseek-chat / glm-5.3-flash 等高速低耗模型
+ */
+export function resolveAutoRouteModel(
+  models: AiModelConfig[] = DEFAULT_AI_MODELS,
+  opts: {
+    hasImage?: boolean
+    userText?: string
+    calledToolNames?: string[]
+    canAccessModel?: (m: AiModelConfig) => boolean
+  } = {},
+): { model: AiModelConfig; reason: 'vision' | 'expert' | 'fast' } {
+  const realModels = enabledAiModels(models, { includeAuto: false }).filter(
+    (m) => Boolean(resolveModelApiKey(m)) && (opts.canAccessModel ? opts.canAccessModel(m) : true),
+  )
+  const pool = realModels.length > 0 ? realModels : enabledAiModels(models, { includeAuto: false })
+
+  const scoreVision = (m: AiModelConfig): number => {
+    const s = `${m.id} ${m.apiModel} ${m.name}`.toLowerCase()
+    if (!isVisionCapableModel(s)) return -1
+    if (/qwen-?3\.8/.test(s)) return 100
+    if (/glm-?5\.3(?!.*flash)/.test(s)) return 96
+    if (/qwen-?3\.7/.test(s)) return 94
+    if (/qwen-?3\.6/.test(s)) return 92
+    if (/qvq|qwen-vl-max/.test(s)) return 90
+    if (/glm-?5\.3.*flash/.test(s)) return 86
+    if (/glm-4v|doubao.*vision|vl|vision/.test(s)) return 80
+    return 70
+  }
+
+  const scoreExpert = (m: AiModelConfig): number => {
+    const s = `${m.id} ${m.apiModel} ${m.name}`.toLowerCase()
+    if (/qwen-?3\.8/.test(s)) return 100
+    if (/glm-?5\.3(?!.*flash)/.test(s)) return 96
+    if (/qwen-?3\.7/.test(s)) return 94
+    if (/qwen-?3\.6/.test(s)) return 92
+    if (/glm-?5\.3.*flash/.test(s)) return 88
+    if (/qwen-max|qvq|qwq/.test(s)) return 85
+    if (/deepseek-reasoner|deepseek-r1|\br1\b/.test(s)) return 82
+    if ((m.cost ?? 1) >= 2) return 75
+    return 50
+  }
+
+  const scoreFast = (m: AiModelConfig): number => {
+    const s = `${m.id} ${m.apiModel} ${m.name}`.toLowerCase()
+    if (/deepseek.*flash|1017/.test(s)) return 100
+    if (/deepseek-chat|deepseek-v3/.test(s)) return 95
+    if (/glm-?5\.3.*flash|glm-4-flash/.test(s)) return 90
+    if (/qwen-plus|doubao/.test(s)) return 85
+    if (!m.reasoning && (m.cost ?? 1) <= 1) return 80
+    return 40
+  }
+
+  const hasProTool = (opts.calledToolNames ?? []).some((n) => PRO_EXPERT_TOOLS.has(n))
+  const wantsVision = Boolean(opts.hasImage) || /\[图片\]|mediaId:/i.test(opts.userText ?? '')
+  const wantsExpert = hasProTool || EXPERT_INTENT_RE.test(opts.userText ?? '')
+
+  if (wantsVision) {
+    const visionCandidates = [...pool].filter((m) => scoreVision(m) > 0).sort((a, b) => scoreVision(b) - scoreVision(a))
+    if (visionCandidates[0]) return { model: visionCandidates[0], reason: 'vision' }
+  }
+
+  if (wantsExpert) {
+    const expertCandidates = [...pool].sort((a, b) => scoreExpert(b) - scoreExpert(a))
+    if (expertCandidates[0] && scoreExpert(expertCandidates[0]) >= 75) {
+      return { model: expertCandidates[0], reason: 'expert' }
+    }
+  }
+
+  const fastCandidates = [...pool].sort((a, b) => scoreFast(b) - scoreFast(a))
+  return { model: fastCandidates[0] ?? pool[0] ?? DEFAULT_AI_MODELS[0], reason: 'fast' }
+}
 
 export class AiError extends Error {
   constructor(
@@ -147,12 +255,29 @@ async function post(modelOrId: AiModelConfig | string, body: Record<string, unkn
     throw new AiError(`模型「${model.name}」尚未配置服务端环境变量（${envKey}），请在环境变量 / Secrets 中添加`, 503)
   }
   const apiModel = model.apiModel || model.id
-  const payloadBody = { ...body, model: apiModel }
+  const payloadBody: Record<string, unknown> = { ...body, model: apiModel }
   let res = await postOnce(url, apiKey, payloadBody, timeoutMs)
   // 兼容不同网关对 DeepSeek V4.1-Flash-1017 的模型 ID 命名（官方 /models 返回 deepseek-flash）
-  if (res.status === 400 && apiModel === 'deepseek-flash') {
-    for (const alias of ['deepseek-v4.1-flash-1017', 'DeepSeek-V4.1-Flash', 'deepseek-chat']) {
+  if ((res.status === 400 || res.status === 404) && /deepseek.*flash/i.test(apiModel)) {
+    for (const alias of ['deepseek-flash-1017', 'deepseek-v4.1-flash-1017', 'DeepSeek-V4.1-Flash', 'deepseek-flash', 'deepseek-chat']) {
+      if (alias === apiModel) continue
       res = await postOnce(url, apiKey, { ...payloadBody, model: alias }, timeoutMs)
+      if (res.ok) return res
+    }
+  }
+  // 如果网关中的该模型不支持多模态 image_url 数组结构而返回 400/422，自动退回纯文本消息重试一次，确保对话绝不中断
+  if ((res.status === 400 || res.status === 422) && Array.isArray(payloadBody.messages)) {
+    const hasArrayContent = (payloadBody.messages as LlmMessage[]).some((m) => Array.isArray(m.content))
+    if (hasArrayContent) {
+      const textOnlyMessages = (payloadBody.messages as LlmMessage[]).map((m) => {
+        if (!Array.isArray(m.content)) return m
+        const joined = m.content
+          .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+          .map((p) => p.text)
+          .join('\n')
+        return { ...m, content: joined }
+      })
+      res = await postOnce(url, apiKey, { ...payloadBody, messages: textOnlyMessages }, timeoutMs)
       if (res.ok) return res
     }
   }

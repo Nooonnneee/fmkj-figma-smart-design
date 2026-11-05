@@ -30,12 +30,23 @@ import { AI_MODELS, DEFAULT_AI_TEMPLATES, fillPromptTemplate } from '@/plugins/a
 type ConvSummary = { id: string; title: string }
 type StoredMessage = { id: string; role: 'user' | 'assistant'; content: string; model: string | null; cost: number | null; toolCalls: AiToolCall[] | null; createdAt: string }
 
+const resolveStoredModelName = (rawModel: string | null, modelList: AiModelOption[]): string | undefined => {
+  if (!rawModel) return undefined
+  if (rawModel.startsWith('auto:')) {
+    const subId = rawModel.slice(5)
+    const found = modelList.find((x) => x.id === subId)?.name ?? AI_MODELS.find((x) => x.id === subId)?.name ?? subId
+    const short = found.replace(/（[^）]*）|\([^)]*\)/g, '').trim() || found
+    return `Auto · ${short}`
+  }
+  return modelList.find((x) => x.id === rawModel)?.name ?? AI_MODELS.find((x) => x.id === rawModel)?.name ?? rawModel
+}
+
 const toChat = (m: StoredMessage, modelList: AiModelOption[]): AiChatMessage => ({
   id: m.id,
   role: m.role,
   content: m.content,
   createdAt: m.createdAt,
-  modelName: modelList.find((x) => x.id === m.model)?.name ?? AI_MODELS.find((x) => x.id === m.model)?.name ?? m.model ?? undefined,
+  modelName: resolveStoredModelName(m.model, modelList),
   cost: m.cost ?? undefined,
   toolCalls: m.toolCalls ?? undefined,
 })
@@ -346,6 +357,9 @@ export function AiSidebarDock({
               setActiveId(cid)
               setConversations((prev) => [{ id: cid, title: displayPrompt.slice(0, 30) }, ...prev.filter((c) => c.id !== cid)])
             }
+            if (typeof ev.modelName === 'string' && ev.modelName) {
+              patchReply((m) => ({ ...m, modelName: String(ev.modelName) }))
+            }
           } else if (ev.type === 'tool') {
             const href = typeof ev.href === 'string' ? ev.href : undefined
             if (href?.includes('/point-map')) touchedPointMap = true
@@ -361,7 +375,6 @@ export function AiSidebarDock({
                   details: [],
                   href,
                   hrefLabel: ev.hrefLabel as string | undefined,
-                  imageUrl: typeof ev.imageUrl === 'string' ? ev.imageUrl : undefined,
                 },
               ],
             }))
@@ -374,7 +387,12 @@ export function AiSidebarDock({
             setThinking(false)
             patchReply((m) => ({ ...m, content: m.content + String(ev.text) }))
           } else if (ev.type === 'done') {
-            patchReply((m) => ({ ...m, id: String(ev.messageId), cost: Number(ev.cost) }))
+            patchReply((m) => ({
+              ...m,
+              id: String(ev.messageId),
+              cost: Number(ev.cost),
+              ...(typeof ev.modelName === 'string' && ev.modelName ? { modelName: String(ev.modelName) } : {}),
+            }))
             if (typeof ev.balance === 'number') setCredits(ev.balance)
             if (ev.mutated) {
               if (touchedPointMap && latestProjectId && pathname !== `/projects/${latestProjectId}/point-map`) {

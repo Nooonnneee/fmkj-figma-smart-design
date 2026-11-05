@@ -7,11 +7,43 @@ import type { User } from '@/payload-types'
 import { getPluginFlags } from '@/plugins/state'
 
 import { UsageMeter } from './billing'
-import { AiError, availableTools, complete, findModel, resolveModelApiKey, runTool, stream, stripDsml, systemPrompt, type LlmMessage, type ToolContext } from './server'
+import {
+  AiError,
+  availableTools,
+  complete,
+  findModel,
+  resolveAutoRouteModel,
+  resolveModelApiKey,
+  runTool,
+  stream,
+  stripDsml,
+  systemPrompt,
+  type LlmContentPart,
+  type LlmMessage,
+  type ToolContext,
+} from './server'
+import { isVisionCapableModel, type AiModelConfig } from './templates'
+import { getCachedDetectedBundle } from './upload-handler'
 
 const MAX_INPUT = 32000
 const HISTORY = 20
 const fail = (status: number, error: string) => Response.json({ ok: false, error }, { status })
+
+/** 从消息文本的【已上传附件】段落中提取上传图片的缓存 DataURL，供多模态视觉模型直接看图 */
+function extractUploadedImageDataUrls(text: string): string[] {
+  const urls: string[] = []
+  const re = /- \[图片\][^\n]*?mediaId:\s*([^\s,)]*),\s*URL:\s*(\/api\/media\/file\/[^\s,)]+)/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    const mediaId = m[1]?.trim() || null
+    const url = m[2]?.trim() || null
+    const bundle = getCachedDetectedBundle(mediaId, url)
+    if (bundle?.imageDataUrl) {
+      urls.push(bundle.imageDataUrl)
+    }
+  }
+  return urls.slice(0, 3)
+}
 
 /**
  * AI 对话（网页侧栏和微信小程序共用）：{ conversationId?, message, modelId, projectId?, pluginIds? }
@@ -26,14 +58,30 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
   const text = typeof body?.message === 'string' ? body.message.trim() : ''
   if (!text) return fail(400, '请输入内容')
   if (text.length > MAX_INPUT) return fail(400, `单条消息最多 ${MAX_INPUT} 字`)
-  const model = findModel(body?.modelId, company.aiModels)
-  if (!model) return fail(400, '不支持的模型')
-  const modelTierCheck = featureAccess(access.membership, model.minTier ?? 'free', access.strict)
-  if (!modelTierCheck.allowed) {
-    return fail(403, `模型「${model.name}」为 ${model.tierBadge ?? 'Plus'} 会员专属高阶模型，请升级至 ${model.tierBadge ?? 'Plus'} 会员后使用`)
+  const requestedModel = findModel(body?.modelId, company.aiModels)
+  if (!requestedModel) return fail(400, '不支持的模型')
+  const isAutoMode = requestedModel.id === 'auto'
+  const canUseModel = (m: AiModelConfig) => featureAccess(access.membership, m.minTier ?? 'free', access.strict).allowed
+  const attachedImages = extractUploadedImageDataUrls(text)
+
+  let activeModel: AiModelConfig = requestedModel
+  if (isAutoMode) {
+    activeModel = resolveAutoRouteModel(company.aiModels, {
+      hasImage: attachedImages.length > 0,
+      userText: text,
+      canAccessModel: canUseModel,
+    }).model
+  } else {
+    const modelTierCheck = featureAccess(access.membership, requestedModel.minTier ?? 'free', access.strict)
+    if (!modelTierCheck.allowed) {
+      return fail(
+        403,
+        `模型「${requestedModel.name}」为 ${requestedModel.tierBadge ?? 'Plus'} 会员专属高阶模型，请升级至 ${requestedModel.tierBadge ?? 'Plus'} 会员后使用`,
+      )
+    }
   }
-  if (!resolveModelApiKey(model)) {
-    return fail(503, `模型「${model.name}」还没有配置密钥环境变量（${model.apiKeyEnv}），请在设置或环境变量中添加`)
+  if (!resolveModelApiKey(activeModel)) {
+    return fail(503, `模型「${activeModel.name}」还没有配置密钥环境变量（${activeModel.apiKeyEnv}），请在设置或环境变量中添加`)
   }
   const pluginIds = Array.isArray(body?.pluginIds) ? body.pluginIds.filter((v): v is string => typeof v === 'string') : []
 
@@ -67,7 +115,7 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
     const cleanTitle = text.replace(/【已上传附件[\s\S]*$/m, '').trim() || '上传文件处理'
     const conv = await payload.create({
       collection: 'ai-conversations',
-      data: { title: cleanTitle.slice(0, 30), owner: user.id, ...(project ? { project: projectId } : {}), model: model.id },
+      data: { title: cleanTitle.slice(0, 30), owner: user.id, ...(project ? { project: projectId } : {}), model: requestedModel.id },
       user,
       overrideAccess: false,
       depth: 0,
@@ -76,9 +124,29 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
   }
   await payload.create({ collection: 'ai-messages', data: { conversation: conversationId, owner: user.id, role: 'user', content: text }, overrideAccess: true, depth: 0 })
 
-  const tools = availableTools(model.id, pluginIds, flags)
+  const tools = availableTools(activeModel.id, pluginIds, flags)
   const messages: LlmMessage[] = [{ role: 'system', content: systemPrompt(project, pluginIds, flags) }, ...history, { role: 'user', content: text }]
   const encoder = new TextEncoder()
+
+  /** 当执行模型支持多模态视觉且本条消息包含上传户型图时，将最后一条用户消息包装为包含 image_url 的多模态消息 */
+  const buildModelMessages = (targetModel: AiModelConfig): LlmMessage[] => {
+    if (attachedImages.length === 0 || !isVisionCapableModel(`${targetModel.id} ${targetModel.apiModel} ${targetModel.name}`)) {
+      return messages
+    }
+    return messages.map((m, idx) => {
+      if (idx === messages.length - 1 && m.role === 'user' && typeof m.content === 'string') {
+        const parts: LlmContentPart[] = [
+          { type: 'text', text: m.content },
+          ...attachedImages.map((url) => ({ type: 'image_url' as const, image_url: { url } })),
+        ]
+        return { role: 'user', content: parts }
+      }
+      return m
+    })
+  }
+
+  const displayModelLabel = (m: AiModelConfig) =>
+    isAutoMode ? `Auto · ${m.name.replace(/（[^）]*）|\([^)]*\)/g, '').trim() || m.name}` : m.name
 
   const body$ = new ReadableStream({
     async start(controller) {
@@ -93,7 +161,7 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
       }
       // 在工具调用（非流式 complete）与深度推理等待期间，每 8 秒发送一次心跳，防止微信小程序、移动网络或反向代理空闲超时断开连接
       const heartbeat = setInterval(() => send({ type: 'ping' }), 8000)
-      send({ type: 'meta', conversationId })
+      send({ type: 'meta', conversationId, modelId: activeModel.id, modelName: displayModelLabel(activeModel) })
       const toolLog: { pluginId: string; pluginName: string; summary: string; href?: string; hrefLabel?: string }[] = []
       const ctx: ToolContext = {
         user,
@@ -106,13 +174,26 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
       }
       const meter = new UsageMeter()
       const promptText = () => messages.map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n')
+      const calledToolNames: string[] = []
       try {
         let content = ''
         if (tools.length) {
           // 支持多步连续调用工具（最多 10 轮，例如：新建项目 → 添加户型图 → 智能选型 → 生成报价单 → 生成合同）
           for (let step = 0; step < 10; step++) {
+            if (isAutoMode && calledToolNames.length > 0) {
+              const routed = resolveAutoRouteModel(company.aiModels, {
+                hasImage: attachedImages.length > 0,
+                userText: text,
+                calledToolNames,
+                canAccessModel: canUseModel,
+              }).model
+              if (routed.id !== activeModel.id) {
+                activeModel = routed
+                send({ type: 'meta', conversationId, modelId: activeModel.id, modelName: displayModelLabel(activeModel) })
+              }
+            }
             const input = promptText()
-            const turn = await complete(model, messages, tools.map((t) => t.definition))
+            const turn = await complete(activeModel, buildModelMessages(activeModel), tools.map((t) => t.definition))
             meter.add(turn.usage, { input, output: (turn.content ?? '') + JSON.stringify(turn.tool_calls ?? '') })
             if (!turn.tool_calls?.length) {
               content = stripDsml(turn.content)
@@ -121,10 +202,11 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
             }
             messages.push({ role: 'assistant', content: turn.content ?? null, tool_calls: turn.tool_calls })
             for (const call of turn.tool_calls) {
+              calledToolNames.push(call.function.name)
               const r = await runTool(tools, call, ctx)
               if (r.tool) meter.tool(call.function.name)
               if (r.tool) {
-                const entry = { pluginId: r.tool.pluginId ?? 'core', pluginName: r.tool.pluginName, summary: r.summary ?? '', href: r.href, hrefLabel: r.hrefLabel, imageUrl: r.imageUrl }
+                const entry = { pluginId: r.tool.pluginId ?? 'core', pluginName: r.tool.pluginName, summary: r.summary ?? '', href: r.href, hrefLabel: r.hrefLabel }
                 toolLog.push(entry)
                 send({ type: 'tool', ...entry })
               }
@@ -133,12 +215,24 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
           }
         }
         if (!content) {
+          if (isAutoMode && calledToolNames.length > 0) {
+            const routed = resolveAutoRouteModel(company.aiModels, {
+              hasImage: attachedImages.length > 0,
+              userText: text,
+              calledToolNames,
+              canAccessModel: canUseModel,
+            }).model
+            if (routed.id !== activeModel.id) {
+              activeModel = routed
+              send({ type: 'meta', conversationId, modelId: activeModel.id, modelName: displayModelLabel(activeModel) })
+            }
+          }
           const input = promptText()
           let usage: { prompt_tokens?: number; completion_tokens?: number } | null = null
           let reasoning = ''
           const raw = await stream(
-            model,
-            messages,
+            activeModel,
+            buildModelMessages(activeModel),
             (t) => {
               if (!t.includes('DSML')) send({ type: 'delta', text: t })
             },
@@ -162,11 +256,12 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
 
         // 按量计费；余额不够本次实际用量时扣到 0 为止（调用前已确认余额 ≥ 1）
         const fresh = await payload.findByID({ collection: 'users', id: user.id, depth: 0, overrideAccess: true, select: { aiCredits: true } })
-        const cost = Math.min(meter.credits(model), Math.max(0, fresh.aiCredits ?? 0))
+        const cost = Math.min(meter.credits(activeModel), Math.max(0, fresh.aiCredits ?? 0))
         const usage = { inputTokens: meter.inputTokens, outputTokens: meter.outputTokens, toolCalls: meter.tools.length, estimated: meter.estimated > 0 }
+        const savedModelId = isAutoMode ? `auto:${activeModel.id}` : activeModel.id
         const reply = await payload.create({
           collection: 'ai-messages',
-          data: { conversation: conversationId, owner: user.id, role: 'assistant', content, model: model.id, cost, toolCalls: toolLog.length ? toolLog : undefined },
+          data: { conversation: conversationId, owner: user.id, role: 'assistant', content, model: savedModelId, cost, toolCalls: toolLog.length ? toolLog : undefined },
           overrideAccess: true,
           depth: 0,
         })
@@ -175,7 +270,7 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
           try {
             const entry = await payload.create({
               collection: 'ai-credit-ledger',
-              data: { user: user.id, delta: -cost, reason: `AI 对话 · ${model.name} · ${meter.summary()}`.slice(0, 120), model: model.id, message: reply.id },
+              data: { user: user.id, delta: -cost, reason: `AI 对话 · ${displayModelLabel(activeModel)} · ${meter.summary()}`.slice(0, 120), model: activeModel.id, message: reply.id },
               overrideAccess: true,
               depth: 0,
             })
@@ -188,12 +283,22 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
           .update({
             collection: 'ai-conversations',
             id: conversationId!,
-            data: { model: model.id, ...(ctx.projectId ? { project: ctx.projectId } : {}) },
+            data: { model: requestedModel.id, ...(ctx.projectId ? { project: ctx.projectId } : {}) },
             overrideAccess: true,
             depth: 0,
           })
           .catch(() => null)
-        send({ type: 'done', messageId: String(reply.id), cost, usage, balance, mutated: ctx.mutated, projectId: ctx.projectId })
+        send({
+          type: 'done',
+          messageId: String(reply.id),
+          cost,
+          usage,
+          balance,
+          mutated: ctx.mutated,
+          projectId: ctx.projectId,
+          modelId: activeModel.id,
+          modelName: displayModelLabel(activeModel),
+        })
       } catch (error) {
         send({ type: 'error', error: error instanceof AiError ? error.message : 'AI 服务出错，请稍后重试' })
         if (!(error instanceof AiError)) console.error('[ai] chat failed', error)

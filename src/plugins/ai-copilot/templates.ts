@@ -124,13 +124,45 @@ export type AiModelConfig = AiModelOption & {
 
 export function inferModelTier(apiModel: string, reasoning?: boolean, cost?: number): { minTier: 'free' | 'pro' | 'team'; tierBadge: 'Go' | 'Plus' | 'Pro' } {
   const m = apiModel.toLowerCase()
-  if (reasoning || /reasoner|deepseek-r1|\br1\b|qwq|qvq|thinking|glm-zero/i.test(m) || (cost ?? 1) >= 3) {
+  if (reasoning || /reasoner|deepseek-r1|\br1\b|qwq|qvq|thinking|glm-zero|qwen-?3\.8|glm-?5\.3(?!.*flash)/i.test(m) || (cost ?? 1) >= 3) {
     return { minTier: 'team', tierBadge: 'Pro' }
   }
-  if (/vl|vision|qwen-max|glm-4v|glm-4-plus|kimi|moonshot-v1-128k|doubao-1-5-vision/i.test(m) || (cost ?? 1) === 2) {
+  if (/vl|vision|qwen-max|qwen-?3\.[567]|glm-4v|glm-4-plus|glm-?5\.3.*flash|kimi|moonshot-v1-128k|doubao-1-5-vision/i.test(m) || (cost ?? 1) === 2) {
     return { minTier: 'pro', tierBadge: 'Plus' }
   }
   return { minTier: 'free', tierBadge: 'Go' }
+}
+
+/**
+ * 判断模型代号是否支持多模态视觉识图（image_url）：
+ * 涵盖千问 Qwen-3.6/3.7/3.8、智谱 GLM-5.3 / GLM-5.3-Flash，以及 Qwen-VL / QVQ / GLM-4V / 豆包 Vision 等。
+ */
+export const VISION_MODEL_RE = /vl|vision|glm-4v|qvq|omni|doubao.*vision|qwen-?3\.[5-9]|glm-?5\.[0-9]|gpt-4o|claude-3|gemini/i
+
+export function isVisionCapableModel(apiModelOrId: string | undefined | null): boolean {
+  if (!apiModelOrId) return false
+  return VISION_MODEL_RE.test(apiModelOrId)
+}
+
+/**
+ * Auto 智能路由虚拟模型：
+ * 平常对话走 DeepSeek Flash 等极速模型；遇到图纸识图或复杂专业工具调用时自动切换到 Qwen-3.x / GLM-5.3 等高阶专业模型。
+ */
+export const AUTO_AI_MODEL: AiModelConfig = {
+  id: 'auto',
+  name: 'Auto（智能路由）',
+  provider: '智能多模型调度',
+  channelId: 'deepseek',
+  tag: '日常 DeepSeek · 识图与重工具自动切 Qwen/GLM',
+  cost: 1,
+  description: '日常对话使用 DeepSeek Flash 高速响应；上传图纸或调用智能选型/审查/报价等专业工具时自动切换 Qwen-3.x / GLM-5.3 等强模型',
+  apiModel: 'auto',
+  baseUrl: AI_PROVIDER_CHANNELS.deepseek.baseUrl,
+  apiKeyEnv: AI_PROVIDER_CHANNELS.deepseek.apiKeyEnv,
+  minTier: 'free',
+  tierBadge: 'Go',
+  enabled: true,
+  isDefault: true,
 }
 
 export function resolveExplicitOrInferredTier(
@@ -216,6 +248,90 @@ export const AI_MODELS: AiModelOption[] = DEFAULT_AI_MODELS
 
 /** 后台「设置 → AI 模型与接口」里可一键添加的常用官方 API 与 NewAPI 聚合网关预设 */
 export const AI_PROVIDER_PRESETS: Omit<AiModelConfig, 'id' | 'enabled' | 'isDefault'>[] = [
+  {
+    name: 'DeepSeek Flash 1017（日常极速对话）',
+    provider: AI_PROVIDER_CHANNELS.deepseek.label,
+    channelId: 'deepseek',
+    tag: 'Go 基础 · Auto 日常对话默认',
+    cost: 1,
+    description: 'DeepSeek V4.1-Flash-1017 极速对话模型，Auto 模式下日常问答与轻量查询的默认引擎',
+    apiModel: 'deepseek-flash',
+    baseUrl: AI_PROVIDER_CHANNELS.deepseek.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.deepseek.apiKeyEnv,
+    minTier: 'free',
+    tierBadge: 'Go',
+    reasoning: false,
+  },
+  {
+    name: '通义千问 Qwen-3.6（高阶多模态与工具）',
+    provider: AI_PROVIDER_CHANNELS.dashscope.label,
+    channelId: 'dashscope',
+    tag: 'Plus 专属 · 多模态识图与配单',
+    cost: 2,
+    description: '千问 3.6 多模态与工具调用主力模型，支持户型图纸识别与方案选型',
+    apiModel: 'qwen-3.6',
+    baseUrl: AI_PROVIDER_CHANNELS.dashscope.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.dashscope.apiKeyEnv,
+    minTier: 'pro',
+    tierBadge: 'Plus',
+    reasoning: false,
+  },
+  {
+    name: '通义千问 Qwen-3.7（专业工程与多模态）',
+    provider: AI_PROVIDER_CHANNELS.dashscope.label,
+    channelId: 'dashscope',
+    tag: 'Plus 专属 · 复杂图纸与选型',
+    cost: 2,
+    description: '千问 3.7 增强版多模态模型，适合非标黑白 CAD 开关图识别与多步工程工具编排',
+    apiModel: 'qwen-3.7',
+    baseUrl: AI_PROVIDER_CHANNELS.dashscope.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.dashscope.apiKeyEnv,
+    minTier: 'pro',
+    tierBadge: 'Plus',
+    reasoning: false,
+  },
+  {
+    name: '通义千问 Qwen-3.8（旗舰视觉与工程大脑）',
+    provider: AI_PROVIDER_CHANNELS.dashscope.label,
+    channelId: 'dashscope',
+    tag: 'Pro 旗舰 · Auto 识图与重工具首选',
+    cost: 3,
+    description: '千问 3.8 旗舰多模态与深度工程模型，Auto 模式下遇到复杂 CAD 识图与全屋选型/审查时自动优先调度',
+    apiModel: 'qwen-3.8',
+    baseUrl: AI_PROVIDER_CHANNELS.dashscope.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.dashscope.apiKeyEnv,
+    minTier: 'team',
+    tierBadge: 'Pro',
+    reasoning: true,
+  },
+  {
+    name: '智谱清言 GLM-5.3-Flash（高速多模态）',
+    provider: AI_PROVIDER_CHANNELS.zhipu.label,
+    channelId: 'zhipu',
+    tag: 'Plus 专属 · 高速视觉与工具',
+    cost: 2,
+    description: '智谱 GLM-5.3 Flash 高速多模态模型，兼顾图纸视觉识别与快速工具执行',
+    apiModel: 'glm-5.3-flash',
+    baseUrl: AI_PROVIDER_CHANNELS.zhipu.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.zhipu.apiKeyEnv,
+    minTier: 'pro',
+    tierBadge: 'Plus',
+    reasoning: false,
+  },
+  {
+    name: '智谱清言 GLM-5.3（旗舰多模态与工程推演）',
+    provider: AI_PROVIDER_CHANNELS.zhipu.label,
+    channelId: 'zhipu',
+    tag: 'Pro 旗舰 · 复杂图纸与全案精算',
+    cost: 3,
+    description: '智谱 GLM-5.3 旗舰多模态大模型，擅长复杂电气图纸理解、竞品报价拆解与合同审查',
+    apiModel: 'glm-5.3',
+    baseUrl: AI_PROVIDER_CHANNELS.zhipu.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.zhipu.apiKeyEnv,
+    minTier: 'team',
+    tierBadge: 'Pro',
+    reasoning: true,
+  },
   {
     name: 'DeepSeek-V3（高速标准）',
     provider: AI_PROVIDER_CHANNELS.deepseek.label,
@@ -459,10 +575,12 @@ export function parseAiModels(value: unknown, customChannels: AiCustomChannel[] 
 }
 
 /** 获取当前已启用且排好序的模型（默认模型排第一）。 */
-export function enabledAiModels(models: AiModelConfig[]): AiModelConfig[] {
-  const active = models.filter((m) => m.enabled)
+export function enabledAiModels(models: AiModelConfig[], options?: { includeAuto?: boolean }): AiModelConfig[] {
+  const active = models.filter((m) => m.enabled && m.id !== 'auto')
   const list = active.length ? active : [models[0] ?? DEFAULT_AI_MODELS[0]]
-  return [...list].sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0))
+  const sorted = [...list].sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0))
+  if (options?.includeAuto === false) return sorted
+  return [AUTO_AI_MODEL, ...sorted]
 }
 
 export type AiTemplateVariable = {

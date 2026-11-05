@@ -1,17 +1,20 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { detectCadSymbolsFromPixels, type DetectedCadArea, type DetectedCadSummary } from '@/lib/cad-point-detector'
+import {
+  detectCadSymbolsFromPixels,
+  snapVisionPointsToCadInk,
+  type DetectedCadArea,
+  type DetectedCadSummary,
+} from '@/lib/cad-point-detector'
 import { getCompanyInfo } from '@/lib/cached-data'
 import { normalizeFloorPlan } from '@/lib/floor-plan-normalize'
 import { getPayloadClient } from '@/lib/payload'
 import { SHEET } from '@/lib/sheet-spec'
-import { resolveModelApiKey } from './server'
-import { enabledAiModels, type AiModelConfig } from './templates'
+import { resolveAutoRouteModel, resolveModelEndpoint } from './server'
+import { isVisionCapableModel } from './templates'
 
 const fail = (status: number, error: string) => Response.json({ ok: false, error }, { status })
-
-const VISION_MODEL_RE = /vl|vision|glm-4v|qvq|omni|doubao.*vision/i
 
 export type DetectedPointItem = { type: string; x: number; y: number }
 export type CachedDetectedBundle = {
@@ -20,6 +23,8 @@ export type CachedDetectedBundle = {
   lightPoints: DetectedPointItem[]
   areas: DetectedCadArea[]
   summary?: DetectedCadSummary
+  /** 缓存的标准图纸 base64 DataURL，供多模态对话模型在聊天中直接「亲眼看图」 */
+  imageDataUrl?: string
 }
 
 const DETECTED_CACHE_FILE = '/tmp/fmkj-ai-detected-points.json'
@@ -41,6 +46,7 @@ function toBundle(raw: unknown): CachedDetectedBundle | null {
       lightPoints: Array.isArray(b.lightPoints) ? b.lightPoints : b.points.filter((p) => !String(p.type).startsWith('switch-')),
       areas: Array.isArray(b.areas) ? b.areas : [],
       summary: b.summary,
+      imageDataUrl: typeof b.imageDataUrl === 'string' ? b.imageDataUrl : undefined,
     }
   }
   return null
@@ -54,8 +60,16 @@ function saveDetectedBundle(mediaId: string, url: string, bundle: CachedDetected
     const existing = existsSync(DETECTED_CACHE_FILE)
       ? (JSON.parse(readFileSync(DETECTED_CACHE_FILE, 'utf8')) as Record<string, unknown>)
       : {}
-    if (mediaId) existing[mediaId] = bundle
-    if (url) existing[url] = bundle
+    // 磁盘缓存不落盘大体积 base64 DataURL，避免 JSON 文件膨胀；内存缓存保留完整 imageDataUrl
+    const diskBundle: CachedDetectedBundle = {
+      points: bundle.points,
+      switchPoints: bundle.switchPoints,
+      lightPoints: bundle.lightPoints,
+      areas: bundle.areas,
+      summary: bundle.summary,
+    }
+    if (mediaId) existing[mediaId] = diskBundle
+    if (url) existing[url] = diskBundle
     // 只保留最近 100 条记录，避免临时文件无限增长
     const keys = Object.keys(existing)
     if (keys.length > 200) {
@@ -100,22 +114,24 @@ export function getCachedDetectedPoints(mediaId?: string | null, url?: string | 
 }
 
 /**
- * 当后台启用了支持视觉（Vision）的国产多模态模型（如 qwen-vl-max、glm-4v-plus、doubao-1-5-vision-pro），
- * 且本地像素检测未检出足够点位时，自动调用多模态视觉模型识图提取真实点位坐标。
+ * 当后台启用了支持视觉（Vision）的多模态模型（如 qwen-3.6/3.7/3.8、glm-5.3/5.3-flash、qwen-vl-max 等），
+ * 且图纸为非标纯黑白图纸或本地像素检测未检出足够彩色点位时，自动调用视觉模型识图提取真实点位坐标与房间结构。
  */
-async function detectPointsViaVisionModel(pngBuffer: Buffer): Promise<{ type: string; x: number; y: number }[]> {
+async function detectPointsViaVisionModel(
+  pngBuffer: Buffer,
+): Promise<{ points: { type: string; x: number; y: number; room?: string }[]; areas: DetectedCadArea[] }> {
   try {
     const company = await getCompanyInfo().catch(() => null)
-    const models = enabledAiModels(company?.aiModels ?? [])
-    const visionModel: AiModelConfig | undefined = models.find(
-      (m) => VISION_MODEL_RE.test(m.apiModel) && Boolean(resolveModelApiKey(m)),
-    )
-    if (!visionModel) return []
-    const apiKey = resolveModelApiKey(visionModel)
-    if (!apiKey || !visionModel.baseUrl.startsWith('https://')) return []
+    const picked = resolveAutoRouteModel(company?.aiModels ?? [], { hasImage: true })
+    const visionModel = picked.model
+    if (!visionModel || !isVisionCapableModel(`${visionModel.id} ${visionModel.apiModel} ${visionModel.name}`)) {
+      return { points: [], areas: [] }
+    }
+    const { url, apiKey } = resolveModelEndpoint(visionModel)
+    if (!apiKey || !url) return { points: [], areas: [] }
 
     const dataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`
-    const res = await fetch(`${visionModel.baseUrl.replace(/\/+$/, '')}/chat/completions`, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -124,14 +140,20 @@ async function detectPointsViaVisionModel(pngBuffer: Buffer): Promise<{ type: st
       body: JSON.stringify({
         model: visionModel.apiModel,
         temperature: 0.1,
-        max_tokens: 2000,
+        max_tokens: 2800,
         messages: [
           {
             role: 'user',
             content: [
               {
                 type: 'text',
-                text: '请识别这张户型/电气点位图中明确绘制的开关、灯具、插座、AP、网关或传感器符号位置。如果图中没有绘制点位符号，返回 {"points":[]}；如果有，严格只返回 JSON：{"points":[{"type":"switch-2|switch-3|downlight|spotlight|ceiling-light|socket|ap-node|gateway","x":0.0~1.0,"y":0.0~1.0}]}，不要输出任何解释文字。',
+                text: [
+                  '你是资深建筑电气与全屋智能CAD审图专家。请仔细查看这张户型/开关/灯具布置图：',
+                  '1. 先看左下角或角落的《图例》表（若有），认清图中单极(switch-1)、双极(switch-2)、三极(switch-3)、四极(switch-4)开关以及筒灯(downlight)、主灯(ceiling-light)的画法（注意：开关通常紧贴门边或床头墙体，且连着黑色控制回路折线的端点；千万不要把图例表内部、尺寸标注、盆栽植物、燃气灶、家具当成开关点位！）。',
+                  '2. 识别图中所有真实的开关与主灯/筒灯位置坐标（x, y 为整张图片左上角为 (0,0)、右下角为 (1,1) 的归一化小数，精确到小数点后3位），以及主要房间区域（areas）。',
+                  '3. 严格只返回如下 JSON 格式，不要输出任何额外解释：',
+                  '{"points":[{"type":"switch-1|switch-2|switch-3|switch-4|downlight|spotlight|ceiling-light","x":0.435,"y":0.242,"room":"主卧"}],"areas":[{"name":"主卧","type":"master-bedroom|bedroom|living-room|dining-room|kitchen|bathroom|balcony|hallway|study","rect":[x,y,w,h]}]}',
+                ].join('\n'),
               },
               {
                 type: 'image_url',
@@ -141,27 +163,51 @@ async function detectPointsViaVisionModel(pngBuffer: Buffer): Promise<{ type: st
           },
         ],
       }),
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(28000),
     })
-    if (!res.ok) return []
+    if (!res.ok) return { points: [], areas: [] }
     const json = (await res.json().catch(() => null)) as {
       choices?: Array<{ message?: { content?: string } }>
     } | null
     const text = json?.choices?.[0]?.message?.content ?? ''
     const match = /\{[\s\S]*\}/.exec(text)
-    if (!match) return []
-    const parsed = JSON.parse(match[0]) as { points?: Array<{ type?: unknown; x?: unknown; y?: unknown }> }
-    if (!Array.isArray(parsed.points)) return []
-    return parsed.points
-      .map((p) => ({
-        type: typeof p.type === 'string' ? p.type : 'switch-2',
-        x: Math.round(Number(p.x) * 1000) / 1000,
-        y: Math.round(Number(p.y) * 1000) / 1000,
-      }))
-      .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y) && p.x > 0.02 && p.x < 0.98 && p.y > 0.02 && p.y < 0.98)
-      .slice(0, 200)
+    if (!match) return { points: [], areas: [] }
+    const parsed = JSON.parse(match[0]) as {
+      points?: Array<{ type?: unknown; x?: unknown; y?: unknown; room?: unknown }>
+      areas?: Array<{ name?: unknown; type?: unknown; rect?: unknown }>
+    }
+    const pts = Array.isArray(parsed.points)
+      ? parsed.points
+          .map((p) => ({
+            type: typeof p.type === 'string' ? p.type : 'switch-2',
+            x: Math.round(Number(p.x) * 1000) / 1000,
+            y: Math.round(Number(p.y) * 1000) / 1000,
+            room: typeof p.room === 'string' ? p.room.trim().slice(0, 24) : undefined,
+          }))
+          .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y) && p.x > 0.04 && p.x < 0.96 && p.y > 0.04 && p.y < 0.94)
+          .slice(0, 200)
+      : []
+    const areas: DetectedCadArea[] = Array.isArray(parsed.areas)
+      ? parsed.areas
+          .map((a) => {
+            const r = Array.isArray(a.rect) ? a.rect.map(Number) : []
+            return {
+              name: typeof a.name === 'string' && a.name.trim() ? a.name.trim().slice(0, 24) : '房间',
+              type: typeof a.type === 'string' && a.type.trim() ? a.type.trim() : 'living-room',
+              rect: [
+                Math.round((r[0] ?? 0) * 1000) / 1000,
+                Math.round((r[1] ?? 0) * 1000) / 1000,
+                Math.round((r[2] ?? 0) * 1000) / 1000,
+                Math.round((r[3] ?? 0) * 1000) / 1000,
+              ] as [number, number, number, number],
+            }
+          })
+          .filter((a) => a.rect[2] > 0.04 && a.rect[3] > 0.04 && a.rect[0] >= 0 && a.rect[1] >= 0 && a.rect[0] + a.rect[2] <= 1 && a.rect[1] + a.rect[3] <= 1)
+          .slice(0, 20)
+      : []
+    return { points: pts, areas }
   } catch {
-    return []
+    return { points: [], areas: [] }
   }
 }
 
@@ -183,15 +229,18 @@ export async function prepareFloorPlanUpload(request: Request) {
   } catch {
     return { error: fail(400, '图片无法读取，只支持 PNG、JPG、WebP 格式') }
   }
-  const detected = detectCadSymbolsFromPixels(normalized.pixels, { sheetName: baseName })
+  let detected = detectCadSymbolsFromPixels(normalized.pixels, { sheetName: baseName })
+  // 当图纸是无彩色图层的纯黑白非标图纸（!detected.hasColorSymbols）或本地未检出点位时，优先调用多模态视觉模型识图 + 本地像素磁吸对齐
+  if (!detected.hasColorSymbols || detected.points.length === 0) {
+    const visionRes = await detectPointsViaVisionModel(normalized.png)
+    if (visionRes.points.length > 0) {
+      const mergedAreas = visionRes.areas.length > 0 ? visionRes.areas : detected.areas
+      detected = snapVisionPointsToCadInk(normalized.pixels, visionRes.points, mergedAreas, { sheetName: baseName })
+    }
+  }
   let finalPoints = detected.points
   let switchPoints = detected.switchPoints
   let lightPoints = detected.lightPoints
-  if (finalPoints.length === 0) {
-    finalPoints = await detectPointsViaVisionModel(normalized.png)
-    switchPoints = finalPoints.filter((p) => p.type.startsWith('switch-'))
-    lightPoints = finalPoints.filter((p) => !p.type.startsWith('switch-'))
-  }
   const payload = await getPayloadClient()
   const media = await payload.create({
     collection: 'media',
@@ -207,6 +256,7 @@ export async function prepareFloorPlanUpload(request: Request) {
     lightPoints,
     areas: detected.areas,
     summary: detected.summary,
+    imageDataUrl: `data:image/png;base64,${normalized.png.toString('base64')}`,
   })
   return {
     upload: {

@@ -12,13 +12,13 @@ const decorate = require('../../utils/decorate')
 const MODEL_STORAGE_KEY = 'fmkj_mp_ai_model'
 
 const FALLBACK_MODEL = {
-  id: 'deepseek-flash',
-  cleanName: 'DeepSeek V3（高速标准）',
-  shortName: 'DeepSeek V3',
-  tag: 'Go 基础 · 高速工具调用',
-  description: '高速长上下文模型，支持多步调用系统工具与已启用插件',
+  id: 'auto',
+  cleanName: 'Auto（智能路由）',
+  shortName: 'Auto',
+  tag: '日常 DeepSeek · 识图与重工具自动切 Qwen/GLM',
+  description: '日常对话使用 DeepSeek Flash 高速响应；上传图纸或调用专业工具时自动切换高阶模型',
   cost: 1,
-  provider: 'DeepSeek 官方',
+  provider: '智能多模型调度',
   tierBadge: 'Go',
   reasoning: false,
   locked: false,
@@ -97,7 +97,7 @@ Page({
     prompts: PROMPTS,
     aiReady: true,
   },
-  modelId: 'deepseek-flash',
+  modelId: 'auto',
   pluginIds: [],
   acc: '',
   reasonAcc: '',
@@ -346,7 +346,9 @@ Page({
     const msg = this.data.messages[idx]
     if (!msg) return
     if (ev.type === 'meta') {
-      this.setData({ conversationId: ev.conversationId })
+      const metaPatch = { conversationId: ev.conversationId }
+      if (ev.modelName) metaPatch[path + '.modelName'] = ev.modelName
+      this.setData(metaPatch)
     } else if (ev.type === 'tool') {
       this.setData({ [path + '.tools']: msg.tools.concat({ name: ev.pluginName, summary: ev.summary, href: ev.href || '', label: ev.hrefLabel || '' }) })
       this.scrollBottom()
@@ -362,7 +364,9 @@ Page({
     } else if (ev.type === 'done') {
       this.flush(path)
       const credits = typeof ev.balance === 'number' ? ev.balance : this.data.credits
-      this.setData({ [path + '.pending']: false, [path + '.cost']: ev.cost || 0, [path + '.reasoningCollapsed']: Boolean(this.reasonAcc), credits })
+      const donePatch = { [path + '.pending']: false, [path + '.cost']: ev.cost || 0, [path + '.reasoningCollapsed']: Boolean(this.reasonAcc), credits }
+      if (ev.modelName) donePatch[path + '.modelName'] = ev.modelName
+      this.setData(donePatch)
       if (getApp().globalData.me) getApp().globalData.me.aiCredits = credits
       if (ev.mutated) getApp().touchData()
     } else if (ev.type === 'error') {
@@ -457,11 +461,19 @@ Page({
           const parsed = parseStored(m.content)
           return { id: m.id, role: 'user', text: parsed.text, images: parsed.images.map((i) => ({ url: absUrl(i.url) })) }
         }
-        const modelObj = m.model ? this.data.models.find((x) => x.id === m.model) : null
+        const rawModelId = m.model ? String(m.model) : ''
+        const isAutoRouted = rawModelId.indexOf('auto:') === 0
+        const actualId = isAutoRouted ? rawModelId.slice(5) : rawModelId
+        const modelObj = actualId ? this.data.models.find((x) => x.id === actualId) : null
+        const displayModelName = isAutoRouted
+          ? 'Auto · ' + (modelObj ? modelObj.shortName : actualId)
+          : modelObj
+            ? modelObj.shortName
+            : actualId
         return {
           id: m.id,
           role: 'assistant',
-          modelName: modelObj ? modelObj.shortName : '',
+          modelName: displayModelName,
           tierBadge: modelObj ? modelObj.tierBadge : '',
           text: m.content,
           html: toHtml(m.content),
