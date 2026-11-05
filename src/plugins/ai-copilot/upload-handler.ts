@@ -12,6 +12,7 @@ import { parseDxfAndRenderFloorPlan } from '@/lib/dxf-point-extractor'
 import { normalizeFloorPlan } from '@/lib/floor-plan-normalize'
 import { getPayloadClient } from '@/lib/payload'
 import { SHEET } from '@/lib/sheet-spec'
+import { recordUploadDiagnostic } from '@/lib/usage-diagnostics'
 import { resolveAutoRouteModel, resolveModelEndpoint } from './server'
 import { isVisionCapableModel } from './templates'
 
@@ -270,6 +271,7 @@ export async function redetectFloorPlanFromUrl(opts: {
  * 不按 file.type 判断格式（小程序上传的文件类型常是 octet-stream），由 sharp 读取图片头。
  */
 export async function prepareFloorPlanUpload(request: Request) {
+  const t0 = Date.now()
   const form = await request.formData().catch(() => null)
   const file = form?.get('file')
   if (!(file instanceof File) || file.size === 0) return { error: fail(400, '请选择要上传的图片') }
@@ -301,6 +303,17 @@ export async function prepareFloorPlanUpload(request: Request) {
         summary: det.summary,
         imageDataUrl: `data:image/png;base64,${dxfParsed.png.toString('base64')}`,
       })
+      recordUploadDiagnostic({
+        fileName: file.name,
+        mediaId: String(media.id),
+        url: media.url,
+        method: 'dxf-vector',
+        totalPoints: det.points.length,
+        switches: det.switchPoints.length,
+        lights: det.lightPoints.length,
+        areas: det.areas.length,
+        durationMs: Date.now() - t0,
+      })
       return {
         upload: {
           mediaId: String(media.id),
@@ -328,12 +341,14 @@ export async function prepareFloorPlanUpload(request: Request) {
     return { error: fail(400, '图纸无法读取，支持 PNG、JPG、WebP 或 CAD .dxf 格式') }
   }
   let detected = detectCadSymbolsFromPixels(normalized.pixels, { sheetName: baseName })
+  let usedVisionSnap = false
   // 当图纸是无彩色图层的纯黑白非标图纸（!detected.hasColorSymbols）或本地未检出点位时，优先调用多模态视觉模型识图 + 本地像素磁吸对齐
   if (!detected.hasColorSymbols || detected.points.length === 0) {
     const visionRes = await detectPointsViaVisionModel(normalized.png)
     if (visionRes.points.length > 0) {
       const mergedAreas = visionRes.areas.length > 0 ? visionRes.areas : detected.areas
       detected = snapVisionPointsToCadInk(normalized.pixels, visionRes.points, mergedAreas, { sheetName: baseName })
+      usedVisionSnap = true
     }
   }
   let finalPoints = detected.points
@@ -355,6 +370,24 @@ export async function prepareFloorPlanUpload(request: Request) {
     areas: detected.areas,
     summary: detected.summary,
     imageDataUrl: `data:image/png;base64,${normalized.png.toString('base64')}`,
+  })
+  recordUploadDiagnostic({
+    fileName: file.name,
+    mediaId: String(media.id),
+    url: media.url,
+    method:
+      finalPoints.length === 0
+        ? 'empty'
+        : usedVisionSnap
+          ? 'vision-snap'
+          : detected.hasColorSymbols
+            ? 'cad-color'
+            : 'cad-bw',
+    totalPoints: finalPoints.length,
+    switches: switchPoints.length,
+    lights: lightPoints.length,
+    areas: detected.areas.length,
+    durationMs: Date.now() - t0,
   })
   return {
     upload: {

@@ -11,9 +11,9 @@
   </view>
 
   <view wx:if="{{mode === 'wechat'}}" class="panel">
-    <button class="btn btn-primary btn-block" hover-class="btn-hover" loading="{{busy}}" disabled="{{busy}}" bindtap="onWechat">微信一键登录</button>
-    <button class="btn btn-outline btn-block mt-16" hover-class="btn-hover" bindtap="toPassword">使用账号密码登录</button>
-    <view class="small muted text-center mt-24">首次使用微信登录需要绑定一次网页版的成员账号</view>
+    <button class="btn btn-primary btn-block" hover-class="btn-hover" loading="{{busy}}" disabled="{{busy}}" bindtap="onWechat">微信一键登录 / 注册</button>
+    <button class="btn btn-outline btn-block mt-16" hover-class="btn-hover" bindtap="toPassword">已有网页账号？邮箱密码登录</button>
+    <view class="small muted text-center mt-24">新用户点击「微信一键登录」将自动开通专属账号并赠送体验积分与示例项目</view>
   </view>
 
   <view wx:else class="panel">

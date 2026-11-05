@@ -181,6 +181,48 @@ export async function bindOpenid(userId: string, openid: string, unionid: string
   return payload.create({ collection: 'wechat-accounts', data: { openid, ...data }, overrideAccess: true, depth: 0 })
 }
 
+/**
+ * 微信小程序新用户一键自动注册：
+ * 当 openid 尚未绑定任何账号时，自动创建新成员账号（自带默认 20 AI 积分与自动克隆的示例项目）并完成微信绑定。
+ */
+export async function autoRegisterWechatUser(openid: string, unionid: string | null, nickname?: string | null): Promise<MpUser> {
+  const payload = await getPayloadClient()
+  const shortHash = createHash('sha256').update(openid).digest('hex').slice(0, 8)
+  const email = `wx_${shortHash}@wx.fmkj.local`
+  const displayName = (nickname && nickname.trim() ? nickname.trim().slice(0, 32) : '') || `微信用户${shortHash.slice(0, 4).toUpperCase()}`
+
+  // 如果已存在同占位邮箱的账号，直接复用并绑定
+  const existing = await payload
+    .find({
+      collection: 'users',
+      where: { email: { equals: email } },
+      limit: 1,
+      depth: 0,
+      overrideAccess: true,
+    })
+    .catch(() => null)
+
+  let user = (existing?.docs?.[0] as User | undefined) ?? null
+  if (!user) {
+    const randomPassword = randomBytes(18).toString('base64url')
+    user = (await payload.create({
+      collection: 'users',
+      data: {
+        name: displayName,
+        email,
+        password: randomPassword,
+        status: 'active',
+        membershipTier: 'free',
+      } as never,
+      overrideAccess: true,
+      depth: 0,
+    })) as User
+  }
+
+  await bindOpenid(String(user.id), openid, unionid, displayName)
+  return { ...user, collection: 'users' }
+}
+
 /** 小程序里展示的成员资料。 */
 export async function presentMe(user: MpUser) {
   const payload = await getPayloadClient()

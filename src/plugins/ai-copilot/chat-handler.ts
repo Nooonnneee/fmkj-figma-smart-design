@@ -3,6 +3,7 @@ import { featureAccess } from '@/lib/membership'
 import { getMembershipContext } from '@/lib/membership-policy'
 import { getPayloadClient } from '@/lib/payload'
 import { loadProjectDocs } from '@/lib/project-docs'
+import { recordAiErrorDiagnostic } from '@/lib/usage-diagnostics'
 import type { User } from '@/payload-types'
 import { getPluginFlags } from '@/plugins/state'
 
@@ -343,7 +344,17 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
           modelName: displayModelLabel(activeModel),
         })
       } catch (error) {
-        send({ type: 'error', error: error instanceof AiError ? error.message : 'AI 服务出错，请稍后重试' })
+        const errMsg = error instanceof AiError ? error.message : 'AI 服务出错，请稍后重试'
+        recordAiErrorDiagnostic({
+          userId: String(user.id),
+          userName: user.name || user.email || '用户',
+          modelId: activeModel.id,
+          modelName: displayModelLabel(activeModel),
+          projectId: ctx.projectId,
+          promptPreview: text.replace(/【已上传附件】[\s\S]*$/m, '').trim().slice(0, 120),
+          errorMessage: errMsg,
+        })
+        send({ type: 'error', error: errMsg })
         if (!(error instanceof AiError)) console.error('[ai] chat failed', error)
       } finally {
         clearInterval(heartbeat)

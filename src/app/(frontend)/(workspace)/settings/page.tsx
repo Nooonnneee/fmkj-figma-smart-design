@@ -1,4 +1,7 @@
 
+import Link from 'next/link'
+import { Activity, ArrowRight } from 'lucide-react'
+
 import { PageHeader } from '@/components/page-header'
 import { allStyles, availableStyles, DOC_KIND_LIST, DOC_KINDS } from '@/documents/registry'
 import { appAuth } from '@/lib/app-auth'
@@ -31,6 +34,21 @@ export default async function SettingsPage() {
   return (
     <section className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       <PageHeader title="设置" description="外观主题、报价单与合同抬头、联系方式，以及报价内部成本与毛利规则" />
+      <Link
+        href="/settings/reports"
+        className="group flex items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 shadow-2xs transition-colors hover:border-primary/40 hover:bg-muted/40"
+      >
+        <div className="flex items-center gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Activity className="size-4" />
+          </span>
+          <div>
+            <div className="text-sm font-semibold text-foreground">客户使用与运维诊断报告</div>
+            <div className="text-xs text-muted-foreground">查看客户活跃漏斗、户型图 CAD 识别复盘、AI 模型 Auto 路由统计与异常排障日志</div>
+          </div>
+        </div>
+        <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+      </Link>
       <AppearanceSettings />
       <CompanyForm
         initial={{

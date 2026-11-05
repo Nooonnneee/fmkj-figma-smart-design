@@ -4,6 +4,7 @@ import { useState } from "react"
 import dynamic from "next/dynamic"
 import { usePathname } from "next/navigation"
 import {
+  Activity,
   Blocks,
   BookOpen,
   Bot,
@@ -75,6 +76,7 @@ const workNav = [
 /** 低频入口不占侧栏：收在左下角齿轮的「设置」菜单里 */
 const settingsNav = [
   { icon: Settings, label: "公司与报价设置", url: "/settings" },
+  { icon: Activity, label: "客户使用报告", url: "/settings/reports" },
   { icon: Blocks, label: "插件市场", url: "/plugins" },
   { icon: BookOpen, label: "使用文档", url: "/docs" },
 ] as const

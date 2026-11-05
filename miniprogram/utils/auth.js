@@ -33,7 +33,13 @@ async function bindAccount(ticket, email, password) {
 }
 
 async function loginWithPassword(email, password) {
-  return saveSession(await api.post('/auth/password', { email, password }, { auth: false }))
+  let code = ''
+  try {
+    code = await wxCode()
+  } catch (e) {
+    code = ''
+  }
+  return saveSession(await api.post('/auth/password', { email, password, code }, { auth: false }))
 }
 
 async function logout() {
