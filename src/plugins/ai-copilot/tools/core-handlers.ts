@@ -27,9 +27,8 @@ import { DEFAULT_PLATFORM, isProjectPlatform } from '@/lib/projects'
 import { QUOTE_STATUSES, type QuoteStatus } from '@/lib/quotes'
 import type { Project } from '@/payload-types'
 import { parsePointImport, planToElements, resolveDeviceType } from '@/plugins/ai-import/point-import'
-import { IMAGE_MODELS, generateImage } from '../image-generation'
 
-import { getCachedDetectedBundle } from '../upload-handler'
+import { getCachedDetectedBundle, redetectFloorPlanFromUrl } from '../upload-handler'
 import { refreshContextProject, type AiToolHandler } from './context'
 
 const parseQuoteStatus = (v: unknown): QuoteStatus | null => {
@@ -161,10 +160,6 @@ export const coreToolHandlers: Record<string, AiToolHandler> = {
     },
   async add_floor_sheet(args, ctx) {
       if (!ctx.projectId) return { result: { error: '没有关联项目，请先新建或关联项目' }, summary: '未关联项目' }
-      const url = typeof args.url === 'string' ? args.url.trim() : ''
-      if (!url) return { result: { error: '缺少图片 url' }, summary: '缺少图片地址' }
-      const mediaId = typeof args.mediaId === 'string' && args.mediaId.trim() ? args.mediaId.trim() : null
-      const name = typeof args.sheetName === 'string' && args.sheetName.trim() ? args.sheetName.trim().slice(0, 40) : '一层平面图'
 
       const payload = await getPayloadClient()
       const project = await payload
@@ -176,21 +171,65 @@ export const coreToolHandlers: Record<string, AiToolHandler> = {
       const norm = normalizeScene(project.pointMap as Partial<StoredScene> | null)
       let elements = [...norm.elements]
       const files = { ...norm.files }
+      let analyzed = analyzeScene({ elements, files })
+
+      // 如果大模型没有传 url（例如用户说「重新生成 / 重新识别刚才的图」），自动从当前项目已有的最后一张真实图纸中提取 url 和 mediaId
+      const existingRealSheets = analyzed.sheets.filter((s) => s.fileId !== 'blank-sheet' && s.url)
+      const lastRealSheet = existingRealSheets[existingRealSheets.length - 1] ?? null
+      const url = (typeof args.url === 'string' && args.url.trim() ? args.url.trim() : lastRealSheet?.url) ?? ''
+      if (!url) return { result: { error: '当前项目还没有上传过户型图纸，请先拖入或上传户型图' }, summary: '缺少户型图纸' }
+
+      const inferredMediaId =
+        lastRealSheet?.fileId?.startsWith('sheet-') ? lastRealSheet.fileId.slice(6) : null
+      const mediaId =
+        typeof args.mediaId === 'string' && args.mediaId.trim()
+          ? args.mediaId.trim()
+          : inferredMediaId
+      const name =
+        typeof args.sheetName === 'string' && args.sheetName.trim()
+          ? args.sheetName.trim().slice(0, 40)
+          : lastRealSheet?.name || '一层平面图'
+
       const fileId = mediaId ? `sheet-${mediaId}` : `sheet-${Date.now().toString(36)}`
       files[fileId] = { id: fileId, dataURL: url, mimeType: 'image/png' }
 
-      let analyzed = analyzeScene({ elements, files })
-      // 只有一张空白示意图、且上面还没有任何点位和区域时直接替换；否则追加为新图纸，不丢失已有点位
-      if (analyzed.sheets.length === 1 && analyzed.sheets[0].fileId === 'blank-sheet' && analyzed.points.length === 0 && analyzed.areas.length === 0) {
+      // 检查是否已经存在同一张图纸（按 fileId 或 url 匹配），或者用户明确要求 replaceExisting
+      const sameSheet = analyzed.sheets.find((s) => s.fileId === fileId || (s.url && s.url === url))
+      const shouldReplace = Boolean(sameSheet) || Boolean(args.replaceExisting)
+
+      if (sameSheet && shouldReplace) {
+        // 原地清理该图纸范围内的旧点位与旧区域，不重复新建第 2 张图纸
+        const sx0 = sameSheet.x
+        const sy0 = sameSheet.y
+        const sx1 = sameSheet.x + sameSheet.width
+        const sy1 = sameSheet.y + sameSheet.height
+        const inSheetRect = (el: { x: number; y: number; width?: number; height?: number }) => {
+          const cx = el.x + (el.width ?? 0) / 2
+          const cy = el.y + (el.height ?? 0) / 2
+          return cx >= sx0 && cx <= sx1 && cy >= sy0 && cy <= sy1
+        }
+        elements = elements.filter((el) => {
+          const k = el.customData?.kind
+          if (k === 'sheet' || k === 'sheet-title') return true
+          return !inSheetRect(el)
+        })
+      } else if (analyzed.sheets.length === 1 && analyzed.sheets[0].fileId === 'blank-sheet' && analyzed.points.length === 0 && analyzed.areas.length === 0) {
         elements = [...buildSheetElements({ index: 0, name, fileId, mediaId }), ...elements.filter((e) => e.customData?.kind !== 'sheet' && e.customData?.kind !== 'sheet-title')]
       } else {
         elements.push(...buildSheetElements({ index: analyzed.sheets.length, name, fileId, mediaId }))
       }
 
       analyzed = analyzeScene({ elements, files })
-      const targetSheet = analyzed.sheets[analyzed.sheets.length - 1]
+      const targetSheet =
+        analyzed.sheets.find((s) => s.fileId === fileId || (s.url && s.url === url)) ??
+        analyzed.sheets[analyzed.sheets.length - 1]
       const importMode = args.importMode === 'all' ? 'all' : args.importMode === 'none' ? 'none' : 'switches'
-      const bundle = getCachedDetectedBundle(mediaId, url)
+      let bundle = getCachedDetectedBundle(mediaId, url)
+      // 如果用户要求重新识别（redetect=true）或者缓存已失效，自动从图纸 URL 重新执行一次完整 CAD + 视觉模型识别
+      if (args.redetect === true || !bundle || (bundle.points.length === 0 && importMode !== 'none')) {
+        const freshBundle = await redetectFloorPlanFromUrl({ mediaId, url, sheetName: name })
+        if (freshBundle) bundle = freshBundle
+      }
       let rawPts = Array.isArray(args.detectedPoints) && args.detectedPoints.length > 0 ? (args.detectedPoints as Record<string, unknown>[]) : []
       if (importMode === 'none') {
         rawPts = []
@@ -844,36 +883,6 @@ export const coreToolHandlers: Record<string, AiToolHandler> = {
         summary: `已生成「${ctx.project.project.name}」的文档打印链接`,
         href: `/projects/${pid}/archive`,
         hrefLabel: '打开项目归档与文档页',
-      }
-    },
-  async generate_image(args, ctx) {
-      const prompt = typeof args.prompt === 'string' ? args.prompt.trim() : ''
-      if (!prompt) throw new Error('请提供图片描述')
-      if (prompt.length > 2000) throw new Error('图片描述最多 2000 字')
-      const model = IMAGE_MODELS[0]
-      const size = typeof args.size === 'string' && (model.sizes as readonly string[]).includes(args.size) ? args.size : model.sizes[0]
-      const payload = await getPayloadClient()
-      const fresh = await payload.findByID({ collection: 'users', id: ctx.user.id, depth: 0, overrideAccess: true, select: { aiCredits: true } })
-      if ((fresh.aiCredits ?? 0) < model.cost) throw new Error(`积分不足，本模型需要 ${model.cost} 积分`)
-      const image = await generateImage({ prompt, model: model.id as never, size, userId: ctx.user.id })
-      let balance: number | null = null
-      try {
-        const entry = await payload.create({
-          collection: 'ai-credit-ledger',
-          data: { user: ctx.user.id, delta: -model.cost, reason: `AI 生图 · ${model.name} · ${prompt.slice(0, 40)}` },
-          overrideAccess: true,
-          depth: 0,
-        })
-        balance = entry.balanceAfter ?? null
-      } catch {
-        // 图片已生成，扣费失败不影响返回
-      }
-      return {
-        result: { ...image, cost: model.cost, balance },
-        summary: `已生成图片（${model.cost} 积分${balance != null ? `，余额 ${balance}` : ''}）`,
-        href: image.url,
-        hrefLabel: '查看图片',
-        imageUrl: image.url,
       }
     },
 }

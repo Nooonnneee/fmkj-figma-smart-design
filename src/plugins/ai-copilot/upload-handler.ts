@@ -8,6 +8,7 @@ import {
   type DetectedCadSummary,
 } from '@/lib/cad-point-detector'
 import { getCompanyInfo } from '@/lib/cached-data'
+import { parseDxfAndRenderFloorPlan } from '@/lib/dxf-point-extractor'
 import { normalizeFloorPlan } from '@/lib/floor-plan-normalize'
 import { getPayloadClient } from '@/lib/payload'
 import { SHEET } from '@/lib/sheet-spec'
@@ -212,8 +213,60 @@ async function detectPointsViaVisionModel(
 }
 
 /**
+ * 对已经在项目或媒体库中的图纸 URL 重新执行一次完整识别（像素检测 + 视觉大模型磁吸对齐），
+ * 解决用户说「重新生成 / 重新识别点位」时无需再次上传图片的问题。
+ */
+export async function redetectFloorPlanFromUrl(opts: {
+  mediaId?: string | null
+  url: string
+  sheetName?: string
+}): Promise<CachedDetectedBundle | null> {
+  try {
+    let rawBuf: Buffer | null = null
+    const cleanUrl = opts.url.trim()
+    const cached = getCachedDetectedBundle(opts.mediaId ?? null, cleanUrl)
+    if (cached?.imageDataUrl?.startsWith('data:image/')) {
+      const b64 = cached.imageDataUrl.split(',')[1]
+      if (b64) rawBuf = Buffer.from(b64, 'base64')
+    }
+    if (cleanUrl.startsWith('data:image/')) {
+      const base64 = cleanUrl.split(',')[1]
+      if (base64) rawBuf = Buffer.from(base64, 'base64')
+    } else if (!rawBuf) {
+      const port = process.env.PORT || '3000'
+      const fetchUrl = cleanUrl.startsWith('http') ? cleanUrl : `http://127.0.0.1:${port}${cleanUrl.startsWith('/') ? '' : '/'}${cleanUrl}`
+      const res = await fetch(fetchUrl, { signal: AbortSignal.timeout(10000) }).catch(() => null)
+      if (res?.ok) rawBuf = Buffer.from(await res.arrayBuffer())
+    }
+    if (!rawBuf || rawBuf.length === 0) return null
+
+    const normalized = await normalizeFloorPlan(rawBuf, { crop: false })
+    let detected = detectCadSymbolsFromPixels(normalized.pixels, { sheetName: opts.sheetName })
+    if (!detected.hasColorSymbols || detected.points.length === 0) {
+      const visionRes = await detectPointsViaVisionModel(normalized.png)
+      if (visionRes.points.length > 0) {
+        const mergedAreas = visionRes.areas.length > 0 ? visionRes.areas : detected.areas
+        detected = snapVisionPointsToCadInk(normalized.pixels, visionRes.points, mergedAreas, { sheetName: opts.sheetName })
+      }
+    }
+    const bundle: CachedDetectedBundle = {
+      points: detected.points,
+      switchPoints: detected.switchPoints,
+      lightPoints: detected.lightPoints,
+      areas: detected.areas,
+      summary: detected.summary,
+      imageDataUrl: `data:image/png;base64,${normalized.png.toString('base64')}`,
+    }
+    saveDetectedBundle(opts.mediaId ?? '', cleanUrl, bundle)
+    return bundle
+  } catch {
+    return null
+  }
+}
+
+/**
  * 上传户型图（AI 对话框、微信小程序共用）：自动去掉图框和标题栏，放进 3:2 标准图纸后存入媒体库。
- * 同时尝试识别 CAD 开关符号；识别不到就返回空数组，绝不生成默认点位。
+ * 同时支持直接上传 CAD .dxf 矢量文件（100% 精确提取图块坐标并渲染标准底图）。
  * 不按 file.type 判断格式（小程序上传的文件类型常是 octet-stream），由 sharp 读取图片头。
  */
 export async function prepareFloorPlanUpload(request: Request) {
@@ -223,11 +276,56 @@ export async function prepareFloorPlanUpload(request: Request) {
   if (file.size > SHEET.maxUploadBytes) return { error: fail(413, `图片超过 ${Math.round(SHEET.maxUploadBytes / 1024 / 1024)}MB 限制`) }
   const nameField = form?.get('name')
   const baseName = (typeof nameField === 'string' && nameField.trim() ? nameField : file.name).replace(/\.[^.]+$/, '').trim().slice(0, 40) || '户型图'
+  const rawBuffer = Buffer.from(await file.arrayBuffer())
+
+  // 支持直接上传 .dxf CAD 矢量图纸文件：直接提取 INSERT 图块坐标、房间文字并渲染为标准 PNG 底图
+  const isDxfFile = /\.dxf$/i.test(file.name) || (rawBuffer.length > 32 && rawBuffer.subarray(0, 256).toString('utf8').includes('SECTION'))
+  if (isDxfFile) {
+    const dxfParsed = await parseDxfAndRenderFloorPlan(rawBuffer.toString('utf8'), { sheetName: baseName }).catch(() => null)
+    if (dxfParsed) {
+      const payload = await getPayloadClient()
+      const media = await payload.create({
+        collection: 'media',
+        data: { alt: `CAD图纸 · ${baseName}` },
+        file: { data: dxfParsed.png, mimetype: 'image/png', name: `dxf-${Date.now().toString(36)}.png`, size: dxfParsed.png.length },
+        overrideAccess: true,
+        depth: 0,
+      })
+      if (!media.url) return { error: fail(500, 'CAD 图纸保存失败，请稍后重试') }
+      const det = dxfParsed.detection
+      saveDetectedBundle(String(media.id), media.url, {
+        points: det.points,
+        switchPoints: det.switchPoints,
+        lightPoints: det.lightPoints,
+        areas: det.areas,
+        summary: det.summary,
+        imageDataUrl: `data:image/png;base64,${dxfParsed.png.toString('base64')}`,
+      })
+      return {
+        upload: {
+          mediaId: String(media.id),
+          url: media.url,
+          name: baseName,
+          width: SHEET.pixelWidth,
+          height: SHEET.pixelHeight,
+          cropped: false,
+          detectedPointCount: det.points.length,
+          detectedPoints: det.points,
+          detectedSwitchCount: det.switchPoints.length,
+          detectedLightCount: det.lightPoints.length,
+          detectedAreaCount: det.areas.length,
+          detectedAreas: det.areas,
+          detectedSummary: det.summary,
+        },
+      }
+    }
+  }
+
   let normalized: Awaited<ReturnType<typeof normalizeFloorPlan>>
   try {
-    normalized = await normalizeFloorPlan(Buffer.from(await file.arrayBuffer()), { crop: form?.get('crop') !== '0' })
+    normalized = await normalizeFloorPlan(rawBuffer, { crop: form?.get('crop') !== '0' })
   } catch {
-    return { error: fail(400, '图片无法读取，只支持 PNG、JPG、WebP 格式') }
+    return { error: fail(400, '图纸无法读取，支持 PNG、JPG、WebP 或 CAD .dxf 格式') }
   }
   let detected = detectCadSymbolsFromPixels(normalized.pixels, { sheetName: baseName })
   // 当图纸是无彩色图层的纯黑白非标图纸（!detected.hasColorSymbols）或本地未检出点位时，优先调用多模态视觉模型识图 + 本地像素磁吸对齐

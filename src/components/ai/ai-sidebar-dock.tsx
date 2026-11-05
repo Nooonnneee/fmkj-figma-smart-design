@@ -159,20 +159,21 @@ export function AiSidebarDock({
     for (const file of files) {
       const id = `att-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
       const lower = file.name.toLowerCase()
-      const isImage = file.type.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(lower)
+      const isImage = file.type.startsWith('image/') || /\.(png|jpe?g|webp|dxf)$/i.test(lower)
       const isJson = file.type === 'application/json' || /\.(json|excalidraw)$/i.test(lower)
       const isText = file.type.startsWith('text/') || /\.(csv|txt|md|tsv)$/i.test(lower)
 
       if (!isImage && !isJson && !isText) {
-        toast.error(`暂不支持「${file.name}」，请拖入 PNG/JPG 户型图、JSON 点位文件或 CSV/TXT 清单`)
+        toast.error(`暂不支持「${file.name}」，请拖入 PNG/JPG 户型图、CAD .dxf 文件、JSON 点位文件或 CSV/TXT 清单`)
         continue
       }
 
       if (isImage) {
-        const previewUrl = URL.createObjectURL(file)
+        const isDxf = /\.dxf$/i.test(lower)
+        const previewUrl = isDxf ? undefined : URL.createObjectURL(file)
         setAttachments((prev) => [
           ...prev,
-          { id, name: file.name, kind: 'image', size: file.size, status: 'uploading', url: previewUrl, summary: '上传中…' },
+          { id, name: file.name, kind: 'image', size: file.size, status: 'uploading', url: previewUrl, summary: isDxf ? '解析 CAD 中…' : '上传识图中…' },
         ])
         try {
           const form = new FormData()
@@ -191,6 +192,14 @@ export function AiSidebarDock({
             throw new Error(data.error ?? '上传失败')
           }
           const ptCount = data.detectedPointCount ?? 0
+            const swCount = (data as { detectedSwitchCount?: number }).detectedSwitchCount ?? 0
+            const ltCount = (data as { detectedLightCount?: number }).detectedLightCount ?? 0
+            const detailSummary =
+              ptCount > 0
+                ? swCount > 0 && ltCount > 0
+                  ? `已识别：开关 ${swCount} · 灯具 ${ltCount}`
+                  : `已识别 ${ptCount} 个点位`
+                : '图纸就绪（无默认点位）'
           setAttachments((prev) =>
             prev.map((a) =>
               a.id === id
@@ -200,7 +209,7 @@ export function AiSidebarDock({
                     url: data.url,
                     mediaId: data.mediaId,
                     detectedPoints: data.detectedPoints ?? [],
-                    summary: ptCount > 0 ? `已识别 ${ptCount} 个点位` : '图纸就绪（无默认点位）',
+                      summary: detailSummary,
                   }
                 : a,
             ),
@@ -548,13 +557,44 @@ export function AiSidebarDock({
                 </span>
               </div>
             ) : (
-              <AiMessageBubble key={m.id} message={m} />
+              <AiMessageBubble
+                key={m.id}
+                message={m}
+                onRegenerate={!streaming ? () => void send('请根据刚才上传的图纸和需求重新生成点位（replaceExisting=true）') : undefined}
+                onQuickAction={!streaming ? (prompt) => void send(prompt) : undefined}
+              />
             ),
           )
         )}
       </div>
 
       <div className="p-3 pt-1.5 pb-3.5">
+        {attachments.some((a) => a.status === 'ready' && a.kind === 'image') && !streaming ? (
+          <div className="mb-2 flex flex-wrap items-center gap-1.5 px-1">
+            <span className="text-[11px] text-muted-foreground">一键导入：</span>
+            <button
+              type="button"
+              onClick={() => void send('请将上传的户型图添加到当前项目点位图，仅导入识别到的开关点位（importMode=switches）')}
+              className="rounded-full border border-primary/30 bg-primary/8 px-2.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/15"
+            >
+              仅导入开关
+            </button>
+            <button
+              type="button"
+              onClick={() => void send('请将上传的户型图添加到当前项目点位图，导入识别到的全部开关与灯具点位（importMode=all）')}
+              className="rounded-full border bg-background px-2.5 py-0.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground"
+            >
+              导入全部（开关+灯具）
+            </button>
+            <button
+              type="button"
+              onClick={() => void send('请只将上传的户型图作为干净底图添加到点位图，不自动生成任何点位（importMode=none）')}
+              className="rounded-full border bg-background px-2.5 py-0.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground"
+            >
+              仅添加干净底图
+            </button>
+          </div>
+        ) : null}
         <AiPromptComposer
           value={input}
           onChange={setInput}

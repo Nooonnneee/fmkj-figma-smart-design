@@ -360,6 +360,7 @@ export function systemPrompt(
   project: Awaited<ReturnType<typeof loadProjectDocs>> | null,
   pluginIds: string[] = [],
   flags?: PluginFlags,
+  sessionUploads: { name: string; mediaId: string; url: string }[] = [],
 ) {
   const lines = [
     '你是「繁梦空间」（FMKJ）全屋智能家居方案设计平台的 AI 助手，服务对象是方案设计师和安装团队。',
@@ -368,6 +369,7 @@ export function systemPrompt(
     '1. 查询/创建/修改项目与归档状态（list_projects, create_project, update_project）；',
     '2. 将用户拖入上传的户型图添加为项目点位图图纸并写入真实识别到的点位（add_floor_sheet），或将拖入的 fmkj-points JSON 导入点位图（import_points_json）；',
     '【重要规则】：当用户上传了户型图图片时，严禁调用 setup_rooms_and_points 生成网格默认点位！点位图打开时绝不能有未识别的默认点位——只有图像真实识别出点位（通过 add_floor_sheet 的 detectedPoints）或用户提供了点位 JSON（import_points_json）时才生成点位图标；若未识别出点位，保持点位图为空（0 点位），绝不虚构默认点位。',
+    '【防失忆规则】：当用户在后续对话中说「重新生成 / 重新识别刚才的图 / 把全部点位导进去 / 只导开关」时，绝不要让用户重新上传图片！直接调用 add_floor_sheet 工具（可直接使用下方「当前项目已有图纸」或「本会话已上传图纸」中的 url 和 mediaId，甚至省略 url 让服务端自动复用当前图纸），并设置 replaceExisting=true（若需重新调用识别器则同时设置 redetect=true）。',
     '3. 检索 728 款产品库、按平台与档次一键选型或指定某类设备的默认产品（search_products, smart_select, set_project_defaults）；',
     '4. 进行房间点位完整度审查（room_insights）与按业主画像推荐方案模板（recommend_proposal_template）；',
     '5. 从点位图直接生成报价单草稿、修改报价单优惠/附加费/状态（get_project_details, create_or_update_quote）；',
@@ -381,15 +383,31 @@ export function systemPrompt(
   }
   if (project) {
     const p = project.project
+    const realSheets = project.sheets.filter((s) => s.fileId !== 'blank-sheet' && s.url)
+    const sheetSummary = realSheets.length
+      ? realSheets
+          .map((s) => {
+            const mid = s.fileId?.startsWith('sheet-') ? s.fileId.slice(6) : ''
+            return `「${s.name}」(url: ${s.url}${mid ? `, mediaId: ${mid}` : ''})`
+          })
+          .join('；')
+      : '暂无已上传图纸（当前为空白示意图）'
     lines.push(
       '',
       `当前关联项目：${p.name}（ID: ${p.id}，客户：${p.customerName || '未填写'}，主平台：${p.platform || '待定'}）`,
       `点位 ${project.points.length} 个，房间 ${project.rooms.length} 个，图纸 ${project.sheets.length} 张，${project.pending} 个点位待选型。`,
+      `当前项目已有图纸：${sheetSummary}`,
       `设备构成：${project.categories.map((c) => `${c.name} ${c.count}`).join('、') || '暂无'}`,
       `按当前选型的设备预算：${project.total.toFixed(0)} 元${project.quote ? `；最新报价「${project.quote.title}」合计 ${project.quote.total} 元` : ''}。`,
     )
   } else {
     lines.push('', '当前尚未关联具体项目。你可以调用 list_projects 查找已有项目，或调用 create_project 直接新建项目（新建后会自动关联）。')
+  }
+  if (sessionUploads.length > 0) {
+    lines.push(
+      '',
+      `本会话历史已上传图纸记忆（用户说「重新生成/重新识别」时可直接复用）：${sessionUploads.map((u) => `${u.name} (mediaId: ${u.mediaId}, url: ${u.url})`).join('；')}`,
+    )
   }
   return lines.join('\n')
 }

@@ -20,12 +20,10 @@ export const coreAiSpec: PluginAiSpec = {
     'contracts:read',
     'contracts:write',
     'documents:read',
-    'images:generate',
   ],
   guidance: [
     '当用户提出创建或修改请求时，主动调用对应工具直接完成操作（可分多步连续调用，例如：新建项目 → 布置房间和点位 → 智能选型 → 生成报价单），不要只给口头步骤。',
     '当用户上传了真实户型图图片时，严禁调用 setup_rooms_and_points 生成网格默认点位！只有图像真实识别出点位（add_floor_sheet 的 detectedPoints）或用户提供了点位 JSON（import_points_json）时才生成点位图标；若未识别出点位，保持点位图为空（0 点位）。',
-    '当用户要求生成图片、画效果图、方案配图、场景图时，必须调用 generate_image 工具；不要声称已生成图片但没有调用。生成后把图片链接或结果告诉用户。',
     '当用户上传或粘贴别家的报价单 / 设备清单要求比价时：先逐行识别品名、品牌、型号、数量与单价（安装调试、布线辅材等服务项放入 fees），再调用 create_quote_from_competitor 生成对比报价单，最后按行总结匹配型号与差价，不要把外店的服务项当成设备。',
   ],
   knowledge: [
@@ -140,7 +138,7 @@ export const coreAiSpec: PluginAiSpec = {
       name: 'add_floor_sheet',
       title: '添加户型图纸',
       description:
-        '将用户在对话框中拖入或上传的户型图图片（带有 url 和 mediaId）添加到当前关联项目的点位图中作为标准楼层图纸。若上传时已识别并缓存点位，只需传入 url 和 mediaId，服务端会自动按 mediaId 加载已识别点位并落图；若没有识别出点位，则只添加干净的户型图纸，不生成任何默认点位。',
+        '将户型图纸添加或更新到当前关联项目的点位图中。当用户说「重新生成点位 / 重新识别刚才的图纸 / 改成导入全部点位」时，绝不要让用户重新上传图片！直接调用本工具（可省略 url 和 mediaId，服务端会自动复用当前项目已有的图纸或历史上传图纸），并设置 replaceExisting=true（及按需设置 redetect=true）即可原地重新识别并替换点位。',
       cost: 1,
       permissions: ['point-map:write'],
       scope: 'project',
@@ -148,13 +146,21 @@ export const coreAiSpec: PluginAiSpec = {
       parameters: {
         type: 'object',
         properties: {
-          url: { type: 'string', description: '上传后返回的图片 URL（如 /api/media/file/...）' },
-          mediaId: { type: 'string', description: '上传后返回的 mediaId（服务端会自动根据 mediaId 读取上传时已识别的点位）' },
+          url: { type: 'string', description: '图片 URL（如 /api/media/file/...；若是对当前项目已有图纸重新生成/切换导入模式，可省略不传）' },
+          mediaId: { type: 'string', description: '上传后返回的 mediaId（可选，省略时自动匹配当前项目已有图纸）' },
           sheetName: { type: 'string', description: '图纸名称（如 一层平面图、二层开关布置图）' },
           importMode: {
             type: 'string',
             enum: ['switches', 'all', 'none'],
             description: '点位导入范围：switches 仅导入开关（默认，避免将灯具圆圈混入开关图）；all 导入开关+筒灯/射灯全部识别点位；none 仅添加干净图纸不生成点位',
+          },
+          replaceExisting: {
+            type: 'boolean',
+            description: '是否清空该图纸上的旧点位与旧区域后重新生成（当用户要求「重新生成 / 重新识别 / 切换为全部导入」时设为 true，默认对同一张图纸自动原地替换）',
+          },
+          redetect: {
+            type: 'boolean',
+            description: '是否强制重新读取图纸文件并调用 CAD 识别器与视觉大模型重新识别点位（当用户觉得识别不准或要求「重新识别」时设为 true）',
           },
           detectedPoints: {
             type: 'array',
@@ -170,7 +176,6 @@ export const coreAiSpec: PluginAiSpec = {
             },
           },
         },
-        required: ['url'],
       },
     },
     {
@@ -425,23 +430,6 @@ export const coreAiSpec: PluginAiSpec = {
             description: '方案模板标识（如 qixu, noir, grove, quick, azure, mono, dawn, jade, construction）',
           },
         },
-      },
-    },
-    {
-      name: 'generate_image',
-      title: 'AI 生图',
-      description: '根据文字描述生成智能家居场景图、方案配图、效果图或材质意向图。用户说“画一张”“生成图片”“出个效果图”时调用。',
-      cost: 0,
-      permissions: ['images:generate'],
-      scope: 'workspace',
-      mutates: false,
-      parameters: {
-        type: 'object',
-        properties: {
-          prompt: { type: 'string', description: '图片描述，包含空间、风格、材质、光线、镜头' },
-          size: { type: 'string', enum: ['1024*1024', '1536*1024', '1024*1536'], description: '输出尺寸，默认 1024*1024' },
-        },
-        required: ['prompt'],
       },
     },
   ],

@@ -31,7 +31,7 @@ export type AiModelOption = {
 }
 export type AiConnectablePlugin = { id: string; name: string; description: string; status: 'ready' | 'coming-soon'; enabled: boolean; where: string; provides: string[] }
 export type AiProjectContext = { id: string; name: string; customerName: string | null; platform: string | null; pointCount: number }
-export type AiToolCall = { pluginId: string; pluginName: string; action: string; summary: string; details: string[]; href?: string; hrefLabel?: string; imageUrl?: string }
+export type AiToolCall = { pluginId: string; pluginName: string; action: string; summary: string; details: string[]; href?: string; hrefLabel?: string }
 export type AiAttachment = {
   id: string
   name: string
@@ -83,8 +83,16 @@ function parseStoredUserContent(raw: string): { text: string; fileBadges: { name
   return { text: visible, fileBadges: badges }
 }
 
-/** 一条消息：用户消息右侧浅灰气泡，AI 回复为无边框正文（参考 ChatGPT / Claude）。 */
-export function AiMessageBubble({ message, onRegenerate }: { message: AiChatMessage; onRegenerate?: () => void }) {
+/** 一条消息：用户消息右侧浅灰气泡，AI 回复为无边框正文（参考 ChatGPT / Claude），支持底部快捷跟进胶囊。 */
+export function AiMessageBubble({
+  message,
+  onRegenerate,
+  onQuickAction,
+}: {
+  message: AiChatMessage
+  onRegenerate?: () => void
+  onQuickAction?: (prompt: string) => void
+}) {
   const [copied, setCopied] = useState(false)
   if (message.role === 'user') {
     const parsed = parseStoredUserContent(message.content)
@@ -124,26 +132,57 @@ export function AiMessageBubble({ message, onRegenerate }: { message: AiChatMess
   return (
     <div className="group flex flex-col gap-1.5">
       {message.toolCalls?.map((c, i) => (
-        <div key={i} className="flex flex-col gap-1.5 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <Blocks className="size-3" />
-            <span>{c.summary ? `${c.pluginName}：${c.summary}` : `已使用 ${c.pluginName}`}</span>
-            {c.href ? (
-              <Link href={c.href} className="underline-offset-4 hover:text-foreground hover:underline">
-                {c.hrefLabel ?? '查看'}
-              </Link>
-            ) : null}
-          </div>
-          {c.imageUrl ? (
-            <a href={c.imageUrl} target="_blank" rel="noreferrer" className="block w-fit">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={c.imageUrl} alt="AI 生成图片" className="max-h-64 max-w-full rounded-xl border object-contain" />
-            </a>
+        <div key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Blocks className="size-3" />
+          <span>{c.summary ? `${c.pluginName}：${c.summary}` : `已使用 ${c.pluginName}`}</span>
+          {c.href ? (
+            <Link href={c.href} className="underline-offset-4 hover:text-foreground hover:underline">
+              {c.hrefLabel ?? '查看'}
+            </Link>
           ) : null}
         </div>
       ))}
       <div className={cn('text-sm leading-relaxed whitespace-pre-wrap', message.error && 'rounded-xl border border-dashed px-3 py-2 text-muted-foreground')}>{message.content}</div>
-      <div className="flex items-center gap-0.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+      {onQuickAction && !message.error && message.toolCalls?.some((c) => c.href?.includes('/point-map') || /户型图|图纸/.test(c.pluginName)) ? (
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => onQuickAction('请对当前项目的户型图重新生成点位，仅导入开关点位（importMode=switches, replaceExisting=true）')}
+            className="rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
+          >
+            仅导入开关
+          </button>
+          <button
+            type="button"
+            onClick={() => onQuickAction('请对当前项目的户型图重新生成点位，导入全部开关与灯具点位（importMode=all, replaceExisting=true）')}
+            className="rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
+          >
+            导入全部（含灯具）
+          </button>
+          <button
+            type="button"
+            onClick={() => onQuickAction('请重新读取并识别当前项目的户型图点位（redetect=true, replaceExisting=true）')}
+            className="rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
+          >
+            重新识别图纸
+          </button>
+          <button
+            type="button"
+            onClick={() => onQuickAction('请按标准档为当前项目一键智能选型，并直接生成报价单')}
+            className="rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
+          >
+            智能选型并出报价
+          </button>
+        </div>
+      ) : null}
+      <div className="flex items-center gap-1.5 text-muted-foreground">
+        {message.modelName ? (
+          <span className="rounded bg-muted/70 px-1.5 py-0.5 text-[11px] text-muted-foreground">
+            {message.modelName}
+            {typeof message.cost === 'number' && message.cost > 0 ? ` · ${message.cost}积分` : ''}
+          </span>
+        ) : null}
+        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
         <button
           type="button"
           aria-label="复制"
@@ -161,6 +200,7 @@ export function AiMessageBubble({ message, onRegenerate }: { message: AiChatMess
             <RotateCcw className="size-3.5" />
           </button>
         ) : null}
+        </div>
       </div>
     </div>
   )
@@ -257,7 +297,7 @@ export function AiPromptComposer({
         ref={fileInputRef}
         type="file"
         multiple
-        accept=".png,.jpg,.jpeg,.webp,.json,.csv,.txt,.md,.excalidraw"
+        accept=".png,.jpg,.jpeg,.webp,.dxf,.json,.csv,.txt,.md,.excalidraw"
         className="hidden"
         onChange={(e) => {
           if (e.target.files?.length) onAddFiles?.(e.target.files)

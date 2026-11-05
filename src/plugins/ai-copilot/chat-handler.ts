@@ -29,15 +29,26 @@ const MAX_INPUT = 32000
 const HISTORY = 20
 const fail = (status: number, error: string) => Response.json({ ok: false, error }, { status })
 
+/** 从消息文本的【已上传附件】段落中提取上传图片的元信息（name, mediaId, url） */
+function parseUploadedImageRefs(text: string): { name: string; mediaId: string; url: string }[] {
+  const refs: { name: string; mediaId: string; url: string }[] = []
+  const re = /- \[图片\]\s*([^\s(]+)[^\n]*?mediaId:\s*([^\s,)]*),\s*URL:\s*(\/api\/media\/file\/[^\s,)]+)/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    refs.push({
+      name: m[1]?.trim() || '户型图',
+      mediaId: m[2]?.trim() || '',
+      url: m[3]?.trim() || '',
+    })
+  }
+  return refs
+}
+
 /** 从消息文本的【已上传附件】段落中提取上传图片的缓存 DataURL，供多模态视觉模型直接看图 */
 function extractUploadedImageDataUrls(text: string): string[] {
   const urls: string[] = []
-  const re = /- \[图片\][^\n]*?mediaId:\s*([^\s,)]*),\s*URL:\s*(\/api\/media\/file\/[^\s,)]+)/g
-  let m: RegExpExecArray | null
-  while ((m = re.exec(text)) !== null) {
-    const mediaId = m[1]?.trim() || null
-    const url = m[2]?.trim() || null
-    const bundle = getCachedDetectedBundle(mediaId, url)
+  for (const ref of parseUploadedImageRefs(text)) {
+    const bundle = getCachedDetectedBundle(ref.mediaId || null, ref.url || null)
     if (bundle?.imageDataUrl) {
       urls.push(bundle.imageDataUrl)
     }
@@ -92,9 +103,14 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
   // 会话：沿用自己的会话，或新建
   let conversationId = typeof body?.conversationId === 'string' && body.conversationId ? body.conversationId : null
   let history: LlmMessage[] = []
+  let convProjectId: string | null = null
+  const sessionUploads: { name: string; mediaId: string; url: string }[] = []
   if (conversationId) {
     const conv = await payload.findByID({ collection: 'ai-conversations', id: conversationId, depth: 0, user, overrideAccess: false }).catch(() => null)
     if (!conv) return fail(404, '会话不存在')
+    if (conv.project) {
+      convProjectId = typeof conv.project === 'object' && conv.project !== null && 'id' in conv.project ? String((conv.project as { id: unknown }).id) : String(conv.project)
+    }
     const { docs } = await payload.find({
       collection: 'ai-messages',
       where: { conversation: { equals: conversationId } },
@@ -103,12 +119,39 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
       depth: 0,
       user,
       overrideAccess: false,
-      select: { role: true, content: true },
+      select: { role: true, content: true, toolCalls: true },
     })
-    history = docs.reverse().map((m) => ({ role: m.role, content: m.content }) as LlmMessage)
+    const chronological = docs.reverse()
+    for (const m of chronological) {
+      if (m.role === 'user' && typeof m.content === 'string') {
+        for (const ref of parseUploadedImageRefs(m.content)) {
+          if (!sessionUploads.some((u) => u.url === ref.url)) sessionUploads.push(ref)
+        }
+      }
+    }
+    history = chronological.map((m) => {
+      let msgContent = m.content
+      if (m.role === 'assistant' && Array.isArray(m.toolCalls) && m.toolCalls.length > 0) {
+        const toolSummary = (m.toolCalls as Array<{ pluginName?: string; summary?: string }>)
+          .map((t) => `${t.pluginName ?? '工具'}：${t.summary ?? '已执行'}`)
+          .join('；')
+        msgContent = `${msgContent}\n\n[历史已执行工具记录：${toolSummary}]`
+      }
+      return { role: m.role, content: msgContent } as LlmMessage
+    })
+  }
+  for (const ref of parseUploadedImageRefs(text)) {
+    if (!sessionUploads.some((u) => u.url === ref.url)) sessionUploads.push(ref)
+  }
+  // 如果本轮用户没有重新传图，但会话历史里有上传过图纸，且用户询问图纸细节，自动复用最近一张图纸的缓存图像供视觉模型看图
+  if (attachedImages.length === 0 && sessionUploads.length > 0) {
+    const lastUpload = sessionUploads[sessionUploads.length - 1]
+    const cachedImg = getCachedDetectedBundle(lastUpload.mediaId || null, lastUpload.url || null)?.imageDataUrl
+    if (cachedImg) attachedImages.push(cachedImg)
   }
 
-  const projectId = typeof body?.projectId === 'string' && body.projectId ? body.projectId : null
+  // 若前端未显式传 projectId，自动从当前会话（conv.project）继承上一轮刚创建或关联的项目 ID
+  const projectId = (typeof body?.projectId === 'string' && body.projectId ? body.projectId : null) ?? convProjectId
   const project = projectId ? await loadProjectDocs(projectId, user).catch(() => null) : null
 
   if (!conversationId) {
@@ -125,7 +168,7 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
   await payload.create({ collection: 'ai-messages', data: { conversation: conversationId, owner: user.id, role: 'user', content: text }, overrideAccess: true, depth: 0 })
 
   const tools = availableTools(activeModel.id, pluginIds, flags)
-  const messages: LlmMessage[] = [{ role: 'system', content: systemPrompt(project, pluginIds, flags) }, ...history, { role: 'user', content: text }]
+  const messages: LlmMessage[] = [{ role: 'system', content: systemPrompt(project, pluginIds, flags, sessionUploads) }, ...history, { role: 'user', content: text }]
   const encoder = new TextEncoder()
 
   /** 当执行模型支持多模态视觉且本条消息包含上传户型图时，将最后一条用户消息包装为包含 image_url 的多模态消息 */
