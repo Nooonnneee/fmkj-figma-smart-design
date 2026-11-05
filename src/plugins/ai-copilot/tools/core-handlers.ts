@@ -29,6 +29,7 @@ import type { Project } from '@/payload-types'
 import { parsePointImport, planToElements, resolveDeviceType } from '@/plugins/ai-import/point-import'
 import { IMAGE_MODELS, generateImage } from '../image-generation'
 
+import { getCachedDetectedPoints } from '../upload-handler'
 import { refreshContextProject, type AiToolHandler } from './context'
 
 const parseQuoteStatus = (v: unknown): QuoteStatus | null => {
@@ -188,7 +189,19 @@ export const coreToolHandlers: Record<string, AiToolHandler> = {
 
       analyzed = analyzeScene({ elements, files })
       const targetSheet = analyzed.sheets[analyzed.sheets.length - 1]
-      const rawPts = Array.isArray(args.detectedPoints) ? (args.detectedPoints as Record<string, unknown>[]) : []
+      let rawPts = Array.isArray(args.detectedPoints) && args.detectedPoints.length > 0 ? (args.detectedPoints as Record<string, unknown>[]) : []
+      if (rawPts.length === 0) {
+        const cached = getCachedDetectedPoints(mediaId, url)
+        if (cached && cached.length > 0) {
+          rawPts = cached
+        } else if (mediaId) {
+          const mediaDoc = await payload.findByID({ collection: 'media', id: mediaId, depth: 0, overrideAccess: true }).catch(() => null)
+          const fromMedia = (mediaDoc as unknown as { aiDetectedPoints?: unknown } | null)?.aiDetectedPoints
+          if (Array.isArray(fromMedia) && fromMedia.length > 0) {
+            rawPts = fromMedia as Record<string, unknown>[]
+          }
+        }
+      }
       let recognizedCount = 0
       if (targetSheet && rawPts.length > 0) {
         const usedCodes = new Set(analyzed.points.map((p) => p.code).filter(Boolean))

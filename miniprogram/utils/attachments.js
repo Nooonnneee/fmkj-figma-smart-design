@@ -7,9 +7,23 @@ function buildMessage(prompt, attachments) {
   if (!attachments.length) return prompt
   const blocks = attachments.map((a) => {
     const title = a.name.replace(/\.[^.]+$/, '')
-    const pts = a.detectedPoints || []
-    if (pts.length) {
-      return '- [图片] ' + a.name + ' (已自动适配为标准图纸, mediaId: ' + a.mediaId + ', URL: ' + a.url + ', 建议图纸名: ' + title + ', 图像自动识别到 ' + pts.length + ' 个真实点位) —— 请调用 add_floor_sheet 工具并传入 detectedPoints: ' + JSON.stringify(pts)
+    const count = a.detectedPointCount || (a.detectedPoints ? a.detectedPoints.length : 0)
+    if (count > 0) {
+      return (
+        '- [图片] ' +
+        a.name +
+        ' (已自动适配为标准图纸, mediaId: ' +
+        a.mediaId +
+        ', URL: ' +
+        a.url +
+        ', 建议图纸名: ' +
+        title +
+        ', 图像已自动识别并缓存 ' +
+        count +
+        ' 个真实点位) —— 请调用 add_floor_sheet 工具并传入 url 与 mediaId（服务端会自动按 mediaId 加载这 ' +
+        count +
+        ' 个识别点位，无需手动传 detectedPoints 数组）'
+      )
     }
     return '- [图片] ' + a.name + ' (已自动适配为标准图纸, mediaId: ' + a.mediaId + ', URL: ' + a.url + ', 建议图纸名: ' + title + ', 识别点位数: 0) —— 请只调用 add_floor_sheet 工具添加干净图纸（不传 detectedPoints），严禁调用 setup_rooms_and_points 生成任何默认点位！'
   })

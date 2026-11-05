@@ -281,7 +281,7 @@ export function AiSidebarDock({
           const sheetTitle = att.name.replace(/\.[^.]+$/, '')
           const pts = att.detectedPoints ?? []
           if (pts.length > 0) {
-            return `- [图片] ${att.name} (已自动适配为标准图纸, mediaId: ${att.mediaId ?? ''}, URL: ${att.url ?? ''}, 建议图纸名: ${sheetTitle}, 图像自动识别到 ${pts.length} 个真实点位) —— 请调用 add_floor_sheet 工具并传入 detectedPoints: ${JSON.stringify(pts)}`
+            return `- [图片] ${att.name} (已自动适配为标准图纸, mediaId: ${att.mediaId ?? ''}, URL: ${att.url ?? ''}, 建议图纸名: ${sheetTitle}, 图像已自动识别并缓存 ${pts.length} 个真实点位) —— 请调用 add_floor_sheet 工具并传入 url 与 mediaId（服务端会自动按 mediaId 加载这 ${pts.length} 个识别点位，无需手动传 detectedPoints 数组）`
           }
           return `- [图片] ${att.name} (已自动适配为标准图纸, mediaId: ${att.mediaId ?? ''}, URL: ${att.url ?? ''}, 建议图纸名: ${sheetTitle}, 识别点位数: 0) —— 请只调用 add_floor_sheet 工具添加干净图纸（不传 detectedPoints），严禁调用 setup_rooms_and_points 生成任何默认点位！`
         }

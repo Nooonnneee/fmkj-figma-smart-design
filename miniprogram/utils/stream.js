@@ -66,8 +66,14 @@ function streamNdjson(path, data, onEvent) {
       if (!line.trim()) continue
       try {
         const ev = JSON.parse(line)
-        if (ev && ev.ok === false && !ev.type) onEvent({ type: 'error', error: ev.error || '请求失败' })
-        else onEvent(ev)
+        if (!ev || ev.type === 'ping') continue
+        if (ev.ok === false && !ev.type) {
+          finished = true
+          onEvent({ type: 'error', error: ev.error || '请求失败' })
+        } else {
+          if (ev.type === 'done' || ev.type === 'error') finished = true
+          onEvent(ev)
+        }
       } catch (e) {
         // 忽略不完整的行
       }
@@ -94,7 +100,15 @@ function streamNdjson(path, data, onEvent) {
       onEvent({ type: 'closed' })
     },
     fail(e) {
-      if (!finished) onEvent({ type: e && /abort/i.test(e.errMsg || '') ? 'aborted' : 'error', error: '网络连接中断，请重试' })
+      if (!finished) {
+        const msg = (e && e.errMsg) || ''
+        const isAbort = /abort/i.test(msg)
+        const isTimeout = /timeout|time out/i.test(msg)
+        onEvent({
+          type: isAbort ? 'aborted' : 'error',
+          error: isTimeout ? 'AI 思考或执行耗时较长，连接超时，请重试' : '网络连接中断，请重试',
+        })
+      }
     },
   })
   if (task && task.onChunkReceived) {

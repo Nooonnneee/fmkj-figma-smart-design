@@ -82,7 +82,17 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
 
   const body$ = new ReadableStream({
     async start(controller) {
-      const send = (o: Record<string, unknown>) => controller.enqueue(encoder.encode(`${JSON.stringify(o)}\n`))
+      let closed = false
+      const send = (o: Record<string, unknown>) => {
+        if (closed) return
+        try {
+          controller.enqueue(encoder.encode(`${JSON.stringify(o)}\n`))
+        } catch {
+          closed = true
+        }
+      }
+      // 在工具调用（非流式 complete）与深度推理等待期间，每 8 秒发送一次心跳，防止微信小程序、移动网络或反向代理空闲超时断开连接
+      const heartbeat = setInterval(() => send({ type: 'ping' }), 8000)
       send({ type: 'meta', conversationId })
       const toolLog: { pluginId: string; pluginName: string; summary: string; href?: string; hrefLabel?: string }[] = []
       const ctx: ToolContext = {
@@ -188,7 +198,13 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
         send({ type: 'error', error: error instanceof AiError ? error.message : 'AI 服务出错，请稍后重试' })
         if (!(error instanceof AiError)) console.error('[ai] chat failed', error)
       } finally {
-        controller.close()
+        clearInterval(heartbeat)
+        closed = true
+        try {
+          controller.close()
+        } catch {
+          // ignore if already closed
+        }
       }
     },
   })

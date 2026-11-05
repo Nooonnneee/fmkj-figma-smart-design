@@ -1,3 +1,6 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+
 import { detectCadSymbolsFromPixels } from '@/lib/cad-point-detector'
 import { getCompanyInfo } from '@/lib/cached-data'
 import { normalizeFloorPlan } from '@/lib/floor-plan-normalize'
@@ -9,6 +12,54 @@ import { enabledAiModels, type AiModelConfig } from './templates'
 const fail = (status: number, error: string) => Response.json({ ok: false, error }, { status })
 
 const VISION_MODEL_RE = /vl|vision|glm-4v|qvq|omni|doubao.*vision/i
+
+export type DetectedPointItem = { type: string; x: number; y: number }
+
+const DETECTED_CACHE_FILE = '/tmp/fmkj-ai-detected-points.json'
+const detectedMemoryCache = new Map<string, DetectedPointItem[]>()
+
+function saveDetectedPoints(mediaId: string, url: string, points: DetectedPointItem[]) {
+  if (mediaId) detectedMemoryCache.set(mediaId, points)
+  if (url) detectedMemoryCache.set(url, points)
+  try {
+    mkdirSync(path.dirname(DETECTED_CACHE_FILE), { recursive: true })
+    const existing = existsSync(DETECTED_CACHE_FILE)
+      ? (JSON.parse(readFileSync(DETECTED_CACHE_FILE, 'utf8')) as Record<string, DetectedPointItem[]>)
+      : {}
+    if (mediaId) existing[mediaId] = points
+    if (url) existing[url] = points
+    // 只保留最近 100 条记录，避免临时文件无限增长
+    const keys = Object.keys(existing)
+    if (keys.length > 200) {
+      for (const k of keys.slice(0, keys.length - 200)) delete existing[k]
+    }
+    writeFileSync(DETECTED_CACHE_FILE, JSON.stringify(existing))
+  } catch {
+    // ignore disk cache write errors
+  }
+}
+
+/** 根据上传返回的 mediaId 或图片 url 读取已识别出的点位（无需客户端和大模型在消息与工具参数中搬运完整坐标数组） */
+export function getCachedDetectedPoints(mediaId?: string | null, url?: string | null): DetectedPointItem[] | null {
+  if (mediaId && detectedMemoryCache.has(mediaId)) return detectedMemoryCache.get(mediaId)!
+  if (url && detectedMemoryCache.has(url)) return detectedMemoryCache.get(url)!
+  try {
+    if (existsSync(DETECTED_CACHE_FILE)) {
+      const stored = JSON.parse(readFileSync(DETECTED_CACHE_FILE, 'utf8')) as Record<string, DetectedPointItem[]>
+      if (mediaId && Array.isArray(stored[mediaId])) {
+        detectedMemoryCache.set(mediaId, stored[mediaId])
+        return stored[mediaId]
+      }
+      if (url && Array.isArray(stored[url])) {
+        detectedMemoryCache.set(url, stored[url])
+        return stored[url]
+      }
+    }
+  } catch {
+    // ignore disk cache read errors
+  }
+  return null
+}
 
 /**
  * 当后台启用了支持视觉（Vision）的国产多模态模型（如 qwen-vl-max、glm-4v-plus、doubao-1-5-vision-pro），
@@ -108,6 +159,7 @@ export async function prepareFloorPlanUpload(request: Request) {
     depth: 0,
   })
   if (!media.url) return { error: fail(500, '图片保存失败，请稍后重试') }
+  saveDetectedPoints(String(media.id), media.url, finalPoints)
   return {
     upload: {
       mediaId: String(media.id),

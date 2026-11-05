@@ -140,7 +140,7 @@ export const coreAiSpec: PluginAiSpec = {
       name: 'add_floor_sheet',
       title: '添加户型图纸',
       description:
-        '将用户在对话框中拖入或上传的户型图图片（带有 url 和 mediaId）添加到当前关联项目的点位图中作为标准楼层图纸。如果上传附件中带有真实识别出的点位（detectedPoints），会一并在图纸对应坐标上生成点位图标；若没有识别出点位，则只添加干净的户型图纸，不生成任何默认点位。',
+        '将用户在对话框中拖入或上传的户型图图片（带有 url 和 mediaId）添加到当前关联项目的点位图中作为标准楼层图纸。若上传时已识别并缓存点位，只需传入 url 和 mediaId，服务端会自动按 mediaId 加载已识别点位并落图；若没有识别出点位，则只添加干净的户型图纸，不生成任何默认点位。',
       cost: 1,
       permissions: ['point-map:write'],
       scope: 'project',
@@ -149,11 +149,11 @@ export const coreAiSpec: PluginAiSpec = {
         type: 'object',
         properties: {
           url: { type: 'string', description: '上传后返回的图片 URL（如 /api/media/file/...）' },
-          mediaId: { type: 'string', description: '上传后返回的 mediaId' },
+          mediaId: { type: 'string', description: '上传后返回的 mediaId（服务端会自动根据 mediaId 读取上传时已识别的点位）' },
           sheetName: { type: 'string', description: '图纸名称（如 一层平面图、二层开关布置图）' },
           detectedPoints: {
             type: 'array',
-            description: '上传户型图时自动识别出的真实点位坐标列表（若无识别点位则不传，不要编造坐标）',
+            description: '可选：通常无需传递（传入 mediaId 后服务端会自动读取已识别点位；禁止编造坐标）',
             items: {
               type: 'object',
               properties: {
