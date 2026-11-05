@@ -1,6 +1,7 @@
 
 import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
+import { loadAndSyncUserCreditTasks } from '@/lib/credit-tasks'
 import { BENEFIT_ROWS, MEMBERSHIP_TIERS, meetsTier, resolveMembership, type MembershipTier } from '@/lib/membership'
 import { getMembershipPolicy } from '@/lib/membership-policy'
 import { getPayloadClient } from '@/lib/payload'
@@ -19,6 +20,8 @@ export default async function MembershipPage() {
 
   const payload = await getPayloadClient()
   const reason = await monthlyCreditReason()
+  // 先同步并自动发放已满足条件的绑定邮箱/微信积分，确保本页余额与流水立即可见
+  const { tasks: creditTasks } = await loadAndSyncUserCreditTasks(user)
   const [freshUser, activeProjects, ledgerRes, claimed, policy, templates] = await Promise.all([
     payload.findByID({ collection: 'users', id: user.id, depth: 0, overrideAccess: true }).catch(() => user),
     payload.count({
@@ -85,6 +88,7 @@ export default async function MembershipPage() {
         tiers: MEMBERSHIP_TIERS.map((t) => ({ value: t.value, label: t.label, badge: t.badge, price: t.price, description: t.description })),
         benefitRows,
         ledger,
+        creditTasks,
       }}
     />
   )

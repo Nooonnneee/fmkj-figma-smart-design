@@ -14,9 +14,10 @@ import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { MembershipState, MembershipTier } from '@/lib/membership'
+import type { CreditTaskId, UserCreditTaskStatus } from '@/lib/credit-tasks'
 import { cn } from '@/lib/utils'
 
-import { claimMonthlyCredits } from './actions'
+import { claimMonthlyCredits, claimTaskCredit } from './actions'
 
 type TierItem = { value: MembershipTier; label: string; badge: string; price: string; description: string }
 type BenefitRow = { label: string; hint?: string; values: Record<MembershipTier, string | boolean> }
@@ -74,6 +75,7 @@ export function MembershipClient({
     tiers: TierItem[]
     benefitRows: BenefitRow[]
     ledger: LedgerRow[]
+    creditTasks?: UserCreditTaskStatus[]
   }
 }) {
   const router = useRouter()
@@ -81,6 +83,7 @@ export function MembershipClient({
   const [code, setCode] = useState('')
   const [pending, startTransition] = useTransition()
   const [claiming, startClaim] = useTransition()
+  const [claimingTaskId, setClaimingTaskId] = useState<string | null>(null)
   const m = initial.membership
   const limit = m.activeProjectLimit
   const usage = limit ? Math.min(100, (initial.activeProjectCount / limit) * 100) : 0
@@ -114,6 +117,23 @@ export function MembershipClient({
       toast.success(`已领取本月 ${res.credits} 积分`)
       router.refresh()
     })
+
+  function handleClaimTask(taskId: CreditTaskId) {
+    setClaimingTaskId(taskId)
+    startTransition(async () => {
+      try {
+        const res = await claimTaskCredit(taskId)
+        if (!res.ok) {
+          toast.error(res.error)
+          return
+        }
+        toast.success(res.message)
+        router.refresh()
+      } finally {
+        setClaimingTaskId(null)
+      }
+    })
+  }
 
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-6">
@@ -210,6 +230,77 @@ export function MembershipClient({
           </form>
         </CardContent>
       </Card>
+
+      {/* 积分任务与绑定奖励中心 */}
+      {initial.creditTasks && initial.creditTasks.length > 0 ? (
+        <Card className="py-5">
+          <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Gift className="size-4 text-primary" />
+                  积分任务与绑定奖励
+                </CardTitle>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  绑定邮箱赠 10 积分、绑定微信小程序赠 10 积分、关注公众号赠 5 积分；每项任务每个账号限领一次，自动记入积分流水。
+                </p>
+              </div>
+              <Badge variant="outline" className="text-xs">
+                已完成 {initial.creditTasks.filter((t) => t.claimed).length} / {initial.creditTasks.length}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-2.5 sm:grid-cols-2">
+            {initial.creditTasks.map((task) => {
+              const isBusy = claimingTaskId === task.id && pending
+              return (
+                <div
+                  key={task.id}
+                  className={cn(
+                    'flex items-center justify-between gap-3 rounded-xl border p-3.5 transition-colors',
+                    task.claimed ? 'bg-muted/30' : 'bg-card hover:border-primary/35',
+                  )}
+                >
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm font-medium text-foreground">{task.title}</span>
+                      <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.2 text-xs font-semibold text-primary tabular-nums">
+                        +{task.credits} 积分
+                      </span>
+                    </div>
+                    <p className="line-clamp-2 text-xs text-muted-foreground">{task.description}</p>
+                  </div>
+                  <div className="shrink-0">
+                    {task.claimed ? (
+                      <Badge variant="secondary" className="gap-1">
+                        <Check className="size-3" />
+                        已领取
+                      </Badge>
+                    ) : task.eligible ? (
+                      <Button size="sm" className="h-8 text-xs" disabled={isBusy} onClick={() => handleClaimTask(task.id)}>
+                        {isBusy ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                        {task.id === 'follow_official_account' ? '已关注 · 领 5 分' : `领取 +${task.credits}`}
+                      </Button>
+                    ) : task.id === 'complete_company_profile' ? (
+                      <Button asChild variant="outline" size="sm" className="h-8 text-xs">
+                        <Link href="/settings">去设置</Link>
+                      </Button>
+                    ) : task.id === 'first_quote' ? (
+                      <Button asChild variant="outline" size="sm" className="h-8 text-xs">
+                        <Link href="/projects">去生成</Link>
+                      </Button>
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground">
+                        待绑定
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* 订阅方案与核心优势卡片 */}
       <div className="grid gap-4 lg:grid-cols-3">

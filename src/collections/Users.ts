@@ -87,7 +87,7 @@ export const Users: CollectionConfig = {
       name: 'aiCredits',
       label: 'AI 积分',
       type: 'number',
-      defaultValue: 20,
+      defaultValue: 0,
       min: 0,
       admin: { readOnly: true, position: 'sidebar', description: '在「积分流水」里新建一条记录来发放积分' },
       access: { update: () => false, create: () => false },

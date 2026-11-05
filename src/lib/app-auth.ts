@@ -3,6 +3,7 @@ import { cookies, headers } from 'next/headers'
 import { cache } from 'react'
 
 import { getPayloadClient } from '@/lib/payload'
+import { grantTaskCreditIfEligible, isRealUserEmail } from '@/lib/credit-tasks'
 import { userFromToken } from '@/lib/mp/auth'
 import type { User } from '@/payload-types'
 
@@ -249,6 +250,11 @@ export function createAppAuth(appUserCollection: 'users') {
         overrideAccess: true,
         depth: 0,
       })) as User
+
+      // 真实邮箱注册自动发放「绑定电子邮箱」+10 积分奖励
+      if (isRealUserEmail(email)) {
+        await grantTaskCreditIfEligible(String(created.id), 'bind_email').catch(() => null)
+      }
 
       const loginRes = await login(email, password)
       if (!loginRes.ok) return loginRes

@@ -111,6 +111,24 @@
           <input class="input" placeholder="如 FMKJ-XXXX-XXXX-XXXX" value="{{redeemCode}}" bindinput="onRedeemInput" />
         </view>
         <button class="btn btn-primary btn-block mt-24" hover-class="btn-hover" loading="{{saving}}" bindtap="submitRedeem">立即兑换</button>
+
+        <view wx:if="{{me.creditTasks && me.creditTasks.length}}" class="mt-32">
+          <view class="field-label">免费领积分 · 绑定与福利任务</view>
+          <view class="card card-flush mt-8">
+            <view wx:for="{{me.creditTasks}}" wx:key="id" class="list-item">
+              <view class="grow">
+                <view class="row gap-12">
+                  <text>{{item.title}}</text>
+                  <text class="badge">+{{item.credits}}分</text>
+                </view>
+                <view class="small muted mt-4">{{item.description}}</view>
+              </view>
+              <text wx:if="{{item.claimed}}" class="small muted">已领取</text>
+              <button wx:elif="{{item.eligible}}" class="btn btn-primary btn-sm" data-id="{{item.id}}" bindtap="claimTask">领取</button>
+              <text wx:else class="small muted">待完成</text>
+            </view>
+          </view>
+        </view>
       </scroll-view>
     </view>
   </block>

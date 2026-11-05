@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 
 import { relId } from '@/lib/access'
+import { grantTaskCreditIfEligible, loadAndSyncUserCreditTasks } from '@/lib/credit-tasks'
 import { resolveMembership } from '@/lib/membership'
 import { getPayloadClient } from '@/lib/payload'
 import type { User } from '@/payload-types'
@@ -176,14 +177,37 @@ export async function findBinding(openid: string, unionid?: string | null) {
 export async function bindOpenid(userId: string, openid: string, unionid: string | null, nickname?: string | null) {
   const payload = await getPayloadClient()
   const existing = await findBinding(openid, unionid)
+  const prevUserId = existing ? relId(existing.user) : null
+
+  // 如果该微信号之前一键生成过一个临时微信小号（@wx.fmkj.local），当用户主动用已有网页邮箱账号登录并改绑时，自动停用该临时小号
+  if (prevUserId && prevUserId !== userId) {
+    const prevUser = (await payload.findByID({ collection: 'users', id: prevUserId, depth: 0, overrideAccess: true }).catch(() => null)) as User | null
+    if (prevUser && prevUser.email?.endsWith('@wx.fmkj.local')) {
+      await payload
+        .update({
+          collection: 'users',
+          id: prevUserId,
+          data: { status: 'disabled' } as never,
+          overrideAccess: true,
+          depth: 0,
+        })
+        .catch(() => null)
+    }
+  }
+
   const data = { user: userId, unionid, lastLoginAt: new Date().toISOString(), ...(nickname ? { nickname: nickname.slice(0, 40) } : {}) }
-  if (existing) return payload.update({ collection: 'wechat-accounts', id: existing.id, data, overrideAccess: true, depth: 0 })
-  return payload.create({ collection: 'wechat-accounts', data: { openid, ...data }, overrideAccess: true, depth: 0 })
+  const record = existing
+    ? await payload.update({ collection: 'wechat-accounts', id: existing.id, data, overrideAccess: true, depth: 0 })
+    : await payload.create({ collection: 'wechat-accounts', data: { openid, ...data }, overrideAccess: true, depth: 0 })
+
+  // 绑定微信成功后，自动发放「绑定微信小程序」+10 积分奖励（按 userId 幂等，每个账号限领一次）
+  await grantTaskCreditIfEligible(userId, 'bind_wechat').catch(() => null)
+  return record
 }
 
 /**
  * 微信小程序新用户一键自动注册：
- * 当 openid 尚未绑定任何账号时，自动创建新成员账号（自带默认 20 AI 积分与自动克隆的示例项目）并完成微信绑定。
+ * 当 openid 尚未绑定任何账号时，自动创建新成员账号，并通过 bindOpenid 自动发放「绑定微信小程序 +10 积分」与克隆示例项目。
  */
 export async function autoRegisterWechatUser(openid: string, unionid: string | null, nickname?: string | null): Promise<MpUser> {
   const payload = await getPayloadClient()
@@ -220,24 +244,28 @@ export async function autoRegisterWechatUser(openid: string, unionid: string | n
   }
 
   await bindOpenid(String(user.id), openid, unionid, displayName)
-  return { ...user, collection: 'users' }
+  const refreshed = (await payload.findByID({ collection: 'users', id: user.id, depth: 0, overrideAccess: true }).catch(() => user)) as User
+  return { ...refreshed, collection: 'users' }
 }
 
 /** 小程序里展示的成员资料。 */
 export async function presentMe(user: MpUser) {
   const payload = await getPayloadClient()
+  const { tasks: creditTasks } = await loadAndSyncUserCreditTasks(user).catch(() => ({ tasks: [] }))
+  const fresh = (await payload.findByID({ collection: 'users', id: user.id, depth: 0, overrideAccess: true }).catch(() => user)) as User
   const { totalDocs } = await payload.count({ collection: 'wechat-accounts', where: { user: { equals: user.id } }, overrideAccess: true })
-  const membership = resolveMembership(user as never)
+  const membership = resolveMembership(fresh as never)
   return {
-    id: String(user.id),
-    name: user.name,
-    email: user.email,
-    phone: user.phone ?? null,
-    aiCredits: user.aiCredits ?? 0,
+    id: String(fresh.id),
+    name: fresh.name,
+    email: fresh.email,
+    phone: fresh.phone ?? null,
+    aiCredits: fresh.aiCredits ?? 0,
     wechatBound: totalDocs > 0,
     membershipTier: membership.effectiveTier,
     membershipLabel: membership.label,
     membershipBadge: membership.badge,
     membershipExpiresAt: membership.expiresAt,
+    creditTasks,
   }
 }

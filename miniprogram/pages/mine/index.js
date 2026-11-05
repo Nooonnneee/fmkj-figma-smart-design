@@ -58,6 +58,18 @@ Page({
       this.setData({ saving: false })
     }
   },
+  async claimTask(e) {
+    const taskId = e.currentTarget.dataset.id
+    if (!taskId || this.data.saving) return
+    this.setData({ saving: true })
+    try {
+      const res = await api.post('/me/redeem', { taskId })
+      toast(res.message || '领取成功')
+      this.load()
+    } finally {
+      this.setData({ saving: false })
+    }
+  },
   onInput(e) {
     this.setData({ ['form.' + e.currentTarget.dataset.key]: e.detail.value })
   },
