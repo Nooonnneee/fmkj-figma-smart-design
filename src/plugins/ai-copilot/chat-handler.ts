@@ -206,7 +206,7 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
       // 在工具调用（非流式 complete）与深度推理等待期间，每 8 秒发送一次心跳，防止微信小程序、移动网络或反向代理空闲超时断开连接
       const heartbeat = setInterval(() => send({ type: 'ping' }), 8000)
       send({ type: 'meta', conversationId, modelId: activeModel.id, modelName: displayModelLabel(activeModel) })
-      const toolLog: { pluginId: string; pluginName: string; summary: string; href?: string; hrefLabel?: string }[] = []
+      const toolLog: { pluginId: string; pluginName: string; summary: string; href?: string; hrefLabel?: string; imageUrl?: string }[] = []
       const ctx: ToolContext = {
         user,
         projectId,
@@ -250,7 +250,7 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
               const r = await runTool(tools, call, ctx)
               if (r.tool) meter.tool(call.function.name)
               if (r.tool) {
-                const entry = { pluginId: r.tool.pluginId ?? 'core', pluginName: r.tool.pluginName, summary: r.summary ?? '', href: r.href, hrefLabel: r.hrefLabel }
+                const entry = { pluginId: r.tool.pluginId ?? 'core', pluginName: r.tool.pluginName, summary: r.summary ?? '', href: r.href, hrefLabel: r.hrefLabel, imageUrl: r.imageUrl }
                 toolLog.push(entry)
                 send({ type: 'tool', ...entry })
               }

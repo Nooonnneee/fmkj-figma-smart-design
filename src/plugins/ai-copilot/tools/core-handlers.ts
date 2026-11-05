@@ -27,6 +27,7 @@ import { DEFAULT_PLATFORM, isProjectPlatform } from '@/lib/projects'
 import { QUOTE_STATUSES, type QuoteStatus } from '@/lib/quotes'
 import type { Project } from '@/payload-types'
 import { parsePointImport, planToElements, resolveDeviceType } from '@/plugins/ai-import/point-import'
+import { IMAGE_MODELS, generateImage } from '../image-generation'
 
 import { getCachedDetectedBundle, redetectFloorPlanFromUrl } from '../upload-handler'
 import { refreshContextProject, type AiToolHandler } from './context'
@@ -883,6 +884,36 @@ export const coreToolHandlers: Record<string, AiToolHandler> = {
         summary: `已生成「${ctx.project.project.name}」的文档打印链接`,
         href: `/projects/${pid}/archive`,
         hrefLabel: '打开项目归档与文档页',
+      }
+    },
+  async generate_image(args, ctx) {
+      const prompt = typeof args.prompt === 'string' ? args.prompt.trim() : ''
+      if (!prompt) throw new Error('请提供图片描述')
+      if (prompt.length > 2000) throw new Error('图片描述最多 2000 字')
+      const model = IMAGE_MODELS[0]
+      const size = typeof args.size === 'string' && (model.sizes as readonly string[]).includes(args.size) ? args.size : model.sizes[0]
+      const payload = await getPayloadClient()
+      const fresh = await payload.findByID({ collection: 'users', id: ctx.user.id, depth: 0, overrideAccess: true, select: { aiCredits: true } })
+      if ((fresh.aiCredits ?? 0) < model.cost) throw new Error(`积分不足，本模型需要 ${model.cost} 积分`)
+      const image = await generateImage({ prompt, model: model.id as never, size, userId: ctx.user.id })
+      let balance: number | null = null
+      try {
+        const entry = await payload.create({
+          collection: 'ai-credit-ledger',
+          data: { user: ctx.user.id, delta: -model.cost, reason: `AI 生图 · ${model.name} · ${prompt.slice(0, 40)}` },
+          overrideAccess: true,
+          depth: 0,
+        })
+        balance = entry.balanceAfter ?? null
+      } catch {
+        // 图片已生成，扣费失败不影响返回
+      }
+      return {
+        result: { ...image, cost: model.cost, balance },
+        summary: `已生成图片（${model.cost} 积分${balance != null ? `，余额 ${balance}` : ''}）`,
+        href: image.url,
+        hrefLabel: '查看图片',
+        imageUrl: image.url,
       }
     },
 }
