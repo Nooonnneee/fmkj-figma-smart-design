@@ -151,6 +151,11 @@ export const coreAiSpec: PluginAiSpec = {
           url: { type: 'string', description: '上传后返回的图片 URL（如 /api/media/file/...）' },
           mediaId: { type: 'string', description: '上传后返回的 mediaId（服务端会自动根据 mediaId 读取上传时已识别的点位）' },
           sheetName: { type: 'string', description: '图纸名称（如 一层平面图、二层开关布置图）' },
+          importMode: {
+            type: 'string',
+            enum: ['switches', 'all', 'none'],
+            description: '点位导入范围：switches 仅导入开关（默认，避免将灯具圆圈混入开关图）；all 导入开关+筒灯/射灯全部识别点位；none 仅添加干净图纸不生成点位',
+          },
           detectedPoints: {
             type: 'array',
             description: '可选：通常无需传递（传入 mediaId 后服务端会自动读取已识别点位；禁止编造坐标）',

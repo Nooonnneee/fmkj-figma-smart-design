@@ -398,20 +398,26 @@ Page({
       wx.showModal({ title: '图纸名称', editable: true, placeholderText: '例如：一层开关布置图', success: (r) => resolve(r.confirm ? (r.content || '').trim() : null) }),
     )
     if (name === null) return
-    const recognize = await new Promise((resolve) =>
-      wx.showModal({
-        title: '识别开关符号',
-        content: '是否尝试识别图上的 CAD 开关符号并生成点位？识别不到时不会生成任何点位。',
-        confirmText: '识别',
-        cancelText: '不识别',
-        success: (r) => resolve(Boolean(r.confirm)),
+    const mode = await new Promise((resolve) =>
+      wx.showActionSheet({
+        alertText: '选择图纸点位导入方式',
+        itemList: ['仅导入开关点位（推荐）', '导入全部符号（开关 + 筒灯/射灯）', '不导入点位（手动调整）'],
+        success: (r) => resolve(r.tapIndex === 0 ? 'switches' : r.tapIndex === 1 ? 'all' : 'none'),
+        fail: () => resolve(null),
       }),
     )
+    if (!mode) return
     wx.showLoading({ title: '正在处理图纸', mask: true })
     try {
-      const r = await upload('/projects/' + this.data.id + '/sheets' + (recognize ? '?recognize=1' : ''), img.path, { name })
+      const r = await upload('/projects/' + this.data.id + '/sheets?mode=' + mode, img.path, { name })
       wx.hideLoading()
-      toast('已添加「' + r.sheetName + '」' + (r.recognizedPoints ? '，识别 ' + r.recognizedPoints + ' 个点位' : ''))
+      toast(
+        '已添加「' +
+          r.sheetName +
+          '」' +
+          (r.recognizedPoints ? '，导入 ' + r.recognizedPoints + ' 个点位' : '') +
+          (r.recognizedAreas ? ' · ' + r.recognizedAreas + ' 个房间' : ''),
+      )
       getApp().touchData()
       this.setData({ sheetIndex: 999 })
       this.load()

@@ -253,6 +253,13 @@ Page({
     this.setData({ attachments: this.data.attachments.concat({ id, name: img.name, status: 'uploading', preview: img.path, summary: '上传中…' }) })
     try {
       const r = await upload('/ai/upload', img.path, { name: img.name })
+      const sw = r.detectedSwitchCount || 0
+      const lt = r.detectedLightCount || 0
+      const ar = r.detectedAreaCount || 0
+      const summaryText =
+        sw || lt
+          ? '开关 ' + sw + (lt ? ' · 灯具 ' + lt : '') + (ar ? ' · ' + ar + ' 个房间' : '')
+          : '图纸已就绪（无默认点位）'
       this.setData({
         attachments: this.data.attachments.map((a) =>
           a.id === id
@@ -261,7 +268,11 @@ Page({
                 url: r.url,
                 mediaId: r.mediaId,
                 detectedPoints: r.detectedPoints || [],
-                summary: r.detectedPointCount ? '识别到 ' + r.detectedPointCount + ' 个点位' : '图纸已就绪（不生成默认点位）',
+                detectedPointCount: r.detectedPointCount || 0,
+                detectedSwitchCount: sw,
+                detectedLightCount: lt,
+                detectedAreaCount: ar,
+                summary: summaryText,
               })
             : a,
         ),

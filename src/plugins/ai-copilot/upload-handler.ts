@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { detectCadSymbolsFromPixels } from '@/lib/cad-point-detector'
+import { detectCadSymbolsFromPixels, type DetectedCadArea, type DetectedCadSummary } from '@/lib/cad-point-detector'
 import { getCompanyInfo } from '@/lib/cached-data'
 import { normalizeFloorPlan } from '@/lib/floor-plan-normalize'
 import { getPayloadClient } from '@/lib/payload'
@@ -14,20 +14,48 @@ const fail = (status: number, error: string) => Response.json({ ok: false, error
 const VISION_MODEL_RE = /vl|vision|glm-4v|qvq|omni|doubao.*vision/i
 
 export type DetectedPointItem = { type: string; x: number; y: number }
+export type CachedDetectedBundle = {
+  points: DetectedPointItem[]
+  switchPoints: DetectedPointItem[]
+  lightPoints: DetectedPointItem[]
+  areas: DetectedCadArea[]
+  summary?: DetectedCadSummary
+}
 
 const DETECTED_CACHE_FILE = '/tmp/fmkj-ai-detected-points.json'
-const detectedMemoryCache = new Map<string, DetectedPointItem[]>()
+const detectedMemoryCache = new Map<string, CachedDetectedBundle>()
 
-function saveDetectedPoints(mediaId: string, url: string, points: DetectedPointItem[]) {
-  if (mediaId) detectedMemoryCache.set(mediaId, points)
-  if (url) detectedMemoryCache.set(url, points)
+function toBundle(raw: unknown): CachedDetectedBundle | null {
+  if (!raw) return null
+  if (Array.isArray(raw)) {
+    const pts = raw as DetectedPointItem[]
+    const sw = pts.filter((p) => String(p.type).startsWith('switch-'))
+    const lt = pts.filter((p) => !String(p.type).startsWith('switch-'))
+    return { points: pts, switchPoints: sw, lightPoints: lt, areas: [] }
+  }
+  if (typeof raw === 'object' && Array.isArray((raw as CachedDetectedBundle).points)) {
+    const b = raw as CachedDetectedBundle
+    return {
+      points: b.points,
+      switchPoints: Array.isArray(b.switchPoints) ? b.switchPoints : b.points.filter((p) => String(p.type).startsWith('switch-')),
+      lightPoints: Array.isArray(b.lightPoints) ? b.lightPoints : b.points.filter((p) => !String(p.type).startsWith('switch-')),
+      areas: Array.isArray(b.areas) ? b.areas : [],
+      summary: b.summary,
+    }
+  }
+  return null
+}
+
+function saveDetectedBundle(mediaId: string, url: string, bundle: CachedDetectedBundle) {
+  if (mediaId) detectedMemoryCache.set(mediaId, bundle)
+  if (url) detectedMemoryCache.set(url, bundle)
   try {
     mkdirSync(path.dirname(DETECTED_CACHE_FILE), { recursive: true })
     const existing = existsSync(DETECTED_CACHE_FILE)
-      ? (JSON.parse(readFileSync(DETECTED_CACHE_FILE, 'utf8')) as Record<string, DetectedPointItem[]>)
+      ? (JSON.parse(readFileSync(DETECTED_CACHE_FILE, 'utf8')) as Record<string, unknown>)
       : {}
-    if (mediaId) existing[mediaId] = points
-    if (url) existing[url] = points
+    if (mediaId) existing[mediaId] = bundle
+    if (url) existing[url] = bundle
     // 只保留最近 100 条记录，避免临时文件无限增长
     const keys = Object.keys(existing)
     if (keys.length > 200) {
@@ -39,26 +67,36 @@ function saveDetectedPoints(mediaId: string, url: string, points: DetectedPointI
   }
 }
 
-/** 根据上传返回的 mediaId 或图片 url 读取已识别出的点位（无需客户端和大模型在消息与工具参数中搬运完整坐标数组） */
-export function getCachedDetectedPoints(mediaId?: string | null, url?: string | null): DetectedPointItem[] | null {
+export function getCachedDetectedBundle(mediaId?: string | null, url?: string | null): CachedDetectedBundle | null {
   if (mediaId && detectedMemoryCache.has(mediaId)) return detectedMemoryCache.get(mediaId)!
   if (url && detectedMemoryCache.has(url)) return detectedMemoryCache.get(url)!
   try {
     if (existsSync(DETECTED_CACHE_FILE)) {
-      const stored = JSON.parse(readFileSync(DETECTED_CACHE_FILE, 'utf8')) as Record<string, DetectedPointItem[]>
-      if (mediaId && Array.isArray(stored[mediaId])) {
-        detectedMemoryCache.set(mediaId, stored[mediaId])
-        return stored[mediaId]
+      const stored = JSON.parse(readFileSync(DETECTED_CACHE_FILE, 'utf8')) as Record<string, unknown>
+      if (mediaId && stored[mediaId]) {
+        const b = toBundle(stored[mediaId])
+        if (b) {
+          detectedMemoryCache.set(mediaId, b)
+          return b
+        }
       }
-      if (url && Array.isArray(stored[url])) {
-        detectedMemoryCache.set(url, stored[url])
-        return stored[url]
+      if (url && stored[url]) {
+        const b = toBundle(stored[url])
+        if (b) {
+          detectedMemoryCache.set(url, b)
+          return b
+        }
       }
     }
   } catch {
     // ignore disk cache read errors
   }
   return null
+}
+
+/** 根据上传返回的 mediaId 或图片 url 读取已识别出的点位（无需客户端和大模型在消息与工具参数中搬运完整坐标数组） */
+export function getCachedDetectedPoints(mediaId?: string | null, url?: string | null): DetectedPointItem[] | null {
+  return getCachedDetectedBundle(mediaId, url)?.points ?? null
 }
 
 /**
@@ -145,10 +183,14 @@ export async function prepareFloorPlanUpload(request: Request) {
   } catch {
     return { error: fail(400, '图片无法读取，只支持 PNG、JPG、WebP 格式') }
   }
-  const detected = detectCadSymbolsFromPixels(normalized.pixels)
+  const detected = detectCadSymbolsFromPixels(normalized.pixels, { sheetName: baseName })
   let finalPoints = detected.points
+  let switchPoints = detected.switchPoints
+  let lightPoints = detected.lightPoints
   if (finalPoints.length === 0) {
     finalPoints = await detectPointsViaVisionModel(normalized.png)
+    switchPoints = finalPoints.filter((p) => p.type.startsWith('switch-'))
+    lightPoints = finalPoints.filter((p) => !p.type.startsWith('switch-'))
   }
   const payload = await getPayloadClient()
   const media = await payload.create({
@@ -159,7 +201,13 @@ export async function prepareFloorPlanUpload(request: Request) {
     depth: 0,
   })
   if (!media.url) return { error: fail(500, '图片保存失败，请稍后重试') }
-  saveDetectedPoints(String(media.id), media.url, finalPoints)
+  saveDetectedBundle(String(media.id), media.url, {
+    points: finalPoints,
+    switchPoints,
+    lightPoints,
+    areas: detected.areas,
+    summary: detected.summary,
+  })
   return {
     upload: {
       mediaId: String(media.id),
@@ -170,6 +218,11 @@ export async function prepareFloorPlanUpload(request: Request) {
       cropped: normalized.cropped,
       detectedPointCount: finalPoints.length,
       detectedPoints: finalPoints,
+      detectedSwitchCount: switchPoints.length,
+      detectedLightCount: lightPoints.length,
+      detectedAreaCount: detected.areas.length,
+      detectedAreas: detected.areas,
+      detectedSummary: detected.summary,
     },
   }
 }

@@ -1,8 +1,10 @@
+import { inferAreaType, isAreaType } from '@/lib/area-types'
 import { getCatalog } from '@/lib/cached-data'
 import { categoryOfType, isDeviceType } from '@/lib/device-types'
 import { getPayloadClient } from '@/lib/payload'
 import {
   analyzeScene,
+  buildAreaElements,
   buildPointElements,
   buildSheetElements,
   compactScene,
@@ -26,6 +28,7 @@ const MAX_BYTES = 190 * 1024
 export type PointMapResult<T = object> = ({ ok: true } & T) | { ok: false; error: string; status: number }
 type Scene = { elements: SceneEl[]; files: Record<string, SceneFile>; appState?: Record<string, unknown> }
 type DetectedPoint = { type: unknown; x: unknown; y: unknown }
+type DetectedArea = { name?: unknown; type?: unknown; rect?: unknown }
 
 async function loadScene(user: User, projectId: string) {
   const payload = await getPayloadClient()
@@ -182,8 +185,8 @@ export async function deletePoint(user: User, projectId: string, pointId: string
 export async function addSheetImage(
   user: User,
   projectId: string,
-  input: { url: string; mediaId: string | null; name: string; detectedPoints?: DetectedPoint[] },
-): Promise<PointMapResult<{ sheetId: string; sheetName: string; recognizedPoints: number }>> {
+  input: { url: string; mediaId: string | null; name: string; detectedPoints?: DetectedPoint[]; detectedAreas?: DetectedArea[] },
+): Promise<PointMapResult<{ sheetId: string; sheetName: string; recognizedPoints: number; recognizedAreas: number }>> {
   const loaded = await loadScene(user, projectId)
   if ('error' in loaded) return loaded.error!
   const scene = loaded.scene
@@ -199,6 +202,26 @@ export async function addSheetImage(
 
   const after = analyzeScene(scene)
   const sheet = after.sheets.find((s) => s.id === sheetId)!
+  let recognizedAreas = 0
+  for (const a of input.detectedAreas ?? []) {
+    const rect = Array.isArray(a.rect) ? a.rect.map(Number) : []
+    if (rect.length < 4 || rect.some((n) => !Number.isFinite(n))) continue
+    const [rx, ry, rw, rh] = rect
+    if (rw <= 0.02 || rh <= 0.02) continue
+    const areaName = typeof a.name === 'string' && a.name.trim() ? a.name.trim().slice(0, 24) : '房间'
+    const areaType = isAreaType(a.type) ? a.type : inferAreaType(areaName)
+    scene.elements.push(
+      ...buildAreaElements({
+        name: areaName,
+        areaType,
+        x: sheet.x + rx * sheet.width,
+        y: sheet.y + ry * sheet.height,
+        width: rw * sheet.width,
+        height: rh * sheet.height,
+      }),
+    )
+    recognizedAreas++
+  }
   const codes = after.points.map((p) => p.code)
   let recognized = 0
   for (const p of input.detectedPoints ?? []) {
@@ -211,5 +234,5 @@ export async function addSheetImage(
     recognized++
   }
   const saved = await persistScene(user, projectId, scene, loaded.storedFiles)
-  return saved.ok ? { ok: true, sheetId, sheetName: name, recognizedPoints: recognized } : saved
+  return saved.ok ? { ok: true, sheetId, sheetName: name, recognizedPoints: recognized, recognizedAreas } : saved
 }

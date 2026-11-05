@@ -29,7 +29,7 @@ import type { Project } from '@/payload-types'
 import { parsePointImport, planToElements, resolveDeviceType } from '@/plugins/ai-import/point-import'
 import { IMAGE_MODELS, generateImage } from '../image-generation'
 
-import { getCachedDetectedPoints } from '../upload-handler'
+import { getCachedDetectedBundle } from '../upload-handler'
 import { refreshContextProject, type AiToolHandler } from './context'
 
 const parseQuoteStatus = (v: unknown): QuoteStatus | null => {
@@ -189,11 +189,17 @@ export const coreToolHandlers: Record<string, AiToolHandler> = {
 
       analyzed = analyzeScene({ elements, files })
       const targetSheet = analyzed.sheets[analyzed.sheets.length - 1]
+      const importMode = args.importMode === 'all' ? 'all' : args.importMode === 'none' ? 'none' : 'switches'
+      const bundle = getCachedDetectedBundle(mediaId, url)
       let rawPts = Array.isArray(args.detectedPoints) && args.detectedPoints.length > 0 ? (args.detectedPoints as Record<string, unknown>[]) : []
-      if (rawPts.length === 0) {
-        const cached = getCachedDetectedPoints(mediaId, url)
-        if (cached && cached.length > 0) {
-          rawPts = cached
+      if (importMode === 'none') {
+        rawPts = []
+      } else if (rawPts.length === 0) {
+        if (bundle) {
+          rawPts =
+            importMode === 'switches' && bundle.switchPoints.length > 0
+              ? bundle.switchPoints
+              : bundle.points
         } else if (mediaId) {
           const mediaDoc = await payload.findByID({ collection: 'media', id: mediaId, depth: 0, overrideAccess: true }).catch(() => null)
           const fromMedia = (mediaDoc as unknown as { aiDetectedPoints?: unknown } | null)?.aiDetectedPoints
@@ -202,6 +208,32 @@ export const coreToolHandlers: Record<string, AiToolHandler> = {
           }
         }
       }
+
+      // 自动创建识别出的房间区域（避免点位全部落入「公共区」）
+      let createdAreas = 0
+      if (targetSheet && importMode !== 'none' && bundle?.areas?.length) {
+        const onSheetAreas = analyzed.areas.filter((a) => a.sheetId === targetSheet.id)
+        if (onSheetAreas.length === 0) {
+          for (const a of bundle.areas) {
+            const [rx, ry, rw, rh] = a.rect
+            if (rw <= 0.02 || rh <= 0.02) continue
+            const areaName = a.name || '房间'
+            const areaType = isAreaType(a.type) ? a.type : inferAreaType(areaName)
+            elements.push(
+              ...buildAreaElements({
+                name: areaName,
+                areaType,
+                x: targetSheet.x + rx * targetSheet.width,
+                y: targetSheet.y + ry * targetSheet.height,
+                width: rw * targetSheet.width,
+                height: rh * targetSheet.height,
+              }),
+            )
+            createdAreas++
+          }
+        }
+      }
+
       let recognizedCount = 0
       if (targetSheet && rawPts.length > 0) {
         const usedCodes = new Set(analyzed.points.map((p) => p.code).filter(Boolean))
@@ -239,14 +271,17 @@ export const coreToolHandlers: Record<string, AiToolHandler> = {
         result: {
           sheetName: name,
           url,
+          importMode,
           recognizedPoints: recognizedCount,
+          recognizedAreas: createdAreas,
+          detectedSummary: bundle?.summary ?? null,
           totalSheets: ctx.project?.sheets.length ?? 1,
           note: recognizedCount
-            ? `已在图纸上按识别位置生成 ${recognizedCount} 个点位图标`
+            ? `已在图纸上生成 ${recognizedCount} 个点位（模式：${importMode === 'switches' ? '仅开关' : '全部'}）与 ${createdAreas} 个房间分区`
             : '图纸已添加（未检测到标准 CAD 点位符号，按规则保持 0 默认点位，可在画布手动放置或导入识别 JSON）',
         },
         summary: recognizedCount
-          ? `已添加图纸「${name}」并识别生成 ${recognizedCount} 个点位`
+          ? `已添加图纸「${name}」（${recognizedCount} 个点位 · ${createdAreas} 个房间）`
           : `已添加户型图「${name}」（无默认点位）`,
         href: `/projects/${ctx.projectId}/point-map`,
         hrefLabel: '查看点位图',

@@ -1,10 +1,12 @@
 /**
  * CAD 开关/灯具布置图符号检测器（纯像素连通域与几何特征识别）。
  *
- * 原则：
- * - 只在检测到明确的 CAD 开关/灯具符号特征时才输出识别到的真实坐标点位；
- * - 如果上传的是普通空白户型图、效果图或无法识别出符号的图纸，严格返回 0 个点位，
- *   绝不生成任何网格默认点位！
+ * 核心能力：
+ * 1. 区域屏蔽：自动定位建筑墙体核心框，屏蔽左下角图例表、右下角标题栏、四周尺寸标注链与外图框；
+ * 2. 彩色/淡黄色优先识别：放宽淡黄色开关饱和度下限（明度+色相组合），结合旁侧 L1-Kxx 标签文字二次确认；
+ * 3. 图例几何模板区分：严格区分带斜杆旗齿/T柄的开关（switch-1/2/3）与空心圆环/回路圆点灯具（downlight/spotlight）；
+ * 4. 房间自动分区：基于主墙体投影切分房间功能区，使点位自动归属对应房间，不再全部落入「公共区」；
+ * 5. 分类统计与按需导入：输出开关、筒灯/射灯、其他设备的分类统计，支持「仅导入开关 / 导入全部 / 手动调整」。
  */
 import { detectPlanBounds, type Pixels } from './floor-plan-crop'
 
@@ -12,6 +14,8 @@ export type DetectedCadPoint = {
   type: string
   x: number
   y: number
+  category?: 'switch' | 'light' | 'other'
+  room?: string
 }
 
 export type DetectedCadArea = {
@@ -20,18 +24,175 @@ export type DetectedCadArea = {
   rect: [number, number, number, number]
 }
 
+export type DetectedCadSummary = {
+  total: number
+  switches: number
+  lights: number
+  others: number
+  areas: number
+  byType: Record<string, number>
+  confirmText: string
+}
+
+export type CadDetectionResult = {
+  points: DetectedCadPoint[]
+  switchPoints: DetectedCadPoint[]
+  lightPoints: DetectedCadPoint[]
+  areas: DetectedCadArea[]
+  summary: DetectedCadSummary
+}
+
+const isSwitchType = (t: string) => t.startsWith('switch-')
+const isLightType = (t: string) =>
+  t === 'downlight' || t === 'spotlight' || t === 'ceiling-light' || t === 'panel-light' || t === 'light-strip' || t === 'track-light' || t === 'pendant-light' || t === 'wall-light'
+
+function buildSummary(points: DetectedCadPoint[], areas: DetectedCadArea[]): DetectedCadSummary {
+  const byType: Record<string, number> = {}
+  let switches = 0
+  let lights = 0
+  let others = 0
+  for (const p of points) {
+    byType[p.type] = (byType[p.type] ?? 0) + 1
+    if (isSwitchType(p.type)) switches++
+    else if (isLightType(p.type)) lights++
+    else others++
+  }
+  const swParts: string[] = []
+  if (byType['switch-1']) swParts.push(`单极 ${byType['switch-1']}`)
+  if (byType['switch-2']) swParts.push(`双极 ${byType['switch-2']}`)
+  if (byType['switch-3']) swParts.push(`三极 ${byType['switch-3']}`)
+  if (byType['switch-4']) swParts.push(`四极 ${byType['switch-4']}`)
+  const swDetail = swParts.length ? `（${swParts.join(' · ')}）` : ''
+  const confirmText =
+    points.length > 0
+      ? `识别到 ${points.length} 个符号：\n- 开关 ${switches}${swDetail}\n- 筒灯/射灯 ${lights}\n- 其他 ${others}`
+      : '未识别到标准点位符号'
+  return {
+    total: points.length,
+    switches,
+    lights,
+    others,
+    areas: areas.length,
+    byType,
+    confirmText,
+  }
+}
+
+/**
+ * 根据建筑核心框内的墙体投影峰值自动切分房间区域，避免点位全部落入「公共区」。
+ */
+function partitionRoomsFromWalls(
+  W: number,
+  H: number,
+  coreX0: number,
+  coreY0: number,
+  coreX1: number,
+  coreY1: number,
+  isWallPixel: (x: number, y: number) => boolean,
+): DetectedCadArea[] {
+  const cw = coreX1 - coreX0
+  const ch = coreY1 - coreY0
+  if (cw < 240 || ch < 200) return []
+
+  const colProj = new Int32Array(cw)
+  const rowProj = new Int32Array(ch)
+  for (let y = coreY0; y < coreY1; y += 2) {
+    for (let x = coreX0; x < coreX1; x += 2) {
+      if (isWallPixel(x, y)) {
+        colProj[x - coreX0]++
+        rowProj[y - coreY0]++
+      }
+    }
+  }
+
+  const findSplits = (proj: Int32Array, len: number, maxSplits: number): number[] => {
+    const minMargin = Math.floor(len * 0.22)
+    const minGap = Math.floor(len * 0.24)
+    const candidates: { idx: number; score: number }[] = []
+    for (let i = minMargin; i <= len - minMargin; i += 4) {
+      let sum = 0
+      for (let d = -6; d <= 6; d++) {
+        if (i + d >= 0 && i + d < len) sum += proj[i + d]
+      }
+      candidates.push({ idx: i, score: sum })
+    }
+    candidates.sort((a, b) => b.score - a.score)
+    const chosen: number[] = []
+    for (const c of candidates) {
+      if (c.score < 18) break
+      if (chosen.every((prev) => Math.abs(prev - c.idx) >= minGap)) {
+        chosen.push(c.idx)
+        if (chosen.length >= maxSplits) break
+      }
+    }
+    return chosen.sort((a, b) => a - b)
+  }
+
+  const xSplits = [0, ...findSplits(colProj, cw, 2), cw]
+  const ySplits = [0, ...findSplits(rowProj, ch, 2), ch]
+
+  const ROOM_PRESETS: { name: string; type: string }[][] = [
+    [
+      { name: '次卧', type: 'bedroom' },
+      { name: '主卫 / 公卫', type: 'bathroom' },
+      { name: '主卧', type: 'bedroom' },
+    ],
+    [
+      { name: '阳台', type: 'balcony' },
+      { name: '客厅', type: 'living' },
+      { name: '厨房 / 餐厅', type: 'dining' },
+    ],
+    [
+      { name: '玄关 / 入户', type: 'entrance' },
+      { name: '餐厅 / 过道', type: 'corridor' },
+      { name: '书房 / 多功能房', type: 'study' },
+    ],
+  ]
+
+  const areas: DetectedCadArea[] = []
+  for (let r = 0; r < ySplits.length - 1; r++) {
+    for (let c = 0; c < xSplits.length - 1; c++) {
+      const ax0 = coreX0 + xSplits[c]
+      const ay0 = coreY0 + ySplits[r]
+      const ax1 = coreX0 + xSplits[c + 1]
+      const ay1 = coreY0 + ySplits[r + 1]
+      if (ax1 - ax0 < 90 || ay1 - ay0 < 80) continue
+      const presetRow = ROOM_PRESETS[Math.min(r, ROOM_PRESETS.length - 1)]!
+      const preset = presetRow[Math.min(c, presetRow.length - 1)]!
+      areas.push({
+        name: preset.name,
+        type: preset.type,
+        rect: [
+          Math.round((ax0 / W) * 1000) / 1000,
+          Math.round((ay0 / H) * 1000) / 1000,
+          Math.round(((ax1 - ax0) / W) * 1000) / 1000,
+          Math.round(((ay1 - ay0) / H) * 1000) / 1000,
+        ],
+      })
+    }
+  }
+  return areas
+}
+
 /**
  * 分析 2400×1600 标准图纸像素，检测 CAD 暗装开关（实心黑圆点+斜杆）与灯具（圆圈+十字/花灯）符号。
  * 仅返回高置信度的符号中心比例坐标（0–1）；无匹配符号时返回空数组。
  */
-export function detectCadSymbolsFromPixels(img: Pixels): {
-  points: DetectedCadPoint[]
-  areas: DetectedCadArea[]
-} {
+export function detectCadSymbolsFromPixels(
+  img: Pixels,
+  opts: { sheetName?: string; mode?: 'switches' | 'all' } = {},
+): CadDetectionResult {
   const W = img.width
   const H = img.height
   const ch = img.channels ?? 4
   const d = img.data
+  const emptyResult = (): CadDetectionResult => ({
+    points: [],
+    switchPoints: [],
+    lightPoints: [],
+    areas: [],
+    summary: buildSummary([], []),
+  })
 
   // 1. 先找出平面图主体范围，向内缩进一点，避开外围尺寸标注文字
   const bounds = detectPlanBounds(img)
@@ -41,7 +202,7 @@ export function detectCadSymbolsFromPixels(img: Pixels): {
   const yMax = bounds.y + Math.floor(bounds.height * 0.96)
 
   if (xMax <= xMin + 100 || yMax <= yMin + 100) {
-    return { points: [], areas: [] }
+    return emptyResult()
   }
 
   // 判断背景是白底还是深色底（部分 CAD 导出图为黑底白线）
@@ -77,10 +238,133 @@ export function detectCadSymbolsFromPixels(img: Pixels): {
   }
   const inkRatio = (darkCount * 4) / totalSample
   if (inkRatio < 0.005 || inkRatio > 0.35) {
-    return { points: [], areas: [] }
+    return emptyResult()
   }
 
-  const candidates: { x: number; y: number; type: string }[] = []
+  // 1b. 精确计算建筑外墙核心框 [wx0, wy0, wx1, wy1]，剔除四周尺寸链、左下角图例表与右下角标题栏
+  const isThickWall = (cx: number, cy: number) => {
+    let cnt = 0
+    for (let dy = -3; dy <= 3; dy += 2) {
+      for (let dx = -3; dx <= 3; dx += 2) {
+        if (isDark(cx + dx, cy + dy)) cnt++
+      }
+    }
+    return cnt >= 14
+  }
+  const isWallLine = (cx: number, cy: number) => {
+    let h = 0
+    let v = 0
+    for (let k = -12; k <= 12; k += 2) {
+      if (isDark(cx + k, cy)) h++
+      if (isDark(cx, cy + k)) v++
+    }
+    return h >= 11 || v >= 11
+  }
+
+  const rowThick = new Int32Array(H)
+  const colThick = new Int32Array(W)
+  let totalThickSamples = 0
+  for (let y = Math.max(yMin, Math.floor(H * 0.06)); y < Math.min(yMax, Math.floor(H * 0.90)); y += 2) {
+    for (let x = Math.max(xMin, Math.floor(W * 0.08)); x < Math.min(xMax, Math.floor(W * 0.92)); x += 2) {
+      if (isThickWall(x, y)) {
+        rowThick[y]++
+        colThick[x]++
+        totalThickSamples++
+      }
+    }
+  }
+
+  let wx0 = xMin
+  let wx1 = xMax
+  let wy0 = yMin
+  let wy1 = yMax
+  if (totalThickSamples >= 40) {
+    let tx0 = 0
+    let tx1 = W - 1
+    let ty0 = 0
+    let ty1 = H - 1
+    while (tx0 < W && colThick[tx0] < 3) tx0++
+    while (tx1 > tx0 && colThick[tx1] < 3) tx1--
+    while (ty0 < H && rowThick[ty0] < 3) ty0++
+    while (ty1 > ty0 && rowThick[ty1] < 3) ty1--
+    if (tx1 - tx0 > 300 && ty1 - ty0 > 240) {
+      wx0 = Math.max(xMin, tx0 - 16)
+      wy0 = Math.max(yMin, ty0 - 16)
+      wx1 = Math.min(xMax, tx1 + 16)
+      wy1 = Math.min(yMax, ty1 + 16)
+    }
+  }
+
+  const inMaskedCorner = (x: number, y: number) =>
+    (x < W * 0.28 && y > H * 0.72) || (x > W * 0.68 && y > H * 0.82)
+
+  const nearThickWall = (cx: number, cy: number) => {
+    for (let dy = -36; dy <= 36; dy += 4) {
+      for (let dx = -36; dx <= 36; dx += 4) {
+        const d2 = dx * dx + dy * dy
+        if (d2 >= 49 && d2 <= 1296 && isThickWall(cx + dx, cy + dy)) return true
+      }
+    }
+    return false
+  }
+  const nearAnyWall = (cx: number, cy: number) => {
+    for (let dy = -34; dy <= 34; dy += 4) {
+      for (let dx = -34; dx <= 34; dx += 4) {
+        const d2 = dx * dx + dy * dy
+        if (d2 >= 49 && d2 <= 1156) {
+          if (isThickWall(cx + dx, cy + dy)) return true
+          if (isWallLine(cx + dx, cy + dy)) return true
+        }
+      }
+    }
+    return false
+  }
+
+  const analyzeSectors = (cx: number, cy: number, rMin: number, rMax: number) => {
+    const sec = new Int32Array(12)
+    let totalInk = 0
+    let totalPts = 0
+    for (let dy = -rMax; dy <= rMax; dy++) {
+      for (let dx = -rMax; dx <= rMax; dx++) {
+        const r = Math.hypot(dx, dy)
+        if (r < rMin || r > rMax) continue
+        totalPts++
+        if (isDark(cx + dx, cy + dy)) {
+          totalInk++
+          let ang = Math.atan2(dy, dx)
+          if (ang < 0) ang += Math.PI * 2
+          sec[Math.min(11, Math.floor((ang / (Math.PI * 2)) * 12))]++
+        }
+      }
+    }
+    let maxSec = 0
+    for (let i = 0; i < 12; i++) {
+      const pair = sec[i] + sec[(i + 1) % 12]
+      if (pair > maxSec) maxSec = pair
+    }
+    return {
+      totalInk,
+      ratio: totalPts > 0 ? totalInk / totalPts : 0,
+      activeSectors: sec.filter((v) => v >= 3).length,
+      emptySectors: sec.filter((v) => v === 0).length,
+      maxSec,
+    }
+  }
+
+  const coreScore = (cx: number, cy: number) => {
+    let cInk = 0
+    let cTot = 0
+    for (let dy = -4; dy <= 4; dy++) {
+      for (let dx = -4; dx <= 4; dx++) {
+        if (dx * dx + dy * dy <= 20) {
+          cTot++
+          if (isDark(cx + dx, cy + dy)) cInk++
+        }
+      }
+    }
+    return cInk / cTot
+  }
+
   const visited = new Uint8Array(W * H)
 
   const markVisited = (cx: number, cy: number, r: number) => {
@@ -93,143 +377,287 @@ export function detectCadSymbolsFromPixels(img: Pixels): {
     }
   }
 
-  // 2. 先扫描高饱和度彩色点位标记（针对彩色 CAD 电气图或已标色点位图）
-  for (let y = yMin + 14; y < yMax - 14; y += 2) {
-    for (let x = xMin + 14; x < xMax - 14; x += 2) {
-      if (visited[y * W + x]) continue
+  const colorSwitches: { x: number; y: number; type: string }[] = []
+  const otherColorPoints: { x: number; y: number; type: string }[] = []
+
+  // 2. Pass 1：优先扫描淡黄色开关标记（放宽饱和度下限，用明度+色相组合判断，并结合旁侧 L1-Kxx 标签或斜杆墨迹二次确认）与高饱和彩色点位
+  const isPaleYellowSwitchPixel = (r: number, g: number, b: number) => {
+    if (r < 175 || g < 160) return false
+    if (r - b < 20 || g - b < 15) return false
+    if (Math.abs(r - g) > 45) return false
+    const max = Math.max(r, g, b)
+    const min = Math.min(r, g, b)
+    const sat = max > 0 ? (max - min) / max : 0
+    return sat >= 0.08
+  }
+
+  for (let y = wy0 + 12; y < wy1 - 12; y += 2) {
+    for (let x = wx0 + 12; x < wx1 - 12; x += 2) {
+      if (visited[y * W + x] || inMaskedCorner(x, y)) continue
       const i = (y * W + x) * ch
       if (ch === 4 && d[i + 3] < 128) continue
       const r = d[i]
       const g = d[i + 1]
       const b = d[i + 2]
+      const paleYellow = isPaleYellowSwitchPixel(r, g, b)
       const max = Math.max(r, g, b)
       const min = Math.min(r, g, b)
-      if (max < 85 || max - min < 65) continue
-      const sat = (max - min) / max
-      if (sat < 0.38) continue
+      const sat = max > 0 ? (max - min) / max : 0
+      const strongColor = max >= 85 && max - min >= 55 && sat >= 0.35
+      if (!paleYellow && !strongColor) continue
 
-      // 检查 7px 半径内是否构成紧凑彩色圆斑，且外围 16px 不是大面积彩色底块
       let colorInner = 0
       let colorOuter = 0
-      for (let dy = -15; dy <= 15; dy += 2) {
-        for (let dx = -15; dx <= 15; dx += 2) {
+      let sumX = 0
+      let sumY = 0
+      for (let dy = -16; dy <= 16; dy += 2) {
+        for (let dx = -16; dx <= 16; dx += 2) {
           const idx = ((y + dy) * W + (x + dx)) * ch
-          const mx = Math.max(d[idx], d[idx + 1], d[idx + 2])
-          const mn = Math.min(d[idx], d[idx + 1], d[idx + 2])
-          const isCol = mx >= 80 && mx - mn >= 55
+          const pr = d[idx]
+          const pg = d[idx + 1]
+          const pb = d[idx + 2]
+          const isCol = paleYellow
+            ? isPaleYellowSwitchPixel(pr, pg, pb)
+            : Math.max(pr, pg, pb) >= 80 && Math.max(pr, pg, pb) - Math.min(pr, pg, pb) >= 50
           const r2 = dx * dx + dy * dy
-          if (r2 <= 49 && isCol) colorInner++
-          else if (r2 >= 144 && r2 <= 225 && isCol) colorOuter++
+          if (r2 <= 64 && isCol) {
+            colorInner++
+            sumX += x + dx
+            sumY += y + dy
+          } else if (r2 >= 169 && r2 <= 256 && isCol) {
+            colorOuter++
+          }
         }
       }
-      if (colorInner >= 10 && colorOuter <= 12) {
+      if (colorInner >= 8 && colorOuter <= 16) {
+        const cx = Math.round(sumX / colorInner)
+        const cy = Math.round(sumY / colorInner)
         let hue = 0
-        const delta = max - min
+        const delta = Math.max(1, max - min)
         if (max === r) hue = ((g - b) / delta) % 6
         else if (max === g) hue = (b - r) / delta + 2
         else hue = (r - g) / delta + 4
         hue = Math.round(hue * 60)
         if (hue < 0) hue += 360
 
+        if (paleYellow || (hue >= 25 && hue <= 72)) {
+          const ring = analyzeSectors(cx, cy, 4, 16)
+          const labelRing = analyzeSectors(cx, cy, 16, 42)
+          if (ring.totalInk >= 6 || labelRing.totalInk >= 12) {
+            const stemInk = ring.maxSec
+            const swType = stemInk >= 36 ? 'switch-3' : stemInk >= 22 ? 'switch-2' : 'switch-1'
+            colorSwitches.push({ x: cx, y: cy, type: swType })
+            markVisited(cx, cy, 22)
+          }
+          continue
+        }
+
         let dt = 'switch-2'
-        if (hue >= 22 && hue <= 58) dt = 'downlight'
-        else if (hue >= 115 && hue <= 165) dt = 'motion-sensor'
+        if (hue >= 115 && hue <= 165) dt = 'motion-sensor'
         else if (hue > 165 && hue <= 198) dt = 'ap-node'
         else if (hue >= 200 && hue <= 250) dt = 'switch-2'
         else if (hue > 250 && hue <= 300) dt = 'gateway'
         else if (hue > 300 && hue <= 345) dt = 'curtain-track'
 
-        candidates.push({ x, y, type: dt })
-        markVisited(x, y, 18)
+        if (isSwitchType(dt)) colorSwitches.push({ x: cx, y: cy, type: dt })
+        else otherColorPoints.push({ x: cx, y: cy, type: dt })
+        markVisited(cx, cy, 20)
       }
     }
   }
 
-  // 3. 扫描 CAD 黑白/灰度符号：空心圆环灯具（筒灯/射灯 ⊕）与实心圆核暗装开关
-  for (let y = yMin + 14; y < yMax - 14; y += 2) {
-    for (let x = xMin + 14; x < xMax - 14; x += 2) {
-      if (visited[y * W + x]) continue
+  const bwSwitches: { x: number; y: number; type: string }[] = []
+  const bwLights: { x: number; y: number; type: string }[] = []
 
-      // 3a. 空心圆环筒灯/射灯符号：中心 r<=2.2 空心，r=4..6.5 圆环墨迹密集且四向闭合，外围 r=9..12 留白
-      let coreInk = 0
-      let coreTot = 0
-      let ringInk = 0
-      let ringTot = 0
-      let moatInk = 0
-      let moatTot = 0
-      for (let dy = -12; dy <= 12; dy++) {
-        for (let dx = -12; dx <= 12; dx++) {
-          const r2 = dx * dx + dy * dy
-          if (r2 <= 5) {
-            coreTot++
-            if (isDark(x + dx, y + dy)) coreInk++
-          } else if (r2 >= 15 && r2 <= 45) {
-            ringTot++
-            if (isDark(x + dx, y + dy)) ringInk++
-          } else if (r2 >= 81 && r2 <= 144) {
-            moatTot++
-            if (isDark(x + dx, y + dy)) moatInk++
+  // 3. Pass 2：按图例几何特征扫描黑白 CAD 开关符号（实心圆核+斜杆旗齿 / 空心圆圈+T柄，且必须紧贴墙体）
+  if (colorSwitches.length < 3) {
+    for (let y = wy0; y <= wy1; y += 2) {
+      for (let x = wx0; x <= wx1; x += 2) {
+        if (visited[y * W + x] || inMaskedCorner(x, y)) continue
+
+        if (isDark(x, y) && coreScore(x, y) >= 0.75) {
+          let cx = x
+          let cy = y
+          let best = coreScore(x, y)
+          for (let dy = -3; dy <= 3; dy++) {
+            for (let dx = -3; dx <= 3; dx++) {
+              const s = coreScore(x + dx, y + dy)
+              if (s > best) {
+                best = s
+                cx = x + dx
+                cy = y + dy
+              }
+            }
+          }
+          const onThick = nearThickWall(cx, cy)
+          const useThinWall = totalThickSamples < 14000
+          if (best >= 0.86 && !visited[cy * W + cx] && (onThick || (useThinWall && nearAnyWall(cx, cy)))) {
+            const ring = analyzeSectors(cx, cy, 7, 13)
+            const outer = analyzeSectors(cx, cy, 12, 18)
+            if (
+              ring.ratio >= 0.035 &&
+              ring.ratio <= 0.25 &&
+              ring.activeSectors >= 1 &&
+              ring.activeSectors <= 4 &&
+              ring.emptySectors >= 6 &&
+              outer.totalInk >= 14 &&
+              outer.totalInk <= 110 &&
+              outer.emptySectors >= (onThick ? 5 : 6)
+            ) {
+              const stemInk = ring.maxSec + outer.maxSec
+              const type = stemInk >= 58 ? 'switch-3' : stemInk >= 40 ? 'switch-2' : 'switch-1'
+              bwSwitches.push({ x: cx, y: cy, type })
+              markVisited(cx, cy, 26)
+              continue
+            }
+          }
+        }
+
+        if (!isDark(x, y)) {
+          let hCore = 0
+          let hRing = 0
+          let hRingTot = 0
+          for (let dy = -7; dy <= 7; dy++) {
+            for (let dx = -7; dx <= 7; dx++) {
+              const r2 = dx * dx + dy * dy
+              const dk = isDark(x + dx, y + dy)
+              if (r2 <= 4 && dk) hCore++
+              else if (r2 >= 12 && r2 <= 42) {
+                hRingTot++
+                if (dk) hRing++
+              }
+            }
+          }
+          if (
+            hCore === 0 &&
+            hRing / hRingTot >= 0.45 &&
+            (isDark(x - 5, y) || isDark(x - 4, y)) &&
+            (isDark(x + 5, y) || isDark(x + 4, y)) &&
+            (isDark(x, y - 5) || isDark(x, y - 4)) &&
+            (isDark(x, y + 5) || isDark(x, y + 4))
+          ) {
+            const moat = analyzeSectors(x, y, 7, 13)
+            const outer = analyzeSectors(x, y, 12, 18)
+            if (
+              nearThickWall(x, y) &&
+              moat.emptySectors >= 6 &&
+              moat.ratio <= 0.24 &&
+              moat.totalInk >= 14 &&
+              moat.activeSectors >= 2 &&
+              moat.activeSectors <= 4 &&
+              outer.totalInk >= 12 &&
+              outer.totalInk <= 90
+            ) {
+              const stemInk = moat.maxSec + outer.maxSec
+              const type = stemInk >= 48 ? 'switch-3' : stemInk >= 34 ? 'switch-2' : 'switch-1'
+              bwSwitches.push({ x, y, type })
+              markVisited(x, y, 24)
+            }
           }
         }
       }
-      if (
-        coreInk / coreTot <= 0.35 &&
-        ringInk / ringTot >= 0.5 &&
-        moatInk / moatTot <= 0.2 &&
-        (isDark(x - 5, y) || isDark(x - 6, y)) &&
-        (isDark(x + 5, y) || isDark(x + 6, y)) &&
-        (isDark(x, y - 5) || isDark(x, y - 6)) &&
-        (isDark(x, y + 5) || isDark(x, y + 6))
-      ) {
-        candidates.push({ x, y, type: 'downlight' })
-        markVisited(x, y, 16)
-        continue
-      }
+    }
+  }
 
-      // 3b. 实心圆核暗装开关符号：中心 r<=4 高密度实心圆，外环 r=7..10 有引出斜杆
-      if (!isDark(x, y)) continue
-      let sCore = 0
-      let sCoreTot = 0
-      let sRing = 0
-      let sRingTot = 0
-      for (let dy = -10; dy <= 10; dy++) {
-        for (let dx = -10; dx <= 10; dx++) {
-          const r2 = dx * dx + dy * dy
-          if (r2 <= 16) {
-            sCoreTot++
-            if (isDark(x + dx, y + dy)) sCore++
-          } else if (r2 >= 49 && r2 <= 100) {
-            sRingTot++
-            if (isDark(x + dx, y + dy)) sRing++
+  // 4. Pass 3：扫描圆圈灯具与回路上的小圆点灯位（全部归类为 downlight，绝不冒充开关）
+  for (let y = wy0; y <= wy1; y += 2) {
+    for (let x = wx0; x <= wx1; x += 2) {
+      if (visited[y * W + x] || inMaskedCorner(x, y)) continue
+
+      if (!isDark(x, y)) {
+        let hCore = 0
+        let hRing = 0
+        let hRingTot = 0
+        for (let dy = -7; dy <= 7; dy++) {
+          for (let dx = -7; dx <= 7; dx++) {
+            const r2 = dx * dx + dy * dy
+            const dk = isDark(x + dx, y + dy)
+            if (r2 <= 4 && dk) hCore++
+            else if (r2 >= 12 && r2 <= 42) {
+              hRingTot++
+              if (dk) hRing++
+            }
+          }
+        }
+        if (
+          hCore === 0 &&
+          hRing / hRingTot >= 0.45 &&
+          (isDark(x - 5, y) || isDark(x - 4, y)) &&
+          (isDark(x + 5, y) || isDark(x + 4, y)) &&
+          (isDark(x, y - 5) || isDark(x, y - 4)) &&
+          (isDark(x, y + 5) || isDark(x, y + 4))
+        ) {
+          const moat = analyzeSectors(x, y, 8, 12)
+          if (moat.emptySectors >= 6 && moat.ratio <= 0.22) {
+            bwLights.push({ x, y, type: 'downlight' })
+            markVisited(x, y, 18)
+            continue
           }
         }
       }
-      const sRingRatio = sRing / sRingTot
-      if (sCore / sCoreTot >= 0.75 && sRingRatio >= 0.06 && sRingRatio <= 0.35) {
-        const horizWall = isDark(x - 10, y) && isDark(x - 14, y) && isDark(x + 10, y) && isDark(x + 14, y)
-        const vertWall = isDark(x, y - 10) && isDark(x, y - 14) && isDark(x, y + 10) && isDark(x, y + 14)
-        if (!horizWall && !vertWall) {
-          candidates.push({
-            x,
-            y,
-            type: sRingRatio > 0.22 ? 'switch-3' : 'switch-2',
-          })
+
+      const cs = coreScore(x, y)
+      if (cs >= 0.55 && !isThickWall(x, y)) {
+        const moat = analyzeSectors(x, y, 7, 12)
+        if (
+          moat.ratio >= 0.04 &&
+          moat.ratio <= 0.18 &&
+          moat.activeSectors >= 1 &&
+          moat.activeSectors <= 3 &&
+          moat.emptySectors >= 8 &&
+          (isDark(x - 3, y) || isDark(x + 3, y)) &&
+          (isDark(x, y - 3) || isDark(x, y + 3))
+        ) {
+          bwLights.push({ x, y, type: 'downlight' })
           markVisited(x, y, 16)
         }
       }
     }
   }
 
-  // 少于 2 个或超过 240 个噪点时返回空，绝不生成网格默认点位
-  if (candidates.length < 2 || candidates.length > 240) {
-    return { points: [], areas: [] }
+  const finalSwitches = colorSwitches.length >= 3 ? colorSwitches : [...colorSwitches, ...bwSwitches]
+  const finalLights = bwLights.slice(0, 200)
+
+  // 5. 自动房间区域切分（基于建筑墙体投影）
+  const areas = partitionRoomsFromWalls(W, H, wx0, wy0, wx1, wy1, isThickWall)
+
+  const toPoint = (c: { x: number; y: number; type: string }): DetectedCadPoint => {
+    const rx = Math.round((c.x / W) * 1000) / 1000
+    const ry = Math.round((c.y / H) * 1000) / 1000
+    const matchedArea = areas.find(
+      (a) => rx >= a.rect[0] && rx <= a.rect[0] + a.rect[2] && ry >= a.rect[1] && ry <= a.rect[1] + a.rect[3],
+    )
+    const category: 'switch' | 'light' | 'other' = isSwitchType(c.type) ? 'switch' : isLightType(c.type) ? 'light' : 'other'
+    return {
+      type: c.type,
+      x: rx,
+      y: ry,
+      category,
+      ...(matchedArea ? { room: matchedArea.name } : {}),
+    }
   }
 
-  const points: DetectedCadPoint[] = candidates.map((c) => ({
-    type: c.type,
-    x: Math.round((c.x / W) * 1000) / 1000,
-    y: Math.round((c.y / H) * 1000) / 1000,
-  }))
+  const switchPoints = finalSwitches.map(toPoint)
+  const lightPoints = finalLights.map(toPoint)
+  const otherPoints = otherColorPoints.map(toPoint)
+  const allPoints = [...switchPoints, ...lightPoints, ...otherPoints]
 
-  return { points, areas: [] }
+  if (allPoints.length < 2 || allPoints.length > 300) {
+    return emptyResult()
+  }
+
+  const summary = buildSummary(allPoints, areas)
+
+  // 如果调用方指定了 mode='switches'，或者图纸名称明确是「开关布置图」且存在开关点位，默认 points 只返回开关点位
+  const preferSwitchesOnly =
+    opts.mode === 'switches' ||
+    (opts.mode !== 'all' && Boolean(opts.sheetName && /开关/.test(opts.sheetName)) && switchPoints.length > 0)
+
+  return {
+    points: preferSwitchesOnly ? switchPoints : allPoints,
+    switchPoints,
+    lightPoints,
+    areas,
+    summary,
+  }
 }
