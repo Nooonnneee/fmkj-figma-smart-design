@@ -350,7 +350,8 @@ async function runVisionFusion(args: {
   const modelLabel = shortModelName(full.model)
   const fused = fuseDetections({
     local: args.local,
-    candidates: [],
+    // 本地候选只用于补齐模型自己读出的标注缺口，不参与点位主判断
+    candidates: collectLocalCandidates(args.local),
     verdicts: new Map(),
     vision,
     strategy: 'vision-first',
