@@ -218,7 +218,10 @@ export function fuseDetections(input: {
   const vision = input.vision
 
   // vision-first：模型直读点位为主；本地候选只在标注数量不足时按型号补缺，插座永不落点
-  if (input.strategy === 'vision-first' && input.vision?.points.some((p) => isSwitchFamily(p.type))) {
+  if (
+    input.strategy === 'vision-first' &&
+    input.vision?.points.some((p) => isSwitchFamily(p.type))
+  ) {
     const seen = new Set<string>()
     for (const vp of input.vision.points) {
       if (SOCKET_POINT_TYPES.has(vp.type)) continue
@@ -247,17 +250,23 @@ export function fuseDetections(input: {
     }
     if (deficit.size) {
       candidates.forEach((p, i) => {
-        // 只补经过局部复核确认为开关的候选，避免把本地误判的插座补成开关
+        // 有局部复核结论时以结论为准；没有结论的候选只在补齐标注缺口时使用（本地铭牌识别已过滤纯色插座条）
         const v = input.verdicts.get(i)
-        if (!v || v.confidence < minConf || !isSwitchFamily(v.kind)) return
-        const need = deficit.get(v.kind)
+        if (
+          v &&
+          v.confidence >= minConf &&
+          (v.kind === 'socket' || v.kind === 'none' || !isSwitchFamily(v.kind))
+        )
+          return
+        const type = v && isSwitchFamily(v.kind) ? v.kind : p.type
+        const need = deficit.get(type)
         if (!need) return
-        const pos = input.snap ? input.snap({ type: v.kind, x: p.x, y: p.y }) : { x: p.x, y: p.y }
+        const pos = input.snap ? input.snap({ type, x: p.x, y: p.y }) : { x: p.x, y: p.y }
         const x = round3(clamp01(pos.x))
         const y = round3(clamp01(pos.y))
         if (kept.some((k) => Math.hypot(k.x - x, k.y - y) < 0.012)) return
-        kept.push({ ...p, type: v.kind, category: categoryOf(v.kind), x, y })
-        deficit.set(v.kind, need - 1)
+        kept.push({ ...p, type, category: categoryOf(type), x, y })
+        deficit.set(type, need - 1)
         stats.added++
       })
     }

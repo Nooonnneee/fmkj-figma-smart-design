@@ -144,4 +144,18 @@ assert.ok(vf.result.points.every((p) => !p.type.startsWith('socket')), 'socket p
 assert.match(vf.confirmText, /视觉直读/)
 assert.match(vf.confirmText, /插座约 54 个/)
 
+// 没有局部复核结论时，仍可用本地点位补齐图纸标注缺口。
+const vfNoVerdict = fuseDetections({
+  local: local([pt('switch-2', 0.8, 0.8)]),
+  verdicts: new Map(),
+  vision: normalizeVisionAnalysis({
+    annotatedCounts: { 'switch-2': 2 },
+    points: [{ type: 'switch-2', x: 0.2, y: 0.2 }],
+    areas: [{ name: '客厅', type: 'living-room', rect: [0.1, 0.1, 0.5, 0.5] }],
+  }),
+  strategy: 'vision-first',
+})
+assert.equal(vfNoVerdict.stats.added, 1)
+assert.equal(vfNoVerdict.result.switchPoints.length, 2)
+
 console.log(`PASS ${checks} assertions: verdict normalisation, vision JSON validation, socket/none removal, gang correction, annotated-count completion, room override, mismatch reporting, vision-first base/补充 and immutability`)
