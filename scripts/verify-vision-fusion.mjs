@@ -158,4 +158,24 @@ const vfNoVerdict = fuseDetections({
 assert.equal(vfNoVerdict.stats.added, 1)
 assert.equal(vfNoVerdict.result.switchPoints.length, 2)
 
+// 视觉直读点位与图纸标注数量不一致时，先做型号校准再补缺。
+const vfReconcile = fuseDetections({
+  local: local([]),
+  verdicts: new Map(),
+  vision: normalizeVisionAnalysis({
+    annotatedCounts: { 'switch-2': 2, 'switch-1': 1 },
+    points: [
+      { type: 'switch-2', x: 0.2, y: 0.2 },
+      { type: 'switch-2', x: 0.3, y: 0.3 },
+      { type: 'switch-2', x: 0.4, y: 0.4 },
+    ],
+    areas: [{ name: '客厅', type: 'living-room', rect: [0.1, 0.1, 0.5, 0.5] }],
+  }),
+  strategy: 'vision-first',
+})
+assert.equal(vfReconcile.stats.retyped, 1)
+assert.equal(vfReconcile.result.switchPoints.length, 3)
+assert.equal(vfReconcile.result.switchPoints.filter((p) => p.type === 'switch-2').length, 2)
+assert.equal(vfReconcile.result.switchPoints.filter((p) => p.type === 'switch-1').length, 1)
+
 console.log(`PASS ${checks} assertions: verdict normalisation, vision JSON validation, socket/none removal, gang correction, annotated-count completion, room override, mismatch reporting, vision-first base/补充 and immutability`)

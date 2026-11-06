@@ -242,6 +242,30 @@ export function fuseDetections(input: {
     stats.visionFirst = true
     stats.baseFromVision = kept.length
     stats.verified = kept.length
+    // 标注校准：开关家族内多出的型号转成缺的型号，再裁掉仍多出的点，保证与图纸文字统计一致
+    const annotatedSwitch = Object.entries(input.vision.annotatedCounts).filter(
+      ([t, n]) => isSwitchFamily(t) && n > 0,
+    )
+    if (annotatedSwitch.length) {
+      const countType = (t: string) => kept.filter((k) => k.type === t).length
+      for (let guard = 0; guard < 24; guard++) {
+        const over = annotatedSwitch.find(([t, n]) => countType(t) > n)
+        const under = annotatedSwitch.find(([t, n]) => countType(t) < n)
+        if (!over || !under) break
+        const idx = kept.findIndex((k) => k.type === over[0])
+        if (idx < 0) break
+        kept[idx] = { ...kept[idx], type: under[0], category: categoryOf(under[0]) }
+        stats.retyped++
+      }
+      for (const [t, n] of annotatedSwitch) {
+        while (countType(t) > n) {
+          const idx = kept.map((k) => k.type).lastIndexOf(t)
+          if (idx < 0) break
+          kept.splice(idx, 1)
+          stats.dropped++
+        }
+      }
+    }
     const deficit = new Map<string, number>()
     for (const [t, n] of Object.entries(input.vision.annotatedCounts)) {
       if (!isSwitchFamily(t)) continue
@@ -423,7 +447,7 @@ export function buildFusionConfirmText(
   if (others > 0) lines.push(`- 其他设备 ${others}`)
   if (vision && stats.visionFirst) {
     lines.push(
-      `视觉直读 ${stats.baseFromVision ?? points.length} 个点位${stats.added ? `，按图纸标注从本地候选补充 ${stats.added} 个` : ''}。`,
+      `视觉直读 ${stats.baseFromVision ?? points.length} 个点位${stats.retyped ? `，型号校准 ${stats.retyped} 个` : ''}${stats.added ? `，按图纸标注从本地候选补充 ${stats.added} 个` : ''}。`,
     )
   } else if (vision) {
     const fixes: string[] = []
