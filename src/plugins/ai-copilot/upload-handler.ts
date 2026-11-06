@@ -282,14 +282,12 @@ const PROFILE_EXTRA: Record<RecognitionProfile, string[]> = {
 
 const recognitionPrompt = (profile: RecognitionProfile) =>
   [
-    '这是一张住宅户型/电气图纸，房间名可能是中文或英文。请先按房间逐个扫描，再列出所有真实点位；坐标用 0~1 归一化（左上角 (0,0)，右下角 (1,1)，保留 3 位小数）。',
-    '1. drawingType：switch-layout / lighting-layout / socket-layout / combined-electrical / floor-plan / colored-plan / other。',
-    '2. legend：逐条写出图例与颜色约定；没有图例返回 []。',
-    '3. annotatedCounts：图中若有文字汇总，按设备类型合计，例如 {"switch-3":5,"switch-2":12,"switch-1":3,"touch-panel":1}；没有返回 {}。',
-    '4. points：逐个列出图中真实点位——switch-1/2/3/4（开关面板）、touch-panel（智能屏）、downlight（筒灯）、spotlight（射灯）、ceiling-light（吸顶灯）、pendant-light（吊灯）、light-strip（灯带）、wall-light（壁灯）、curtain-track（窗帘）、motion-sensor、contact-sensor、water-sensor、smoke-sensor、smart-lock、camera、ap-node、gateway、vrf-controller。插座只统计数量写进 socketCount，不要列点。家具、文字、尺寸、图框、连线、图例不是点位。',
-    '5. areas：房间名称 + 外接框 rect=[x,y,w,h] + type(entrance/living/dining/kitchen/bedroom/kids/study/bathroom/balcony/corridor/stairs/closet/utility/other)。',
+    '这是一张住宅户型/电气图纸，房间名可能是中文或英文。请先按房间逐个扫描，不要只看大符号；开关通常在门边并连着弧线，灯具符号分布在各房间和走道。',
+    '任务 A（必须完整）：逐个房间列出所有真实点位——switch-1/2/3/4（开关面板）、touch-panel（智能屏）、downlight（筒灯）、spotlight（射灯）、ceiling-light（吸顶灯）、pendant-light（吊灯）、light-strip（灯带）、wall-light（壁灯）、curtain-track、motion-sensor、contact-sensor、water-sensor、smoke-sensor、smart-lock、camera、ap-node、gateway、vrf-controller。插座只统计数量写进 socketCount，不要列点。家具、文字、尺寸、图框、连线、图例不是点位。',
+    '坐标用 0~1 归一化（左上角 (0,0)，右下角 (1,1)，保留 3 位小数）；每个点给 room。',
+    '任务 B（有就填，没有就留空）：drawingType；legend 图例；annotatedCounts 图中文字汇总（如 {"switch-3":5,"switch-2":12,"switch-1":3}）；areas 房间外接框 rect=[x,y,w,h] + type。',
     ...PROFILE_EXTRA[profile],
-    '只返回 JSON：{"drawingType":"","legend":[],"annotatedCounts":{},"socketCount":0,"points":[{"type":"downlight","x":0.512,"y":0.341,"room":"Kitchen"}],"areas":[{"name":"Kitchen","type":"kitchen","rect":[0.6,0.1,0.3,0.3]}],"summary":"50字内概括","issues":["存疑之处"]}',
+    '只返回 JSON：{"drawingType":"","legend":[],"annotatedCounts":{},"socketCount":0,"rooms":["Kitchen"],"points":[{"type":"downlight","x":0.512,"y":0.341,"room":"Kitchen"}],"areas":[{"name":"Kitchen","type":"kitchen","rect":[0.6,0.1,0.3,0.3]}],"summary":"50字内概括","issues":["存疑之处"]}',
   ].join('\n')
 
 const shortModelName = (m: AiModelConfig) =>
