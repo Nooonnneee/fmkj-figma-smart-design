@@ -6,6 +6,9 @@
  * - loadImageBuffer / encodeImageForVision：从缓存、媒体库地址读取图片并压成适合视觉模型的 JPEG；
  * - buildPatchSheets：把候选点位周围的局部放大拼成带编号的拼图，让视觉模型逐格复核小符号（不依赖系统字体）。
  */
+import { existsSync, readFileSync } from 'node:fs'
+import path from 'node:path'
+
 import sharp from 'sharp'
 
 import { getCompanyInfo } from '@/lib/cached-data'
@@ -324,8 +327,23 @@ function siteOrigins(): string[] {
   return [...new Set(out)]
 }
 
+/** 自托管媒体库原图直读：/api/media/file 会按需转 WebP 缩图，识别必须用原始文件。 */
+function localMediaFile(url: string): string | null {
+  try {
+    const pathname = url.startsWith('/') ? url.split('?')[0] : new URL(url).pathname
+    const match = /^\/api\/media\/file\/([^/]+)$/.exec(pathname)
+    if (!match) return null
+    const name = decodeURIComponent(match[1])
+    if (!name || name === '.' || name === '..' || name.includes('/') || name.includes('\\'))
+      return null
+    const file = path.join(process.env.MEDIA_DIR || '/data/media', name)
+    return existsSync(file) ? file : null
+  } catch {
+    return null
+  }
+}
 /**
- * 读取图片原始字节：内存缓存 → data URL → 本站媒体库地址（只允许站内路径，杜绝 SSRF）→ 按 mediaId 查媒体库地址。
+ * 读取图片原始字节：内存缓存 → data URL → 自托管媒体库原图 → 本站媒体库地址（只允许站内路径，杜绝 SSRF）→ 按 mediaId 查媒体库地址。
  */
 export async function loadImageBuffer(ref: {
   mediaId?: string | null
@@ -353,6 +371,14 @@ export async function loadImageBuffer(ref: {
       (media?.filename ? `/api/media/file/${media.filename}` : '')
   }
   if (!url) return null
+  const localFile = localMediaFile(url)
+  if (localFile) {
+    const buf = readFileSync(localFile)
+    if (buf.length) {
+      rememberImageBuffer(keys, buf)
+      return buf
+    }
+  }
   const origins = siteOrigins()
   let targets: string[] = []
   if (url.startsWith('/')) {
