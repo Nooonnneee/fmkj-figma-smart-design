@@ -14,7 +14,7 @@ import { categoryOfType, DEVICE_GROUPS } from '@/lib/device-types'
 import { yuan } from '@/lib/quotes'
 import { wiringSpecOf } from '@/app/(frontend)/print/projects/[id]/wiring/page'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 3600
 
 export const metadata: Metadata = {
   title: pageTitle('全屋智能点位图例符号与产品选型库'),
@@ -121,7 +121,7 @@ export default async function PublicCatalogPage() {
                     {shown.map((p) => (
                       <div key={p.id} className="flex flex-col justify-between gap-3 rounded-xl border border-border bg-card p-3.5">
                         <div className="flex gap-3">
-                          <ProductThumb src={p.image?.url} alt={p.name} className="size-14 shrink-0" />
+                          <ProductThumb src={p.image?.url} alt={p.name} size={96} loading="lazy" className="size-14 shrink-0" />
                           <div className="min-w-0 flex-1">
                             {p.brand ? <BrandLogo name={p.brand.name} logo={p.brand.logo} className="h-3.5 max-w-16" /> : null}
                             <p className="mt-1 line-clamp-2 text-xs leading-snug font-medium">{p.name}</p>

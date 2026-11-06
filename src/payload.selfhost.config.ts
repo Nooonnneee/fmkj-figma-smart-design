@@ -1,8 +1,11 @@
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { s3Storage } from '@payloadcms/storage-s3'
+import { createHash } from 'crypto'
+import fs from 'fs'
 import path from 'path'
 import { buildConfig } from 'payload'
+import sharp from 'sharp'
 import { fileURLToPath } from 'url'
 
 import { migrations } from './migrations'
@@ -24,10 +27,110 @@ const required = (name: string) => {
 }
 
 // 没有配置 S3 时，图片存在服务器本地目录（Docker 里挂载为数据卷）。
+const mediaDir = path.resolve(/*turbopackIgnore: true*/ process.env.MEDIA_DIR || 'media')
+const thumbCacheDir = '/tmp/fmkj-selfhost-thumbs'
+
 const collections = useS3
   ? sharedConfig.collections
   : sharedConfig.collections.map((c) =>
-      c.slug === 'media' ? { ...c, upload: { staticDir: path.resolve(/*turbopackIgnore: true*/ process.env.MEDIA_DIR || 'media') } } : c,
+      c.slug === 'media'
+        ? {
+            ...c,
+            upload: { staticDir: mediaDir },
+            endpoints: [
+              ...(Array.isArray(c.endpoints) ? c.endpoints : []),
+              {
+                path: '/file/:filename',
+                method: 'get' as const,
+                handler: async (req: { routeParams?: Record<string, unknown>; url?: string; headers: Headers }) => {
+                  const rawName = typeof req.routeParams?.filename === 'string' ? req.routeParams.filename : ''
+                  const filename = path.basename(decodeURIComponent(rawName))
+                  if (!filename) return new Response('Not Found', { status: 404 })
+
+                  const filePath = path.join(/*turbopackIgnore: true*/ mediaDir, filename)
+                  if (!fs.existsSync(/*turbopackIgnore: true*/ filePath)) {
+                    return new Response('Not Found', { status: 404 })
+                  }
+
+                  const stat = fs.statSync(/*turbopackIgnore: true*/ filePath)
+                  const reqUrl = new URL(req.url || 'http://localhost', 'http://localhost')
+                  const widthParam = Number(reqUrl.searchParams.get('width') || reqUrl.searchParams.get('w') || 0)
+                  const qualityParam = Math.min(92, Math.max(50, Number(reqUrl.searchParams.get('quality') || reqUrl.searchParams.get('q') || 78)))
+                  const ext = path.extname(filename).toLowerCase()
+                  const isRaster = ext === '.png' || ext === '.jpg' || ext === '.jpeg' || ext === '.webp'
+
+                  // 当带有 ?width= 缩略图参数，或原图超过 350KB（例如 9MB 的 XLSX-CLEAN-0338-original.png）时，自动用 sharp 转为轻量 WebP 并缓存
+                  const targetWidth =
+                    widthParam > 0
+                      ? Math.min(2400, Math.max(48, widthParam))
+                      : stat.size > 350 * 1024
+                        ? 1280
+                        : 0
+
+                  const etag = `"${createHash('sha1').update(`${filename}:${stat.mtimeMs}:${targetWidth}:${qualityParam}`).digest('hex').slice(0, 20)}"`
+                  if (req.headers.get('if-none-match') === etag) {
+                    return new Response(null, {
+                      status: 304,
+                      headers: {
+                        ETag: etag,
+                        'Cache-Control': 'public, max-age=31536000, immutable',
+                      },
+                    })
+                  }
+
+                  if (isRaster && targetWidth > 0) {
+                    try {
+                      fs.mkdirSync(thumbCacheDir, { recursive: true })
+                      const cacheKey = `${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}_w${targetWidth}_q${qualityParam}.webp`
+                      const cachePath = path.join(/*turbopackIgnore: true*/ thumbCacheDir, cacheKey)
+                      let outBuf: Buffer
+                      if (fs.existsSync(/*turbopackIgnore: true*/ cachePath)) {
+                        outBuf = fs.readFileSync(/*turbopackIgnore: true*/ cachePath)
+                      } else {
+                        outBuf = await sharp(/*turbopackIgnore: true*/ filePath)
+                          .resize({ width: targetWidth, withoutEnlargement: true })
+                          .webp({ quality: qualityParam })
+                          .toBuffer()
+                        fs.writeFileSync(/*turbopackIgnore: true*/ cachePath, outBuf)
+                      }
+                      return new Response(new Uint8Array(outBuf), {
+                        status: 200,
+                        headers: {
+                          'Content-Type': 'image/webp',
+                          'Content-Length': String(outBuf.length),
+                          ETag: etag,
+                          'Cache-Control': 'public, max-age=31536000, immutable',
+                        },
+                      })
+                    } catch {
+                      // sharp 转换异常时回退直接返回原文件并附带强缓存头
+                    }
+                  }
+
+                  const mimeMap: Record<string, string> = {
+                    '.png': 'image/png',
+                    '.jpg': 'image/jpeg',
+                    '.jpeg': 'image/jpeg',
+                    '.webp': 'image/webp',
+                    '.svg': 'image/svg+xml',
+                    '.gif': 'image/gif',
+                    '.avif': 'image/avif',
+                  }
+                  const rawBuf = fs.readFileSync(/*turbopackIgnore: true*/ filePath)
+                  return new Response(new Uint8Array(rawBuf), {
+                    status: 200,
+                    headers: {
+                      'Content-Type': mimeMap[ext] || 'application/octet-stream',
+                      'Content-Length': String(rawBuf.length),
+                      ETag: etag,
+                      'Cache-Control': 'public, max-age=31536000, immutable',
+                    },
+                  })
+                },
+              },
+            ],
+          }
+        : c,
     )
 
 export default buildConfig({

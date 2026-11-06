@@ -803,7 +803,7 @@ export function QuoteEditor({
                             return (
                               <div key={`${room.id}-${line.deviceType}-${line.productId}`} className="flex flex-col gap-2 py-2.5 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:gap-2.5">
                                 <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                                  <ProductThumb src={line.image} alt={line.name} className="size-10 shrink-0" />
+                                  <ProductThumb src={line.image} alt={line.name} size={96} loading="lazy" className="size-10 shrink-0" />
                                   <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-1.5">
                                       <PointMarker type={line.deviceType} className="size-4 shrink-0" />

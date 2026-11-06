@@ -66,6 +66,17 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Payload 媒体库图片（/api/media/file/...）：设置 1 年强缓存，避免热刷新重复下载十几 MB 原图
+        source: '/api/media/file/:path*',
+        headers: [
+          ...securityHeaders,
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
         // 方案氛围图（没有版本号，换图时可能沿用文件名）：缓存一天，过期后后台更新
         source: '/proposal/:path*',
         headers: [...securityHeaders, { key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' }],

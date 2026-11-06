@@ -356,7 +356,7 @@ function QuoteSheet({
                           <td className={cn(t.td, deskCell, 'py-1.5 text-doc-muted tabular-nums')}>{i + 1}</td>
                           {showImages ? (
                             <td className={cn(t.td, deskCell, 'py-1')}>
-                              <ProductThumb src={item.image} alt={item.name} className="size-8" />
+                              <ProductThumb src={item.image} alt={item.name} size={96} loading="lazy" className="size-8" />
                             </td>
                           ) : null}
                           <td className={cn(t.td, 'py-1.5')}>
@@ -490,7 +490,7 @@ function QuoteSheet({
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {g.rows.map(({ item, i }) => (
                       <div key={`${item.sku}-${i}`} className="flex gap-3 rounded-doc border border-doc-rule p-2">
-                        <ProductThumb src={item.image} alt={item.name} className="size-14 shrink-0" />
+                        <ProductThumb src={item.image} alt={item.name} size={120} loading="lazy" className="size-14 shrink-0" />
                         <div className="flex min-w-0 flex-1 flex-col text-[11px]">
                           {item.brandName ? <BrandLogo name={item.brandName} logo={item.brandLogo ?? null} className="h-3 max-w-14" /> : null}
                           <div className="doc-strong mt-0.5 line-clamp-1 leading-snug">{item.name}</div>
@@ -583,7 +583,7 @@ function QuoteSheet({
                     <td className={cn(t.td, deskCell, 'text-doc-muted tabular-nums', layout === 'compact' ? 'py-1' : 'py-2')}>{i + 1}</td>
                     {showImages ? (
                       <td className={cn(t.td, deskCell, 'py-1')}>
-                        <ProductThumb src={item.image} alt={item.name} className="size-8" />
+                        <ProductThumb src={item.image} alt={item.name} size={96} loading="lazy" className="size-8" />
                       </td>
                     ) : null}
                     <td className={cn(t.td, layout === 'compact' ? 'py-1' : 'py-2')}>
