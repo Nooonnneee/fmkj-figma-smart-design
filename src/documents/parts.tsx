@@ -4,6 +4,7 @@ import Link from 'next/link'
 
 import { Button } from '@/components/ui/button'
 import type { CompanyInfo } from '@/lib/cached-data'
+import { brandInitials } from '@/lib/brand'
 import { cn } from '@/lib/utils'
 
 import { docVars } from './theme'
@@ -53,13 +54,13 @@ export function DocSheetPage({ children, className }: { children: React.ReactNod
 /** 品牌名里的英文部分（FMKJ 智能家居 → FMKJ），用于英文副标。 */
 export const brandLatin = (name: string) => name.match(/[A-Za-z][A-Za-z0-9&.-]*/)?.[0]?.toUpperCase() ?? ''
 
-/** 品牌标记：有 Logo 用 Logo，没有时用风格的渐变方块。 */
+/** 品牌标记：有 Logo 用 Logo，自定义公司缺图时显示名称缩写。 */
 export function BrandMark({ company, className }: { company: CompanyInfo; className?: string }) {
   const logo = company.logo
   if (logo) {
     return <Image src={logo.url} alt={logo.alt || company.name} width={logo.width ?? 96} height={logo.height ?? 96} className={cn('w-auto object-contain', className)} unoptimized />
   }
-  return <span aria-hidden className={cn('block aspect-square bg-linear-to-r from-doc-soft to-doc-soft-to', className)} />
+  return <span aria-hidden className={cn('inline-flex aspect-square shrink-0 items-center justify-center rounded-sm border border-doc-rule text-[10px] font-semibold text-doc-accent', className)}>{brandInitials(company.name)}</span>
 }
 
 /** 页眉：editorial 品牌标记 + 英文副标 / band 色带 / line 细线。右侧放日期、编号等信息。 */
@@ -174,7 +175,7 @@ export function docTable(style: DocStyle) {
   const dark = style.table === 'dark'
   return {
     head: cn('bg-doc-head text-left text-doc-head-fg', style.table === 'ruled' && 'border-y border-doc-rule'),
-    th: cn('doc-strong px-2 py-2', grid && 'border border-doc-rule'),
+    th: cn('doc-strong px-2 py-2 whitespace-nowrap', grid && 'border border-doc-rule'),
     row: (i: number) => cn('break-inside-avoid', grid ? '' : 'border-b border-doc-rule', dark && i % 2 === 1 && 'bg-doc-stripe'),
     td: cn('px-2', grid && 'border border-doc-rule'),
   }
@@ -187,7 +188,7 @@ export function DocFacts({ items, cols = 2, className }: { items: [string, React
       {items.map(([k, v]) => (
         <div key={k} className="flex min-w-0 gap-2">
           <dt className="shrink-0 text-doc-muted">{k}</dt>
-          <dd className="min-w-0 truncate">{v || '—'}</dd>
+          <dd className="min-w-0 [overflow-wrap:anywhere]">{v || '—'}</dd>
         </div>
       ))}
     </dl>

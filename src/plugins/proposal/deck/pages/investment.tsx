@@ -49,7 +49,8 @@ function Summary({ ctx }: { ctx: DeckCtx }) {
         </div>
       ))}
       <div className="h-px w-full bg-doc-rule" />
-      <p className="doc-strong text-[16px] leading-normal">按空间核对 / 仅设备</p>
+      <p className="doc-strong text-[16px] leading-normal">{m.d.quote ? '当前点位测算 / 仅设备' : '按空间核对 / 仅设备'}</p>
+      {m.d.quote ? <p className="doc-body text-[12px] leading-relaxed text-doc-muted">用于核对空间配置，正式报价以本页条目及方案总价为准。</p> : null}
       <div className="flex flex-col gap-[7px]">
         {shown.map((r) => (
           <div key={r.areaId} className="doc-body flex justify-between gap-3 text-[14px] leading-normal">
@@ -89,7 +90,7 @@ export function InvestmentPage({
   const pending = m.items.filter((i) => i.pending).reduce((s, i) => s + i.count, 0)
   return (
     <Slide ctx={ctx} no={no} total={total} name={`07 投资明细${part}`}>
-      <Chapter ctx={ctx} no={no} title="每一笔投入，都有清楚的去向。" subtitle={`完整设备与服务报价${part} / 人民币 · 元 / 条目编号与平面点位一一对应`} tag="CLEAR INVESTMENT" />
+      <Chapter ctx={ctx} no={no} title="每一笔投入，都有清楚的去向。" subtitle={`完整设备与服务报价${part} / 人民币 · 元 / 条目编号可对照已关联平面点位`} tag="CLEAR INVESTMENT" />
       <div className="flex min-h-0 w-full flex-1 items-start gap-[28px] overflow-hidden">
         <div className="flex w-[1000px] shrink-0 flex-col gap-[10px] overflow-hidden">
           {rows.length ? (

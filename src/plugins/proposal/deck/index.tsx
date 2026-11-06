@@ -12,8 +12,10 @@ import type { ProjectDocsData } from '@/lib/project-docs'
 import type { DeckSection } from '../framework'
 import type { ProposalMarkers } from '../templates'
 import { buildDeck } from './model'
+import { buildNetworkCamera } from './network-camera'
 import { CoverPage } from './pages/cover'
 import { InvestmentPage, paginateRows, type InvestRow } from './pages/investment'
+import { NetworkCameraPage } from './pages/network-camera'
 import { PlanPage } from './pages/plan'
 import { paginateRooms, RoomsPage } from './pages/rooms'
 import { deckScenes, ScenesPage } from './pages/scenes'
@@ -53,6 +55,7 @@ export function deckPreviewPages(d: ProjectDocsData, theme: DeckTheme, opts: { i
 
 function deckPageRenders(d: ProjectDocsData, theme: DeckTheme, opts: { markers: ProposalMarkers; insights: boolean; sections?: DeckSection[]; lazy?: boolean }): PageRender[] {
   const m = buildDeck(d)
+  const network = buildNetworkCamera(m)
   const ctx: DeckCtx = { m, theme, markers: 'symbol', lazy: opts.lazy }
   const pages: PageRender[] = []
   const needsPoints = new Set<DeckSection>(['plans', 'system', 'zones', 'scenes', 'rooms'])
@@ -62,7 +65,10 @@ function deckPageRenders(d: ProjectDocsData, theme: DeckTheme, opts: { markers: 
   const render: Record<DeckSection, () => void> = {
     cover: () => pages.push((no, total) => <CoverPage ctx={ctx} no={no} total={total} />),
     plans: () => m.sheets.forEach((s, i) => pages.push((no, total) => <PlanPage ctx={ctx} no={no} total={total} s={s} first={i === 0} />)),
-    system: () => pages.push((no, total) => <SystemPage ctx={ctx} no={no} total={total} />),
+    system: () => {
+      pages.push((no, total) => <SystemPage ctx={ctx} no={no} total={total} />)
+      if (network) pages.push((no, total) => <NetworkCameraPage ctx={ctx} no={no} total={total} network={network} />)
+    },
     zones: () => {
       for (const zone of m.zones) pages.push((no, total) => <ZonePage ctx={ctx} no={no} total={total} zone={zone} insights={opts.insights} />)
     },
