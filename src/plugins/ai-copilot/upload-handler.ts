@@ -29,6 +29,7 @@ import { recordUploadDiagnostic } from '@/lib/usage-diagnostics'
 
 import type { AiModelConfig } from './templates'
 import {
+  buildGridTiles,
   buildPatchSheets,
   callVision,
   encodeImageForVision,
@@ -62,6 +63,7 @@ export type VisionRecognitionMeta = {
   caption?: string
   stats?: FusionStats
   durationMs?: number
+  tiles?: number
 }
 
 export type DetectedPointItem = { type: string; x: number; y: number; room?: string }
@@ -288,6 +290,14 @@ const patchPrompt = (n: number) =>
     '只返回 JSON：{"cells":[{"n":1,"kind":"switch-2","confidence":0.92,"text":"双开"}]}，每一格都要给出结论。',
   ].join('\n')
 
+const gridTilePrompt = (index: number, total: number) =>
+  [
+    `这是同一张图纸的第 ${index + 1}/${total} 块放大图。请只列出本块内真实的开关面板、智能屏和灯具点位，插座不要列点。`,
+    '装置类型：switch-1/switch-2/switch-3/switch-4（开关面板）、touch-panel（智能屏）、downlight（筒灯）、spotlight（射灯）、ceiling-light（吸顶灯）、pendant-light（吊灯）、light-strip（灯带）、wall-light（壁灯）。',
+    '坐标用本块 0~1 归一化（本块左上角为 (0,0)，右下角为 (1,1)，保留 3 位小数）；家具、文字、尺寸、图框、连线不是点位。看不清的不要编造。',
+    '只返回 JSON：{"points":[{"type":"downlight","x":0.512,"y":0.341,"room":"主卧"}]}',
+  ].join('\n')
+
 const shortModelName = (m: AiModelConfig) =>
   m.name.replace(/（[^）]*）|\([^)]*\)/g, '').trim() || m.name
 
@@ -316,11 +326,18 @@ async function runVisionFusion(args: {
   if (!args.models.length) return { ...base, vision: { status: 'unavailable' } }
 
   const candidates = collectLocalCandidates(args.local)
-  const [fullImage, sheets] = await Promise.all([
+  // 彩色铭牌图：候选拼图复核；黑白 CAD 图：整图缩小会糊掉小符号，改走 2×2 分块放大点数
+  const usePatches = Boolean(args.local.hasColorSymbols)
+  const [fullImage, sheets, tiles] = await Promise.all([
     encodeImageForVision(args.png, { maxSide: 2048, quality: 88 }),
-    candidates.length ? buildPatchSheets(args.pixels, candidates) : Promise.resolve([]),
+    usePatches && candidates.length
+      ? buildPatchSheets(args.pixels, candidates)
+      : Promise.resolve([]),
+    usePatches
+      ? Promise.resolve([])
+      : buildGridTiles(args.png, { cols: 2, rows: 2, maxSide: 1600 }),
   ])
-  // 先发起整图与第 1 张放大拼图并发，其余拼图顺序补齐，避免同一秒发出 3~4 张大图把上游网关队列打满导致超时
+  // 先发起整图，再顺序补齐拼图/分块，避免同一秒发出 3~4 张大图把上游网关队列打满导致超时
   const fullPromise = callVision({
     images: [fullImage],
     system: FLOORPLAN_SYSTEM,
@@ -346,9 +363,63 @@ async function runVisionFusion(args: {
       }),
     )
   }
+  const tileResults: Awaited<ReturnType<typeof callVision>>[] = []
+  for (let i = 0; i < tiles.length; i += 2) {
+    const batch = tiles.slice(i, i + 2)
+    tileResults.push(
+      ...(await Promise.all(
+        batch.map((tile, j) =>
+          callVision({
+            images: [tile.dataUrl],
+            system: FLOORPLAN_SYSTEM,
+            prompt: gridTilePrompt(i + j, tiles.length),
+            models: args.models,
+            maxTokens: 2200,
+            timeoutMs: 65_000,
+            thinking: false,
+            highResolution: false,
+          }),
+        ),
+      )),
+    )
+  }
   const full = await fullPromise
 
-  const vision = normalizeVisionAnalysis(extractJson(full?.text))
+  const rawVision = extractJson<Record<string, unknown>>(full?.text)
+  const tilePoints: DetectedPointItem[] = []
+  tileResults.forEach((res, ti) => {
+    const parsed = extractJson<{ points?: Array<Record<string, unknown>> }>(res?.text)
+    const tile = tiles[ti]
+    if (!tile || !parsed?.points) return
+    for (const p of parsed.points.slice(0, 120)) {
+      const type = typeof p.type === 'string' ? p.type.trim() : ''
+      const lx = Number(p.x)
+      const ly = Number(p.y)
+      if (
+        !type ||
+        !Number.isFinite(lx) ||
+        !Number.isFinite(ly) ||
+        lx < 0 ||
+        lx > 1 ||
+        ly < 0 ||
+        ly > 1
+      )
+        continue
+      tilePoints.push({
+        type,
+        x: Math.round((tile.x + lx * tile.w) * 1000) / 1000,
+        y: Math.round((tile.y + ly * tile.h) * 1000) / 1000,
+        ...(typeof p.room === 'string' && p.room.trim()
+          ? { room: p.room.trim().slice(0, 24) }
+          : {}),
+      })
+    }
+  })
+  const rawPoints = Array.isArray(rawVision?.points) ? (rawVision.points as unknown[]) : []
+  const vision = normalizeVisionAnalysis({
+    ...(rawVision ?? {}),
+    points: [...rawPoints, ...tilePoints],
+  })
   const verdicts = new Map<number, VisionVerdict>()
   cellResults.forEach((res, si) => {
     const parsed = extractJson<{
@@ -369,7 +440,8 @@ async function runVisionFusion(args: {
       })
     }
   })
-  const usedModel = full?.model ?? cellResults.find(Boolean)?.model
+  const usedModel =
+    full?.model ?? cellResults.find(Boolean)?.model ?? tileResults.find(Boolean)?.model
   if (!usedModel || (!vision && verdicts.size === 0)) {
     return { ...base, vision: { status: 'failed', durationMs: Date.now() - t0 } }
   }
@@ -379,7 +451,7 @@ async function runVisionFusion(args: {
     candidates,
     verdicts,
     vision,
-    strategy: 'vision-first',
+    strategy: args.local.hasColorSymbols ? 'vision-first' : 'hybrid',
     snap: (p) => snapPointToInk(args.pixels, p.x, p.y, isSwitchFamily(p.type)),
     sheetName: args.sheetName,
     modelLabel,
@@ -403,6 +475,7 @@ async function runVisionFusion(args: {
       issues: vision?.issues,
       stats: fused.stats,
       durationMs: Date.now() - t0,
+      tiles: tiles.length,
     },
   }
 }

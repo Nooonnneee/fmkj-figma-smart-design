@@ -437,6 +437,52 @@ const DIGITS: Record<string, string[]> = {
   '9': ['01110', '10001', '10001', '01111', '00001', '00010', '01100'],
 }
 
+export type VisionTile = { dataUrl: string; x: number; y: number; w: number; h: number }
+
+/**
+ * 黑白 CAD 图纸没有彩色铭牌，整图缩放后小符号会糊；按 2×2 分块放大后再让模型逐块点数。
+ * 返回的 x/y/w/h 是 tile 在整图中的归一化范围，模型坐标乘 w/h 后加 x/y 即为整图坐标。
+ */
+export async function buildGridTiles(
+  input: Buffer,
+  opts: { cols?: number; rows?: number; overlap?: number; maxSide?: number } = {},
+): Promise<VisionTile[]> {
+  const meta = await sharp(input, { failOn: 'none' }).metadata()
+  const W = meta.width ?? 0
+  const H = meta.height ?? 0
+  if (!W || !H) return []
+  const cols = Math.max(1, Math.min(4, opts.cols ?? 2))
+  const rows = Math.max(1, Math.min(4, opts.rows ?? 2))
+  const overlap = Math.max(0, Math.min(0.2, opts.overlap ?? 0.06))
+  const maxSide = opts.maxSide ?? 1600
+  const tiles: VisionTile[] = []
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x0 = Math.max(0, c / cols - (c > 0 ? overlap : 0))
+      const y0 = Math.max(0, r / rows - (r > 0 ? overlap : 0))
+      const x1 = Math.min(1, (c + 1) / cols + (c < cols - 1 ? overlap : 0))
+      const y1 = Math.min(1, (r + 1) / rows + (r < rows - 1 ? overlap : 0))
+      const left = Math.round(x0 * W)
+      const top = Math.round(y0 * H)
+      const width = Math.max(8, Math.round((x1 - x0) * W))
+      const height = Math.max(8, Math.round((y1 - y0) * H))
+      const buf = await sharp(input, { failOn: 'none' })
+        .extract({ left, top, width: Math.min(width, W - left), height: Math.min(height, H - top) })
+        .resize({ width: maxSide, height: maxSide, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 86, mozjpeg: true })
+        .toBuffer()
+      tiles.push({
+        dataUrl: `data:image/jpeg;base64,${buf.toString('base64')}`,
+        x: x0,
+        y: y0,
+        w: x1 - x0,
+        h: y1 - y0,
+      })
+    }
+  }
+  return tiles
+}
+
 export type PatchSheet = { dataUrl: string; indices: number[] }
 
 /**
