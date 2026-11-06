@@ -200,10 +200,10 @@ export function detectCadSymbolsFromPixels(
 
   // 1. 先找出平面图主体范围，向内缩进一点，避开外围尺寸标注文字
   const bounds = detectPlanBounds(img)
-  const xMin = bounds.x + Math.floor(bounds.width * 0.04)
-  const xMax = bounds.x + Math.floor(bounds.width * 0.96)
-  const yMin = bounds.y + Math.floor(bounds.height * 0.04)
-  const yMax = bounds.y + Math.floor(bounds.height * 0.96)
+  const xMin = bounds.x + Math.floor(bounds.width * 0.015)
+  const xMax = bounds.x + Math.floor(bounds.width * 0.985)
+  const yMin = bounds.y + Math.floor(bounds.height * 0.02)
+  const yMax = bounds.y + Math.floor(bounds.height * 0.98)
 
   if (xMax <= xMin + 100 || yMax <= yMin + 100) {
     return emptyResult()
@@ -300,7 +300,10 @@ export function detectCadSymbolsFromPixels(
   }
 
   const inMaskedCorner = (x: number, y: number) =>
-    (x < W * 0.28 && y > H * 0.72) || (x > W * 0.68 && y > H * 0.82)
+    (x < W * 0.28 && y > H * 0.72) ||
+    (x > W * 0.68 && y > H * 0.82) ||
+    (x < W * 0.28 && y < H * 0.25) ||
+    (x > W * 0.62 && y < H * 0.21)
 
   const nearThickWall = (cx: number, cy: number) => {
     for (let dy = -36; dy <= 36; dy += 4) {
@@ -384,6 +387,188 @@ export function detectCadSymbolsFromPixels(
   const colorSwitches: { x: number; y: number; type: string }[] = []
   const otherColorPoints: { x: number; y: number; type: string }[] = []
 
+  // 1.5 Pass 0：优先检测家装水电图常见的「彩底白字开关铭牌」（如草绿底白字「双开/单开」、橙底白字「三开」、天蓝底白字「双开」、红底白字「智能屏」）
+  // 这类图纸同时用纯色实心小竖条（无白字）表示五孔/四孔插座，若检出彩底白字开关铭牌，则严格过滤掉纯色无字插座条！
+  const badgeVisited = new Uint8Array(W * H)
+  const badgeSwitches: { x: number; y: number; type: string }[] = []
+  const badgeOthers: { x: number; y: number; type: string }[] = []
+
+  // 判断 (px, py) 是否属于实心色块内部（排除 1~2px 宽的红色标注外框细线）
+  const isSolidColorPixel = (px: number, py: number) => {
+    let neighbors = 0
+    for (const [ox, oy] of [
+      [-2, 0],
+      [2, 0],
+      [0, -2],
+      [0, 2],
+    ]) {
+      const idx = ((py + oy) * W + (px + ox)) * ch
+      const nr = d[idx]
+      const ng = d[idx + 1]
+      const nb = d[idx + 2]
+      if (Math.max(nr, ng, nb) - Math.min(nr, ng, nb) >= 50 || (nr > 185 && ng > 160 && nb > 160)) {
+        neighbors++
+      }
+    }
+    return neighbors >= 3
+  }
+
+  for (let y = wy0; y < wy1; y += 2) {
+    for (let x = wx0; x < wx1; x += 2) {
+      if (badgeVisited[y * W + x] || inMaskedCorner(x, y)) continue
+      const i = (y * W + x) * ch
+      if (ch === 4 && d[i + 3] < 128) continue
+      const r = d[i]
+      const g = d[i + 1]
+      const b = d[i + 2]
+      const max = Math.max(r, g, b)
+      const min = Math.min(r, g, b)
+      // 开关铭牌底色具有明显高饱和度，只从实心底色启动（避开外圈抗锯齿浅色晕染边）
+      if (max < 115 || max - min < 80 || min > 115) continue
+      if (!isSolidColorPixel(x, y)) continue
+
+      const q: [number, number][] = [[x, y]]
+      const seenInBlob: number[] = [y * W + x]
+      badgeVisited[y * W + x] = 1
+      let minX = x
+      let maxX = x
+      let minY = y
+      let maxY = y
+      let sumR = 0
+      let sumG = 0
+      let sumB = 0
+      let count = 0
+
+      while (q.length > 0 && count < 1500) {
+        const [cx, cy] = q.pop()!
+        count++
+        const ci = (cy * W + cx) * ch
+        sumR += d[ci]
+        sumG += d[ci + 1]
+        sumB += d[ci + 2]
+        if (cx < minX) minX = cx
+        if (cx > maxX) maxX = cx
+        if (cy < minY) minY = cy
+        if (cy > maxY) maxY = cy
+
+        for (const [dx, dy] of [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+          [2, 0],
+          [-2, 0],
+          [0, 2],
+          [0, -2],
+        ]) {
+          const nx = cx + dx
+          const ny = cy + dy
+          if (nx < wx0 || nx >= wx1 || ny < wy0 || ny >= wy1) continue
+          if (Math.abs(nx - x) > 48 || Math.abs(ny - y) > 15) continue
+          if (badgeVisited[ny * W + nx]) continue
+          const ni = (ny * W + nx) * ch
+          const nr = d[ni]
+          const ng = d[ni + 1]
+          const nb = d[ni + 2]
+          const nmax = Math.max(nr, ng, nb)
+          const nmin = Math.min(nr, ng, nb)
+          if (!isSolidColorPixel(nx, ny)) continue
+          if (
+            nmax >= 105 &&
+            nmax - nmin >= 65 &&
+            nmin <= 130 &&
+            Math.abs(nr - r) + Math.abs(ng - g) + Math.abs(nb - b) < 175
+          ) {
+            badgeVisited[ny * W + nx] = 1
+            seenInBlob.push(ny * W + nx)
+            q.push([nx, ny])
+          }
+        }
+      }
+
+      const bw = maxX - minX + 1
+      const bh = maxY - minY + 1
+      const area = bw * bh
+      // 如果扫到的是外围细长红框线（跨度过大或过扁），解除其内部像素占用，避免把框内的开关/智能屏吞掉
+      if (bw > 56 || bh > 18) {
+        for (const idx of seenInBlob) badgeVisited[idx] = 0
+        badgeVisited[y * W + x] = 1
+        continue
+      }
+      // 标准横向开关铭牌：单个宽 19~34px（两个并排相连时宽 38~52px），高 11~16px
+      if (count >= 95 && bw >= 19 && bw <= 54 && bh >= 10 && bh <= 16 && count / area >= 0.34) {
+        let lightPx = 0
+        for (let py = minY + 1; py < maxY; py++) {
+          for (let px = minX + 1; px < maxX; px++) {
+            const pi = (py * W + px) * ch
+            const pr = d[pi]
+            const pg = d[pi + 1]
+            const pb = d[pi + 2]
+            if (0.299 * pr + 0.587 * pg + 0.114 * pb > 182 && Math.min(pr, pg, pb) > 145) lightPx++
+          }
+        }
+        // 内部必须有清晰的白色汉字笔画（排除 lightPx === 0 的纯色实心插座条）
+        if (lightPx >= 36 && lightPx / area <= 0.58) {
+          const ar = sumR / count
+          const ag = sumG / count
+          const ab = sumB / count
+          const mx = Math.max(ar, ag, ab)
+          const mn = Math.min(ar, ag, ab)
+          const delta = Math.max(1, mx - mn)
+          let hue = 0
+          if (mx === ar) hue = ((ag - ab) / delta) % 6
+          else if (mx === ag) hue = (ab - ar) / delta + 2
+          else hue = (ar - ag) / delta + 4
+          hue = Math.round(hue * 60)
+          if (hue < 0) hue += 360
+
+          const cy = Math.round((minY + maxY) / 2)
+          const cx = Math.round((minX + maxX) / 2)
+          const isDoubleBadge = bw >= 38
+
+          if (hue >= 24 && hue <= 48) {
+            // 橙黄色底白字「三开」
+            if (isDoubleBadge) {
+              const x1 = Math.round(minX + bw * 0.25)
+              const x2 = Math.round(minX + bw * 0.75)
+              badgeSwitches.push({ x: x1, y: cy, type: 'switch-3' })
+              badgeSwitches.push({ x: x2, y: cy, type: 'switch-3' })
+              markVisited(x1, cy, 14)
+              markVisited(x2, cy, 14)
+            } else {
+              badgeSwitches.push({ x: cx, y: cy, type: 'switch-3' })
+              markVisited(cx, cy, 18)
+            }
+          } else if ((hue >= 68 && hue <= 108) || (hue >= 190 && hue <= 215)) {
+            // 草绿色/天蓝色底白字「双开 / 单开」
+            if (isDoubleBadge) {
+              const x1 = Math.round(minX + bw * 0.25)
+              const x2 = Math.round(minX + bw * 0.75)
+              badgeSwitches.push({ x: x1, y: cy, type: 'switch-2' })
+              badgeSwitches.push({ x: x2, y: cy, type: 'switch-2' })
+              markVisited(x1, cy, 14)
+              markVisited(x2, cy, 14)
+            } else {
+              // 单开汉字「单」笔画比「双」稍疏，结合白字像素占比区分单开与双开
+              const swType = lightPx <= 66 ? 'switch-1' : 'switch-2'
+              badgeSwitches.push({ x: cx, y: cy, type: swType })
+              markVisited(cx, cy, 18)
+            }
+          } else if ((hue >= 345 || hue <= 14) && bw >= 28 && cx > W * 0.42 && cx < W * 0.62) {
+            // 过道中央红底白字「智能屏」
+            badgeSwitches.push({ x: cx, y: cy, type: 'touch-panel' })
+            markVisited(cx, cy, 20)
+          }
+        }
+      }
+    }
+  }
+
+  if (badgeSwitches.length >= 4) {
+    colorSwitches.push(...badgeSwitches)
+    otherColorPoints.push(...badgeOthers)
+  }
+
   // 2. Pass 1：优先扫描淡黄色开关标记（放宽饱和度下限，用明度+色相组合判断，并结合旁侧 L1-Kxx 标签或斜杆墨迹二次确认）与高饱和彩色点位
   const isPaleYellowSwitchPixel = (r: number, g: number, b: number) => {
     if (r < 175 || g < 160) return false
@@ -395,7 +580,7 @@ export function detectCadSymbolsFromPixels(
     return sat >= 0.08
   }
 
-  for (let y = wy0 + 12; y < wy1 - 12; y += 2) {
+  if (badgeSwitches.length < 4) for (let y = wy0 + 12; y < wy1 - 12; y += 2) {
     for (let x = wx0 + 12; x < wx1 - 12; x += 2) {
       if (visited[y * W + x] || inMaskedCorner(x, y)) continue
       const i = (y * W + x) * ch
