@@ -25,7 +25,8 @@ export const coreAiSpec: PluginAiSpec = {
   guidance: [
     '当用户提出创建或修改请求时，主动调用对应工具直接完成操作（可分多步连续调用，例如：新建项目 → 布置房间和点位 → 智能选型 → 生成报价单），不要只给口头步骤。',
     '当用户上传了真实户型图图片时，严禁调用 setup_rooms_and_points 生成网格默认点位！只有图像真实识别出点位（add_floor_sheet 的 detectedPoints）或用户提供了点位 JSON（import_points_json）时才生成点位图标；若未识别出点位，保持点位图为空（0 点位）。',
-    '当用户要求生成图片、画效果图、方案配图、场景图时，必须调用 generate_image 工具；不要声称已生成图片但没有调用。生成后把图片链接或结果告诉用户。',
+    '当用户要求生成图片、画效果图、方案配图、场景图时，必须调用 generate_image 工具；不要声称已生成图片但没有调用。用户上传了参考图时设置 useAttachedImage=true。生成后把视觉质检结论告诉用户，质检分低于 7 时主动提出重新生成。',
+    '项目已有户型图纸、用户要求规划或补齐 AP、窗帘、传感器、摄像头、中控屏、音箱、网关、VRF 等智能设备时，调用 plan_points_with_vision（视觉模型看图按规范布点），不要调用 setup_rooms_and_points。',
     '当用户上传或粘贴别家的报价单 / 设备清单要求比价时：先逐行识别品名、品牌、型号、数量与单价（安装调试、布线辅材等服务项放入 fees），再调用 create_quote_from_competitor 生成对比报价单，最后按行总结匹配型号与差价，不要把外店的服务项当成设备。',
   ],
   knowledge: [
@@ -435,9 +436,34 @@ export const coreAiSpec: PluginAiSpec = {
       },
     },
     {
+      name: 'plan_points_with_vision',
+      title: '视觉智能布点',
+      description:
+        '对当前项目已上传的户型图，调用视觉大模型看图，并按平台设计规范规划智能设备点位：全屋 WiFi（ap-node / ceiling-ap / network-panel）、窗帘电轨 curtain-track、智能网关 gateway、VRF 控制器 vrf-controller、人体传感器 motion-sensor、智能音箱 speaker、中控屏 touch-panel、摄像头 camera，以及门磁 contact-sensor、水浸 water-sensor、烟感 smoke-sensor。开关、插座、灯具只照图识别，本工具不会生成。用户说「帮我规划/补齐/布置 AP、窗帘、传感器、摄像头」「按户型把智能设备点位布好」时调用；重复调用会先替换上次规划的点位。',
+      cost: 2,
+      permissions: ['point-map:write'],
+      scope: 'project',
+      mutates: true,
+      parameters: {
+        type: 'object',
+        properties: {
+          deviceTypes: {
+            type: 'array',
+            items: { type: 'string' },
+            description: '要规划的设备类型代号（留空 = 按规范规划全部默认智能设备），如 ["ap-node","curtain-track","motion-sensor"]',
+          },
+          rooms: { type: 'array', items: { type: 'string' }, description: '只规划这些房间（留空 = 全屋），如 ["主卧","客厅"]' },
+          sheetName: { type: 'string', description: '多张图纸时指定图纸名称（留空 = 全部已上传图纸，最多 3 张）' },
+          requirements: { type: 'string', description: '客户的额外要求，如「老人房加人体传感器」「全屋 AP 用吸顶款」' },
+          replacePlanned: { type: 'boolean', description: '是否先移除本工具之前规划的点位再重新规划（默认 true）' },
+        },
+      },
+    },
+    {
       name: 'generate_image',
       title: 'AI 生图',
-      description: '根据文字描述生成智能家居场景图、方案配图、效果图或材质意向图。用户说“画一张”“生成图片”“出个效果图”时调用。',
+      description:
+        '根据文字描述生成智能家居场景图、方案配图、效果图或材质意向图。用户说“画一张”“生成图片”“出个效果图”时调用。用户上传了参考图并希望据此出图时设 useAttachedImage=true：平台会先由视觉模型理解参考图再写提示词生成，生成后再由视觉模型质检。',
       cost: 0,
       permissions: ['images:generate'],
       scope: 'workspace',
@@ -446,7 +472,8 @@ export const coreAiSpec: PluginAiSpec = {
         type: 'object',
         properties: {
           prompt: { type: 'string', description: '图片描述，包含空间、风格、材质、光线、镜头' },
-          size: { type: 'string', enum: ['1024*1024', '1536*1024', '1024*1536'], description: '输出尺寸，默认 1024*1024' },
+          size: { type: 'string', enum: ['1024*1024', '1536*1024', '1024*1536'], description: '输出尺寸，默认 1024*1024；横版效果图用 1536*1024' },
+          useAttachedImage: { type: 'boolean', description: '是否参考本轮对话里用户上传的图片（户型图 / 实景照片 / 效果图）' },
         },
         required: ['prompt'],
       },

@@ -45,7 +45,7 @@ export type CadDetectionResult = {
 }
 
 const isSwitchType = (t: string) => t.startsWith('switch-')
-const isLightType = (t: string) =>
+export const isLightType = (t: string) =>
   t === 'downlight' || t === 'spotlight' || t === 'ceiling-light' || t === 'panel-light' || t === 'light-strip' || t === 'track-light' || t === 'pendant-light' || t === 'wall-light'
 
 export function buildCadDetectionSummary(points: DetectedCadPoint[], areas: DetectedCadArea[]): DetectedCadSummary {
@@ -862,65 +862,67 @@ export function detectCadSymbolsFromPixels(
  * 视觉大模型识图结果 + 本地像素「磁吸对齐器（Snap-to-Cad-Ink）」：
  * 大模型擅长看懂非标图纸语义但坐标会有 1%~3% 漂移；本函数在模型给出的 (x, y) 周围搜索最符合符号几何特征的墨迹中心进行吸附对齐。
  */
+/**
+ * 把一个视觉模型给出的近似坐标（0–1）吸附到附近最像符号中心的墨迹/色块上（找不到合适位置时保持原坐标）。
+ */
+export function snapPointToInk(pixels: Pixels, x: number, y: number, isSwitch: boolean): { x: number; y: number; snapped: boolean } {
+  const { data: d, width: W, height: H, channels: ch = 4 } = pixels
+  const isDark = (px: number, py: number) => {
+    if (px < 2 || px >= W - 2 || py < 2 || py >= H - 2) return false
+    const i = (py * W + px) * ch
+    if (ch === 4 && d[i + 3] < 128) return false
+    return (d[i] + d[i + 1] + d[i + 2]) / 3 < 155
+  }
+  const px0 = Math.round(x * W)
+  const py0 = Math.round(y * H)
+  const searchRadius = isSwitch ? 30 : 24
+  let bestX = px0
+  let bestY = py0
+  let bestScore = -1
+  for (let dy = -searchRadius; dy <= searchRadius; dy += 2) {
+    for (let dx = -searchRadius; dx <= searchRadius; dx += 2) {
+      const cx = px0 + dx
+      const cy = py0 + dy
+      if (cx < 16 || cx >= W - 16 || cy < 16 || cy >= H - 16) continue
+      // 7x7 局部圆核墨迹密度 + 外围适度留白（避免直接吸到实心粗黑墙体正中间）
+      let inner = 0
+      let ring = 0
+      for (let iy = -3; iy <= 3; iy++) {
+        for (let ix = -3; ix <= 3; ix++) {
+          if (isDark(cx + ix, cy + iy)) inner++
+        }
+      }
+      if (inner < 6) continue
+      for (let ry = -9; ry <= 9; ry += 3) {
+        for (let rx = -9; rx <= 9; rx += 3) {
+          if (Math.abs(rx) <= 3 && Math.abs(ry) <= 3) continue
+          if (isDark(cx + rx, cy + ry)) ring++
+        }
+      }
+      // 理想符号圆心：中心有墨迹，外围有斜杆或圆环但不是全黑实心墙
+      if (inner <= 42 && ring >= 2 && ring <= 24) {
+        const score = inner * 1.4 - Math.abs(ring - 10) * 0.8 - Math.hypot(dx, dy) * 0.35
+        if (score > bestScore) {
+          bestScore = score
+          bestX = cx
+          bestY = cy
+        }
+      }
+    }
+  }
+  return { x: Math.round((bestX / W) * 1000) / 1000, y: Math.round((bestY / H) * 1000) / 1000, snapped: bestScore >= 0 }
+}
+
 export function snapVisionPointsToCadInk(
   pixels: Pixels,
   visionPoints: { type: string; x: number; y: number; room?: string }[],
   existingAreas: DetectedCadArea[],
   opts: { sheetName?: string } = {},
 ): CadDetectionResult {
-  const { data: d, width: W, height: H, channels: ch = 4 } = pixels
-  const isDark = (x: number, y: number) => {
-    if (x < 2 || x >= W - 2 || y < 2 || y >= H - 2) return false
-    const i = (y * W + x) * ch
-    if (ch === 4 && d[i + 3] < 128) return false
-    return (d[i] + d[i + 1] + d[i + 2]) / 3 < 155
-  }
-
   const snapped: DetectedCadPoint[] = []
   for (const vp of visionPoints) {
-    const px0 = Math.round(vp.x * W)
-    const py0 = Math.round(vp.y * H)
     const isSw = isSwitchType(vp.type)
-    const searchRadius = isSw ? 30 : 24
-    let bestX = px0
-    let bestY = py0
-    let bestScore = -1
-
-    for (let dy = -searchRadius; dy <= searchRadius; dy += 2) {
-      for (let dx = -searchRadius; dx <= searchRadius; dx += 2) {
-        const cx = px0 + dx
-        const cy = py0 + dy
-        if (cx < 16 || cx >= W - 16 || cy < 16 || cy >= H - 16) continue
-        // 计算 7x7 局部圆核墨迹密度 + 外围适度留白（避免直接吸到实心粗黑墙体正中间）
-        let inner = 0
-        let ring = 0
-        for (let iy = -3; iy <= 3; iy++) {
-          for (let ix = -3; ix <= 3; ix++) {
-            if (isDark(cx + ix, cy + iy)) inner++
-          }
-        }
-        if (inner < 6) continue
-        for (let ry = -9; ry <= 9; ry += 3) {
-          for (let rx = -9; rx <= 9; rx += 3) {
-            if (Math.abs(rx) <= 3 && Math.abs(ry) <= 3) continue
-            if (isDark(cx + rx, cy + ry)) ring++
-          }
-        }
-        // 理想符号圆心：中心有墨迹（6~38），外围有斜杆或圆环但不是全黑实心墙（ring 在 3~24 之间）
-        if (inner <= 42 && ring >= 2 && ring <= 24) {
-          const distPenalty = Math.hypot(dx, dy) * 0.35
-          const score = inner * 1.4 - Math.abs(ring - 10) * 0.8 - distPenalty
-          if (score > bestScore) {
-            bestScore = score
-            bestX = cx
-            bestY = cy
-          }
-        }
-      }
-    }
-
-    const rx = Math.round((bestX / W) * 1000) / 1000
-    const ry = Math.round((bestY / H) * 1000) / 1000
+    const { x: rx, y: ry } = snapPointToInk(pixels, vp.x, vp.y, isSw)
     const matchedArea = existingAreas.find(
       (a) => rx >= a.rect[0] && rx <= a.rect[0] + a.rect[2] && ry >= a.rect[1] && ry <= a.rect[1] + a.rect[3],
     )

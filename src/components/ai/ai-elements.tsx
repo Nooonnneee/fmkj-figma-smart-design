@@ -18,6 +18,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
+import { MarkdownText } from './markdown'
+
 export type AiModelOption = {
   id: string
   name: string
@@ -43,6 +45,12 @@ export type AiAttachment = {
   mediaId?: string
   /** 图片上传时服务端 CAD 符号检测器真实识别到的点位（无识别则为空数组） */
   detectedPoints?: { type: string; x: number; y: number }[]
+  /** 视觉模型判断的图片类型：floor-plan / quote-document / photo / rendering / other */
+  imageKind?: string
+  /** 户型图视觉复核进度：pending / done / failed / unavailable / skipped */
+  visionStatus?: string
+  detectedSwitchCount?: number
+  detectedLightCount?: number
   /** 文本或 JSON 文件解析后的内容 */
   textContent?: string
   summary?: string
@@ -52,6 +60,8 @@ export type AiChatMessage = {
   id: string
   role: 'user' | 'assistant'
   content: string
+  /** 用户消息实际发给服务端的完整内容（含附件块），用于「重新生成」 */
+  rawContent?: string
   createdAt: string
   modelName?: string
   cost?: number
@@ -63,6 +73,9 @@ export type AiChatMessage = {
 
 /** 从历史消息文本中分离出用户可见正文与附带的附件摘要（兼容刷新后从数据库读取的历史消息） */
 function parseStoredUserContent(raw: string): { text: string; fileBadges: { name: string; kind: string; url?: string }[] } {
+  // 服务端会把视觉识图结论追加在用户消息末尾（供后续对话参考），界面上不显示
+  const briefIdx = raw.indexOf('\n\n【视觉识图结论】')
+  if (briefIdx !== -1) raw = raw.slice(0, briefIdx)
   const marker = '\n\n【已上传附件】'
   const idx = raw.indexOf(marker)
   if (idx === -1) return { text: raw, fileBadges: [] }
@@ -83,15 +96,69 @@ function parseStoredUserContent(raw: string): { text: string; fileBadges: { name
   return { text: visible, fileBadges: badges }
 }
 
+type Suggestion = { label: string; prompt: string }
+
+/** 根据这条回复执行过的工具，给出可一键发送的下一步（只在最后一条回复下显示） */
+export function followUpSuggestions(message: AiChatMessage): Suggestion[] {
+  const calls = message.toolCalls ?? []
+  if (!calls.length || message.error) return []
+  const href = (re: RegExp) => calls.some((c) => re.test(c.href ?? ''))
+  if (href(/\/point-map/)) {
+    return [
+      { label: '仅导入开关', prompt: '请对当前项目的户型图重新生成点位，仅导入开关面板（importMode=switches, replaceExisting=true）' },
+      { label: '导入全部（含灯具）', prompt: '请对当前项目的户型图重新生成点位，导入全部开关与灯具点位（importMode=all, replaceExisting=true）' },
+      { label: '视觉智能布点', prompt: '请用视觉智能布点，按设计规范为当前户型规划 AP、窗帘、传感器、网关、中控屏等智能设备点位' },
+      { label: '智能选型并出报价', prompt: '请按标准档为当前项目一键智能选型，并直接生成报价单' },
+    ]
+  }
+  if (href(/\/quotes/)) {
+    return [
+      { label: '生成施工合同', prompt: '请根据当前报价单生成施工合同（默认三期付款）' },
+      { label: '检查点位完整度', prompt: '请检查当前项目每个房间的点位配置是否完整，列出缺失项和优化建议' },
+      { label: '导出报价单', prompt: '请给我当前项目报价单与方案的打印/导出链接' },
+    ]
+  }
+  if (href(/\/contract/)) {
+    return [
+      { label: '导出合同', prompt: '请给我当前项目合同的打印/导出链接' },
+      { label: '生成方案演示', prompt: '请为当前项目推荐合适的方案模板并给出方案演示链接' },
+    ]
+  }
+  if (calls.some((c) => c.imageUrl)) {
+    return [
+      { label: '换个风格再来一张', prompt: '保持空间和构图，换一种设计风格再生成一张效果图' },
+      { label: '改成夜间灯光氛围', prompt: '保持空间和构图，改成夜间灯光氛围再生成一张' },
+      { label: '生成横版效果图', prompt: '把刚才的画面生成一张 1536*1024 的横版效果图' },
+    ]
+  }
+  if (calls.some((c) => c.pluginId === 'vision')) {
+    const detail = calls.find((c) => c.pluginId === 'vision')?.details?.[0] ?? ''
+    if (/报价|单价|清单/.test(detail)) {
+      return [{ label: '生成对比报价单', prompt: '请按看图转写的外店报价明细，在当前项目生成对比报价单并分析差价' }]
+    }
+    if (/户型|开关|房间|点位|图例/.test(detail)) {
+      return [
+        { label: '添加到项目点位图', prompt: '请把这张户型图添加到当前项目的点位图，并导入识别出的开关面板' },
+        { label: '视觉智能布点', prompt: '请用视觉智能布点，按设计规范为这张户型规划 AP、窗帘、传感器等智能设备点位' },
+      ]
+    }
+    return [{ label: '据此生成效果图', prompt: '请参考这张图片生成一张全屋智能场景效果图（useAttachedImage=true）' }]
+  }
+  return []
+}
+
 /** 一条消息：用户消息右侧浅灰气泡，AI 回复为无边框正文（参考 ChatGPT / Claude），支持底部快捷跟进胶囊。 */
 export function AiMessageBubble({
   message,
   onRegenerate,
   onQuickAction,
+  isLast = false,
 }: {
   message: AiChatMessage
   onRegenerate?: () => void
   onQuickAction?: (prompt: string) => void
+  /** 是否为最后一条回复（只在最后一条下面显示下一步建议） */
+  isLast?: boolean
 }) {
   const [copied, setCopied] = useState(false)
   if (message.role === 'user') {
@@ -131,6 +198,12 @@ export function AiMessageBubble({
   }
   return (
     <div className="group flex flex-col gap-1.5">
+      {message.reasoning ? (
+        <details className="rounded-lg border bg-muted/30 px-2.5 py-1.5" open={!message.content}>
+          <summary className="cursor-pointer text-xs text-muted-foreground select-none hover:text-foreground">{message.content ? '深度思考过程' : '深度思考中…'}</summary>
+          <div className="mt-1.5 max-h-60 overflow-y-auto text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">{message.reasoning}</div>
+        </details>
+      ) : null}
       {message.toolCalls?.map((c, i) => (
         <div key={i} className="flex flex-col gap-1.5 text-xs text-muted-foreground">
           <div className="flex items-center gap-1.5">
@@ -142,6 +215,12 @@ export function AiMessageBubble({
               </Link>
             ) : null}
           </div>
+          {c.details?.[0] ? (
+            <details className="rounded-lg border bg-muted/30 px-2.5 py-1.5">
+              <summary className="cursor-pointer text-xs text-muted-foreground select-none hover:text-foreground">查看视觉识图结论</summary>
+              <MarkdownText text={c.details[0]} className="mt-1.5 text-xs text-foreground/90" />
+            </details>
+          ) : null}
           {c.imageUrl ? (
             <a href={c.imageUrl} target="_blank" rel="noreferrer" className="block w-fit">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -150,37 +229,23 @@ export function AiMessageBubble({
           ) : null}
         </div>
       ))}
-      <div className={cn('text-sm leading-relaxed whitespace-pre-wrap', message.error && 'rounded-xl border border-dashed px-3 py-2 text-muted-foreground')}>{message.content}</div>
-      {onQuickAction && !message.error && message.toolCalls?.some((c) => c.href?.includes('/point-map') || /户型图|图纸/.test(c.pluginName)) ? (
+      {message.error ? (
+        <div className="rounded-xl border border-dashed px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">{message.content}</div>
+      ) : message.content ? (
+        <MarkdownText text={message.content} />
+      ) : null}
+      {onQuickAction && isLast && followUpSuggestions(message).length ? (
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => onQuickAction('请对当前项目的户型图重新生成点位，仅导入开关点位（importMode=switches, replaceExisting=true）')}
-            className="rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
-          >
-            仅导入开关
-          </button>
-          <button
-            type="button"
-            onClick={() => onQuickAction('请对当前项目的户型图重新生成点位，导入全部开关与灯具点位（importMode=all, replaceExisting=true）')}
-            className="rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
-          >
-            导入全部（含灯具）
-          </button>
-          <button
-            type="button"
-            onClick={() => onQuickAction('请重新读取并识别当前项目的户型图点位（redetect=true, replaceExisting=true）')}
-            className="rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
-          >
-            重新识别图纸
-          </button>
-          <button
-            type="button"
-            onClick={() => onQuickAction('请按标准档为当前项目一键智能选型，并直接生成报价单')}
-            className="rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
-          >
-            智能选型并出报价
-          </button>
+          {followUpSuggestions(message).map((s) => (
+            <button
+              key={s.label}
+              type="button"
+              onClick={() => onQuickAction(s.prompt)}
+              className="rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
+            >
+              {s.label}
+            </button>
+          ))}
         </div>
       ) : null}
       <div className="flex items-center gap-1.5 text-muted-foreground">

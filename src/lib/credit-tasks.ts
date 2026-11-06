@@ -1,3 +1,4 @@
+import { relId } from './access'
 import { getPayloadClient } from './payload'
 import type { User } from '@/payload-types'
 
@@ -73,6 +74,30 @@ export async function grantTaskCreditIfEligible(
   taskId: CreditTaskId,
   opts: { openid?: string | null } = {},
 ): Promise<{ granted: boolean; credits: number; reason: string }> {
+  // 同一账号同一任务（微信绑定奖励按微信号）串行核验，避免并发请求在「查重 → 入账」之间重复发放
+  const lockKey = taskId === 'bind_wechat' ? 'bind_wechat' : `${taskId}:${userId}`
+  return withGrantLock(lockKey, () => grantTaskCreditUnlocked(userId, taskId, opts))
+}
+
+const grantLocks = new Map<string, Promise<unknown>>()
+
+async function withGrantLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const prev = grantLocks.get(key) ?? Promise.resolve()
+  const run = prev.catch(() => undefined).then(fn)
+  const tail = run.catch(() => undefined)
+  grantLocks.set(key, tail)
+  try {
+    return await run
+  } finally {
+    if (grantLocks.get(key) === tail) grantLocks.delete(key)
+  }
+}
+
+async function grantTaskCreditUnlocked(
+  userId: string,
+  taskId: CreditTaskId,
+  opts: { openid?: string | null },
+): Promise<{ granted: boolean; credits: number; reason: string }> {
   const spec = CREDIT_TASKS.find((t) => t.id === taskId)
   if (!spec) return { granted: false, credits: 0, reason: '未知任务' }
 
@@ -97,13 +122,25 @@ export async function grantTaskCreditIfEligible(
       : spec.ledgerReason
 
   if (taskId === 'bind_wechat' && opts.openid) {
-    const existingForOpenid = await payload.count({
+    const prior = await payload.find({
       collection: 'ai-credit-ledger',
       where: { reason: { equals: reasonText } },
+      limit: 20,
+      depth: 0,
       overrideAccess: true,
+      select: { user: true },
     })
-    if (existingForOpenid.totalDocs > 0) {
-      return { granted: false, credits: 0, reason: '该微信号已领取过绑定奖励' }
+    const otherUserIds = Array.from(new Set(prior.docs.map((d) => relId(d.user)).filter((id): id is string => Boolean(id) && id !== userId)))
+    if (otherUserIds.length) {
+      // 只拦截仍在使用中的账号；换绑时被自动停用的临时微信小号不算，避免真实账号领不到奖励
+      const activeOthers = await payload.count({
+        collection: 'users',
+        where: { and: [{ id: { in: otherUserIds } }, { status: { equals: 'active' } }] },
+        overrideAccess: true,
+      })
+      if (activeOthers.totalDocs > 0) {
+        return { granted: false, credits: 0, reason: '该微信号已领取过绑定奖励' }
+      }
     }
   }
 
@@ -136,8 +173,15 @@ export async function loadAndSyncUserCreditTasks(user: User): Promise<{
   const payload = await getPayloadClient()
   const userId = String(user.id)
 
-  const [wechatCount, quoteCount, ledgerRes] = await Promise.all([
-    payload.count({ collection: 'wechat-accounts', where: { user: { equals: userId } }, overrideAccess: true }),
+  const [wechatRes, quoteCount, ledgerRes] = await Promise.all([
+    payload.find({
+      collection: 'wechat-accounts',
+      where: { user: { equals: userId } },
+      limit: 1,
+      depth: 0,
+      overrideAccess: true,
+      select: { openid: true },
+    }),
     payload.count({
       collection: 'quotes',
       where: { project: { in: await getUserProjectIds(userId) } },
@@ -154,7 +198,8 @@ export async function loadAndSyncUserCreditTasks(user: User): Promise<{
   ])
 
   const hasRealEmail = isRealUserEmail(user.email)
-  const hasWechat = wechatCount.totalDocs > 0
+  const hasWechat = wechatRes.docs.length > 0
+  const wechatOpenid = (wechatRes.docs[0] as { openid?: string | null } | undefined)?.openid ?? null
   const profile = (user as { companyProfile?: { name?: string | null; phone?: string | null } | null }).companyProfile
   const hasProfile = Boolean(profile?.name?.trim() && profile?.phone?.trim())
   const hasQuote = quoteCount.totalDocs > 0
@@ -176,7 +221,10 @@ export async function loadAndSyncUserCreditTasks(user: User): Promise<{
   for (const autoId of ['bind_email', 'bind_wechat'] as CreditTaskId[]) {
     const spec = CREDIT_TASKS.find((t) => t.id === autoId)!
     if (eligibilityMap[autoId] && !isClaimed(spec)) {
-      const res = await grantTaskCreditIfEligible(userId, autoId).catch(() => ({ granted: false, credits: 0 }))
+      const res = await grantTaskCreditIfEligible(userId, autoId, autoId === 'bind_wechat' ? { openid: wechatOpenid } : {}).catch(() => ({
+        granted: false,
+        credits: 0,
+      }))
       if (res.granted) {
         autoGrantedCredits += res.credits
         claimedReasons.add(spec.ledgerReason)

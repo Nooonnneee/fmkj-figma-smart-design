@@ -41,10 +41,27 @@ const resolveStoredModelName = (rawModel: string | null, modelList: AiModelOptio
   return modelList.find((x) => x.id === rawModel)?.name ?? AI_MODELS.find((x) => x.id === rawModel)?.name ?? rawModel
 }
 
+const IMAGE_KIND_TEXT: Record<string, string> = { 'floor-plan': '户型/点位图纸', 'quote-document': '报价单/清单截图', photo: '实景照片', rendering: '效果图', other: '图片' }
+
+/** 附件上的识别摘要：图纸显示识别数量与视觉复核进度，其他图片显示视觉判断的类型 */
+function attachmentSummary(d: { imageKind?: string; visionStatus?: string; status?: string; detectedPointCount?: number; detectedSwitchCount?: number; detectedLightCount?: number }) {
+  const kind = d.imageKind ?? 'floor-plan'
+  if (kind !== 'floor-plan') return `已识别为${IMAGE_KIND_TEXT[kind] ?? '图片'} · 发送后视觉模型看图`
+  const vs = d.visionStatus ?? d.status
+  const sw = d.detectedSwitchCount ?? 0
+  const lt = d.detectedLightCount ?? 0
+  const counts = (d.detectedPointCount ?? 0) > 0 || sw || lt ? `开关 ${sw}${lt ? ` · 灯具 ${lt}` : ''}` : '暂未识别到点位'
+  if (vs === 'pending') return `${counts} · 视觉复核中…`
+  if (vs === 'done') return `${counts} · 已视觉复核`
+  if (vs === 'failed') return `${counts} · 视觉复核未完成`
+  return counts
+}
+
 const toChat = (m: StoredMessage, modelList: AiModelOption[]): AiChatMessage => ({
   id: m.id,
   role: m.role,
   content: m.content,
+  ...(m.role === 'user' ? { rawContent: m.content } : {}),
   createdAt: m.createdAt,
   modelName: resolveStoredModelName(m.model, modelList),
   cost: m.cost ?? undefined,
@@ -92,6 +109,7 @@ export function AiSidebarDock({
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [streaming, setStreaming] = useState(false)
   const [thinking, setThinking] = useState(false)
+  const [statusText, setStatusText] = useState('')
   const [input, setInput] = useState(initialInput ?? '')
   const [attachments, setAttachments] = useState<AiAttachment[]>([])
   const [dockDragging, setDockDragging] = useState(false)
@@ -152,6 +170,32 @@ export function AiSidebarDock({
     setAttachments([])
   }
 
+  /** 轮询户型图的视觉复核结果，完成后更新附件上的识别摘要（最多约 75 秒） */
+  async function pollRecognition(attId: string, mediaId: string) {
+    for (let i = 0; i < 25; i++) {
+      await new Promise((r) => setTimeout(r, 3000))
+      const res = await fetch(`/ai/upload?mediaId=${encodeURIComponent(mediaId)}`, { cache: 'no-store' }).catch(() => null)
+      const data = (await res?.json().catch(() => null)) as
+        | { ok?: boolean; status?: string; imageKind?: string; detectedPointCount?: number; detectedSwitchCount?: number; detectedLightCount?: number }
+        | null
+      if (!data?.ok || data.status === 'pending') continue
+      setAttachments((prev) =>
+        prev.map((a) =>
+          a.id === attId
+            ? {
+                ...a,
+                visionStatus: data.status,
+                detectedSwitchCount: data.detectedSwitchCount ?? a.detectedSwitchCount,
+                detectedLightCount: data.detectedLightCount ?? a.detectedLightCount,
+                summary: attachmentSummary({ ...data, imageKind: data.imageKind ?? 'floor-plan', visionStatus: data.status }),
+              }
+            : a,
+        ),
+      )
+      return
+    }
+  }
+
   async function handleAddFiles(fileList: FileList | File[]) {
     const files = Array.from(fileList)
     if (!files.length) return
@@ -184,22 +228,18 @@ export function AiSidebarDock({
             url?: string
             mediaId?: string
             name?: string
+            imageKind?: string
+            caption?: string
+            visionStatus?: string
             detectedPointCount?: number
+            detectedSwitchCount?: number
+            detectedLightCount?: number
             detectedPoints?: { type: string; x: number; y: number }[]
             error?: string
           }
           if (!res.ok || !data.ok || !data.url) {
             throw new Error(data.error ?? '上传失败')
           }
-          const ptCount = data.detectedPointCount ?? 0
-            const swCount = (data as { detectedSwitchCount?: number }).detectedSwitchCount ?? 0
-            const ltCount = (data as { detectedLightCount?: number }).detectedLightCount ?? 0
-            const detailSummary =
-              ptCount > 0
-                ? swCount > 0 && ltCount > 0
-                  ? `已识别：开关 ${swCount} · 灯具 ${ltCount}`
-                  : `已识别 ${ptCount} 个点位`
-                : '图纸就绪（无默认点位）'
           setAttachments((prev) =>
             prev.map((a) =>
               a.id === id
@@ -208,12 +248,17 @@ export function AiSidebarDock({
                     status: 'ready',
                     url: data.url,
                     mediaId: data.mediaId,
+                    imageKind: data.imageKind ?? 'floor-plan',
+                    visionStatus: data.visionStatus,
                     detectedPoints: data.detectedPoints ?? [],
-                      summary: detailSummary,
+                    detectedSwitchCount: data.detectedSwitchCount ?? 0,
+                    detectedLightCount: data.detectedLightCount ?? 0,
+                    summary: attachmentSummary(data),
                   }
                 : a,
             ),
           )
+          if (data.visionStatus === 'pending' && data.mediaId) void pollRecognition(id, data.mediaId)
         } catch (err) {
           const msg = (err as Error).message || '上传失败'
           toast.error(`${file.name}：${msg}`)
@@ -286,10 +331,13 @@ export function AiSidebarDock({
     if (credits < 1) return toast.error('积分已用完，请在「会员与积分」页兑换或联系管理员发放')
 
     // 如果用户只拖入了附件没有输入文字，自动补一句默认说明
+    const planImages = readyAtts.filter((a) => a.kind === 'image' && (a.imageKind ?? 'floor-plan') === 'floor-plan')
     const displayPrompt =
       text ||
       (readyAtts.every((a) => a.kind === 'image')
-        ? `请将上传的户型图（${readyAtts.map((a) => a.name).join('、')}）添加到当前项目的点位图中。`
+        ? planImages.length === readyAtts.length
+          ? `请将上传的户型图（${readyAtts.map((a) => a.name).join('、')}）添加到当前项目的点位图中。`
+          : `请帮我看看上传的图片（${readyAtts.map((a) => a.name).join('、')}），说明图片内容并给出建议。`
         : readyAtts.some((a) => a.kind === 'json')
           ? `请解析并导入上传的点位文件（${readyAtts.map((a) => a.name).join('、')}）到当前项目点位图中。`
           : `请根据上传的文件（${readyAtts.map((a) => a.name).join('、')}）处理项目配置。`)
@@ -299,11 +347,16 @@ export function AiSidebarDock({
       const blocks = readyAtts.map((att) => {
         if (att.kind === 'image') {
           const sheetTitle = att.name.replace(/\.[^.]+$/, '')
-          const pts = att.detectedPoints ?? []
-          if (pts.length > 0) {
-            return `- [图片] ${att.name} (已自动适配为标准图纸, mediaId: ${att.mediaId ?? ''}, URL: ${att.url ?? ''}, 建议图纸名: ${sheetTitle}, 图像已自动识别并缓存 ${pts.length} 个真实点位) —— 请调用 add_floor_sheet 工具并传入 url 与 mediaId（服务端会自动按 mediaId 加载这 ${pts.length} 个识别点位，无需手动传 detectedPoints 数组）`
+          const kind = att.imageKind ?? 'floor-plan'
+          if (kind !== 'floor-plan') {
+            return `- [图片] ${att.name} (类型: ${IMAGE_KIND_TEXT[kind] ?? '图片'}, mediaId: ${att.mediaId ?? ''}, URL: ${att.url ?? ''}) —— 这不是户型图纸：请依据视觉识图结论回答，不要调用 add_floor_sheet`
           }
-          return `- [图片] ${att.name} (已自动适配为标准图纸, mediaId: ${att.mediaId ?? ''}, URL: ${att.url ?? ''}, 建议图纸名: ${sheetTitle}, 识别点位数: 0) —— 请只调用 add_floor_sheet 工具添加干净图纸（不传 detectedPoints），严禁调用 setup_rooms_and_points 生成任何默认点位！`
+          const pts = att.detectedPoints ?? []
+          const pending = att.visionStatus === 'pending' ? '，视觉复核进行中（工具会自动等待复核完成）' : att.visionStatus === 'done' ? '，已完成视觉复核' : ''
+          if (pts.length > 0) {
+            return `- [图片] ${att.name} (已自动适配为标准图纸, mediaId: ${att.mediaId ?? ''}, URL: ${att.url ?? ''}, 建议图纸名: ${sheetTitle}, 平台已识别开关 ${att.detectedSwitchCount ?? 0} 个、灯具 ${att.detectedLightCount ?? 0} 个${pending}) —— 请调用 add_floor_sheet 工具并传入 url 与 mediaId（服务端按 mediaId 加载识别结果，无需传 detectedPoints）`
+          }
+          return `- [图片] ${att.name} (已自动适配为标准图纸, mediaId: ${att.mediaId ?? ''}, URL: ${att.url ?? ''}, 建议图纸名: ${sheetTitle}, 识别点位数: 0${pending}) —— 请调用 add_floor_sheet 工具添加图纸（不传 detectedPoints），严禁调用 setup_rooms_and_points 生成任何默认点位！`
         }
         if (att.kind === 'json') {
           return `- [JSON] ${att.name} (${att.summary ?? ''}) —— 可调用 import_points_json 工具直接导入，内容如下：\n\`\`\`json\n${att.textContent}\n\`\`\``
@@ -321,6 +374,7 @@ export function AiSidebarDock({
         id: `u-${Date.now()}`,
         role: 'user',
         content: displayPrompt,
+        rawContent: fullPayloadMessage,
         createdAt: now,
         attachments: readyAtts.map((a) => ({ id: a.id, name: a.name, kind: a.kind, url: a.url, summary: a.summary })),
       },
@@ -330,6 +384,7 @@ export function AiSidebarDock({
     setAttachments([])
     setStreaming(true)
     setThinking(true)
+    setStatusText(readyAtts.some((a) => a.kind === 'image') ? '正在由视觉模型看图…' : '')
     const patchReply = (fn: (m: AiChatMessage) => AiChatMessage) => setMessages((prev) => prev.map((m) => (m.id === replyId ? fn(m) : m)))
     const dropReply = () => setMessages((prev) => prev.filter((m) => m.id !== replyId || m.content))
 
@@ -341,7 +396,7 @@ export function AiSidebarDock({
       const res = await fetch('/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversationId: activeId, message: fullPayloadMessage, modelId: model.id, projectId, pluginIds: connected }),
+        body: JSON.stringify({ conversationId: activeId, message: fullPayloadMessage, modelId: model.id, projectId, pluginIds: connected, pagePath: pathname }),
         signal: controller.signal,
       })
       if (!res.ok || !res.body) {
@@ -381,7 +436,7 @@ export function AiSidebarDock({
                   pluginName: String(ev.pluginName),
                   action: '',
                   summary: String(ev.summary ?? ''),
-                  details: [],
+                  details: Array.isArray(ev.details) ? (ev.details as unknown[]).filter((d): d is string => typeof d === 'string') : [],
                   href,
                   hrefLabel: ev.hrefLabel as string | undefined,
                   imageUrl: typeof ev.imageUrl === 'string' ? ev.imageUrl : undefined,
@@ -393,8 +448,15 @@ export function AiSidebarDock({
             latestProjectId = p.id
             setProjectList((prev) => [p, ...prev.filter((x) => x.id !== p.id)])
             setProjectId(p.id)
+          } else if (ev.type === 'status' && typeof ev.text === 'string') {
+            setStatusText(ev.text)
+          } else if (ev.type === 'reasoning' && typeof ev.text === 'string') {
+            const piece = ev.text
+            setThinking(false)
+            patchReply((m) => ({ ...m, reasoning: (m.reasoning ?? '') + piece }))
           } else if (ev.type === 'delta') {
             setThinking(false)
+            setStatusText('')
             patchReply((m) => ({ ...m, content: m.content + String(ev.text) }))
           } else if (ev.type === 'done') {
             patchReply((m) => ({
@@ -422,7 +484,20 @@ export function AiSidebarDock({
     } finally {
       setStreaming(false)
       setThinking(false)
+      setStatusText('')
       abortRef.current = null
+    }
+  }
+
+  /** 重新生成：把这条回复之前的那条用户消息（含附件信息）原样再发一次 */
+  function regenerate(assistantId: string) {
+    const idx = messages.findIndex((m) => m.id === assistantId)
+    for (let i = idx - 1; i >= 0; i--) {
+      const m = messages[i]
+      if (m.role === 'user') {
+        void send(m.rawContent ?? m.content)
+        return
+      }
     }
   }
 
@@ -546,31 +621,45 @@ export function AiSidebarDock({
             </div>
           </div>
         ) : (
-          messages.map((m) =>
-            m.role === 'assistant' && !m.content && thinking ? (
+          messages.map((m, idx) => {
+            const isLastReply = m.role === 'assistant' && idx === messages.length - 1
+            if (m.role === 'assistant' && !m.content && !m.reasoning && thinking) {
+              return (
+                <div key={m.id} className="flex flex-col gap-1.5">
+                  {m.toolCalls?.map((c, i) => (
+                    <span key={i} className="text-xs text-muted-foreground">
+                      {c.summary ? `${c.pluginName}：${c.summary}` : `已使用 ${c.pluginName}`}
+                    </span>
+                  ))}
+                  <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Loader2 className="size-3.5 animate-spin" />
+                    {statusText || (model.reasoning ? '思考中…' : '正在回复…')}
+                  </span>
+                </div>
+              )
+            }
+            return (
               <div key={m.id} className="flex flex-col gap-1.5">
-                {m.toolCalls?.map((c, i) => (
-                  <span key={i} className="text-xs text-muted-foreground">已使用 {c.pluginName}</span>
-                ))}
-                <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Loader2 className="size-3.5 animate-spin" />
-                  {model.reasoning ? '思考中…' : '正在回复…'}
-                </span>
+                <AiMessageBubble
+                  message={m}
+                  isLast={isLastReply && !streaming}
+                  onRegenerate={!streaming && m.role === 'assistant' ? () => regenerate(m.id) : undefined}
+                  onQuickAction={!streaming ? (prompt) => void send(prompt) : undefined}
+                />
+                {isLastReply && streaming && statusText ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Loader2 className="size-3 animate-spin" />
+                    {statusText}
+                  </span>
+                ) : null}
               </div>
-            ) : (
-              <AiMessageBubble
-                key={m.id}
-                message={m}
-                onRegenerate={!streaming ? () => void send('请根据刚才上传的图纸和需求重新生成点位（replaceExisting=true）') : undefined}
-                onQuickAction={!streaming ? (prompt) => void send(prompt) : undefined}
-              />
-            ),
-          )
+            )
+          })
         )}
       </div>
 
       <div className="p-3 pt-1.5 pb-3.5">
-        {attachments.some((a) => a.status === 'ready' && a.kind === 'image') && !streaming ? (
+        {attachments.some((a) => a.status === 'ready' && a.kind === 'image' && (a.imageKind ?? 'floor-plan') === 'floor-plan') && !streaming ? (
           <div className="mb-2 flex flex-wrap items-center gap-1.5 px-1">
             <span className="text-[11px] text-muted-foreground">一键导入：</span>
             <button

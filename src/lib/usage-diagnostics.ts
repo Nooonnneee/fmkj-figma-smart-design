@@ -12,7 +12,7 @@ export type UploadDiagnosticEvent = {
   fileName: string
   mediaId: string
   url: string
-  method: 'cad-color' | 'vision-snap' | 'dxf-vector' | 'cad-bw' | 'empty'
+  method: 'cad-color' | 'vision-snap' | 'vision-fusion' | 'dxf-vector' | 'cad-bw' | 'empty' | 'non-plan'
   totalPoints: number
   switches: number
   lights: number

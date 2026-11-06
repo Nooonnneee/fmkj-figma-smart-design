@@ -3,10 +3,16 @@
  */
 const MARKER = '\n\n【已上传附件】'
 
+const KIND_TEXT = { 'floor-plan': '户型/点位图纸', 'quote-document': '报价单/清单截图', photo: '实景照片', rendering: '效果图', other: '图片' }
+
 function buildMessage(prompt, attachments) {
   if (!attachments.length) return prompt
   const blocks = attachments.map((a) => {
     const title = a.name.replace(/\.[^.]+$/, '')
+    const kind = a.imageKind || 'floor-plan'
+    if (kind !== 'floor-plan') {
+      return '- [图片] ' + a.name + ' (类型: ' + (KIND_TEXT[kind] || '图片') + ', mediaId: ' + a.mediaId + ', URL: ' + a.url + ') —— 这不是户型图纸：请依据视觉识图结论回答，不要调用 add_floor_sheet'
+    }
     const count = a.detectedPointCount || (a.detectedPoints ? a.detectedPoints.length : 0)
     const sw = a.detectedSwitchCount || 0
     const lt = a.detectedLightCount || 0
@@ -31,8 +37,10 @@ function buildMessage(prompt, attachments) {
   return prompt + MARKER + '\n' + blocks.join('\n\n')
 }
 
-/** 历史消息：拆出可见正文和图片附件 */
+/** 历史消息：拆出可见正文和图片附件（服务端追加的视觉识图结论不显示） */
 function parseStored(content) {
+  const briefIdx = content.indexOf('\n\n【视觉识图结论】')
+  if (briefIdx !== -1) content = content.slice(0, briefIdx)
   const idx = content.indexOf(MARKER)
   if (idx === -1) return { text: content, images: [] }
   const images = []

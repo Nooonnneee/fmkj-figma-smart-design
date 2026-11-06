@@ -3,6 +3,9 @@ import type { User } from '@/payload-types'
 import type { RegisteredToolSpec } from '@/plugins/ai-catalog'
 import type { PluginFlags } from '@/plugins/state'
 
+import type { TokenUsage } from '../billing'
+import type { AiModelConfig } from '../templates'
+
 export type ActiveProjectUpdate = {
   id: string
   name: string
@@ -11,12 +14,25 @@ export type ActiveProjectUpdate = {
   pointCount: number
 }
 
+/** 本轮对话里用户附带的图片（已压成视觉模型可用的 data URL） */
+export type ToolImage = { dataUrl: string; mediaId?: string | null; url?: string | null; kind?: string | null; name?: string }
+
 export type ToolContext = {
   user: User
   projectId: string | null
   project: Awaited<ReturnType<typeof loadProjectDocs>> | null
   onProjectChange?: (proj: ActiveProjectUpdate) => void
   mutated?: boolean
+  /** 本轮对话可用的图片（生图参考、看图规划使用） */
+  images?: ToolImage[]
+  /** 视觉模型看图结论（已注入对话上下文） */
+  visionBrief?: string
+  /** 可用的视觉模型（按能力排序），工具内部看图时使用 */
+  visionModels?: AiModelConfig[]
+  /** 工具内部调用模型产生的 tokens 计入本次对话费用 */
+  recordUsage?: (model: AiModelConfig, usage: TokenUsage | null, fallback?: { input: string; output: string }) => void
+  /** 长耗时工具向前端推送进度提示 */
+  notify?: (status: string) => void
 }
 
 export type ToolRunResult = {

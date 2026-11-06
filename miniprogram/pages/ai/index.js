@@ -74,6 +74,21 @@ function normalizeModel(m) {
   }
 }
 
+const KIND_TEXT = { 'floor-plan': '户型/点位图纸', 'quote-document': '报价单/清单截图', photo: '实景照片', rendering: '效果图', other: '图片' }
+
+/** 附件摘要：图纸显示识别数量与视觉复核进度，其他图片显示视觉判断的类型 */
+function uploadSummary(r) {
+  const kind = r.imageKind || 'floor-plan'
+  if (kind !== 'floor-plan') return '已识别为' + (KIND_TEXT[kind] || '图片') + ' · 发送后视觉看图'
+  const sw = r.detectedSwitchCount || 0
+  const lt = r.detectedLightCount || 0
+  const ar = r.detectedAreaCount || 0
+  const counts = sw || lt ? '开关 ' + sw + (lt ? ' · 灯具 ' + lt : '') + (ar ? ' · ' + ar + ' 个房间' : '') : '图纸已就绪（无默认点位）'
+  if (r.visionStatus === 'pending') return counts + ' · 视觉复核中'
+  if (r.visionStatus === 'done') return counts + ' · 已视觉复核'
+  return counts
+}
+
 Page({
   data: {
     messages: [],
@@ -256,10 +271,7 @@ Page({
       const sw = r.detectedSwitchCount || 0
       const lt = r.detectedLightCount || 0
       const ar = r.detectedAreaCount || 0
-      const summaryText =
-        sw || lt
-          ? '开关 ' + sw + (lt ? ' · 灯具 ' + lt : '') + (ar ? ' · ' + ar + ' 个房间' : '')
-          : '图纸已就绪（无默认点位）'
+      const summaryText = uploadSummary(r)
       this.setData({
         attachments: this.data.attachments.map((a) =>
           a.id === id
@@ -272,14 +284,41 @@ Page({
                 detectedSwitchCount: sw,
                 detectedLightCount: lt,
                 detectedAreaCount: ar,
+                imageKind: r.imageKind || 'floor-plan',
+                visionStatus: r.visionStatus || '',
                 summary: summaryText,
               })
             : a,
         ),
       })
+      if (r.visionStatus === 'pending' && r.mediaId) this.pollRecognition(id, r.mediaId, 0)
     } catch (e) {
       this.setData({ attachments: this.data.attachments.filter((a) => a.id !== id) })
     }
+  },
+  /** 轮询户型图视觉复核结果（每 3 秒，最多约 75 秒），完成后更新附件摘要 */
+  pollRecognition(attId, mediaId, round) {
+    if (round > 24) return
+    setTimeout(() => {
+      api
+        .get('/ai/upload', { mediaId }, { silent: true })
+        .then((d) => {
+          if (!d || d.status === 'pending') return this.pollRecognition(attId, mediaId, round + 1)
+          this.setData({
+            attachments: this.data.attachments.map((a) =>
+              a.id === attId
+                ? Object.assign({}, a, {
+                    visionStatus: d.status,
+                    detectedSwitchCount: d.detectedSwitchCount || 0,
+                    detectedLightCount: d.detectedLightCount || 0,
+                    summary: uploadSummary(Object.assign({}, d, { visionStatus: d.status, imageKind: d.imageKind || a.imageKind })),
+                  })
+                : a,
+            ),
+          })
+        })
+        .catch(() => this.pollRecognition(attId, mediaId, round + 1))
+    }, 3000)
   },
   removeAttachment(e) {
     this.setData({ attachments: this.data.attachments.filter((a) => a.id !== e.currentTarget.dataset.id) })
@@ -302,7 +341,12 @@ Page({
     if (this.data.attachments.some((a) => a.status === 'uploading')) return toast('图片还在上传')
     if (!this.data.aiReady) return toast('服务器还没有配置 AI 密钥')
     const names = ready.map((a) => a.name).join('、')
-    const prompt = text || '请将上传的户型图（' + names + '）添加到' + (this.data.project ? '当前项目' : '新项目') + '的点位图中。'
+    const allPlans = ready.every((a) => (a.imageKind || 'floor-plan') === 'floor-plan')
+    const prompt =
+      text ||
+      (allPlans
+        ? '请将上传的户型图（' + names + '）添加到' + (this.data.project ? '当前项目' : '新项目') + '的点位图中。'
+        : '请帮我看看上传的图片（' + names + '），说明图片内容并给出建议。')
     const now = Date.now()
     const userMsg = { id: 'u' + now, role: 'user', text: prompt, images: ready.map((a) => ({ url: a.preview || absUrl(a.url) })) }
     const reply = {
@@ -345,7 +389,9 @@ Page({
     const path = 'messages[' + idx + ']'
     const msg = this.data.messages[idx]
     if (!msg) return
-    if (ev.type === 'meta') {
+    if (ev.type === 'status') {
+      this.setData({ [path + '.status']: ev.text || '' })
+    } else if (ev.type === 'meta') {
       const metaPatch = { conversationId: ev.conversationId }
       if (ev.modelName) metaPatch[path + '.modelName'] = ev.modelName
       this.setData(metaPatch)
@@ -360,6 +406,7 @@ Page({
       this.flushSoon(path)
     } else if (ev.type === 'delta') {
       this.acc += ev.text || ''
+      if (msg.status) this.setData({ [path + '.status']: '' })
       this.flushSoon(path)
     } else if (ev.type === 'done') {
       this.flush(path)

@@ -28,8 +28,9 @@ import { QUOTE_STATUSES, type QuoteStatus } from '@/lib/quotes'
 import type { Project } from '@/payload-types'
 import { parsePointImport, planToElements, resolveDeviceType } from '@/plugins/ai-import/point-import'
 import { IMAGE_MODELS, generateImage } from '../image-generation'
+import { callVision, encodeImageForVision, extractJson, loadImageDataUrlForVision } from '../vision'
 
-import { getCachedDetectedBundle, redetectFloorPlanFromUrl } from '../upload-handler'
+import { awaitRecognition, getRecognitionStatus, IMAGE_KIND_LABEL, redetectFloorPlanFromUrl } from '../upload-handler'
 import { refreshContextProject, type AiToolHandler } from './context'
 
 const parseQuoteStatus = (v: unknown): QuoteStatus | null => {
@@ -224,28 +225,33 @@ export const coreToolHandlers: Record<string, AiToolHandler> = {
       const targetSheet =
         analyzed.sheets.find((s) => s.fileId === fileId || (s.url && s.url === url)) ??
         analyzed.sheets[analyzed.sheets.length - 1]
-      const importMode = args.importMode === 'all' ? 'all' : args.importMode === 'none' ? 'none' : 'switches'
-      let bundle = getCachedDetectedBundle(mediaId, url)
-      // 如果用户要求重新识别（redetect=true）或者缓存已失效，自动从图纸 URL 重新执行一次完整 CAD + 视觉模型识别
-      if (args.redetect === true || !bundle || (bundle.points.length === 0 && importMode !== 'none')) {
-        const freshBundle = await redetectFloorPlanFromUrl({ mediaId, url, sheetName: name })
+      const requestedMode = args.importMode === 'all' ? 'all' : args.importMode === 'none' ? 'none' : args.importMode === 'switches' ? 'switches' : null
+      // 上传后视觉复核在后台进行：落图前等待复核完成，保证写入的是「本地几何识别 + 视觉复核」后的结果
+      if (getRecognitionStatus(mediaId, url).status === 'pending') ctx.notify?.('正在等待视觉模型复核图纸点位…')
+      let bundle = await awaitRecognition(mediaId, url, 60_000)
+      if (bundle?.imageKind && bundle.imageKind !== 'floor-plan') {
+        return {
+          result: { error: `这张图片是「${IMAGE_KIND_LABEL[bundle.imageKind]}」，不是户型图纸，不能添加到点位图；请结合视觉识图结论直接回答用户` },
+          summary: '非户型图纸，未添加',
+        }
+      }
+      // 用户要求重新识别（redetect=true）或缓存已失效：从图纸重新执行一次完整识别（本地几何识别 + 视觉复核）
+      if (args.redetect === true || !bundle || (bundle.points.length === 0 && requestedMode !== 'none')) {
+        ctx.notify?.('正在重新识别图纸（本地几何识别 + 视觉复核）…')
+        const freshBundle = await redetectFloorPlanFromUrl({ mediaId, url, sheetName: name, userId: ctx.user.id })
         if (freshBundle) bundle = freshBundle
       }
+      // 未指定导入范围时：灯具布置图（或图上只有灯具）导入全部，其余默认只导入开关面板
+      const importMode: 'switches' | 'all' | 'none' =
+        requestedMode ?? (bundle?.vision?.drawingType === 'lighting-layout' || (!bundle?.switchPoints.length && (bundle?.lightPoints.length ?? 0) > 0) ? 'all' : 'switches')
       let rawPts = Array.isArray(args.detectedPoints) && args.detectedPoints.length > 0 ? (args.detectedPoints as Record<string, unknown>[]) : []
       if (importMode === 'none') {
         rawPts = []
       } else if (rawPts.length === 0) {
         if (bundle) {
-          rawPts =
-            importMode === 'switches' && bundle.switchPoints.length > 0
-              ? bundle.switchPoints
-              : bundle.points
-        } else if (mediaId) {
-          const mediaDoc = await payload.findByID({ collection: 'media', id: mediaId, depth: 0, overrideAccess: true }).catch(() => null)
-          const fromMedia = (mediaDoc as unknown as { aiDetectedPoints?: unknown } | null)?.aiDetectedPoints
-          if (Array.isArray(fromMedia) && fromMedia.length > 0) {
-            rawPts = fromMedia as Record<string, unknown>[]
-          }
+          rawPts = importMode === 'switches' ? bundle.switchPoints : [...bundle.switchPoints, ...bundle.lightPoints, ...bundle.points].filter(
+            (p, i, all) => all.findIndex((q) => q.type === p.type && Math.abs(q.x - p.x) < 0.004 && Math.abs(q.y - p.y) < 0.004) === i,
+          )
         }
       }
 
@@ -315,13 +321,18 @@ export const coreToolHandlers: Record<string, AiToolHandler> = {
           recognizedPoints: recognizedCount,
           recognizedAreas: createdAreas,
           detectedSummary: bundle?.summary ?? null,
+          recognition: bundle?.summary?.confirmText ?? null,
+          vision: bundle?.vision
+            ? { status: bundle.vision.status, model: bundle.vision.model, legend: bundle.vision.legend, annotatedCounts: bundle.vision.annotatedCounts, issues: bundle.vision.issues, stats: bundle.vision.stats }
+            : null,
+          localBeforeVision: bundle?.local ?? null,
           totalSheets: ctx.project?.sheets.length ?? 1,
           note: recognizedCount
             ? `已在图纸上生成 ${recognizedCount} 个点位（模式：${importMode === 'switches' ? '仅开关' : '全部'}）与 ${createdAreas} 个房间分区`
             : '图纸已添加（未检测到标准 CAD 点位符号，按规则保持 0 默认点位，可在画布手动放置或导入识别 JSON）',
         },
         summary: recognizedCount
-          ? `已添加图纸「${name}」（${recognizedCount} 个点位 · ${createdAreas} 个房间）`
+          ? `已添加图纸「${name}」（${recognizedCount} 个点位 · ${createdAreas} 个房间${bundle?.vision?.status === 'done' ? ' · 已视觉复核' : ''}）`
           : `已添加户型图「${name}」（无默认点位）`,
         href: `/projects/${ctx.projectId}/point-map`,
         hrefLabel: '查看点位图',
@@ -887,20 +898,51 @@ export const coreToolHandlers: Record<string, AiToolHandler> = {
       }
     },
   async generate_image(args, ctx) {
-      const prompt = typeof args.prompt === 'string' ? args.prompt.trim() : ''
-      if (!prompt) throw new Error('请提供图片描述')
-      if (prompt.length > 2000) throw new Error('图片描述最多 2000 字')
+      const userPrompt = typeof args.prompt === 'string' ? args.prompt.trim() : ''
+      if (!userPrompt) throw new Error('请提供图片描述')
+      if (userPrompt.length > 2000) throw new Error('图片描述最多 2000 字')
       const model = IMAGE_MODELS[0]
       const size = typeof args.size === 'string' && (model.sizes as readonly string[]).includes(args.size) ? args.size : model.sizes[0]
       const payload = await getPayloadClient()
       const fresh = await payload.findByID({ collection: 'users', id: ctx.user.id, depth: 0, overrideAccess: true, select: { aiCredits: true } })
       if ((fresh.aiCredits ?? 0) < model.cost) throw new Error(`积分不足，本模型需要 ${model.cost} 积分`)
-      const image = await generateImage({ prompt, model: model.id as never, size, userId: ctx.user.id })
+
+      // 有参考图时：先由视觉模型理解参考图（空间、构图、风格），再写成生图提示词
+      const wantsReference =
+        (ctx.images?.length ?? 0) > 0 && (args.useAttachedImage === true || (args.useAttachedImage !== false && /参考|这张|上传的|按照这|根据这|照着|基于/.test(userPrompt)))
+      const reference = wantsReference ? ctx.images![0] : null
+      let finalPrompt = userPrompt
+      let referenceNote: string | null = null
+      if (reference && ctx.visionModels?.length) {
+        ctx.notify?.('视觉模型正在理解参考图…')
+        const res = await callVision({
+          images: [reference.dataUrl],
+          system: '你是室内设计与 AI 绘图提示词专家，只描述参考图里能确认的内容。',
+          prompt: [
+            `用户想参考这张图生成图片，需求：「${userPrompt}」。`,
+            '先理解参考图（空间类型、布局与构图、视角、风格、材质色调、灯光、关键家具与智能设备）；若参考图是户型平面图，则把它理解为对应户型的室内空间。',
+            '再写一段给文生图模型的中文提示词（220 字以内）：保留参考图的空间布局与视角，融入用户需求，写清风格、材质、光线与镜头，不要出现文字水印。',
+            '只返回 JSON：{"prompt":"...","reference":"一句话概括参考图"}',
+          ].join('\n'),
+          models: ctx.visionModels,
+          maxTokens: 800,
+          timeoutMs: 45_000,
+        })
+        if (res) {
+          ctx.recordUsage?.(res.model, res.usage, { input: userPrompt, output: res.text })
+          const parsed = extractJson<{ prompt?: string; reference?: string }>(res.text)
+          if (parsed?.prompt?.trim()) finalPrompt = parsed.prompt.trim().slice(0, 1800)
+          referenceNote = parsed?.reference?.trim() || null
+        }
+      }
+
+      ctx.notify?.('正在生成图片…')
+      const image = await generateImage({ prompt: finalPrompt, model: model.id as never, size, userId: ctx.user.id, referenceImage: reference?.dataUrl ?? null })
       let balance: number | null = null
       try {
         const entry = await payload.create({
           collection: 'ai-credit-ledger',
-          data: { user: ctx.user.id, delta: -model.cost, reason: `AI 生图 · ${model.name} · ${prompt.slice(0, 40)}` },
+          data: { user: ctx.user.id, delta: -model.cost, reason: `AI 生图 · ${model.name} · ${userPrompt.slice(0, 40)}` },
           overrideAccess: true,
           depth: 0,
         })
@@ -908,12 +950,200 @@ export const coreToolHandlers: Record<string, AiToolHandler> = {
       } catch {
         // 图片已生成，扣费失败不影响返回
       }
+
+      // 生成后由视觉模型质检：画面是否符合需求、有无畸形与乱码文字
+      let qa: { score?: number; caption?: string; issues?: string[] } | null = null
+      if (ctx.visionModels?.length) {
+        ctx.notify?.('视觉模型正在质检生成结果…')
+        const generated = await encodeImageForVision(image.buffer, { maxSide: 1024, quality: 82 }).catch(() => null)
+        const res = generated
+          ? await callVision({
+              images: [generated],
+              prompt: `请对照需求检查这张 AI 生成的图片。需求：「${userPrompt}」。只返回 JSON：{"score":0到10的整数,"caption":"30字以内描述画面","issues":["与需求不符或明显瑕疵（畸形、乱码文字、透视错误等），没有则为空数组"]}`,
+              models: ctx.visionModels,
+              maxTokens: 400,
+              timeoutMs: 40_000,
+            })
+          : null
+        if (res) {
+          ctx.recordUsage?.(res.model, res.usage, { input: userPrompt, output: res.text })
+          const parsed = extractJson<{ score?: unknown; caption?: unknown; issues?: unknown }>(res.text)
+          if (parsed) {
+            const score = Math.round(Number(parsed.score))
+            qa = {
+              score: Number.isFinite(score) ? Math.min(10, Math.max(0, score)) : undefined,
+              caption: typeof parsed.caption === 'string' ? parsed.caption.slice(0, 60) : undefined,
+              issues: Array.isArray(parsed.issues) ? parsed.issues.filter((x): x is string => typeof x === 'string').slice(0, 5) : [],
+            }
+          }
+        }
+      }
       return {
-        result: { ...image, cost: model.cost, balance },
-        summary: `已生成图片（${model.cost} 积分${balance != null ? `，余额 ${balance}` : ''}）`,
+        result: {
+          mediaId: image.mediaId,
+          url: image.url,
+          width: image.width,
+          height: image.height,
+          model: image.model,
+          cost: model.cost,
+          balance,
+          promptUsed: finalPrompt,
+          referenceUsed: Boolean(reference),
+          referenceSummary: referenceNote,
+          visionQa: qa,
+          tip: qa && (qa.score ?? 10) < 7 ? '视觉质检分偏低，建议向用户说明问题并提供重新生成的选项' : undefined,
+        },
+        summary: `已生成图片（${model.cost} 积分${reference ? ' · 参考上传图片' : ''}${qa?.score != null ? ` · 视觉质检 ${qa.score}/10` : ''}${balance != null ? ` · 余额 ${balance}` : ''}）`,
         href: image.url,
         hrefLabel: '查看图片',
         imageUrl: image.url,
+      }
+    },
+  async plan_points_with_vision(args, ctx) {
+      if (!ctx.projectId) return { result: { error: '没有关联项目，请先新建或关联项目' }, summary: '未关联项目' }
+      if (!ctx.visionModels?.length) return { result: { error: '后台尚未启用视觉模型，无法看图规划点位' }, summary: '未配置视觉模型' }
+      const payload = await getPayloadClient()
+      const project = await payload
+        .findByID({ collection: 'projects', id: ctx.projectId, depth: 0, user: ctx.user, overrideAccess: false, select: { name: true, status: true, pointMap: true } })
+        .catch(() => null)
+      if (!project) return { result: { error: '项目不存在或无权限' }, summary: '项目不可用' }
+      if (project.status === 'archived') return { result: { error: '项目已归档，无法修改点位图' }, summary: '项目已归档' }
+
+      const norm = normalizeScene(project.pointMap as Partial<StoredScene> | null)
+      let elements = [...norm.elements]
+      const files = { ...norm.files }
+      let analyzed = analyzeScene({ elements, files })
+      const sheetFilter = typeof args.sheetName === 'string' ? args.sheetName.trim() : ''
+      const sheets = analyzed.sheets
+        .filter((s) => s.fileId !== 'blank-sheet' && s.url)
+        .filter((s) => !sheetFilter || s.name.includes(sheetFilter))
+        .slice(0, 3)
+      if (!sheets.length) return { result: { error: '当前项目还没有上传户型图纸，请先上传户型图' }, summary: '缺少户型图纸' }
+
+      const DEFAULT_TYPES = ['ap-node', 'ceiling-ap', 'network-panel', 'curtain-track', 'gateway', 'vrf-controller', 'motion-sensor', 'speaker', 'touch-panel', 'camera', 'contact-sensor', 'water-sensor', 'smoke-sensor']
+      const EXTRA_TYPES = ['temp-sensor', 'doorbell', 'smart-lock', 'ac-router']
+      const requested = Array.isArray(args.deviceTypes) ? args.deviceTypes.map((t) => resolveDeviceType(t) ?? (isDeviceType(t) ? String(t) : '')).filter(Boolean) : []
+      const allowed = new Set((requested.length ? requested : DEFAULT_TYPES).filter((t) => [...DEFAULT_TYPES, ...EXTRA_TYPES].includes(t) && !isDrawingOnlyType(t)))
+      if (!allowed.size) return { result: { error: '开关、插座、灯具只能照图识别，不能由 AI 规划；请指定 AP、窗帘、传感器、摄像头等智能设备' }, summary: '设备类型不可规划' }
+      const roomFilter = Array.isArray(args.rooms) ? args.rooms.filter((r): r is string => typeof r === 'string' && Boolean(r.trim())).map((r) => r.trim()) : []
+      const requirements = typeof args.requirements === 'string' ? args.requirements.trim().slice(0, 500) : ''
+      const replacePlanned = args.replacePlanned !== false
+
+      // 先移除之前由本工具规划的点位（同组的代号文字一起移除），再重新规划
+      if (replacePlanned) {
+        const sheetIds = new Set(sheets.map((s) => s.id))
+        const plannedGroups = new Set<string>()
+        for (const p of analyzed.points) {
+          if (!p.sheetId || !sheetIds.has(p.sheetId)) continue
+          const el = elements.find((e) => e.id === p.id)
+          if (el?.customData?.aiPlanned === true) for (const g of el.groupIds ?? []) plannedGroups.add(g)
+        }
+        if (plannedGroups.size) {
+          elements = elements.filter((e) => !(e.groupIds ?? []).some((g) => plannedGroups.has(g)))
+          analyzed = analyzeScene({ elements, files })
+        }
+      }
+
+      const typeName = (t: string) => deviceTypeOf(t)?.name ?? t
+      const usedCodes = new Set(analyzed.points.map((p) => p.code).filter(Boolean))
+      const created: { deviceType: string; room: string; reason: string; sheet: string }[] = []
+      const notes: string[] = []
+      const cameraCap = /摄像|监控/.test(requirements) ? 8 : CAMERA_PER_FLOOR
+      // 智能音箱默认只放客厅和书房；客户明确提出音箱需求时按要求放
+      const speakerAnywhere = /音箱|音响|背景音乐/.test(requirements)
+
+      for (const sheet of sheets) {
+        ctx.notify?.(`视觉模型正在看图规划「${sheet.name}」的智能设备点位…`)
+        const dataUrl = await loadImageDataUrlForVision({ url: sheet.url }, 2048)
+        if (!dataUrl) {
+          notes.push(`「${sheet.name}」图纸读取失败，已跳过`)
+          continue
+        }
+        const sheetAreas = analyzed.areas.filter((a) => a.sheetId === sheet.id)
+        const rel = (v: number, o: number, len: number) => Math.round(((v - o) / len) * 1000) / 1000
+        const areaList = sheetAreas.map((a) => ({ name: a.name, type: a.areaType, rect: [rel(a.x, sheet.x, sheet.width), rel(a.y, sheet.y, sheet.height), Math.round((a.width / sheet.width) * 1000) / 1000, Math.round((a.height / sheet.height) * 1000) / 1000] }))
+        const sheetPoints = analyzed.points.filter((p) => p.sheetId === sheet.id && p.rx != null && p.ry != null)
+        const areaName = (id: string | null) => sheetAreas.find((a) => a.id === id)?.name ?? null
+        const pointList = sheetPoints.slice(0, 160).map((p) => ({ type: p.deviceType, x: p.rx, y: p.ry, room: areaName(p.areaId) }))
+        const res = await callVision({
+          images: [dataUrl],
+          system: '你是资深全屋智能方案设计师，熟悉弱电与智能设备的安装位置规范。只依据图纸能确认的空间布局规划，严格输出 JSON。',
+          prompt: [
+            `这是项目「${project.name}」的图纸「${sheet.name}」，坐标为 0~1 归一化（左上角 (0,0)，右下角 (1,1)）。`,
+            `已有房间：${areaList.length ? JSON.stringify(areaList) : '（图纸上还没有画房间区域，请根据图纸自行判断房间）'}`,
+            `已有点位：${pointList.length ? JSON.stringify(pointList) : '（暂无）'}`,
+            `平台设计规范：${DESIGN_RULE_TEXT}`,
+            `本次只规划这些设备类型：${[...allowed].map((t) => `${t}（${typeName(t)}）`).join('、')}。`,
+            roomFilter.length ? `只规划这些房间：${roomFilter.join('、')}。` : '规划范围：整张图纸。',
+            requirements ? `客户额外要求：${requirements}` : '',
+            '安装位置常识：AP/吸顶 AP 放在客厅、走廊、卧室等区域顶面开阔处，保证全屋覆盖且不重复；网络面板靠电视墙或书桌墙面；窗帘电轨沿窗户内侧；人体传感器在玄关、走廊、卫生间入口或吊顶中部；门磁在入户门与外窗；水浸在厨房水槽下、卫生间地漏旁；烟感在厨房顶面；摄像头在入户门口与客厅角落；中控屏在入户或客厅开关旁；智能音箱在客厅或书房；VRF 控制器在客厅墙面；网关在客厅电视柜或弱电箱附近。已有同类点位的房间不要重复规划。',
+            '只返回 JSON：{"placements":[{"deviceType":"ap-node","x":0.452,"y":0.318,"room":"客厅","reason":"一句理由"}],"notes":"60 字以内的整体说明"}',
+          ]
+            .filter(Boolean)
+            .join('\n'),
+          models: ctx.visionModels,
+          maxTokens: 3000,
+          timeoutMs: 75_000,
+        })
+        if (!res) {
+          notes.push(`「${sheet.name}」视觉模型暂时不可用，未规划`)
+          continue
+        }
+        ctx.recordUsage?.(res.model, res.usage, { input: sheet.name, output: res.text })
+        const parsed = extractJson<{ placements?: Array<Record<string, unknown>>; notes?: unknown }>(res.text)
+        if (typeof parsed?.notes === 'string' && parsed.notes.trim()) notes.push(`「${sheet.name}」${parsed.notes.trim().slice(0, 120)}`)
+        const hasSwitch = sheetPoints.some((p) => p.deviceType.startsWith('switch-'))
+        const placed: { type: string; x: number; y: number; area: string | null }[] = sheetPoints.map((p) => ({ type: p.deviceType, x: p.rx!, y: p.ry!, area: p.areaId }))
+        const areaAt = (x: number, y: number) => sheetAreas.find((a) => {
+          const ax = (a.x - sheet.x) / sheet.width
+          const ay = (a.y - sheet.y) / sheet.height
+          return x >= ax && x <= ax + a.width / sheet.width && y >= ay && y <= ay + a.height / sheet.height
+        }) ?? null
+        for (const raw of (parsed?.placements ?? []).slice(0, 60)) {
+          const t = resolveDeviceType(raw.deviceType) ?? (isDeviceType(raw.deviceType) ? String(raw.deviceType) : '')
+          const x = Number(raw.x)
+          const y = Number(raw.y)
+          if (!t || !allowed.has(t) || !Number.isFinite(x) || !Number.isFinite(y) || x < 0.02 || x > 0.98 || y < 0.02 || y > 0.98) continue
+          const area = areaAt(x, y)
+          const roomName = (area?.name ?? (typeof raw.room === 'string' ? raw.room.trim().slice(0, 20) : '')) || '公共区域'
+          if (roomFilter.length && !roomFilter.some((r) => roomName.includes(r) || r.includes(roomName))) continue
+          if (NEEDS_SWITCH_TYPES.has(t) && !hasSwitch) continue
+          if (t === 'speaker' && !speakerAnywhere && !isSpeakerArea(area?.areaType, roomName)) continue
+          if (ONE_PER_AREA_TYPES.has(t) && area && placed.some((p) => p.area === area.id && ONE_PER_AREA_TYPES.has(p.type))) continue
+          if (t === 'vrf-controller' && placed.filter((p) => p.type === t).length >= VRF_PER_FLOOR) continue
+          if (t === 'camera' && placed.filter((p) => p.type === t).length >= cameraCap) continue
+          if (t === 'gateway' && placed.some((p) => p.type === t)) continue
+          if (placed.some((p) => p.type === t && Math.hypot(p.x - x, p.y - y) < 0.03)) continue
+          const code = nextPointCode(t, usedCodes)
+          usedCodes.add(code)
+          const [marker, label] = buildPointElements({ deviceType: t, cx: sheet.x + x * sheet.width, cy: sheet.y + y * sheet.height, code })
+          marker.customData = { ...(marker.customData ?? {}), aiPlanned: true }
+          elements.push(marker, label)
+          placed.push({ type: t, x, y, area: area?.id ?? null })
+          created.push({ deviceType: t, room: roomName, reason: typeof raw.reason === 'string' ? raw.reason.slice(0, 60) : '', sheet: sheet.name })
+        }
+      }
+
+      if (created.length) {
+        const compacted = compactScene(elements, files, norm.appState)
+        await payload.update({ collection: 'projects', id: ctx.projectId, data: { pointMap: compacted as never }, user: ctx.user, overrideAccess: false, depth: 0 })
+        ctx.mutated = true
+        await refreshContextProject(ctx, ctx.projectId)
+      }
+      const byType = new Map<string, number>()
+      for (const c of created) byType.set(c.deviceType, (byType.get(c.deviceType) ?? 0) + 1)
+      const typeText = [...byType].map(([t, n]) => `${typeName(t)}×${n}`).join('、')
+      return {
+        result: {
+          created: created.length,
+          byType: Object.fromEntries(byType),
+          placements: created,
+          notes,
+          rulesApplied: '开关/插座/灯具不规划；中控屏需有开关点位；音箱与中控屏每区域只放一种；VRF 每层 1 个；摄像头默认每层 2 个',
+        },
+        summary: created.length ? `视觉布点完成：新增 ${created.length} 个点位（${typeText}）` : '视觉布点未新增点位（已有点位已满足或图纸无法判断）',
+        href: `/projects/${ctx.projectId}/point-map`,
+        hrefLabel: '查看点位图',
       }
     },
 }

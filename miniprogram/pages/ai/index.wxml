@@ -76,7 +76,8 @@
           <view wx:if="{{!item.reasoningCollapsed}}" class="reasoning-body">{{item.reasoning}}</view>
         </view>
         <rich-text wx:if="{{item.html}}" class="answer {{item.error ? 'error' : ''}}" nodes="{{item.html}}" user-select />
-        <view wx:if="{{item.pending && !item.html && !item.reasoning}}" class="small muted thinking">{{item.tools.length ? '正在继续处理…' : '思考中…'}}</view>
+        <view wx:if="{{item.pending && !item.html && !item.reasoning}}" class="small muted thinking">{{item.status || (item.tools.length ? '正在继续处理…' : '思考中…')}}</view>
+        <view wx:elif="{{item.pending && item.status}}" class="small muted thinking">{{item.status}}</view>
         <view wx:if="{{!item.pending && item.text}}" class="row gap-16 msg-actions">
           <text class="small muted" data-index="{{index}}" bindtap="copy">复制</text>
           <text wx:if="{{item.cost}}" class="small muted">消耗 {{item.cost}} 积分</text>

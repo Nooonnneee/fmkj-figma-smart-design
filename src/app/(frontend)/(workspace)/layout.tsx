@@ -6,6 +6,7 @@ import { appAuth } from '@/lib/app-auth'
 import { getCompanyInfo } from '@/lib/cached-data'
 import { resolveMembership } from '@/lib/membership'
 import { getPayloadClient } from '@/lib/payload'
+import { isPlatformOperator } from '@/lib/platform-operator'
 import { PLUGINS } from '@/plugins'
 import { aiConfigured } from '@/plugins/ai-copilot/server'
 import { enabledAiModels } from '@/plugins/ai-copilot/templates'
@@ -16,7 +17,7 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
   const user = await appAuth.getCurrentUser()
   if (!user) return redirectToLogin()
   const payload = await getPayloadClient()
-  const [company, projectsRes] = await Promise.all([
+  const [company, projectsRes, operator] = await Promise.all([
     getCompanyInfo(user.id),
     payload
       .find({
@@ -30,6 +31,7 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
         select: { name: true, customerName: true, platform: true, pointCount: true },
       })
       .catch(() => ({ docs: [] })),
+    isPlatformOperator(user),
   ])
 
   const disabled = new Set(company.disabledPlugins)
@@ -61,6 +63,7 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
         plugins={plugins}
         projects={projects}
         ai={{ credits: user.aiCredits ?? 0, configured: aiConfigured(activeAiModels), models: activeAiModels }}
+        showOperatorReports={operator}
       />
       <SidebarInset>
         <SiteHeader />

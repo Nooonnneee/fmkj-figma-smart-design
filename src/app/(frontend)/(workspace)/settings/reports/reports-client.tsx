@@ -49,6 +49,10 @@ function methodLabel(m?: string) {
       return { text: 'DXF 矢量提取', cls: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' }
     case 'vision-snap':
       return { text: '视觉模型 + 磁吸', cls: 'border-primary/30 bg-primary/10 text-primary' }
+    case 'vision-fusion':
+      return { text: '本地识别 + 视觉复核', cls: 'border-primary/30 bg-primary/10 text-primary' }
+    case 'non-plan':
+      return { text: '非图纸图片（仅看图）', cls: 'border-border bg-muted/60 text-muted-foreground' }
     case 'cad-color':
       return { text: 'CAD 彩色图层', cls: 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-400' }
     case 'cad-bw':

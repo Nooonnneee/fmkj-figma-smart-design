@@ -33,29 +33,41 @@ export async function generateImage(opts: {
   model: ImageModelId
   size?: string
   userId: string | number
-}): Promise<{ mediaId: string; url: string; width: number; height: number; model: ImageModelId }> {
+  /** 参考图（data URL）：支持图生图的模型会参考它的构图与空间；不支持时自动退回纯文生图 */
+  referenceImage?: string | null
+}): Promise<{ mediaId: string; url: string; width: number; height: number; model: ImageModelId; buffer: Buffer; usedReference: boolean }> {
   const key = process.env.AI_BAILIAN_TOKEN_PLAN_KEY?.trim()
   if (!key) throw new ImageGenerationError('服务器尚未配置 AI_BAILIAN_TOKEN_PLAN_KEY')
   const model = IMAGE_MODELS.find((m) => m.id === opts.model)
   if (!model) throw new ImageGenerationError('不支持的图像模型')
   const size = opts.size && (model.sizes as readonly string[]).includes(opts.size) ? opts.size : model.sizes[0]
 
-  let res: Response
-  try {
-    res = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: opts.model,
-        input: { messages: [{ role: 'user', content: [{ text: opts.prompt }] }] },
-        parameters: { n: 1, size, watermark: false, prompt_extend: true },
-      }),
-      signal: AbortSignal.timeout(300_000),
-    })
-  } catch (error) {
-    throw new ImageGenerationError(`生图请求失败：${(error as Error).message || '网络错误'}`)
+  const request = async (withReference: boolean) => {
+    const content: Record<string, string>[] = withReference && opts.referenceImage ? [{ image: opts.referenceImage }, { text: opts.prompt }] : [{ text: opts.prompt }]
+    try {
+      return await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: opts.model,
+          input: { messages: [{ role: 'user', content }] },
+          parameters: { n: 1, size, watermark: false, prompt_extend: true },
+        }),
+        signal: AbortSignal.timeout(300_000),
+      })
+    } catch (error) {
+      throw new ImageGenerationError(`生图请求失败：${(error as Error).message || '网络错误'}`)
+    }
   }
-  const raw = await res.text()
+  let usedReference = Boolean(opts.referenceImage)
+  let res = await request(usedReference)
+  let raw = await res.text()
+  if (!res.ok && usedReference && res.status >= 400 && res.status < 500) {
+    // 模型不支持参考图输入：改为纯文生图（提示词已由视觉模型根据参考图写好）
+    usedReference = false
+    res = await request(false)
+    raw = await res.text()
+  }
   if (!res.ok) throw new ImageGenerationError(`生图接口返回 ${res.status}：${raw.slice(0, 300)}`)
   let data: {
     output?: { choices?: { message?: { content?: { type?: string; image?: string }[] } }[] }
@@ -97,5 +109,7 @@ export async function generateImage(opts: {
     width: data.usage?.output_width ?? 0,
     height: data.usage?.output_height ?? 0,
     model: opts.model,
+    buffer,
+    usedReference,
   }
 }

@@ -124,10 +124,10 @@ export type AiModelConfig = AiModelOption & {
 
 export function inferModelTier(apiModel: string, reasoning?: boolean, cost?: number): { minTier: 'free' | 'pro' | 'team'; tierBadge: 'Go' | 'Plus' | 'Pro' } {
   const m = apiModel.toLowerCase()
-  if (reasoning || /reasoner|deepseek-r1|\br1\b|qwq|qvq|thinking|glm-zero|qwen-?3\.8|glm-?5\.3(?!.*flash)/i.test(m) || (cost ?? 1) >= 3) {
+  if (reasoning || /reasoner|deepseek-r1|\br1\b|qwq|qvq|thinking|glm-zero|qwen-?3\.8(?!.*flash)|glm-?5\.3(?!.*flash)/i.test(m) || (cost ?? 1) >= 3) {
     return { minTier: 'team', tierBadge: 'Pro' }
   }
-  if (/vl|vision|qwen-max|qwen-?3\.[567]|glm-4v|glm-4-plus|glm-?5\.3.*flash|kimi|moonshot-v1-128k|doubao-1-5-vision/i.test(m) || (cost ?? 1) === 2) {
+  if (/vl|vision|qwen-max|qwen-?3\.[5678]|glm-4v|glm-4-plus|glm-?5\.3.*flash|kimi|moonshot-v1-128k|doubao-1-5-vision/i.test(m) || (cost ?? 1) === 2) {
     return { minTier: 'pro', tierBadge: 'Plus' }
   }
   return { minTier: 'free', tierBadge: 'Go' }
@@ -284,6 +284,20 @@ export const AI_PROVIDER_PRESETS: Omit<AiModelConfig, 'id' | 'enabled' | 'isDefa
     cost: 2,
     description: '千问 3.7 增强版多模态模型，适合非标黑白 CAD 开关图识别与多步工程工具编排',
     apiModel: 'qwen-3.7',
+    baseUrl: AI_PROVIDER_CHANNELS.dashscope.baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS.dashscope.apiKeyEnv,
+    minTier: 'pro',
+    tierBadge: 'Plus',
+    reasoning: false,
+  },
+  {
+    name: '通义千问 Qwen-3.8-Flash（高速视觉与多模态）',
+    provider: AI_PROVIDER_CHANNELS.dashscope.label,
+    channelId: 'dashscope',
+    tag: 'Plus 专属 · 极速图纸视觉识别',
+    cost: 2,
+    description: '千问 3.8 Flash 高速多模态模型，首包快、吞吐高，适合户型图点位识别与日常看图问答',
+    apiModel: 'qwen3.8-flash',
     baseUrl: AI_PROVIDER_CHANNELS.dashscope.baseUrl,
     apiKeyEnv: AI_PROVIDER_CHANNELS.dashscope.apiKeyEnv,
     minTier: 'pro',

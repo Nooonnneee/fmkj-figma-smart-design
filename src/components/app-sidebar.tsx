@@ -107,6 +107,7 @@ export function AppSidebar({
   plugins,
   projects,
   ai,
+  showOperatorReports = false,
 }: {
   user: SidebarUser
   brand: SidebarBrand
@@ -114,6 +115,8 @@ export function AppSidebar({
   /** 只给 AI 对话面板提供项目上下文；侧栏本身不再列出最近项目 */
   projects: AiProjectContext[]
   ai: { credits: number; configured: boolean; models?: AiModelOption[] }
+  /** 跨客户的使用报告只对平台运营人员显示入口 */
+  showOperatorReports?: boolean
 }) {
   const pathname = usePathname()
   const { state, isMobile, setOpen, widthPx } = useSidebar()
@@ -125,7 +128,8 @@ export function AppSidebar({
   const effectiveMode = aiCopilotEnabled && state === "expanded" ? mode : "nav"
   const isActive = (url: string) => pathname === url || pathname.startsWith(`${url}/`)
   const collapsed = state === "collapsed" && !isMobile
-  const inSettings = settingsNav.some((item) => isActive(item.url))
+  const visibleSettingsNav = settingsNav.filter((item) => showOperatorReports || item.url !== "/settings/reports")
+  const inSettings = visibleSettingsNav.some((item) => isActive(item.url))
 
   async function handleLogout() {
     if (isLoggingOut) return
@@ -311,7 +315,7 @@ export function AppSidebar({
                   <TooltipContent side={collapsed ? "right" : "top"}>设置</TooltipContent>
                 </Tooltip>
                 <DropdownMenuContent side="top" align={collapsed ? "start" : "end"} sideOffset={8} className="w-52">
-                  {settingsNav.map(({ icon: Icon, label, url }) => (
+                  {visibleSettingsNav.map(({ icon: Icon, label, url }) => (
                     <DropdownMenuItem key={url} asChild className={cn(isActive(url) && "bg-accent/60 font-medium")}>
                       <GuardedLink href={url} aria-current={isActive(url) ? "page" : undefined}>
                         <Icon />

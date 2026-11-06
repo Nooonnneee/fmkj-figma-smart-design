@@ -200,8 +200,8 @@ export async function bindOpenid(userId: string, openid: string, unionid: string
     ? await payload.update({ collection: 'wechat-accounts', id: existing.id, data, overrideAccess: true, depth: 0 })
     : await payload.create({ collection: 'wechat-accounts', data: { openid, ...data }, overrideAccess: true, depth: 0 })
 
-  // 绑定微信成功后，自动发放「绑定微信小程序」+10 积分奖励（按 userId 幂等，每个账号限领一次）
-  await grantTaskCreditIfEligible(userId, 'bind_wechat').catch(() => null)
+  // 绑定微信成功后，自动发放「绑定微信小程序」+10 积分奖励（按 userId 幂等，每个账号限领一次；同一微信号换绑其他账号不再重复发放）
+  await grantTaskCreditIfEligible(userId, 'bind_wechat', { openid }).catch(() => null)
   return record
 }
 

@@ -105,11 +105,15 @@ export class UsageMeter {
 
   /** 本次应扣积分（整数，最少 1）。传入模型价格时按真实成本计费，也兼容直接传倍率数字。 */
   credits(modelOrMultiplier: PricedModel | number, at: Date = new Date()): number {
+    return Math.max(1, Math.ceil(this.tokenCredits(modelOrMultiplier, at) + this.toolCost() - 1e-9))
+  }
+
+  /** 仅 tokens 部分折算的积分（未取整、不含工具费），多模型合计时使用。 */
+  tokenCredits(modelOrMultiplier: PricedModel | number, at: Date = new Date()): number {
     const model: PricedModel = typeof modelOrMultiplier === 'number' ? { cost: modelOrMultiplier } : modelOrMultiplier
     const multiplier = Number.isFinite(model?.cost) && Number(model.cost) > 0 ? Number(model.cost) : 1
     const pricing = model?.pricing
     const hasPricing = Boolean(pricing && (pricing.peak.input > 0 || pricing.peak.output > 0))
-    let tokenCredits: number
     if (hasPricing && pricing) {
       const price = isPeakTime(at) ? pricing.peak : pricing.offPeak
       const missInput = Math.max(0, this.inputTokens - this.cachedInputTokens)
@@ -117,12 +121,10 @@ export class UsageMeter {
         (missInput / 1_000_000) * Math.max(0, price.input) +
         (this.cachedInputTokens / 1_000_000) * Math.max(0, price.cachedInput) +
         (this.outputTokens / 1_000_000) * Math.max(0, price.output)
-      tokenCredits = multiplier * (costCny / CREDIT_VALUE_CNY)
-    } else {
-      // 旧公式：模型未配置价格时的兼容路径
-      tokenCredits = multiplier * ((this.inputTokens / 1000) * INPUT_PER_1K + (this.outputTokens / 1000) * OUTPUT_PER_1K)
+      return multiplier * (costCny / CREDIT_VALUE_CNY)
     }
-    return Math.max(1, Math.ceil(tokenCredits + this.toolCost() - 1e-9))
+    // 旧公式：模型未配置价格时的兼容路径
+    return multiplier * ((this.inputTokens / 1000) * INPUT_PER_1K + (this.outputTokens / 1000) * OUTPUT_PER_1K)
   }
 
   summary() {
@@ -137,4 +139,53 @@ export function estimateTokens(text: string) {
   if (!text) return 0
   const cjk = (text.match(/[\u3400-\u9fff\uf900-\ufaff]/g) ?? []).length
   return Math.ceil(cjk * 0.7 + (text.length - cjk) / 4)
+}
+
+type LedgerModel = PricedModel & { id: string; name?: string }
+
+/**
+ * 一次对话里可能先后用到多个模型（Auto 路由、视觉看图、失败自动切换），按每个模型各自的真实价格分别计费后合计。
+ */
+export class UsageLedger {
+  private meters = new Map<string, { model: LedgerModel; meter: UsageMeter }>()
+  readonly tools: string[] = []
+
+  add(model: LedgerModel, usage: TokenUsage | null | undefined, fallback?: { input: string; output: string }) {
+    let entry = this.meters.get(model.id)
+    if (!entry) {
+      entry = { model, meter: new UsageMeter() }
+      this.meters.set(model.id, entry)
+    }
+    entry.meter.add(usage, fallback)
+  }
+
+  tool(name: string) {
+    this.tools.push(name)
+  }
+
+  get inputTokens() {
+    return [...this.meters.values()].reduce((s, e) => s + e.meter.inputTokens, 0)
+  }
+
+  get outputTokens() {
+    return [...this.meters.values()].reduce((s, e) => s + e.meter.outputTokens, 0)
+  }
+
+  get estimated() {
+    return [...this.meters.values()].reduce((s, e) => s + e.meter.estimated, 0)
+  }
+
+  credits(at: Date = new Date()): number {
+    let tokens = 0
+    for (const { model, meter } of this.meters.values()) tokens += meter.tokenCredits(model, at)
+    const toolCost = this.tools.reduce((s, n) => s + (TOOL_COSTS[n] ?? DEFAULT_TOOL_COST), 0)
+    return Math.max(1, Math.ceil(tokens + toolCost - 1e-9))
+  }
+
+  summary() {
+    const models = [...this.meters.values()].map((e) => e.model.name ?? e.model.id)
+    const t = this.tools.length ? ` · 工具 ${this.tools.length} 次` : ''
+    const m = models.length > 1 ? ` · ${models.length} 个模型协作` : ''
+    return `输入 ${this.inputTokens.toLocaleString('en-US')} / 输出 ${this.outputTokens.toLocaleString('en-US')} tokens${t}${m}${this.estimated ? '（部分估算）' : ''}`
+  }
 }
