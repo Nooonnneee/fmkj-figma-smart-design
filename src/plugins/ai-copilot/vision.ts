@@ -16,7 +16,12 @@ import type { TokenUsage } from './billing'
 import { resolveModelEndpoint } from './server'
 import { enabledAiModels, isVisionCapableModel, type AiModelConfig } from './templates'
 
-export type VisionCallResult = { text: string; usage: TokenUsage | null; model: AiModelConfig; durationMs: number }
+export type VisionCallResult = {
+  text: string
+  usage: TokenUsage | null
+  model: AiModelConfig
+  durationMs: number
+}
 
 const modelText = (m: AiModelConfig) => `${m.id} ${m.apiModel} ${m.name}`.toLowerCase()
 
@@ -24,6 +29,7 @@ const modelText = (m: AiModelConfig) => `${m.id} ${m.apiModel} ${m.name}`.toLowe
 export function visionScore(m: AiModelConfig): number {
   const s = modelText(m)
   if (!isVisionCapableModel(s)) return -1
+  if (/qwen-?3\.7-plus/.test(s)) return 300
   if (/qwen-?3\.8(?!.*flash)/.test(s)) return 100
   if (/qwen-?3\.8.*flash/.test(s)) return 98
   if (/glm-?5\.3(?!.*flash)/.test(s)) return 96
@@ -36,28 +42,37 @@ export function visionScore(m: AiModelConfig): number {
   return 70
 }
 
-export const isReasoningOnlyModel = (m: AiModelConfig) => Boolean(m.reasoning) || /reasoner|deepseek-r1|\br1\b|qwq|qvq|thinking/.test(modelText(m))
+export const isReasoningOnlyModel = (m: AiModelConfig) =>
+  Boolean(m.reasoning) || /reasoner|deepseek-r1|\br1\b|qwq|qvq|thinking/.test(modelText(m))
 
 /**
  * 可用的视觉模型（已启用、可识图、已配置密钥），按能力从高到低。
  * 带图片的任务必须走视觉模型：会员档位允许的优先；档位内没有时仍由平台最强的视觉模型代为看图。
  */
-export function rankVisionModels(models: AiModelConfig[], opts: { canAccessModel?: (m: AiModelConfig) => boolean } = {}): AiModelConfig[] {
-  const usable = enabledAiModels(models, { includeAuto: false }).filter((m) => visionScore(m) > 0 && Boolean(resolveModelEndpoint(m).apiKey))
+export function rankVisionModels(
+  models: AiModelConfig[],
+  opts: { canAccessModel?: (m: AiModelConfig) => boolean } = {},
+): AiModelConfig[] {
+  const usable = enabledAiModels(models, { includeAuto: false }).filter(
+    (m) => visionScore(m) > 0 && Boolean(resolveModelEndpoint(m).apiKey),
+  )
   const sorted = [...usable].sort((a, b) => visionScore(b) - visionScore(a))
   if (!opts.canAccessModel) return sorted
   const accessible = sorted.filter(opts.canAccessModel)
   return [...accessible, ...sorted.filter((m) => !accessible.includes(m))]
 }
 
-export async function getVisionModels(opts: { userId?: string | number | null; canAccessModel?: (m: AiModelConfig) => boolean } = {}) {
+export async function getVisionModels(
+  opts: { userId?: string | number | null; canAccessModel?: (m: AiModelConfig) => boolean } = {},
+) {
   const company = await getCompanyInfo(opts.userId ?? null).catch(() => null)
   return rankVisionModels(company?.aiModels ?? [], { canAccessModel: opts.canAccessModel })
 }
 
 /** 不同渠道的图片字段格式：智谱要求裸 base64，其余 OpenAI 兼容渠道使用 data URL。 */
 export function providerImageUrl(model: AiModelConfig, image: string) {
-  if (model.channelId === 'zhipu' && image.startsWith('data:')) return image.slice(image.indexOf(',') + 1)
+  if (model.channelId === 'zhipu' && image.startsWith('data:'))
+    return image.slice(image.indexOf(',') + 1)
   return image
 }
 
@@ -65,7 +80,11 @@ function messageText(content: unknown): string {
   if (typeof content === 'string') return content
   if (Array.isArray(content)) {
     return content
-      .map((p) => (p && typeof p === 'object' && typeof (p as { text?: unknown }).text === 'string' ? (p as { text: string }).text : ''))
+      .map((p) =>
+        p && typeof p === 'object' && typeof (p as { text?: unknown }).text === 'string'
+          ? (p as { text: string }).text
+          : '',
+      )
       .join('')
   }
   return ''
@@ -90,18 +109,24 @@ export async function callVision(opts: {
   /** 是否开启百炼 vl_high_resolution_images；放大局部拼图等无需重复开启 */
   highResolution?: boolean
 }): Promise<VisionCallResult | null> {
-  const attempts = opts.models.slice(0, Math.max(1, opts.maxAttempts ?? 2))
+  const attempts = opts.models.slice(0, Math.max(1, opts.maxAttempts ?? 3))
   for (const model of attempts) {
     const { url, apiKey } = resolveModelEndpoint(model)
     if (!url || !apiKey) continue
     const t0 = Date.now()
     const content = [
-      ...opts.images.map((img) => ({ type: 'image_url', image_url: { url: providerImageUrl(model, img) } })),
+      ...opts.images.map((img) => ({
+        type: 'image_url',
+        image_url: { url: providerImageUrl(model, img) },
+      })),
       { type: 'text', text: opts.prompt },
     ]
     const body: Record<string, unknown> = {
       model: model.apiModel || model.id,
-      messages: [...(opts.system ? [{ role: 'system', content: opts.system }] : []), { role: 'user', content }],
+      messages: [
+        ...(opts.system ? [{ role: 'system', content: opts.system }] : []),
+        { role: 'user', content },
+      ],
       max_tokens: opts.maxTokens ?? 2000,
       stream: true,
       stream_options: { include_usage: true },
@@ -115,18 +140,37 @@ export async function callVision(opts: {
       }
     }
     // 百炼视觉模型：开启高分辨率，看清图纸里的小字与小符号
-    if (model.channelId === 'dashscope' && opts.highResolution !== false) body.vl_high_resolution_images = true
+    if (model.channelId === 'dashscope' && opts.highResolution !== false)
+      body.vl_high_resolution_images = true
 
     // 首包等待 + 流式分片空闲续期：只要模型仍在持续吐字，就不会因为总时长满 60s 被强制掐断
     const firstByteMs = opts.timeoutMs ?? 60_000
     const idleMs = Math.min(Math.max(Math.round(firstByteMs * 0.6), 20_000), 45_000)
     const hardCapMs = Math.max(firstByteMs * 3, 180_000)
     const abortCtrl = new AbortController()
-    let timer: ReturnType<typeof setTimeout> | null = setTimeout(() => abortCtrl.abort(new DOMException('The operation was aborted due to timeout', 'TimeoutError')), firstByteMs)
-    const hardTimer = setTimeout(() => abortCtrl.abort(new DOMException('The operation was aborted due to timeout', 'TimeoutError')), hardCapMs)
+    let timer: ReturnType<typeof setTimeout> | null = setTimeout(
+      () =>
+        abortCtrl.abort(
+          new DOMException('The operation was aborted due to timeout', 'TimeoutError'),
+        ),
+      firstByteMs,
+    )
+    const hardTimer = setTimeout(
+      () =>
+        abortCtrl.abort(
+          new DOMException('The operation was aborted due to timeout', 'TimeoutError'),
+        ),
+      hardCapMs,
+    )
     const touchTimer = () => {
       if (timer) clearTimeout(timer)
-      timer = setTimeout(() => abortCtrl.abort(new DOMException('The operation was aborted due to timeout', 'TimeoutError')), idleMs)
+      timer = setTimeout(
+        () =>
+          abortCtrl.abort(
+            new DOMException('The operation was aborted due to timeout', 'TimeoutError'),
+          ),
+        idleMs,
+      )
     }
     const clearTimers = () => {
       if (timer) clearTimeout(timer)
@@ -152,7 +196,10 @@ export async function callVision(opts: {
       let usage: TokenUsage | null = null
       if (ctype.includes('application/json')) {
         // 个别网关忽略 stream 参数直接返回整段 JSON
-        const json = (await res.json().catch(() => null)) as { choices?: { message?: { content?: unknown } }[]; usage?: TokenUsage } | null
+        const json = (await res.json().catch(() => null)) as {
+          choices?: { message?: { content?: unknown } }[]
+          usage?: TokenUsage
+        } | null
         text = messageText(json?.choices?.[0]?.message?.content)
         usage = json?.usage ?? null
       } else {
@@ -165,7 +212,10 @@ export async function callVision(opts: {
           const data = trimmed.replace(/^data:\s*/, '')
           if (!data || data === '[DONE]') return
           try {
-            const chunk = JSON.parse(data) as { choices?: { delta?: { content?: unknown } }[]; usage?: TokenUsage | null }
+            const chunk = JSON.parse(data) as {
+              choices?: { delta?: { content?: unknown } }[]
+              usage?: TokenUsage | null
+            }
             if (chunk.usage) usage = chunk.usage
             const piece = messageText(chunk.choices?.[0]?.delta?.content)
             if (piece) text += piece
@@ -223,8 +273,11 @@ export function extractJson<T = unknown>(text: string | null | undefined): T | n
 }
 
 /** 压成视觉模型友好的 JPEG data URL（自动旋正、透明底转白、等比限制最长边）。 */
-export async function encodeImageForVision(input: Buffer, opts: { maxSide?: number; quality?: number } = {}): Promise<string> {
-  const maxSide = opts.maxSide ?? 2048
+export async function encodeImageForVision(
+  input: Buffer,
+  opts: { maxSide?: number; quality?: number } = {},
+): Promise<string> {
+  const maxSide = opts.maxSide ?? 2400
   const out = await sharp(input, { failOn: 'none' })
     .rotate()
     .flatten({ background: '#ffffff' })
@@ -256,7 +309,11 @@ const SAFE_RELATIVE = /^\/(api\/media\/file|demo-plans|proposal|board)\//
 
 function siteOrigins(): string[] {
   const out: string[] = [`http://127.0.0.1:${process.env.PORT || '3000'}`]
-  for (const raw of [process.env.PUBLIC_URL, process.env.NEXT_PUBLIC_SITE_URL, process.env.FIGMA_PUBLIC_URL]) {
+  for (const raw of [
+    process.env.PUBLIC_URL,
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.FIGMA_PUBLIC_URL,
+  ]) {
     if (!raw) continue
     try {
       out.push(new URL(raw).origin)
@@ -270,7 +327,10 @@ function siteOrigins(): string[] {
 /**
  * 读取图片原始字节：内存缓存 → data URL → 本站媒体库地址（只允许站内路径，杜绝 SSRF）→ 按 mediaId 查媒体库地址。
  */
-export async function loadImageBuffer(ref: { mediaId?: string | null; url?: string | null }): Promise<Buffer | null> {
+export async function loadImageBuffer(ref: {
+  mediaId?: string | null
+  url?: string | null
+}): Promise<Buffer | null> {
   const keys = [ref.mediaId, ref.url].filter((k): k is string => Boolean(k))
   for (const key of keys) {
     const hit = imageBufferCache.get(key)
@@ -285,8 +345,12 @@ export async function loadImageBuffer(ref: { mediaId?: string | null; url?: stri
   }
   if (!url && ref.mediaId) {
     const payload = await getPayloadClient()
-    const media = await payload.findByID({ collection: 'media', id: ref.mediaId, depth: 0, overrideAccess: true }).catch(() => null)
-    url = (media?.url as string | undefined) || (media?.filename ? `/api/media/file/${media.filename}` : '')
+    const media = await payload
+      .findByID({ collection: 'media', id: ref.mediaId, depth: 0, overrideAccess: true })
+      .catch(() => null)
+    url =
+      (media?.url as string | undefined) ||
+      (media?.filename ? `/api/media/file/${media.filename}` : '')
   }
   if (!url) return null
   const origins = siteOrigins()
@@ -318,7 +382,10 @@ export async function loadImageBuffer(ref: { mediaId?: string | null; url?: stri
   return null
 }
 
-export async function loadImageDataUrlForVision(ref: { mediaId?: string | null; url?: string | null }, maxSide = 2048): Promise<string | null> {
+export async function loadImageDataUrlForVision(
+  ref: { mediaId?: string | null; url?: string | null },
+  maxSide = 2048,
+): Promise<string | null> {
   const buf = await loadImageBuffer(ref)
   if (!buf) return null
   try {
@@ -401,7 +468,13 @@ export async function buildPatchSheets(
           }
           const si = (sy * W + sx) * ch
           const a = ch === 4 ? src[si + 3] / 255 : 1
-          put(ox + xx, oy + yy, Math.round(src[si] * a + 255 * (1 - a)), Math.round(src[si + 1] * a + 255 * (1 - a)), Math.round(src[si + 2] * a + 255 * (1 - a)))
+          put(
+            ox + xx,
+            oy + yy,
+            Math.round(src[si] * a + 255 * (1 - a)),
+            Math.round(src[si + 1] * a + 255 * (1 - a)),
+            Math.round(src[si + 2] * a + 255 * (1 - a)),
+          )
         }
       }
       // 红色准星：中心留空，只画外圈与四个方向的短刻度，不遮挡符号本身
@@ -410,7 +483,8 @@ export async function buildPatchSheets(
       const ring = Math.round(cell * 0.11)
       for (let t = 0; t < 360; t += 2) {
         const rad = (t * Math.PI) / 180
-        for (const rr of [ring, ring + 1]) put(Math.round(mx + rr * Math.cos(rad)), Math.round(my + rr * Math.sin(rad)), 239, 68, 68)
+        for (const rr of [ring, ring + 1])
+          put(Math.round(mx + rr * Math.cos(rad)), Math.round(my + rr * Math.sin(rad)), 239, 68, 68)
       }
       for (let d = ring + 4; d <= ring + 14; d++) {
         for (const w of [0, 1]) {
@@ -425,20 +499,34 @@ export async function buildPatchSheets(
       const dot = 3
       const boxW = label.length * 6 * dot + dot * 2
       const boxH = 7 * dot + dot * 2
-      for (let yy = 0; yy < boxH; yy++) for (let xx = 0; xx < boxW; xx++) put(ox + 2 + xx, oy + 2 + yy, 255, 255, 255)
+      for (let yy = 0; yy < boxH; yy++)
+        for (let xx = 0; xx < boxW; xx++) put(ox + 2 + xx, oy + 2 + yy, 255, 255, 255)
       ;[...label].forEach((digit, di) => {
         const glyph = DIGITS[digit]
         if (!glyph) return
         glyph.forEach((rowBits, gy) => {
           for (let gx = 0; gx < 5; gx++) {
             if (rowBits[gx] !== '1') continue
-            for (let py = 0; py < dot; py++) for (let px = 0; px < dot; px++) put(ox + 2 + dot + di * 6 * dot + gx * dot + px, oy + 2 + dot + gy * dot + py, 17, 24, 39)
+            for (let py = 0; py < dot; py++)
+              for (let px = 0; px < dot; px++)
+                put(
+                  ox + 2 + dot + di * 6 * dot + gx * dot + px,
+                  oy + 2 + dot + gy * dot + py,
+                  17,
+                  24,
+                  39,
+                )
           }
         })
       })
     })
-    const jpg = await sharp(canvas, { raw: { width: CW, height: CH, channels: 3 } }).jpeg({ quality: 90 }).toBuffer()
-    sheets.push({ dataUrl: `data:image/jpeg;base64,${jpg.toString('base64')}`, indices: chunk.map((_, k) => start + k) })
+    const jpg = await sharp(canvas, { raw: { width: CW, height: CH, channels: 3 } })
+      .jpeg({ quality: 90 })
+      .toBuffer()
+    sheets.push({
+      dataUrl: `data:image/jpeg;base64,${jpg.toString('base64')}`,
+      indices: chunk.map((_, k) => start + k),
+    })
   }
   return sheets
 }

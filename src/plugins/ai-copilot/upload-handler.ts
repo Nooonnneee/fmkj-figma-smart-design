@@ -85,14 +85,23 @@ function toBundle(raw: unknown): CachedDetectedBundle | null {
   if (!raw) return null
   if (Array.isArray(raw)) {
     const pts = raw as DetectedPointItem[]
-    return { points: pts, switchPoints: pts.filter((p) => isSwitchFamily(String(p.type))), lightPoints: pts.filter((p) => !isSwitchFamily(String(p.type))), areas: [] }
+    return {
+      points: pts,
+      switchPoints: pts.filter((p) => isSwitchFamily(String(p.type))),
+      lightPoints: pts.filter((p) => !isSwitchFamily(String(p.type))),
+      areas: [],
+    }
   }
   if (typeof raw === 'object' && Array.isArray((raw as CachedDetectedBundle).points)) {
     const b = raw as CachedDetectedBundle
     return {
       points: b.points,
-      switchPoints: Array.isArray(b.switchPoints) ? b.switchPoints : b.points.filter((p) => isSwitchFamily(String(p.type))),
-      lightPoints: Array.isArray(b.lightPoints) ? b.lightPoints : b.points.filter((p) => !isSwitchFamily(String(p.type))),
+      switchPoints: Array.isArray(b.switchPoints)
+        ? b.switchPoints
+        : b.points.filter((p) => isSwitchFamily(String(p.type))),
+      lightPoints: Array.isArray(b.lightPoints)
+        ? b.lightPoints
+        : b.points.filter((p) => !isSwitchFamily(String(p.type))),
       areas: Array.isArray(b.areas) ? b.areas : [],
       summary: b.summary,
       imageKind: b.imageKind,
@@ -108,7 +117,9 @@ function saveDetectedBundle(mediaId: string, url: string, bundle: CachedDetected
   if (url) detectedMemoryCache.set(url, bundle)
   try {
     mkdirSync(path.dirname(DETECTED_CACHE_FILE), { recursive: true })
-    const existing = existsSync(DETECTED_CACHE_FILE) ? (JSON.parse(readFileSync(DETECTED_CACHE_FILE, 'utf8')) as Record<string, unknown>) : {}
+    const existing = existsSync(DETECTED_CACHE_FILE)
+      ? (JSON.parse(readFileSync(DETECTED_CACHE_FILE, 'utf8')) as Record<string, unknown>)
+      : {}
     if (mediaId) existing[mediaId] = bundle
     if (url) existing[url] = bundle
     const keys = Object.keys(existing)
@@ -121,12 +132,18 @@ function saveDetectedBundle(mediaId: string, url: string, bundle: CachedDetected
   }
 }
 
-export function getCachedDetectedBundle(mediaId?: string | null, url?: string | null): CachedDetectedBundle | null {
+export function getCachedDetectedBundle(
+  mediaId?: string | null,
+  url?: string | null,
+): CachedDetectedBundle | null {
   if (mediaId && detectedMemoryCache.has(mediaId)) return detectedMemoryCache.get(mediaId)!
   if (url && detectedMemoryCache.has(url)) return detectedMemoryCache.get(url)!
   try {
     if (existsSync(DETECTED_CACHE_FILE)) {
-      const stored = JSON.parse(readFileSync(DETECTED_CACHE_FILE, 'utf8')) as Record<string, unknown>
+      const stored = JSON.parse(readFileSync(DETECTED_CACHE_FILE, 'utf8')) as Record<
+        string,
+        unknown
+      >
       for (const key of [mediaId, url]) {
         if (!key || !stored[key]) continue
         const b = toBundle(stored[key])
@@ -143,7 +160,10 @@ export function getCachedDetectedBundle(mediaId?: string | null, url?: string | 
 }
 
 /** 根据上传返回的 mediaId 或图片 url 读取已识别出的点位 */
-export function getCachedDetectedPoints(mediaId?: string | null, url?: string | null): DetectedPointItem[] | null {
+export function getCachedDetectedPoints(
+  mediaId?: string | null,
+  url?: string | null,
+): DetectedPointItem[] | null {
   return getCachedDetectedBundle(mediaId, url)?.points ?? null
 }
 
@@ -151,11 +171,18 @@ export function getCachedDetectedPoints(mediaId?: string | null, url?: string | 
 export function getRecognitionStatus(mediaId?: string | null, url?: string | null) {
   const bundle = getCachedDetectedBundle(mediaId, url)
   const pending = Boolean((mediaId && visionJobs.has(mediaId)) || (url && visionJobs.has(url)))
-  return { status: pending ? 'pending' : (bundle?.vision?.status ?? (bundle ? 'done' : 'unknown')), bundle }
+  return {
+    status: pending ? 'pending' : (bundle?.vision?.status ?? (bundle ? 'done' : 'unknown')),
+    bundle,
+  }
 }
 
 /** 等待视觉复核完成（最多 timeoutMs），返回最新识别结果 */
-export async function awaitRecognition(mediaId?: string | null, url?: string | null, timeoutMs = 55_000): Promise<CachedDetectedBundle | null> {
+export async function awaitRecognition(
+  mediaId?: string | null,
+  url?: string | null,
+  timeoutMs = 55_000,
+): Promise<CachedDetectedBundle | null> {
   const job = (mediaId && visionJobs.get(mediaId)) || (url && visionJobs.get(url)) || null
   if (job) await Promise.race([job, new Promise((resolve) => setTimeout(resolve, timeoutMs))])
   return getCachedDetectedBundle(mediaId, url)
@@ -163,7 +190,13 @@ export async function awaitRecognition(mediaId?: string | null, url?: string | n
 
 /* ---------------- 图片分类（带图任务第一步就交给视觉模型判断） ---------------- */
 
-const KIND_VALUES: UploadImageKind[] = ['floor-plan', 'quote-document', 'photo', 'rendering', 'other']
+const KIND_VALUES: UploadImageKind[] = [
+  'floor-plan',
+  'quote-document',
+  'photo',
+  'rendering',
+  'other',
+]
 
 function normalizeKind(raw: unknown): UploadImageKind | null {
   if (typeof raw !== 'string') return null
@@ -197,7 +230,10 @@ const CLASSIFY_PROMPT =
   '判断这张图片属于哪一类，只返回 JSON：{"kind":"floor-plan|quote-document|photo|rendering|other","caption":"20字以内的中文描述"}。' +
   'floor-plan=户型图/平面图/CAD图纸/开关灯具点位图/水电图/彩平图；quote-document=报价单/设备清单/表格/合同截图；photo=实拍照片；rendering=效果图/渲染图；other=其他。'
 
-async function classifyUploadImage(buf: Buffer, models: AiModelConfig[]): Promise<{ kind: UploadImageKind; caption?: string; by: 'vision' | 'heuristic' }> {
+async function classifyUploadImage(
+  buf: Buffer,
+  models: AiModelConfig[],
+): Promise<{ kind: UploadImageKind; caption?: string; by: 'vision' | 'heuristic' }> {
   const heuristic = await heuristicKind(buf).catch(() => 'floor-plan' as UploadImageKind)
   if (!models.length) return { kind: heuristic, by: 'heuristic' }
   // 分类要快：优先 flash 轻量视觉模型，其次非推理型视觉模型
@@ -222,12 +258,17 @@ async function classifyUploadImage(buf: Buffer, models: AiModelConfig[]): Promis
   const parsed = extractJson<{ kind?: string; caption?: string }>(res?.text)
   const kind = normalizeKind(parsed?.kind) ?? normalizeKind(res?.text)
   if (!kind) return { kind: heuristic, by: 'heuristic' }
-  return { kind, caption: typeof parsed?.caption === 'string' ? parsed.caption.trim().slice(0, 40) : undefined, by: 'vision' }
+  return {
+    kind,
+    caption: typeof parsed?.caption === 'string' ? parsed.caption.trim().slice(0, 40) : undefined,
+    by: 'vision',
+  }
 }
 
 /* ---------------- 视觉复核：整图理解 + 候选点放大拼图逐格核对 ---------------- */
 
-const FLOORPLAN_SYSTEM = '你是资深的全屋智能与建筑电气审图工程师，只陈述图中能确认的内容，看不清的不要编造。严格按要求只输出 JSON。'
+const FLOORPLAN_SYSTEM =
+  '你是资深的全屋智能与建筑电气审图工程师，只陈述图中能确认的内容，看不清的不要编造。严格按要求只输出 JSON。'
 
 const FULL_IMAGE_PROMPT = [
   '请仔细查看这张图纸，坐标用 0~1 归一化（左上角为 (0,0)，右下角为 (1,1)，保留 3 位小数）。',
@@ -247,7 +288,8 @@ const patchPrompt = (n: number) =>
     '只返回 JSON：{"cells":[{"n":1,"kind":"switch-2","confidence":0.92,"text":"双开"}]}，每一格都要给出结论。',
   ].join('\n')
 
-const shortModelName = (m: AiModelConfig) => m.name.replace(/（[^）]*）|\([^)]*\)/g, '').trim() || m.name
+const shortModelName = (m: AiModelConfig) =>
+  m.name.replace(/（[^）]*）|\([^)]*\)/g, '').trim() || m.name
 
 async function runVisionFusion(args: {
   png: Buffer
@@ -257,7 +299,11 @@ async function runVisionFusion(args: {
   models: AiModelConfig[]
 }): Promise<CachedDetectedBundle> {
   const t0 = Date.now()
-  const localCounts = { total: collectLocalCandidates(args.local).length, switches: args.local.switchPoints.length, lights: args.local.lightPoints.length }
+  const localCounts = {
+    total: collectLocalCandidates(args.local).length,
+    switches: args.local.switchPoints.length,
+    lights: args.local.lightPoints.length,
+  }
   const base: CachedDetectedBundle = {
     points: args.local.points,
     switchPoints: args.local.switchPoints,
@@ -281,11 +327,11 @@ async function runVisionFusion(args: {
     prompt: FULL_IMAGE_PROMPT,
     models: args.models,
     maxTokens: 3600,
-    timeoutMs: 75_000,
+    timeoutMs: 100_000,
     thinking: false,
     highResolution: true,
   })
-  const cellResults: (Awaited<ReturnType<typeof callVision>>)[] = []
+  const cellResults: Awaited<ReturnType<typeof callVision>>[] = []
   for (const s of sheets) {
     cellResults.push(
       await callVision({
@@ -305,7 +351,9 @@ async function runVisionFusion(args: {
   const vision = normalizeVisionAnalysis(extractJson(full?.text))
   const verdicts = new Map<number, VisionVerdict>()
   cellResults.forEach((res, si) => {
-    const parsed = extractJson<{ cells?: Array<{ n?: unknown; kind?: unknown; confidence?: unknown; text?: unknown }> }>(res?.text)
+    const parsed = extractJson<{
+      cells?: Array<{ n?: unknown; kind?: unknown; confidence?: unknown; text?: unknown }>
+    }>(res?.text)
     for (const c of parsed?.cells ?? []) {
       const n = Math.round(Number(c.n))
       const kind = normalizeVerdictKind(c.kind)
@@ -315,7 +363,9 @@ async function runVisionFusion(args: {
       verdicts.set(sheet.indices[n - 1], {
         kind,
         confidence: Number.isFinite(conf) ? Math.min(1, Math.max(0, conf)) : 0.7,
-        ...(typeof c.text === 'string' && c.text.trim() ? { text: c.text.trim().slice(0, 12) } : {}),
+        ...(typeof c.text === 'string' && c.text.trim()
+          ? { text: c.text.trim().slice(0, 12) }
+          : {}),
       })
     }
   })
@@ -329,6 +379,7 @@ async function runVisionFusion(args: {
     candidates,
     verdicts,
     vision,
+    strategy: 'vision-first',
     snap: (p) => snapPointToInk(args.pixels, p.x, p.y, isSwitchFamily(p.type)),
     sheetName: args.sheetName,
     modelLabel,
@@ -387,7 +438,8 @@ function startVisionFusionJob(args: {
     .catch((error) => {
       console.error('[vision-fusion] failed', error)
       const current = getCachedDetectedBundle(args.mediaId, args.url)
-      if (current) saveDetectedBundle(args.mediaId, args.url, { ...current, vision: { status: 'failed' } })
+      if (current)
+        saveDetectedBundle(args.mediaId, args.url, { ...current, vision: { status: 'failed' } })
       return current
     })
     .finally(() => {
@@ -412,7 +464,12 @@ function keepAlive(job: Promise<unknown>) {
  * 对已经在项目或媒体库中的图纸重新执行一次完整识别（本地几何识别 + 视觉复核），
  * 用户说「重新生成 / 重新识别点位」时无需再次上传图片。
  */
-export async function redetectFloorPlanFromUrl(opts: { mediaId?: string | null; url: string; sheetName?: string; userId?: string | number | null }): Promise<CachedDetectedBundle | null> {
+export async function redetectFloorPlanFromUrl(opts: {
+  mediaId?: string | null
+  url: string
+  sheetName?: string
+  userId?: string | number | null
+}): Promise<CachedDetectedBundle | null> {
   try {
     const cleanUrl = opts.url.trim()
     const rawBuf = await loadImageBuffer({ mediaId: opts.mediaId, url: cleanUrl })
@@ -420,7 +477,13 @@ export async function redetectFloorPlanFromUrl(opts: { mediaId?: string | null; 
     const normalized = await normalizeFloorPlan(rawBuf, { crop: false })
     const local = detectCadSymbolsFromPixels(normalized.pixels, { sheetName: opts.sheetName })
     const models = await getVisionModels({ userId: opts.userId })
-    const bundle = await runVisionFusion({ png: normalized.png, pixels: normalized.pixels, local, sheetName: opts.sheetName, models })
+    const bundle = await runVisionFusion({
+      png: normalized.png,
+      pixels: normalized.pixels,
+      local,
+      sheetName: opts.sheetName,
+      models,
+    })
     saveDetectedBundle(opts.mediaId ?? '', cleanUrl, bundle)
     return bundle
   } catch (error) {
@@ -448,26 +511,44 @@ function uploadFields(bundle: CachedDetectedBundle) {
  * - 其他图片：原图等比压缩后存入媒体库，供对话中的视觉模型看图，不进入点位识别；
  * - 支持 CAD .dxf 矢量文件（图块坐标 100% 精确）。
  */
-export async function prepareFloorPlanUpload(request: Request, opts: { awaitVision?: boolean; forceKind?: UploadImageKind } = {}) {
+export async function prepareFloorPlanUpload(
+  request: Request,
+  opts: { awaitVision?: boolean; forceKind?: UploadImageKind } = {},
+) {
   const t0 = Date.now()
   const form = await request.formData().catch(() => null)
   const file = form?.get('file')
   if (!(file instanceof File) || file.size === 0) return { error: fail(400, '请选择要上传的图片') }
-  if (file.size > SHEET.maxUploadBytes) return { error: fail(413, `图片超过 ${Math.round(SHEET.maxUploadBytes / 1024 / 1024)}MB 限制`) }
+  if (file.size > SHEET.maxUploadBytes)
+    return { error: fail(413, `图片超过 ${Math.round(SHEET.maxUploadBytes / 1024 / 1024)}MB 限制`) }
   const nameField = form?.get('name')
-  const baseName = (typeof nameField === 'string' && nameField.trim() ? nameField : file.name).replace(/\.[^.]+$/, '').trim().slice(0, 40) || '户型图'
+  const baseName =
+    (typeof nameField === 'string' && nameField.trim() ? nameField : file.name)
+      .replace(/\.[^.]+$/, '')
+      .trim()
+      .slice(0, 40) || '户型图'
   const rawBuffer = Buffer.from(await file.arrayBuffer())
   const payload = await getPayloadClient()
 
   // CAD .dxf 矢量图纸：直接提取 INSERT 图块坐标与房间文字（精确，无需视觉复核）
-  const isDxfFile = /\.dxf$/i.test(file.name) || (rawBuffer.length > 32 && rawBuffer.subarray(0, 256).toString('utf8').includes('SECTION'))
+  const isDxfFile =
+    /\.dxf$/i.test(file.name) ||
+    (rawBuffer.length > 32 && rawBuffer.subarray(0, 256).toString('utf8').includes('SECTION'))
   if (isDxfFile) {
-    const dxfParsed = await parseDxfAndRenderFloorPlan(rawBuffer.toString('utf8'), { sheetName: baseName }).catch(() => null)
-    if (!dxfParsed) return { error: fail(400, 'CAD 文件无法解析，请另存为 DXF（R2013 及以下）或导出图片后上传') }
+    const dxfParsed = await parseDxfAndRenderFloorPlan(rawBuffer.toString('utf8'), {
+      sheetName: baseName,
+    }).catch(() => null)
+    if (!dxfParsed)
+      return { error: fail(400, 'CAD 文件无法解析，请另存为 DXF（R2013 及以下）或导出图片后上传') }
     const media = await payload.create({
       collection: 'media',
       data: { alt: `CAD图纸 · ${baseName}` },
-      file: { data: dxfParsed.png, mimetype: 'image/png', name: `dxf-${Date.now().toString(36)}.png`, size: dxfParsed.png.length },
+      file: {
+        data: dxfParsed.png,
+        mimetype: 'image/png',
+        name: `dxf-${Date.now().toString(36)}.png`,
+        size: dxfParsed.png.length,
+      },
       overrideAccess: true,
       depth: 0,
     })
@@ -484,15 +565,39 @@ export async function prepareFloorPlanUpload(request: Request, opts: { awaitVisi
     }
     rememberImageBuffer([String(media.id), media.url], dxfParsed.png)
     saveDetectedBundle(String(media.id), media.url, bundle)
-    recordUploadDiagnostic({ fileName: file.name, mediaId: String(media.id), url: media.url, method: 'dxf-vector', totalPoints: det.points.length, switches: det.switchPoints.length, lights: det.lightPoints.length, areas: det.areas.length, durationMs: Date.now() - t0 })
+    recordUploadDiagnostic({
+      fileName: file.name,
+      mediaId: String(media.id),
+      url: media.url,
+      method: 'dxf-vector',
+      totalPoints: det.points.length,
+      switches: det.switchPoints.length,
+      lights: det.lightPoints.length,
+      areas: det.areas.length,
+      durationMs: Date.now() - t0,
+    })
     return {
-      upload: { mediaId: String(media.id), url: media.url, name: baseName, width: SHEET.pixelWidth, height: SHEET.pixelHeight, cropped: false, imageKind: 'floor-plan' as UploadImageKind, visionStatus: 'skipped', ...uploadFields(bundle) },
+      upload: {
+        mediaId: String(media.id),
+        url: media.url,
+        name: baseName,
+        width: SHEET.pixelWidth,
+        height: SHEET.pixelHeight,
+        cropped: false,
+        imageKind: 'floor-plan' as UploadImageKind,
+        visionStatus: 'skipped',
+        ...uploadFields(bundle),
+      },
     }
   }
 
   try {
     const meta = await sharp(rawBuffer, { failOn: 'none' }).metadata()
-    if (!meta.format || !['png', 'jpeg', 'jpg', 'webp', 'gif', 'heif', 'tiff'].includes(meta.format)) throw new Error('UNSUPPORTED')
+    if (
+      !meta.format ||
+      !['png', 'jpeg', 'jpg', 'webp', 'gif', 'heif', 'tiff'].includes(meta.format)
+    )
+      throw new Error('UNSUPPORTED')
   } catch {
     return { error: fail(400, '图片无法读取，支持 PNG、JPG、WebP 或 CAD .dxf 格式') }
   }
@@ -508,21 +613,48 @@ export async function prepareFloorPlanUpload(request: Request, opts: { awaitVisi
   // 非图纸图片：保留原图（等比压缩），只做视觉看图，不进入点位识别
   if (classified.kind !== 'floor-plan') {
     const isPhotoLike = classified.kind === 'photo' || classified.kind === 'rendering'
-    const pipeline = sharp(rawBuffer, { failOn: 'none' }).rotate().flatten({ background: '#ffffff' }).resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
-    const out = isPhotoLike ? await pipeline.jpeg({ quality: 86, mozjpeg: true }).toBuffer() : await pipeline.png({ compressionLevel: 9 }).toBuffer()
+    const pipeline = sharp(rawBuffer, { failOn: 'none' })
+      .rotate()
+      .flatten({ background: '#ffffff' })
+      .resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
+    const out = isPhotoLike
+      ? await pipeline.jpeg({ quality: 86, mozjpeg: true }).toBuffer()
+      : await pipeline.png({ compressionLevel: 9 }).toBuffer()
     const dims = await sharp(out).metadata()
     const media = await payload.create({
       collection: 'media',
       data: { alt: `${IMAGE_KIND_LABEL[classified.kind]} · ${baseName}` },
-      file: { data: out, mimetype: isPhotoLike ? 'image/jpeg' : 'image/png', name: `upload-${Date.now().toString(36)}.${isPhotoLike ? 'jpg' : 'png'}`, size: out.length },
+      file: {
+        data: out,
+        mimetype: isPhotoLike ? 'image/jpeg' : 'image/png',
+        name: `upload-${Date.now().toString(36)}.${isPhotoLike ? 'jpg' : 'png'}`,
+        size: out.length,
+      },
       overrideAccess: true,
       depth: 0,
     })
     if (!media.url) return { error: fail(500, '图片保存失败，请稍后重试') }
-    const bundle: CachedDetectedBundle = { points: [], switchPoints: [], lightPoints: [], areas: [], imageKind: classified.kind, vision: { status: 'skipped', caption: classified.caption } }
+    const bundle: CachedDetectedBundle = {
+      points: [],
+      switchPoints: [],
+      lightPoints: [],
+      areas: [],
+      imageKind: classified.kind,
+      vision: { status: 'skipped', caption: classified.caption },
+    }
     rememberImageBuffer([String(media.id), media.url], out)
     saveDetectedBundle(String(media.id), media.url, bundle)
-    recordUploadDiagnostic({ fileName: file.name, mediaId: String(media.id), url: media.url, method: 'non-plan', totalPoints: 0, switches: 0, lights: 0, areas: 0, durationMs: Date.now() - t0 })
+    recordUploadDiagnostic({
+      fileName: file.name,
+      mediaId: String(media.id),
+      url: media.url,
+      method: 'non-plan',
+      totalPoints: 0,
+      switches: 0,
+      lights: 0,
+      areas: 0,
+      durationMs: Date.now() - t0,
+    })
     return {
       upload: {
         mediaId: String(media.id),
@@ -549,14 +681,23 @@ export async function prepareFloorPlanUpload(request: Request, opts: { awaitVisi
   const media = await payload.create({
     collection: 'media',
     data: { alt: `户型图 · ${baseName}` },
-    file: { data: normalized.png, mimetype: 'image/png', name: `sheet-${Date.now().toString(36)}.png`, size: normalized.png.length },
+    file: {
+      data: normalized.png,
+      mimetype: 'image/png',
+      name: `sheet-${Date.now().toString(36)}.png`,
+      size: normalized.png.length,
+    },
     overrideAccess: true,
     depth: 0,
   })
   if (!media.url) return { error: fail(500, '图片保存失败，请稍后重试') }
   const mediaId = String(media.id)
   rememberImageBuffer([mediaId, media.url], normalized.png)
-  const localCounts = { total: collectLocalCandidates(local).length, switches: local.switchPoints.length, lights: local.lightPoints.length }
+  const localCounts = {
+    total: collectLocalCandidates(local).length,
+    switches: local.switchPoints.length,
+    lights: local.lightPoints.length,
+  }
   let bundle: CachedDetectedBundle = {
     points: local.points,
     switchPoints: local.switchPoints,
@@ -581,7 +722,16 @@ export async function prepareFloorPlanUpload(request: Request, opts: { awaitVisi
   })
 
   if (models.length) {
-    const job = startVisionFusionJob({ mediaId, url: media.url, fileName: file.name, png: normalized.png, pixels: normalized.pixels, local, sheetName: baseName, models })
+    const job = startVisionFusionJob({
+      mediaId,
+      url: media.url,
+      fileName: file.name,
+      png: normalized.png,
+      pixels: normalized.pixels,
+      local,
+      sheetName: baseName,
+      models,
+    })
     if (opts.awaitVision) {
       bundle = (await awaitRecognition(mediaId, media.url, 55_000)) ?? bundle
     } else {

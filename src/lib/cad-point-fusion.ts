@@ -8,10 +8,27 @@
  * 3. 房间：视觉模型读出的房间名与范围优先，否则沿用本地墙体投影分区。
  */
 import { inferAreaType, isAreaType } from './area-types'
-import { buildCadDetectionSummary, isLightType, type CadDetectionResult, type DetectedCadArea, type DetectedCadPoint } from './cad-point-detector'
+import {
+  buildCadDetectionSummary,
+  isLightType,
+  type CadDetectionResult,
+  type DetectedCadArea,
+  type DetectedCadPoint,
+} from './cad-point-detector'
 import { isDeviceType } from './device-types'
 
-export type VisionVerdictKind = 'switch-1' | 'switch-2' | 'switch-3' | 'switch-4' | 'touch-panel' | 'light' | 'socket' | 'sensor' | 'curtain' | 'other-device' | 'none'
+export type VisionVerdictKind =
+  | 'switch-1'
+  | 'switch-2'
+  | 'switch-3'
+  | 'switch-4'
+  | 'touch-panel'
+  | 'light'
+  | 'socket'
+  | 'sensor'
+  | 'curtain'
+  | 'other-device'
+  | 'none'
 export type VisionVerdict = { kind: VisionVerdictKind; confidence: number; text?: string }
 export type VisionFullPoint = { type: string; x: number; y: number; room?: string }
 export type VisionFullAnalysis = {
@@ -33,13 +50,31 @@ export type FusionStats = {
   retyped: number
   added: number
   visionPoints: number
+  visionFirst?: boolean
+  baseFromVision?: number
 }
 
-const VERDICT_KINDS = new Set<VisionVerdictKind>(['switch-1', 'switch-2', 'switch-3', 'switch-4', 'touch-panel', 'light', 'socket', 'sensor', 'curtain', 'other-device', 'none'])
+const SOCKET_POINT_TYPES = new Set(['socket', 'socket-double', 'socket-usb'])
+
+const VERDICT_KINDS = new Set<VisionVerdictKind>([
+  'switch-1',
+  'switch-2',
+  'switch-3',
+  'switch-4',
+  'touch-panel',
+  'light',
+  'socket',
+  'sensor',
+  'curtain',
+  'other-device',
+  'none',
+])
 
 export const isSwitchFamily = (t: string) => t.startsWith('switch-') || t === 'touch-panel'
-const categoryOf = (t: string): 'switch' | 'light' | 'other' => (t.startsWith('switch-') ? 'switch' : isLightType(t) ? 'light' : 'other')
-const famOf = (t: string): 'switch' | 'light' | 'other' => (isSwitchFamily(t) ? 'switch' : isLightType(t) ? 'light' : 'other')
+const categoryOf = (t: string): 'switch' | 'light' | 'other' =>
+  t.startsWith('switch-') ? 'switch' : isLightType(t) ? 'light' : 'other'
+const famOf = (t: string): 'switch' | 'light' | 'other' =>
+  isSwitchFamily(t) ? 'switch' : isLightType(t) ? 'light' : 'other'
 const round3 = (n: number) => Math.round(n * 1000) / 1000
 const clamp01 = (n: number) => Math.min(0.995, Math.max(0.005, n))
 
@@ -74,7 +109,14 @@ export function normalizeVisionAnalysis(raw: unknown): VisionFullAnalysis | null
       const y = Number(o.y)
       if (!type || !isDeviceType(type) || !Number.isFinite(x) || !Number.isFinite(y)) continue
       if (x <= 0.01 || x >= 0.99 || y <= 0.01 || y >= 0.99) continue
-      points.push({ type, x: round3(x), y: round3(y), ...(typeof o.room === 'string' && o.room.trim() ? { room: o.room.trim().slice(0, 24) } : {}) })
+      points.push({
+        type,
+        x: round3(x),
+        y: round3(y),
+        ...(typeof o.room === 'string' && o.room.trim()
+          ? { room: o.room.trim().slice(0, 24) }
+          : {}),
+      })
     }
   }
   const areas: DetectedCadArea[] = []
@@ -88,7 +130,11 @@ export function normalizeVisionAnalysis(raw: unknown): VisionFullAnalysis | null
       if (w < 0.03 || h < 0.03 || x < 0 || y < 0 || x + w > 1.01 || y + h > 1.01) continue
       const name = typeof o.name === 'string' && o.name.trim() ? o.name.trim().slice(0, 24) : '房间'
       const type = typeof o.type === 'string' && isAreaType(o.type) ? o.type : inferAreaType(name)
-      areas.push({ name, type, rect: [round3(x), round3(y), round3(Math.min(w, 1 - x)), round3(Math.min(h, 1 - y))] })
+      areas.push({
+        name,
+        type,
+        rect: [round3(x), round3(y), round3(Math.min(w, 1 - x)), round3(Math.min(h, 1 - y))],
+      })
     }
   }
   const annotatedCounts: Record<string, number> = {}
@@ -99,7 +145,12 @@ export function normalizeVisionAnalysis(raw: unknown): VisionFullAnalysis | null
     }
   }
   const strList = (v: unknown, max: number) =>
-    Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string' && Boolean(s.trim())).map((s) => s.trim().slice(0, 120)).slice(0, max) : []
+    Array.isArray(v)
+      ? v
+          .filter((s): s is string => typeof s === 'string' && Boolean(s.trim()))
+          .map((s) => s.trim().slice(0, 120))
+          .slice(0, max)
+      : []
   const socketCount = Math.round(Number(r.socketCount))
   return {
     drawingType: typeof r.drawingType === 'string' ? r.drawingType.slice(0, 40) : undefined,
@@ -117,15 +168,27 @@ export function normalizeVisionAnalysis(raw: unknown): VisionFullAnalysis | null
 export function collectLocalCandidates(local: CadDetectionResult): DetectedCadPoint[] {
   const out: DetectedCadPoint[] = []
   for (const p of [...local.switchPoints, ...local.lightPoints, ...local.points]) {
-    if (out.some((q) => q.type === p.type && Math.abs(q.x - p.x) < 0.004 && Math.abs(q.y - p.y) < 0.004)) continue
+    if (
+      out.some(
+        (q) => q.type === p.type && Math.abs(q.x - p.x) < 0.004 && Math.abs(q.y - p.y) < 0.004,
+      )
+    )
+      continue
     out.push(p)
   }
   return out
 }
 
-const inRect = (a: DetectedCadArea, x: number, y: number) => x >= a.rect[0] && x <= a.rect[0] + a.rect[2] && y >= a.rect[1] && y <= a.rect[1] + a.rect[3]
+const inRect = (a: DetectedCadArea, x: number, y: number) =>
+  x >= a.rect[0] && x <= a.rect[0] + a.rect[2] && y >= a.rect[1] && y <= a.rect[1] + a.rect[3]
 
-const SWITCH_LABEL: Record<string, string> = { 'switch-1': '单开', 'switch-2': '双开', 'switch-3': '三开', 'switch-4': '四开', 'touch-panel': '智能屏' }
+const SWITCH_LABEL: Record<string, string> = {
+  'switch-1': '单开',
+  'switch-2': '双开',
+  'switch-3': '三开',
+  'switch-4': '四开',
+  'touch-panel': '智能屏',
+}
 
 export function fuseDetections(input: {
   local: CadDetectionResult
@@ -136,87 +199,157 @@ export function fuseDetections(input: {
   sheetName?: string
   modelLabel?: string
   minConfidence?: number
+  /** vision-first：彩色铭牌图以视觉模型点位为主，本地只做吸附与按标注补缺 */
+  strategy?: 'hybrid' | 'vision-first'
 }): { result: CadDetectionResult; stats: FusionStats; confirmText: string } {
   const candidates = input.candidates ?? collectLocalCandidates(input.local)
   const minConf = input.minConfidence ?? 0.6
-  const stats: FusionStats = { localCount: candidates.length, verified: 0, dropped: 0, droppedSockets: 0, retyped: 0, added: 0, visionPoints: input.vision?.points.length ?? 0 }
+  const stats: FusionStats = {
+    localCount: candidates.length,
+    verified: 0,
+    dropped: 0,
+    droppedSockets: 0,
+    retyped: 0,
+    added: 0,
+    visionPoints: input.vision?.points.length ?? 0,
+  }
 
-  // 1. 逐个复核本地候选
   const kept: DetectedCadPoint[] = []
-  candidates.forEach((p, i) => {
-    const v = input.verdicts.get(i)
-    if (!v) {
-      kept.push({ ...p })
-      return
-    }
-    stats.verified++
-    const confident = v.confidence >= minConf
-    if (confident && (v.kind === 'none' || v.kind === 'socket')) {
-      stats.dropped++
-      if (v.kind === 'socket') stats.droppedSockets++
-      return
-    }
-    let type = p.type
-    if (confident) {
-      if (v.kind.startsWith('switch-') || v.kind === 'touch-panel') type = v.kind
-      else if (v.kind === 'light') type = isLightType(p.type) ? p.type : 'downlight'
-      else if (v.kind === 'sensor') type = p.type.endsWith('-sensor') ? p.type : 'motion-sensor'
-      else if (v.kind === 'curtain') type = 'curtain-track'
-    }
-    if (type !== p.type) stats.retyped++
-    kept.push({ ...p, type, category: categoryOf(type) })
-  })
-
-  // 2. 补充视觉模型找到而本地漏掉的点位（按类别控制数量上限，避免凭空多出）
   const vision = input.vision
-  if (vision && vision.points.length) {
-    // 其他智能设备（风管机/VRF、传感器、窗帘、门锁、摄像头、AP、网关）本地识别器基本识别不到，按视觉模型结果补充（与已有点位去重）
-    let otherAdded = 0
-    for (const vp of vision.points) {
-      if (famOf(vp.type) !== 'other' || otherAdded >= 30) continue
-      if (kept.some((k) => k.type === vp.type && Math.hypot(k.x - vp.x, k.y - vp.y) < 0.035)) continue
+
+  // vision-first：模型直读点位为主；本地候选只在标注数量不足时按型号补缺，插座永不落点
+  if (input.strategy === 'vision-first' && input.vision?.points.some((p) => isSwitchFamily(p.type))) {
+    const seen = new Set<string>()
+    for (const vp of input.vision.points) {
+      if (SOCKET_POINT_TYPES.has(vp.type)) continue
       const pos = input.snap ? input.snap(vp) : { x: vp.x, y: vp.y }
-      kept.push({ type: vp.type, x: round3(clamp01(pos.x)), y: round3(clamp01(pos.y)), category: 'other', ...(vp.room ? { room: vp.room } : {}) })
-      stats.added++
-      otherAdded++
+      const x = round3(clamp01(pos.x))
+      const y = round3(clamp01(pos.y))
+      const key = `${vp.type}:${Math.round(x * 100)}:${Math.round(y * 100)}`
+      if (seen.has(key) || kept.some((k) => Math.hypot(k.x - x, k.y - y) < 0.012)) continue
+      seen.add(key)
+      kept.push({
+        type: vp.type,
+        x,
+        y,
+        category: categoryOf(vp.type),
+        ...(vp.room ? { room: vp.room } : {}),
+      })
     }
-    for (const fam of ['switch', 'light'] as const) {
-      const keptFam = kept.filter((p) => famOf(p.type) === fam).length
-      const visionFam = vision.points.filter((p) => famOf(p.type) === fam)
-      const annotatedFam = Object.entries(vision.annotatedCounts)
-        .filter(([t]) => famOf(t) === fam)
-        .reduce((s, [, n]) => s + n, 0)
-      const target = annotatedFam > 0 ? annotatedFam : visionFam.length
-      let need = Math.min(40, target - keptFam)
-      if (need <= 0) continue
-      // 按图纸标注统计每种型号还缺几个，优先补缺的型号
-      const deficit = new Map<string, number>()
-      for (const [t, n] of Object.entries(vision.annotatedCounts)) {
-        if (famOf(t) === fam) deficit.set(t, n - kept.filter((k) => k.type === t).length)
-      }
-      const pool = [...visionFam]
-      // 贪心选点：每次选离已有点位最远的候选（避免把视觉模型对同一符号的重复坐标都加进来）
-      while (need > 0 && pool.length) {
-        const famPoints = kept.filter((k) => famOf(k.type) === fam)
-        let bestIdx = -1
-        let bestScore = -Infinity
-        pool.forEach((vp, idx) => {
-          const dist = Math.min(1, ...famPoints.map((k) => Math.hypot(k.x - vp.x, k.y - vp.y)))
-          if (dist <= 0.035) return
-          const score = dist + ((deficit.get(vp.type) ?? 0) > 0 ? 1 : 0)
-          if (score > bestScore) {
-            bestScore = score
-            bestIdx = idx
-          }
-        })
-        if (bestIdx < 0) break
-        const [vp] = pool.splice(bestIdx, 1)
-        const pos = input.snap ? input.snap(vp) : { x: vp.x, y: vp.y }
-        if (kept.some((k) => Math.hypot(k.x - pos.x, k.y - pos.y) < 0.012)) continue
-        kept.push({ type: vp.type, x: round3(clamp01(pos.x)), y: round3(clamp01(pos.y)), category: categoryOf(vp.type), ...(vp.room ? { room: vp.room } : {}) })
-        if (deficit.has(vp.type)) deficit.set(vp.type, (deficit.get(vp.type) ?? 0) - 1)
+    stats.visionFirst = true
+    stats.baseFromVision = kept.length
+    stats.verified = kept.length
+    const deficit = new Map<string, number>()
+    for (const [t, n] of Object.entries(input.vision.annotatedCounts)) {
+      if (!isSwitchFamily(t)) continue
+      const got = kept.filter((k) => k.type === t).length
+      if (n > got) deficit.set(t, n - got)
+    }
+    if (deficit.size) {
+      candidates.forEach((p, i) => {
+        // 只补经过局部复核确认为开关的候选，避免把本地误判的插座补成开关
+        const v = input.verdicts.get(i)
+        if (!v || v.confidence < minConf || !isSwitchFamily(v.kind)) return
+        const need = deficit.get(v.kind)
+        if (!need) return
+        const pos = input.snap ? input.snap({ type: v.kind, x: p.x, y: p.y }) : { x: p.x, y: p.y }
+        const x = round3(clamp01(pos.x))
+        const y = round3(clamp01(pos.y))
+        if (kept.some((k) => Math.hypot(k.x - x, k.y - y) < 0.012)) return
+        kept.push({ ...p, type: v.kind, category: categoryOf(v.kind), x, y })
+        deficit.set(v.kind, need - 1)
         stats.added++
-        need--
+      })
+    }
+  } else {
+    // 1. 逐个复核本地候选
+    candidates.forEach((p, i) => {
+      const v = input.verdicts.get(i)
+      if (!v) {
+        kept.push({ ...p })
+        return
+      }
+      stats.verified++
+      const confident = v.confidence >= minConf
+      if (confident && (v.kind === 'none' || v.kind === 'socket')) {
+        stats.dropped++
+        if (v.kind === 'socket') stats.droppedSockets++
+        return
+      }
+      let type = p.type
+      if (confident) {
+        if (v.kind.startsWith('switch-') || v.kind === 'touch-panel') type = v.kind
+        else if (v.kind === 'light') type = isLightType(p.type) ? p.type : 'downlight'
+        else if (v.kind === 'sensor') type = p.type.endsWith('-sensor') ? p.type : 'motion-sensor'
+        else if (v.kind === 'curtain') type = 'curtain-track'
+      }
+      if (type !== p.type) stats.retyped++
+      kept.push({ ...p, type, category: categoryOf(type) })
+    })
+
+    // 2. 补充视觉模型找到而本地漏掉的点位（按类别控制数量上限，避免凭空多出）
+    if (vision && vision.points.length) {
+      // 其他智能设备（风管机/VRF、传感器、窗帘、门锁、摄像头、AP、网关）本地识别器基本识别不到，按视觉模型结果补充（与已有点位去重）
+      let otherAdded = 0
+      for (const vp of vision.points) {
+        if (famOf(vp.type) !== 'other' || otherAdded >= 30) continue
+        if (kept.some((k) => k.type === vp.type && Math.hypot(k.x - vp.x, k.y - vp.y) < 0.035))
+          continue
+        const pos = input.snap ? input.snap(vp) : { x: vp.x, y: vp.y }
+        kept.push({
+          type: vp.type,
+          x: round3(clamp01(pos.x)),
+          y: round3(clamp01(pos.y)),
+          category: 'other',
+          ...(vp.room ? { room: vp.room } : {}),
+        })
+        stats.added++
+        otherAdded++
+      }
+      for (const fam of ['switch', 'light'] as const) {
+        const keptFam = kept.filter((p) => famOf(p.type) === fam).length
+        const visionFam = vision.points.filter((p) => famOf(p.type) === fam)
+        const annotatedFam = Object.entries(vision.annotatedCounts)
+          .filter(([t]) => famOf(t) === fam)
+          .reduce((s, [, n]) => s + n, 0)
+        const target = annotatedFam > 0 ? annotatedFam : visionFam.length
+        let need = Math.min(40, target - keptFam)
+        if (need <= 0) continue
+        // 按图纸标注统计每种型号还缺几个，优先补缺的型号
+        const deficit = new Map<string, number>()
+        for (const [t, n] of Object.entries(vision.annotatedCounts)) {
+          if (famOf(t) === fam) deficit.set(t, n - kept.filter((k) => k.type === t).length)
+        }
+        const pool = [...visionFam]
+        // 贪心选点：每次选离已有点位最远的候选（避免把视觉模型对同一符号的重复坐标都加进来）
+        while (need > 0 && pool.length) {
+          const famPoints = kept.filter((k) => famOf(k.type) === fam)
+          let bestIdx = -1
+          let bestScore = -Infinity
+          pool.forEach((vp, idx) => {
+            const dist = Math.min(1, ...famPoints.map((k) => Math.hypot(k.x - vp.x, k.y - vp.y)))
+            if (dist <= 0.035) return
+            const score = dist + ((deficit.get(vp.type) ?? 0) > 0 ? 1 : 0)
+            if (score > bestScore) {
+              bestScore = score
+              bestIdx = idx
+            }
+          })
+          if (bestIdx < 0) break
+          const [vp] = pool.splice(bestIdx, 1)
+          const pos = input.snap ? input.snap(vp) : { x: vp.x, y: vp.y }
+          if (kept.some((k) => Math.hypot(k.x - pos.x, k.y - pos.y) < 0.012)) continue
+          kept.push({
+            type: vp.type,
+            x: round3(clamp01(pos.x)),
+            y: round3(clamp01(pos.y)),
+            category: categoryOf(vp.type),
+            ...(vp.room ? { room: vp.room } : {}),
+          })
+          if (deficit.has(vp.type)) deficit.set(vp.type, (deficit.get(vp.type) ?? 0) - 1)
+          stats.added++
+          need--
+        }
       }
     }
   }
@@ -230,18 +363,31 @@ export function fuseDetections(input: {
 
   const switchPoints = points.filter((p) => isSwitchFamily(p.type))
   const lightPoints = points.filter((p) => isLightType(p.type))
-  const preferSwitchesOnly = Boolean(input.sheetName && /开关/.test(input.sheetName)) && switchPoints.length > 0
+  const preferSwitchesOnly =
+    Boolean(input.sheetName && /开关/.test(input.sheetName)) && switchPoints.length > 0
   const summary = buildCadDetectionSummary(points, areas)
   const confirmText = buildFusionConfirmText(points, stats, vision, input.modelLabel)
   summary.confirmText = confirmText
   return {
-    result: { points: preferSwitchesOnly ? switchPoints : points, switchPoints, lightPoints, areas, summary, hasColorSymbols: input.local.hasColorSymbols },
+    result: {
+      points: preferSwitchesOnly ? switchPoints : points,
+      switchPoints,
+      lightPoints,
+      areas,
+      summary,
+      hasColorSymbols: input.local.hasColorSymbols,
+    },
     stats,
     confirmText,
   }
 }
 
-export function buildFusionConfirmText(points: DetectedCadPoint[], stats: FusionStats, vision: VisionFullAnalysis | null, modelLabel?: string): string {
+export function buildFusionConfirmText(
+  points: DetectedCadPoint[],
+  stats: FusionStats,
+  vision: VisionFullAnalysis | null,
+  modelLabel?: string,
+): string {
   const count = (t: string) => points.filter((p) => p.type === t).length
   const switches = points.filter((p) => p.type.startsWith('switch-'))
   const touch = count('touch-panel')
@@ -252,28 +398,54 @@ export function buildFusionConfirmText(points: DetectedCadPoint[], stats: Fusion
     .filter(Boolean)
     .join(' · ')
   const lines: string[] = []
-  lines.push(`识别到 ${points.length} 个点位（${vision ? `本地几何识别 + ${modelLabel || '视觉模型'}复核` : '本地几何识别'}）：`)
-  lines.push(`- 开关面板 ${switches.length}${subtypes ? `（${subtypes}）` : ''}${touch ? ` · 智能屏 ${touch}` : ''}`)
+  if (stats.visionFirst) {
+    lines.push(
+      `识别到 ${points.length} 个点位（${modelLabel || '视觉模型'}直读 + 本地几何吸附校验）：`,
+    )
+  } else {
+    lines.push(
+      `识别到 ${points.length} 个点位（${vision ? `本地几何识别 + ${modelLabel || '视觉模型'}复核` : '本地几何识别'}）：`,
+    )
+  }
+  lines.push(
+    `- 开关面板 ${switches.length}${subtypes ? `（${subtypes}）` : ''}${touch ? ` · 智能屏 ${touch}` : ''}`,
+  )
   if (lights) lines.push(`- 灯具 ${lights}`)
   if (others > 0) lines.push(`- 其他设备 ${others}`)
-  if (vision) {
+  if (vision && stats.visionFirst) {
+    lines.push(
+      `视觉直读 ${stats.baseFromVision ?? points.length} 个点位${stats.added ? `，按图纸标注从本地候选补充 ${stats.added} 个` : ''}。`,
+    )
+  } else if (vision) {
     const fixes: string[] = []
-    if (stats.dropped) fixes.push(`剔除 ${stats.dropped} 处误报${stats.droppedSockets ? `（其中插座 ${stats.droppedSockets} 处）` : ''}`)
+    if (stats.dropped)
+      fixes.push(
+        `剔除 ${stats.dropped} 处误报${stats.droppedSockets ? `（其中插座 ${stats.droppedSockets} 处）` : ''}`,
+      )
     if (stats.retyped) fixes.push(`修正 ${stats.retyped} 个型号`)
     if (stats.added) fixes.push(`补充 ${stats.added} 个漏识别点位`)
-    lines.push(`视觉复核：${fixes.length ? fixes.join('，') : stats.verified ? `${stats.verified} 个候选全部核对通过` : '已完成整图核对'}。`)
+    lines.push(
+      `视觉复核：${fixes.length ? fixes.join('，') : stats.verified ? `${stats.verified} 个候选全部核对通过` : '已完成整图核对'}。`,
+    )
+  }
+  if (vision) {
     const annotated = Object.entries(vision.annotatedCounts).filter(([t]) => isSwitchFamily(t))
     if (annotated.length) {
       const label = annotated.map(([t, n]) => `${SWITCH_LABEL[t] ?? t} ${n}`).join(' / ')
       const diffs = annotated
         .map(([t, n]) => {
           const got = count(t)
-          return got === n ? '' : `${SWITCH_LABEL[t] ?? t}${got < n ? `少 ${n - got}` : `多 ${got - n}`} 个`
+          return got === n
+            ? ''
+            : `${SWITCH_LABEL[t] ?? t}${got < n ? `少 ${n - got}` : `多 ${got - n}`} 个`
         })
         .filter(Boolean)
-      lines.push(`图纸文字标注：${label}；${diffs.length ? `差异：${diffs.join('、')}，请在点位图中核对` : '与识别结果一致'}。`)
+      lines.push(
+        `图纸文字标注：${label}；${diffs.length ? `差异：${diffs.join('、')}，请在点位图中核对` : '与识别结果一致'}。`,
+      )
     }
-    if (vision.socketCount) lines.push(`另有插座约 ${vision.socketCount} 个（按规范不生成点位，可在报价中按需添加）。`)
+    if (vision.socketCount)
+      lines.push(`另有插座约 ${vision.socketCount} 个（按规范不生成点位，可在报价中按需添加）。`)
   }
   return lines.join('\n')
 }

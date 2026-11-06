@@ -8,6 +8,16 @@ export const aiImportSpec: PluginAiSpec = {
   ],
   knowledge: [
     {
+      id: 'switch-plan-vision-first',
+      title: '开关布置图视觉直读策略',
+      summary: '彩色铭牌开关图以视觉模型直读点位为主，本地几何识别只做吸附校验；插座只统计不落点',
+      rules: [
+        '彩色底白字开关铭牌图优先让视觉模型直读点位，本地几何识别仅负责坐标吸附、去重与按图纸标注数量补缺。',
+        '插座（四孔/五孔/16A/网插）只统计 socketCount，不生成点位。',
+        '图纸文字统计与实际点位数不一致时，在确认文案中提示差异，由人工核对。',
+      ],
+    },
+    {
       id: 'fmkj-points-protocol',
       title: 'fmkj-points 户型图点位识别 JSON 协议',
       summary: '基于 3:2 标准图纸的 0~1 比例坐标记录房间区域与设备点位',
@@ -22,6 +32,25 @@ export const aiImportSpec: PluginAiSpec = {
   tools: [],
   skills: [
     {
+      id: 'tpl-switch-plan-recognition',
+      name: '开关布置图识别（插座不落点）',
+      category: '图纸识图',
+      description: '按视觉直读模式识别开关面板与智能屏，读取图例和插座数量，但不生成插座点位',
+      modelHint: 'vision',
+      recommendedModelId: 'qwen3.7-plus',
+      requiredPlugins: ['ai-import'],
+      variables: [
+        {
+          key: 'scope',
+          label: '识别范围',
+          defaultValue: '仅开关面板与智能屏',
+          options: ['仅开关面板与智能屏', '开关面板 + 灯具'],
+        },
+      ],
+      promptTemplate:
+        '请按【{scope}】重新识别当前图纸：先读图例和房间文字统计，再让视觉模型直读开关面板/智能屏点位；本地几何识别只做坐标吸附与补缺。插座只统计数量，不生成点位。',
+    },
+    {
       id: 'tpl-blueprint-vision',
       name: '户型图 AI 识图协议生成',
       category: '图纸识图',
@@ -30,8 +59,18 @@ export const aiImportSpec: PluginAiSpec = {
       recommendedModelId: 'qwen-vl-plus',
       requiredPlugins: ['ai-import'],
       variables: [
-        { key: 'sheetName', label: '图纸楼层', defaultValue: '一层平面图', options: ['一层平面图', '二层平面图', '地下室平面图', '全套标准图'] },
-        { key: 'scope', label: '布点范围', defaultValue: '全屋点位（含灯光开关与传感）', options: ['全屋点位（含灯光开关与传感）', '仅智能开关与插座', '不含灯具（后装改造）'] },
+        {
+          key: 'sheetName',
+          label: '图纸楼层',
+          defaultValue: '一层平面图',
+          options: ['一层平面图', '二层平面图', '地下室平面图', '全套标准图'],
+        },
+        {
+          key: 'scope',
+          label: '布点范围',
+          defaultValue: '全屋点位（含灯光开关与传感）',
+          options: ['全屋点位（含灯光开关与传感）', '仅智能开关与插座', '不含灯具（后装改造）'],
+        },
       ],
       promptTemplate:
         '请按「AI 识别导入」插件规范，针对【{sheetName}】按【{scope}】生成 fmkj-points JSON 识图提示词与导入校验清单。',

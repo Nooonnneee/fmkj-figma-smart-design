@@ -123,4 +123,25 @@ const before = JSON.stringify(det)
 fuseDetections({ local: det, candidates, verdicts, vision })
 assert.equal(JSON.stringify(det), before)
 
-console.log(`PASS ${checks} assertions: verdict normalisation, vision JSON validation, socket/none removal, gang correction, annotated-count completion, room override, mismatch reporting and immutability`)
+// vision-first：模型直读点位为主，本地只在标注数量不足时补缺，插座永远不落点。
+const vfVision = normalizeVisionAnalysis({
+  annotatedCounts: { 'switch-2': 2, 'switch-1': 1 },
+  socketCount: 54,
+  points: [
+    { type: 'switch-2', x: 0.19, y: 0.2 },
+    { type: 'switch-1', x: 0.3, y: 0.3 },
+    { type: 'socket', x: 0.4, y: 0.4 },
+  ],
+  areas: [{ name: '客厅', type: 'living-room', rect: [0.1, 0.1, 0.5, 0.5] }],
+})
+const vfLocal = local([pt('switch-2', 0.2, 0.2), pt('switch-2', 0.8, 0.8), pt('switch-1', 0.3, 0.3), pt('socket', 0.45, 0.45)])
+const vf = fuseDetections({ local: vfLocal, verdicts: new Map([[1, { kind: 'switch-2', confidence: 0.9 }]]), vision: vfVision, strategy: 'vision-first', modelLabel: 'Qwen3.7-plus' })
+assert.equal(vf.stats.visionFirst, true)
+assert.equal(vf.stats.baseFromVision, 2, 'model points are the base')
+assert.equal(vf.stats.added, 1, 'local candidate fills the annotated switch-2 deficit')
+assert.equal(vf.result.switchPoints.length, 3)
+assert.ok(vf.result.points.every((p) => !p.type.startsWith('socket')), 'socket points never enter the point map')
+assert.match(vf.confirmText, /视觉直读/)
+assert.match(vf.confirmText, /插座约 54 个/)
+
+console.log(`PASS ${checks} assertions: verdict normalisation, vision JSON validation, socket/none removal, gang correction, annotated-count completion, room override, mismatch reporting, vision-first base/补充 and immutability`)
