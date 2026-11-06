@@ -1,6 +1,6 @@
 /**
  * 其余空间：场景章节没有展开的房间，逐间列出设备与小计，保证每个点位都有着落。
- * 设备类别少的房间用三行紧凑卡片（每页最多 12 间），否则两行（每页 8 间）。
+ * 少设备房间每页最多8间；明细较多时用三列两排，长房间名则保留一排。
  */
 import type { Room } from '@/lib/project-docs'
 import { cn } from '@/lib/utils'
@@ -18,14 +18,16 @@ export function paginateRooms(rooms: Room[]): RoomPage[] {
   let i = 0
   while (i < rooms.length) {
     let run = 0
-    while (run < 12 && i + run < rooms.length && rooms[i + run]!.lines.length <= COMPACT_LINES) run++
+    while (run < 8 && i + run < rooms.length && rooms[i + run]!.lines.length <= COMPACT_LINES) run++
     // 紧凑卡片至少能排满两行，或者剩下的房间都适合紧凑排列
     if (run >= 8 || (run > 0 && i + run === rooms.length)) {
       pages.push({ rooms: rooms.slice(i, i + run), compact: true })
       i += run
     } else {
-      pages.push({ rooms: rooms.slice(i, i + 8), compact: false })
-      i += 8
+      const next = rooms.slice(i, i + 6)
+      const size = next.some((r) => r.displayName.length > 18) ? 3 : 6
+      pages.push({ rooms: rooms.slice(i, i + size), compact: false })
+      i += size
     }
   }
   return pages
@@ -45,37 +47,37 @@ export function RoomsPage({ ctx, no, total, page, rooms: roomCount, part }: { ct
       />
       <div
         className={cn(
-          'grid min-h-0 w-full grid-cols-4 gap-[20px] overflow-hidden',
-          compact ? 'auto-rows-[206px]' : rooms.length > 4 ? 'flex-1 grid-rows-2' : 'h-[330px]',
+          'grid min-h-0 w-full auto-rows-max content-start items-start gap-[20px] overflow-hidden',
+          rooms.length <= 2 ? 'grid-cols-2' : !compact || rooms.length === 3 ? 'grid-cols-3' : 'grid-cols-4',
         )}
       >
         {rooms.map((r) => (
           <div
             key={r.areaId}
-            className={cn('flex min-h-0 flex-col overflow-hidden rounded-(--deck-radius-sm) border border-doc-rule bg-(--deck-diagram) px-[18px]', compact ? 'py-[14px]' : 'py-[16px]')}
+            className={cn('flex min-w-0 flex-col overflow-hidden rounded-(--deck-radius-sm) border border-doc-rule bg-(--deck-diagram) px-[18px] py-[14px]', compact ? 'min-h-[250px]' : 'min-h-[310px]')}
           >
             <div className="flex items-baseline justify-between gap-2">
-              <p className="doc-display truncate text-[18px] leading-normal">{r.displayName}</p>
-              <p className="doc-latin shrink-0 text-[12px] text-doc-accent">{r.total}点</p>
+              <p className="doc-display min-w-0 line-clamp-2 text-[20px] leading-[1.35] wrap-anywhere">{r.displayName}</p>
+              <p className="doc-latin shrink-0 text-[14px] text-doc-accent">{r.total}点</p>
             </div>
-            <p className="doc-body mt-[2px] truncate text-[12px] text-doc-muted">
+            <p className="doc-body mt-[4px] line-clamp-2 text-[14px] leading-[1.4] text-doc-muted wrap-anywhere">
               {r.typeLabel} · {[...new Set(r.lines.map((l) => l.typeName))].slice(0, 3).join('、')}
             </p>
             <div className={cn('flex min-h-0 flex-1 flex-col border-t border-doc-rule', compact ? 'mt-[10px] gap-[4px] pt-[8px]' : 'mt-[12px] gap-[6px] pt-[10px]')}>
               {r.lines.slice(0, maxLines).map((l) => (
-                <div key={`${l.deviceType}-${l.product?.id ?? 'p'}`} className="doc-body flex justify-between gap-2 text-[13px] leading-[1.5]">
-                  <span className="truncate">
+                <div key={`${l.deviceType}-${l.product?.id ?? 'p'}`} className="doc-body flex justify-between gap-2 text-[15px] leading-[1.5]">
+                  <span className="min-w-0 wrap-anywhere">
                     {l.typeName} ×{l.count}
                     {l.product?.unit || '个'}
                   </span>
                   <span className="doc-latin shrink-0 text-doc-muted">{l.product ? yuanShort(l.subtotal) : '待选型'}</span>
                 </div>
               ))}
-              {r.lines.length > maxLines ? <p className="doc-body text-[12px] text-doc-muted">另含 {r.lines.length - maxLines} 类设备</p> : null}
+              {r.lines.length > maxLines ? <p className="doc-body text-[13px] text-doc-muted">另含 {r.lines.length - maxLines} 类设备，见报价明细</p> : null}
             </div>
             <div className={cn('flex items-end justify-between border-t border-doc-rule', compact ? 'mt-[8px] pt-[8px]' : 'mt-[10px] pt-[10px]')}>
-              <p className="doc-body text-[13px] text-doc-muted">设备小计</p>
-              <p className={cn(amountFont(ctx), 'leading-none text-doc-accent', compact ? 'text-[20px]' : 'text-[22px]')}>{yuanShort(r.subtotal)}</p>
+              <p className="doc-body text-[14px] text-doc-muted">设备小计</p>
+              <p className={cn(amountFont(ctx), 'leading-none text-doc-accent', compact ? 'text-[23px]' : 'text-[26px]')}>{yuanShort(r.subtotal)}</p>
             </div>
           </div>
         ))}

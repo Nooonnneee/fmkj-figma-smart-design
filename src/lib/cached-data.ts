@@ -1,4 +1,5 @@
 import { relId } from '@/lib/access'
+import { APP_NAME } from '@/lib/brand'
 import { CACHE_TAGS } from '@/lib/cache-tags'
 import { deviceTypeOf } from '@/lib/device-types'
 import { memoize } from '@/lib/memo-cache'
@@ -215,7 +216,7 @@ function resolveCompanyQr(qr: Media | null, rawUrl: string | null, fallbackAlt: 
 }
 
 const getBaseCompanyInfo = memoize(
-  'company-settings-v8',
+  'company-settings-v9',
   [CACHE_TAGS.company],
   TTL,
   async (): Promise<CompanyInfo> => {
@@ -232,8 +233,11 @@ const getBaseCompanyInfo = memoize(
     const logoUrl = resolveMediaUrl(logo)
     const qrUrl = resolveMediaUrl(qr)
     const qrCaption = s.qrCaption ?? '扫码添加微信'
+    const configuredName = s.name?.trim()
+    const platformBrand = !configuredName || configuredName === 'FMKJ 智能家居' || configuredName === APP_NAME
+    const name = platformBrand ? APP_NAME : (configuredName || APP_NAME)
     return {
-      name: s.name || 'FMKJ 智能家居',
+      name,
       slogan: s.slogan ?? null,
       phone: s.phone ?? null,
       email: s.email ?? null,
@@ -245,7 +249,9 @@ const getBaseCompanyInfo = memoize(
       documentDefaults: parseDocumentDefaults(s.documentDefaults),
       disabledPlugins: Array.isArray(s.disabledPlugins) ? s.disabledPlugins.filter((v): v is string => typeof v === 'string') : [],
       aiModels: parseAiModels(rawAiModels, parseCustomChannels((ai as unknown as { customChannels?: unknown } | null)?.customChannels)),
-      logo: logo && logoUrl ? { url: logoUrl, alt: logo.alt || s.name, width: logo.width ?? null, height: logo.height ?? null } : null,
+      logo: logo && logoUrl
+        ? { url: logoUrl, alt: logo.alt || name, width: logo.width ?? null, height: logo.height ?? null }
+        : platformBrand ? { url: '/brand/fmkj-logo.svg', alt: APP_NAME, width: 436, height: 120 } : null,
       qrCode: resolveCompanyQr(qr, qrUrl, qrCaption),
     }
   },

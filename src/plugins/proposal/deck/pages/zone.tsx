@@ -4,34 +4,19 @@
  * 房间智能分析插件关闭时不展示推荐场景，改为列出各房间的设备配置。
  */
 import type { Room } from '@/lib/project-docs'
+import { sceneVisualForRoom } from '@/lib/scene-visuals'
 import { cn } from '@/lib/utils'
 
 import { installNote, roomScenes, yuanShort, ZONE_COPY, type DeckZone, type SceneItem } from '../model'
 import { amountFont, Chapter, Panel, PlanCard, PlanView, Photo, roomCrop, SectionTitle, Slide, type DeckCtx } from '../parts'
+import { SceneProductFigure } from '../scene-product-figure'
+import { matchSceneProducts } from '../scene-products'
 
 const CN = ['一', '二', '三', '四']
 const SENSOR_TYPES = ['water-sensor', 'smoke-sensor', 'contact-sensor', 'motion-sensor']
-/** 照片标注优先展示的设备 */
-const CALLOUT_ORDER = ['smart-lock', 'gateway', 'water-sensor', 'smoke-sensor', 'curtain-track', 'touch-panel', 'contact-sensor', 'switch-2', 'switch-3', 'switch-1', 'switch-4', 'ceiling-ap', 'ap-node', 'ac-router', 'camera', 'motion-sensor', 'speaker']
 
 const unitOf = (l: Room['lines'][number]) => l.product?.unit || '个'
 const lineText = (l: Room['lines'][number]) => `${l.typeName} ×${l.count}${unitOf(l)}`
-
-function callouts(zone: DeckZone) {
-  const pts = zone.points.slice().sort((a, b) => {
-    const ia = CALLOUT_ORDER.indexOf(a.deviceType)
-    const ib = CALLOUT_ORDER.indexOf(b.deviceType)
-    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)
-  })
-  const out: { no: number; code: string; deviceType: string }[] = []
-  for (const p of pts) {
-    if (out.length >= 2) break
-    // 标注用设备名称（客户看得懂），不用施工代号；同类设备只标一个
-    if (out.some((o) => o.code === p.typeName)) continue
-    out.push({ no: p.no, code: p.typeName, deviceType: p.deviceType })
-  }
-  return out
-}
 
 /** 分章的边界说明（不承诺做不到的事） */
 function boundary(zone: DeckZone): { title: string; body: string } {
@@ -57,15 +42,15 @@ function boundary(zone: DeckZone): { title: string; body: string } {
 function SceneBlock({ ctx, scene, index }: { ctx: DeckCtx; scene: SceneItem; index: number }) {
   const name = scene.name.replace(/模式$/, '')
   return (
-    <div className="flex flex-col gap-[10px] border-b border-doc-rule py-[18px]">
-      <p className="doc-display flex items-center gap-[10px] text-[20px] leading-normal">
+    <div className="flex flex-col gap-[10px] border-b border-doc-rule py-[15px]">
+      <p className="doc-display flex items-center gap-[10px] text-[22px] leading-normal">
         <span aria-hidden className={cn('size-[8px] shrink-0 bg-doc-accent', ctx.theme.rounded && 'rounded-full')} />
         {name} / 场景{CN[index] ?? index + 1}
       </p>
-      <p className="doc-body text-[14px] leading-[1.6] text-doc-muted">
+      <p className="doc-body text-[15px] leading-[1.55] text-doc-muted">
         <span className="mr-[14px]">条件</span>手动选择「{name}」，或在场景面板 / App 中一键触发，由业主确认后启用。
       </p>
-      <p className="doc-body text-[15px] leading-[1.6]">
+      <p className="doc-body text-[17px] leading-[1.55]">
         <span className="mr-[12px]">→</span>
         {scene.action}
       </p>
@@ -73,21 +58,31 @@ function SceneBlock({ ctx, scene, index }: { ctx: DeckCtx; scene: SceneItem; ind
   )
 }
 
-/** 推荐场景关闭时：列出房间设备配置 */
-function ConfigBlock({ r }: { r: Room }) {
+/** 推荐场景关闭时：按类型汇总配置，完整型号保留在投资明细和报价单。 */
+function ConfigBlock({ ctx, r }: { ctx: DeckCtx; r: Room }) {
+  const byType = new Map<string, { name: string; count: number; unit: string }>()
+  for (const line of r.lines) {
+    const current = byType.get(line.deviceType)
+    if (current) current.count += line.count
+    else byType.set(line.deviceType, { name: line.typeName, count: line.count, unit: unitOf(line) })
+  }
+  const types = [...byType.values()]
   return (
-    <div className="flex flex-col gap-[8px] border-b border-doc-rule py-[16px]">
-      <p className="doc-display text-[18px] leading-normal">
+    <div className="flex flex-col gap-[5px] border-b border-doc-rule py-[10px]">
+      <p className="doc-display text-[20px] leading-[1.35] wrap-anywhere">
         {r.displayName} · {r.typeLabel}
       </p>
-      {r.lines.slice(0, 5).map((l) => (
-        <p key={`${l.deviceType}-${l.product?.id ?? 'p'}`} className="doc-body flex justify-between gap-4 text-[13px] text-doc-muted">
-          <span className="truncate">
-            {l.typeName} ×{l.count}
-            {unitOf(l)}　{l.product?.name ?? '待选型'}
-          </span>
+      {types.slice(0, 4).map((type) => (
+        <p key={type.name} className="doc-body flex justify-between gap-4 text-[14px] leading-[1.5] text-doc-muted">
+          <span className="wrap-anywhere">{type.name}</span>
+          <span className="shrink-0">×{type.count}{type.unit}</span>
         </p>
       ))}
+      {types.length > 4 ? <p className="doc-body text-[13px] text-doc-muted">另含 {types.length - 4} 类设备，见报价明细</p> : null}
+      <p className="doc-body mt-[2px] flex items-baseline justify-between gap-4 text-[14px]">
+        <span>设备小计</span>
+        <span className={cn(amountFont(ctx), 'shrink-0 text-[23px] text-doc-accent')}>{yuanShort(r.subtotal)}</span>
+      </p>
     </div>
   )
 }
@@ -97,20 +92,20 @@ function RoomBlock({ ctx, r }: { ctx: DeckCtx; r: Room }) {
   const lines = r.lines.slice(0, 4)
   return (
     <div className="flex min-w-0 flex-col">
-      <p className="doc-strong truncate text-[18px] leading-normal">
+      <p className="doc-strong line-clamp-2 text-[20px] leading-[1.35] wrap-anywhere">
         {r.displayName} · {r.total}点
       </p>
-      <div className="doc-body mt-[10px] flex flex-col gap-[4px] text-[13px] leading-[1.6] text-doc-muted">
+      <div className="doc-body mt-[8px] flex flex-col gap-[4px] text-[15px] leading-[1.5] text-doc-muted">
         {lines.map((l) => (
-          <p key={`${l.deviceType}-${l.product?.id ?? 'p'}`} className="truncate">
+          <p key={`${l.deviceType}-${l.product?.id ?? 'p'}`} className="wrap-anywhere">
             {lineText(l)}　{l.product ? yuanShort(l.subtotal) : '待选型'}
           </p>
         ))}
         {r.lines.length > lines.length ? <p>另含 {r.lines.length - lines.length} 类设备，见报价明细</p> : null}
       </div>
-      <div className="mt-[10px] flex items-end justify-between border-t border-doc-rule pt-[12px]">
-        <p className="doc-body text-[14px] leading-normal">{r.displayName}设备小计</p>
-        <p className={cn(amountFont(ctx), 'text-[26px] leading-none text-doc-accent')}>{yuanShort(r.subtotal)}</p>
+      <div className="mt-[8px] flex items-end justify-between gap-[12px] border-t border-doc-rule pt-[10px]">
+        <p className="doc-body min-w-0 text-[15px] leading-normal wrap-anywhere">{r.displayName}设备小计</p>
+        <p className={cn(amountFont(ctx), 'shrink-0 text-[28px] leading-none text-doc-accent')}>{yuanShort(r.subtotal)}</p>
       </div>
     </div>
   )
@@ -159,31 +154,44 @@ export function ZonePage({ ctx, no, total, zone, insights }: { ctx: DeckCtx; no:
   const minis = zone.key === 'rest' || zone.key === 'care'
   const note = boundary(zone)
   const roomNames = rooms.map((r) => r.displayName).join('与')
-  const photoH = minis ? 386 : 414
+  const photoH = minis ? 410 : 440
   const priced = zone.key === 'rest'
+  // 一张氛围图只展示一个真实房间的选型，不把同名或邻近空间的型号混进来。
+  const sceneRoom = rooms.find((room) => sceneVisualForRoom(room.areaType))
+  const visual = sceneRoom ? sceneVisualForRoom(sceneRoom.areaType) : null
+  const products = visual && sceneRoom
+    ? matchSceneProducts(visual, sceneRoom.points, ctx.m.d.productById, { roomType: sceneRoom.areaType, maxCallouts: 6 })
+    : null
+  const photoNote = sceneRoom
+    ? `AI场景意向 · ${sceneRoom.displayName}产品位置示意${products?.unplaced.length ? ` · 另${products.unplaced.length}组见报价` : ''}`
+    : ctx.theme.photoNote
   return (
     <Slide ctx={ctx} no={no} total={total} name={`${copy.tag} · ${roomNames}`}>
       <Chapter ctx={ctx} no={no} title={copy.title} subtitle={`${roomNames} / ${copy.subtitle}`} tag={copy.tag} />
-      <div className="flex min-h-0 w-full flex-1 items-start gap-[36px] overflow-hidden">
-        <div className="flex w-[776px] shrink-0 flex-col">
-          <Photo src={zone.photo} width={776} height={photoH} note={`${ctx.theme.photoNote} · 点位关系示意`} callouts={callouts(zone)} />
+      <div className="flex min-h-0 w-full flex-1 items-start gap-[24px] overflow-hidden">
+        <div className="flex w-[864px] shrink-0 flex-col">
+          {visual && products ? (
+            <SceneProductFigure visual={visual} callouts={products.callouts} width={864} height={photoH} lazy={ctx.lazy} note={photoNote} />
+          ) : (
+            <Photo src={zone.photo} width={864} height={photoH} note={photoNote} />
+          )}
           {minis ? (
             rooms.length > 1 ? (
-              <div className="mt-[14px] grid grid-cols-2 gap-[24px]">
+              <div className="mt-[12px] grid grid-cols-2 gap-[24px]">
                 {rooms.map((r) => (
                   <div key={r.areaId} className="flex min-w-0 flex-col gap-[8px]">
-                    <RoomMini ctx={ctx} r={r} width={376} height={132} />
-                    <p className="doc-body truncate text-[12px] text-doc-muted">{caption(r)}</p>
+                    <RoomMini ctx={ctx} r={r} width={420} height={160} />
+                    <p className="doc-body line-clamp-2 text-[13px] leading-[1.45] text-doc-muted wrap-anywhere">{caption(r)}</p>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="mt-[14px] flex gap-[24px]">
-                <RoomMini ctx={ctx} r={rooms[0]} width={332} height={164} />
+              <div className="mt-[12px] flex gap-[24px]">
+                <RoomMini ctx={ctx} r={rooms[0]} width={366} height={176} />
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <p className="doc-strong truncate text-[15px] leading-[1.7]">{rooms[0].displayName} / {rooms[0].typeLabel}</p>
+                  <p className="doc-strong line-clamp-2 text-[17px] leading-[1.45] wrap-anywhere">{rooms[0].displayName} / {rooms[0].typeLabel}</p>
                   {rooms[0].lines.slice(0, 3).map((l) => (
-                    <p key={`${l.deviceType}-${l.product?.id ?? 'p'}`} className="doc-body truncate text-[14px] leading-[1.7]">
+                    <p key={`${l.deviceType}-${l.product?.id ?? 'p'}`} className="doc-body line-clamp-2 text-[14px] leading-[1.5] wrap-anywhere">
                       {l.product?.name || l.typeName} · {lineText(l)}
                     </p>
                   ))}
@@ -195,16 +203,16 @@ export function ZonePage({ ctx, no, total, zone, insights }: { ctx: DeckCtx; no:
               </div>
             )
           ) : (
-            <div className="mt-[22px] grid grid-cols-2 gap-[28px]">
+            <div className="mt-[18px] grid grid-cols-2 gap-[28px]">
               {rooms.map((r) => (
                 <RoomBlock key={r.areaId} ctx={ctx} r={r} />
               ))}
             </div>
           )}
-          {minis ? <p className="doc-body mt-[12px] text-[12px] text-doc-muted">示意，非施工图；房间小平面取自总平面，仅表示相对位置，尺寸与安装条件以现场复核为准。</p> : null}
+          {minis ? <p className="doc-body mt-[10px] text-[13px] leading-[1.45] text-doc-muted">示意，非施工图；房间小平面取自总平面，仅表示相对位置，尺寸与安装条件以现场复核为准。</p> : null}
         </div>
 
-        <div className="flex w-[516px] shrink-0 flex-col overflow-hidden">
+        <div className="flex w-[440px] shrink-0 flex-col overflow-hidden">
           {showAlert ? (
             <>
               <SectionTitle title="报警逻辑" note="安全规则 / 非新增生活场景" className="pb-[6px]" />
@@ -219,8 +227,8 @@ export function ZonePage({ ctx, no, total, zone, insights }: { ctx: DeckCtx; no:
                 ],
               ].map(([t, body]) => (
                 <div key={t} className="flex flex-col gap-[6px] border-b border-doc-rule py-[14px]">
-                  <p className="doc-strong text-[17px] leading-normal">{t}</p>
-                  <p className="doc-body text-[13px] leading-[1.7] text-doc-muted">{body}</p>
+                  <p className="doc-strong text-[18px] leading-normal">{t}</p>
+                  <p className="doc-body text-[14px] leading-[1.55] text-doc-muted">{body}</p>
                 </div>
               ))}
             </>
@@ -229,21 +237,22 @@ export function ZonePage({ ctx, no, total, zone, insights }: { ctx: DeckCtx; no:
               <div className="h-px w-full shrink-0 bg-doc-rule" />
               {scenes.length
                 ? scenes.slice(0, priced ? 1 : 2).map((s, i) => <SceneBlock key={s.name} ctx={ctx} scene={s} index={i} />)
-                : rooms.map((r) => <ConfigBlock key={r.areaId} r={r} />)}
+                : rooms.map((r) => <ConfigBlock key={r.areaId} ctx={ctx} r={r} />)}
+              {!scenes.length ? <p className="doc-body mt-[10px] text-[12px] leading-[1.5] text-doc-muted">完整设备品牌、型号及数量见投资明细与报价单。</p> : null}
             </>
           )}
-          <Panel title={note.title} className="mt-[20px]">
+          <Panel title={note.title} className="mt-[16px] px-[16px] py-[14px] [&>div]:text-[14px] [&>div]:leading-[1.55] [&>p]:text-[17px]">
             {note.body}
           </Panel>
-          <p className="doc-body mt-[18px] text-[12px] leading-[1.7] text-doc-muted">{installNote([...new Set(zone.points.map((p) => p.deviceType))])}</p>
-          {priced
+          <p className="doc-body mt-[14px] text-[13px] leading-[1.55] text-doc-muted">{installNote([...new Set(zone.points.map((p) => p.deviceType))])}</p>
+          {priced && scenes.length > 0
             ? rooms.map((r) => (
                 <div key={r.areaId} className="mt-[14px] flex items-start justify-between gap-4 border-t border-doc-rule pt-[14px]">
                   <div className="min-w-0">
-                    <p className="doc-body truncate text-[15px] leading-normal">
+                    <p className="doc-body line-clamp-2 text-[16px] leading-[1.45] wrap-anywhere">
                       {r.displayName} · {r.total} 个点位
                     </p>
-                    <p className="doc-body mt-[4px] truncate text-[12px] text-doc-muted">
+                    <p className="doc-body mt-[4px] line-clamp-2 text-[13px] leading-[1.45] text-doc-muted wrap-anywhere">
                       {r.lines.map((l) => l.product?.name || l.typeName).slice(0, 2).join(' / ')} · 设备小计
                     </p>
                   </div>

@@ -77,9 +77,9 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // 方案氛围图（没有版本号，换图时可能沿用文件名）：缓存一天，过期后后台更新
+        // 方案氛围图与校准场景底图：长效缓存 7 天 + 后台静默更新 30 天
         source: '/proposal/:path*',
-        headers: [...securityHeaders, { key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' }],
+        headers: [...securityHeaders, { key: 'Cache-Control', value: 'public, max-age=604800, stale-while-revalidate=2592000' }],
       },
       {
         source: '/:path*',

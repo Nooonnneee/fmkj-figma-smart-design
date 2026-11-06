@@ -87,17 +87,18 @@ export default async function PlansPrintPage({
                 points={pts.map((p) => ({ ...p, image: p.productId ? d.productById.get(p.productId)?.image?.url : null }))}
                 areas={areas}
                 mode={markers}
+                dim={0.7}
                 className="max-h-full w-full"
               />
             )
             return (
-              <DocSheetPage key={sheet.id}>
+              <DocSheetPage key={sheet.id} className="px-[9mm] py-[7mm]">
                 <DocHeader style={style} company={company} meta={`${d.project.name} · ${date}`} />
-                <div className="mt-4">
+                <div className="mt-3">
                   <DocTitle style={style} no={pad(i + 1)} title={`${sheet.name} · ${kind}`} subtitle={`${pts.length} 个点位 · ${rooms} 个房间 · ${types.length} 类设备`} tag="FLOOR PLAN" />
                 </div>
-                <div className={cn('mt-4 grid min-h-0 flex-1 gap-[6mm]', layout === 'clean' ? 'grid-cols-1' : 'grid-cols-[1fr_62mm]')}>
-                  <div className="flex min-h-0 items-center justify-center overflow-hidden rounded-doc border border-doc-rule bg-white p-[3mm]">{figure}</div>
+                <div className={cn('mt-3 grid min-h-0 flex-1 gap-[4mm]', layout === 'clean' ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_52mm]')}>
+                  <div className="flex min-h-0 items-center justify-center overflow-hidden rounded-doc border border-doc-rule bg-white p-[1.5mm]">{figure}</div>
                   {layout === 'clean' ? null : (
                     <div className="min-h-0 overflow-hidden text-[10px]">
                       <table className="w-full border-collapse">

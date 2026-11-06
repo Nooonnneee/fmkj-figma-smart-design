@@ -68,11 +68,24 @@ function collectAtomicBlocks(root: HTMLElement, scale: number): { top: number; b
   }
   // 标题与紧跟它的下一块保持在同一页，避免标题单独留在页底
   for (const el of root.querySelectorAll<HTMLElement>('[data-pdf-keep-next]')) {
+    if (el.closest('[data-pdf-keep-first-row]')) continue
     const r = el.getBoundingClientRect()
     if (r.height <= 0) continue
     const top = Math.max(0, Math.floor((r.top - rootRect.top) * scale))
     const bottom = Math.ceil((r.bottom - rootRect.top) * scale) + Math.round(140 * scale)
     blocks.push({ top, bottom })
+  }
+  // 交底分组按实际首行高度保护，长型号换行后仍能与房间标题、表头一起分页。
+  for (const section of root.querySelectorAll<HTMLElement>('[data-pdf-keep-first-row]')) {
+    const firstRow = section.querySelector<HTMLElement>('tbody tr')
+    if (!firstRow) continue
+    const start = section.getBoundingClientRect()
+    const end = firstRow.getBoundingClientRect()
+    if (start.height <= 0 || end.height <= 0) continue
+    blocks.push({
+      top: Math.max(0, Math.floor((start.top - rootRect.top) * scale)),
+      bottom: Math.ceil((end.bottom - rootRect.top) * scale),
+    })
   }
   // 文档末尾的 footer 与它上方的签字栏保持在同一页，防止最后一页只剩单独一行页脚
   const footerEl = root.querySelector<HTMLElement>('footer')
@@ -146,16 +159,22 @@ function slicePortraitCanvas(source: HTMLCanvasElement, domEl: HTMLElement, scal
       const minCut = y + Math.floor(maxSlice * 0.35)
       // 只要切线压在某个原子块内部，就把切线移到该块上方
       let changed = true
+      let atBlockBoundary = false
       while (changed) {
         changed = false
         for (const b of blocks) {
-          if (b.top > minCut && b.top < nextY && b.bottom > nextY) {
-            nextY = Math.max(minCut, b.top - Math.round(6 * scale))
+          // 相邻表格行共享边界。向前留空会落入上一行，逐行回退到整张表开头；
+          // 保留精确边界，并容忍 floor/ceil 带来的 1px 重叠。
+          if (b.top > minCut && b.top + 2 < nextY && b.bottom - 2 > nextY) {
+            nextY = b.top
+            atBlockBoundary = true
             changed = true
           }
         }
       }
-      nextY = findSafeCutY(srcCtx, safeWidth, nextY, Math.max(minCut, nextY - Math.round(48 * scale)), bg)
+      if (!atBlockBoundary) {
+        nextY = findSafeCutY(srcCtx, safeWidth, nextY, Math.max(minCut, nextY - Math.round(48 * scale)), bg)
+      }
     }
     const sliceH = Math.max(1, nextY - y)
     const pageCanvas = document.createElement('canvas')

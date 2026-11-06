@@ -162,3 +162,4 @@ public/point-icons/** -filter -diff -merge -text
 scripts/point-icons/** -filter -diff -merge -text
 public/proposal-templates/*.jpg -filter -diff -merge -text
 public/proposal/photos/** -filter -diff -merge -text
+public/proposal/scenes/** -filter -diff -merge -text

@@ -1,7 +1,7 @@
 import { relId } from '@/lib/access'
 import { analyzeProject, floorTagFromSheetName, groupRooms, roomKey, type AreaAnalysis } from '@/lib/area-analysis'
 import { getCatalog, getCompanyInfo, resolveMediaUrl, type CatalogProduct } from '@/lib/cached-data'
-import { categoryOfType, DEVICE_CATEGORIES, DEVICE_TYPE_ORDER, deviceTypeOf } from '@/lib/device-types'
+import { categoryOfType, DEVICE_CATEGORIES, DEVICE_TYPE_ORDER, deviceTypeOf, isDeviceType } from '@/lib/device-types'
 import { getPayloadClient } from '@/lib/payload'
 import { assignScenes, loadSceneLibrary } from '@/lib/scenes'
 import { resolveFinalQuote } from '@/lib/deliverables'
@@ -147,13 +147,15 @@ async function loadDocs(projectId: string, user: User | null, scope: PointScope 
   }
 
   if (activeQuote?.items?.length) {
-    for (const item of activeQuote.items) {
+    for (const [index, item] of activeQuote.items.entries()) {
       const pid = relId(item.product)
       const imgDoc = item.image ? (typeof item.image === 'object' ? (item.image as Media) : mediaById.get(String(item.image))) : null
       const imgUrl = imgDoc ? resolveMediaUrl(imgDoc) : null
       if (pid) {
         const base = byId.get(pid)
-        if (base) {
+        // 历史报价可能保留了错误的产品关联，不能把灯具快照覆盖到 AP 等其他类型。
+        // 报价本身的快照仍由提案投资明细原样展示，不用于污染点位选型。
+        if (base && (!item.deviceType || base.deviceType === item.deviceType)) {
           byId.set(pid, {
             ...base,
             name: item.name || base.name,
@@ -162,12 +164,13 @@ async function loadDocs(projectId: string, user: User | null, scope: PointScope 
             price: typeof item.price === 'number' ? item.price : base.price,
             image: imgUrl ? { id: base.image?.id ?? pid, url: imgUrl, alt: item.name || base.name } : base.image,
           })
+          const deviceType = item.deviceType ?? base.deviceType
+          if (isDeviceType(deviceType) && base.status === 'active' && !quoteTypeOverride.has(deviceType)) {
+            quoteTypeOverride.set(deviceType, pid)
+          }
         }
-        if (item.deviceType && !quoteTypeOverride.has(item.deviceType)) {
-          quoteTypeOverride.set(item.deviceType, pid)
-        }
-      } else if (item.deviceType) {
-        const syntheticId = `quote-item-${item.id ?? item.deviceType}`
+      } else if (isDeviceType(item.deviceType)) {
+        const syntheticId = `quote-item-${item.id ?? index}`
         byId.set(syntheticId, {
           id: syntheticId,
           name: item.name,

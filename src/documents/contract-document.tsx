@@ -142,8 +142,8 @@ export function ContractDocument({
         {formal ? (
           <section className="flex min-h-[262mm] flex-col items-center justify-between py-[16mm] text-center break-after-page">
             <div className="flex flex-col items-center gap-3">
-              <BrandMark company={company} className="h-12" />
-              <div className="doc-display text-[15px]">{company.name}</div>
+              {company.logo ? <BrandMark company={company} className="h-12 max-w-[125mm]" /> : null}
+              <div className={cn('doc-display max-w-[125mm] break-words', company.logo ? 'text-[15px]' : 'text-[18px]')}>{company.name}</div>
             </div>
             <div>
               <div className="doc-display text-[32px] tracking-[0.35em]">智能家居工程合同</div>
@@ -307,20 +307,20 @@ export function ContractDocument({
             <table className="mt-3 w-full border-collapse text-[11.5px]">
               <thead>
                 <tr className={t.head}>
-                  <th className={cn(t.th, 'w-10')}>序号</th>
+                  <th className={cn(t.th, 'w-10 whitespace-nowrap')}>序号</th>
                   <th className={t.th}>产品</th>
-                  <th className={t.th}>型号</th>
-                  <th className={cn(t.th, 'text-right')}>单价</th>
-                  <th className={cn(t.th, 'text-right')}>数量</th>
-                  <th className={cn(t.th, 'text-right')}>金额</th>
+                  <th className={cn(t.th, 'w-36')}>型号</th>
+                  <th className={cn(t.th, 'w-24 whitespace-nowrap text-right')}>单价</th>
+                  <th className={cn(t.th, 'w-16 whitespace-nowrap text-right')}>数量</th>
+                  <th className={cn(t.th, 'w-24 whitespace-nowrap text-right')}>金额</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item, i) => (
                   <tr key={item.id ?? i} className={t.row(i)}>
                     <td className={cn(t.td, 'py-1.5 tabular-nums')}>{i + 1}</td>
-                    <td className={cn(t.td, 'py-1.5')}>{item.name}</td>
-                    <td className={cn(t.td, 'py-1.5 text-doc-muted')}>{item.sku}</td>
+                    <td className={cn(t.td, 'py-1.5 [overflow-wrap:anywhere]')}>{item.name}</td>
+                    <td className={cn(t.td, 'py-1.5 text-doc-muted [overflow-wrap:anywhere]')}>{item.sku}</td>
                     <td className={cn(t.td, 'py-1.5 text-right whitespace-nowrap tabular-nums')}>{yuan(item.price)}</td>
                     <td className={cn(t.td, 'py-1.5 text-right whitespace-nowrap tabular-nums')}>{item.quantity}{item.unit ? ` ${item.unit}` : ''}</td>
                     <td className={cn(t.td, 'py-1.5 text-right whitespace-nowrap tabular-nums')}>{yuan(item.price * item.quantity)}</td>

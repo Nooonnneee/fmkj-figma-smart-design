@@ -154,8 +154,8 @@ export default async function ChecklistPrintPage({
             {groups.map((g) => {
               const sheet = g.sheetId ? d.sheets.find((s) => s.id === g.sheetId) : null
               return (
-                <section key={g.key}>
-                  <DocSectionHeading style={style} className="mb-2" title={g.title} note={g.note} />
+                <section key={g.key} data-pdf-keep-first-row>
+                  <DocSectionHeading style={style} className="mb-2 break-after-avoid" title={g.title} note={g.note} />
                   {sheet ? (
                     <div data-pdf-block className="mb-3 overflow-hidden rounded-doc border border-doc-rule bg-white break-inside-avoid">
                       <PlanFigure
@@ -173,16 +173,16 @@ export default async function ChecklistPrintPage({
                       <PlanLegend points={g.points} />
                     </div>
                   ) : null}
-                  <table className="w-full border-collapse text-[11px]">
-                    <thead>
+                  <table className="w-full table-fixed border-collapse text-[11px]">
+                    <thead className="break-after-avoid">
                       <tr className={t.head}>
-                        <th className={cn(t.th, 'w-14')}>代号</th>
-                        <th className={cn(t.th, 'w-20')}>设备</th>
-                        <th className={t.th}>型号 / 产品</th>
-                        <th className={cn(t.th, 'w-28')}>位置</th>
-                        <th className={cn(t.th, 'w-10 text-center')}>安装</th>
-                        <th className={cn(t.th, 'w-10 text-center')}>调试</th>
-                        <th className={cn(t.th, 'w-24')}>备注</th>
+                        <th scope="col" className={cn(t.th, 'w-14 whitespace-nowrap')}>代号</th>
+                        <th scope="col" className={cn(t.th, 'w-20 whitespace-nowrap')}>设备</th>
+                        <th scope="col" className={t.th}>型号 / 产品</th>
+                        <th scope="col" className={cn(t.th, 'w-28 whitespace-nowrap')}>位置</th>
+                        <th scope="col" className={cn(t.th, 'w-10 whitespace-nowrap text-center')}>安装</th>
+                        <th scope="col" className={cn(t.th, 'w-10 whitespace-nowrap text-center')}>调试</th>
+                        <th scope="col" className={cn(t.th, 'w-24 whitespace-nowrap')}>备注</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -192,7 +192,14 @@ export default async function ChecklistPrintPage({
                           <tr key={p.id} className={t.row(i)}>
                             <td className={cn(t.td, 'doc-strong py-1.5 tabular-nums')} style={{ color: `color-mix(in oklch, ${categoryOfType(p.deviceType)?.color ?? '#525252'} 70%, black)` }}>{p.code}</td>
                             <td className={cn(t.td, 'py-1.5')}>{deviceTypeOf(p.deviceType)?.name}</td>
-                            <td className={cn(t.td, 'max-w-0 truncate py-1.5', !product && 'text-doc-muted')}>{product ? `${product.name}（${product.sku}）` : '待选型'}</td>
+                            <td className={cn(t.td, 'whitespace-normal py-1.5 [overflow-wrap:anywhere]', !product && 'text-doc-muted')}>
+                              {product ? (
+                                <>
+                                  <div>{product.name}</div>
+                                  {product.sku ? <div className="doc-latin mt-0.5 text-[10px] leading-relaxed text-doc-muted">{product.sku}</div> : null}
+                                </>
+                              ) : '待选型'}
+                            </td>
                             <td className={cn(t.td, 'py-1.5 text-doc-muted')}>{location(p)}</td>
                             <td className={cn(t.td, 'py-1.5 text-center text-doc-muted')}><DocCheckbox className="align-middle" /></td>
                             <td className={cn(t.td, 'py-1.5 text-center text-doc-muted')}><DocCheckbox className="align-middle" /></td>

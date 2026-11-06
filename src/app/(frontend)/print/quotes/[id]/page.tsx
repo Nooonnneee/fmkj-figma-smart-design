@@ -158,19 +158,20 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
         ]}
       />
       <DocRoot style={style}>
-        <DocArticle>
+        <DocArticle className={layout === 'budget' ? 'px-[12mm] py-[10mm]' : undefined}>
           <DocHeader style={style} company={company} meta={date} />
-          <div className="mt-7">
+          <div className={layout === 'budget' ? 'mt-5' : 'mt-7'}>
             <DocTitle
               style={style}
-              no={yuan(quote.total).replace('.00', '')}
-              title="报价单"
+              no={layout === 'budget' ? undefined : yuan(quote.total).replace('.00', '')}
+              title={layout === 'budget' ? '方案预算概览' : '报价单'}
               subtitle={projectLabel ? `${projectLabel} · ${quoteLabel}` : quote.title}
               tag="QUOTATION"
             />
           </div>
           <DocFacts
-            className="mt-6 border-y border-doc-rule py-4"
+            cols={layout === 'budget' ? 3 : 2}
+            className={cn('border-y border-doc-rule', layout === 'budget' ? 'mt-4 gap-x-5 py-3' : 'mt-6 py-4')}
             items={[
               ['客户', project?.customerName],
               ['电话', project?.customerPhone],
@@ -181,7 +182,7 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
             ]}
           />
 
-          <div className="mt-6">
+          <div className={layout === 'budget' ? 'mt-4' : 'mt-6'}>
             {layout === 'system' ? (
               <div className="space-y-5">
                 <section data-pdf-block className="break-inside-avoid">
@@ -284,8 +285,8 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
                 ) : null}
               </div>
             ) : layout === 'budget' ? (
-              <div className="space-y-6">
-                <section data-pdf-block className="grid grid-cols-[1fr_auto] items-end gap-6 rounded-doc border border-doc-rule p-5 break-inside-avoid">
+              <div className="space-y-4">
+                <section data-pdf-block className="grid grid-cols-[1fr_auto] items-end gap-6 rounded-doc border border-doc-rule p-4 break-inside-avoid">
                   <div>
                     <div className="text-[12px] text-doc-muted">报价合计</div>
                     <div className="doc-numeral mt-1 text-[34px] leading-none text-doc-accent">{yuan(quote.total)}</div>
@@ -311,49 +312,51 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
                     <div className="text-doc-muted">{items.length} 行设备 · 共 {items.reduce((s, i) => s + i.quantity, 0)} 件</div>
                   </div>
                 </section>
-                <section data-pdf-block className="break-inside-avoid">
-                  <DocSectionHeading style={style} className="mb-2" title="各系统预算" note="按设备类别汇总" />
-                  <div className="space-y-2 text-[12px]">
-                    {systems.map((g) => (
-                      <div key={g.key} className="grid grid-cols-[7rem_1fr_6rem_3rem] items-center gap-3">
-                        <span className="flex items-center gap-2">
-                          <span className="size-2 rounded-full" style={{ backgroundColor: g.color }} />
-                          {g.name}
-                        </span>
-                        <span className="h-2 overflow-hidden rounded-full bg-doc-stripe">
-                          <span className="block h-full rounded-full" style={{ width: share(g.subtotal), backgroundColor: g.color }} />
-                        </span>
-                        <span className="text-right tabular-nums">{yuan(g.subtotal)}</span>
-                        <span className="text-right text-doc-muted tabular-nums">{share(g.subtotal)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-                {floors.length ? (
-                  <section data-pdf-block className="break-inside-avoid">
-                    <DocSectionHeading style={style} className="mb-2" title="各楼层设备" note="按点位图统计" />
-                    <table className="w-full border-collapse text-[12px]">
-                      <thead>
-                        <tr className={t.head}>
-                          <th className={t.th}>楼层</th>
-                          <th className={cn(t.th, 'text-right')}>房间</th>
-                          <th className={cn(t.th, 'text-right')}>点位</th>
-                          <th className={cn(t.th, 'text-right')}>设备金额</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {floors.map((f, i) => (
-                          <tr key={f.sheetId} className={t.row(i)}>
-                            <td className={cn(t.td, 'py-1.5')}>{f.floorName}</td>
-                            <td className={cn(t.td, 'py-1.5 text-right tabular-nums')}>{f.rooms.length}</td>
-                            <td className={cn(t.td, 'py-1.5 text-right tabular-nums')}>{f.pointCount}</td>
-                            <td className={cn(t.td, 'py-1.5 text-right tabular-nums')}>{yuan(f.subtotal)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                <div className={cn('grid gap-5', floors.length ? 'grid-cols-2' : 'grid-cols-1')}>
+                  <section data-pdf-block className="min-w-0 break-inside-avoid">
+                    <DocSectionHeading style={style} className="mb-2" title="各系统预算" note="按设备类别汇总" />
+                    <div className="space-y-2 text-[11.5px]">
+                      {systems.map((g) => (
+                        <div key={g.key} className="grid grid-cols-[4.5rem_minmax(1rem,1fr)_5.5rem_2rem] items-center gap-2">
+                          <span className="flex items-center gap-2">
+                            <span className="size-2 rounded-full" style={{ backgroundColor: g.color }} />
+                            {g.name}
+                          </span>
+                          <span className="h-2 overflow-hidden rounded-full bg-doc-stripe">
+                            <span className="block h-full rounded-full" style={{ width: share(g.subtotal), backgroundColor: g.color }} />
+                          </span>
+                          <span className="text-right whitespace-nowrap tabular-nums">{yuan(g.subtotal)}</span>
+                          <span className="text-right whitespace-nowrap text-doc-muted tabular-nums">{share(g.subtotal)}</span>
+                        </div>
+                      ))}
+                    </div>
                   </section>
-                ) : null}
+                  {floors.length ? (
+                    <section data-pdf-block className="min-w-0 break-inside-avoid">
+                      <DocSectionHeading style={style} className="mb-2" title="各楼层设备" note="按点位图统计" />
+                      <table className="w-full border-collapse text-[12px]">
+                        <thead>
+                          <tr className={t.head}>
+                            <th className={t.th}>楼层</th>
+                            <th className={cn(t.th, 'text-right')}>房间</th>
+                            <th className={cn(t.th, 'text-right')}>点位</th>
+                            <th className={cn(t.th, 'text-right')}>设备金额</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {floors.map((f, i) => (
+                            <tr key={f.sheetId} className={t.row(i)}>
+                              <td className={cn(t.td, 'py-1.5')}>{f.floorName}</td>
+                              <td className={cn(t.td, 'py-1.5 text-right tabular-nums')}>{f.rooms.length}</td>
+                              <td className={cn(t.td, 'py-1.5 text-right tabular-nums')}>{f.pointCount}</td>
+                              <td className={cn(t.td, 'py-1.5 text-right tabular-nums')}>{yuan(f.subtotal)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </section>
+                  ) : null}
+                </div>
                 <section data-pdf-block className="break-inside-avoid">
                   <DocSectionHeading style={style} className="mb-2" title="参考付款节点" note="签订合同后以合同约定为准" />
                   <table className="w-full border-collapse text-[12px]">
@@ -390,12 +393,12 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
                         const brand = brandOf.get(productIdOf(item) ?? '')
                         return (
                           <div key={item.id ?? i} className="flex gap-3 rounded-doc border border-doc-rule p-2 break-inside-avoid">
-                            <ProductThumb src={imageOf(item)} alt={item.name} className="size-16" />
+                            {imageOf(item) ? <ProductThumb src={imageOf(item)} alt={item.name} className="size-16" /> : <PointMarker type={item.deviceType ?? 'other'} className="size-16 rounded-doc bg-doc-soft p-2" />}
                             <div className="flex min-w-0 flex-1 flex-col text-[11px]">
                               {brand ? <BrandLogo name={brand.name} logo={brand.logo} className="h-3 max-w-14" /> : null}
-                              <div className="doc-strong mt-0.5 line-clamp-2 leading-snug">{item.name}</div>
-                              <div className="truncate text-[10px] text-doc-muted">{item.sku}</div>
-                              <div className="mt-auto flex justify-between tabular-nums">
+                              <div className="doc-strong mt-0.5 leading-snug [overflow-wrap:anywhere]">{item.name}</div>
+                              <div className="mt-1 text-[10px] leading-relaxed text-doc-muted [overflow-wrap:anywhere]">{item.sku}</div>
+                              <div className="mt-2 flex justify-between gap-2 tabular-nums">
                                 <span className="text-doc-muted">{yuan(item.price)} × {item.quantity}{item.unit ?? ''}</span>
                                 <span className="doc-strong">{yuan(item.price * item.quantity)}</span>
                               </div>
@@ -456,8 +459,8 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
                                   <div key={`${r.id}-${l.deviceType}-${l.productId}`} className="flex items-center gap-1.5 py-1 first:pt-0 last:pb-0">
                                     <PointMarker type={l.deviceType} className="size-3.5" />
                                     <div className="min-w-0 flex-1">
-                                      <div className="truncate">{l.name}</div>
-                                      <div className="truncate text-[10px] text-doc-muted">{l.typeName}{l.sku ? ` · ${l.sku}` : ''}</div>
+                                      <div className="leading-snug [overflow-wrap:anywhere]">{l.name}</div>
+                                      <div className="mt-0.5 text-[10px] leading-relaxed text-doc-muted [overflow-wrap:anywhere]">{l.typeName}{l.sku ? ` · ${l.sku}` : ''}</div>
                                     </div>
                                     <div className="shrink-0 text-right tabular-nums">
                                       <div>{yuan(l.subtotal)}</div>
@@ -481,9 +484,9 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
                       {showImages ? <th className={cn(t.th, 'w-14')}>图片</th> : null}
                       <th className={t.th}>产品</th>
                       <th className={t.th}>型号</th>
-                      <th className={cn(t.th, 'text-right')}>单价</th>
-                      <th className={cn(t.th, 'text-right')}>数量</th>
-                      <th className={cn(t.th, 'text-right')}>金额</th>
+                      <th className={cn(t.th, 'min-w-[64px] text-right')}>单价</th>
+                      <th className={cn(t.th, 'min-w-[48px] text-right')}>数量</th>
+                      <th className={cn(t.th, 'min-w-[76px] text-right')}>金额</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -492,11 +495,11 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
                         <td className={cn(t.td, 'tabular-nums', layout === 'compact' ? 'py-1' : 'py-2')}>{i + 1}</td>
                         {showImages ? (
                           <td className={cn(t.td, 'py-1.5')}>
-                            <ProductThumb src={imageOf(item)} alt={item.name} className="size-10" />
+                            {imageOf(item) ? <ProductThumb src={imageOf(item)} alt={item.name} className="size-10" /> : <PointMarker type={item.deviceType ?? 'other'} className="size-10 rounded-doc bg-doc-soft p-1" />}
                           </td>
                         ) : null}
-                        <td className={cn(t.td, layout === 'compact' ? 'py-1' : 'py-2')}>{item.name}</td>
-                        <td className={cn(t.td, 'text-doc-muted')}>{item.sku}</td>
+                        <td className={cn(t.td, 'max-w-[210px] [overflow-wrap:anywhere]', layout === 'compact' ? 'py-1' : 'py-2')}>{item.name}</td>
+                        <td className={cn(t.td, 'max-w-[150px] text-doc-muted [overflow-wrap:anywhere]')}>{item.sku}</td>
                         <td className={cn(t.td, 'text-right whitespace-nowrap tabular-nums')}>{yuan(item.price)}</td>
                         <td className={cn(t.td, 'text-right whitespace-nowrap tabular-nums')}>{item.quantity}{item.unit ? ` ${item.unit}` : ''}</td>
                         <td className={cn(t.td, 'text-right whitespace-nowrap tabular-nums')}>{yuan(item.price * item.quantity)}</td>
@@ -546,14 +549,14 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
           ) : null}
 
           {quote.notes ? (
-            <section data-pdf-block className="mt-8 border-t border-doc-rule pt-3 text-[12px] break-inside-avoid">
+            <section data-pdf-block className={cn('border-t border-doc-rule pt-3 text-[12px] break-inside-avoid', layout === 'budget' ? 'mt-4' : 'mt-8')}>
               <div className="doc-strong mb-1">备注</div>
               <p className="whitespace-pre-line text-doc-muted">{quote.notes}</p>
             </section>
           ) : null}
 
           {contact.length || company.qrCode?.url ? (
-            <section className="mt-8 flex items-center justify-between gap-6 border-t border-doc-rule pt-3 text-[12px] break-inside-avoid">
+            <section className={cn('flex items-center justify-between gap-6 border-t border-doc-rule pt-3 text-[12px] break-inside-avoid', layout === 'budget' ? 'mt-4' : 'mt-8')}>
               <div>
                 <div className="doc-strong mb-1">联系我们</div>
                 {contact.map((line) => (
@@ -562,16 +565,16 @@ export default async function PrintQuotePage({ params, searchParams }: { params:
               </div>
               {company.qrCode ? (
                 <figure className="flex flex-col items-center gap-1">
-                  <Image src={company.qrCode.url} alt={company.qrCode.alt || '二维码'} width={88} height={88} className="size-[88px] object-contain" unoptimized />
+                  <Image src={company.qrCode.url} alt={company.qrCode.alt || '二维码'} width={88} height={88} className={cn('object-contain', layout === 'budget' ? 'size-[60px]' : 'size-[88px]')} unoptimized />
                   {company.qrCaption ? <figcaption className="text-[10px] text-doc-muted">{company.qrCaption}</figcaption> : null}
                 </figure>
               ) : null}
             </section>
           ) : null}
 
-          <section data-pdf-block className="mt-8 break-inside-avoid">
-            <DocSignatures parties={[{ label: '客户确认签字' }, { label: `${company.name} 盖章` }]} />
-            <DocFooter className="mt-6" left={address || project?.name || ''} center={date} right={company.name} />
+          <section data-pdf-block className={cn('break-inside-avoid', layout === 'budget' ? 'mt-4' : 'mt-8')}>
+            <DocSignatures className={layout === 'budget' ? '[&>div]:space-y-4' : undefined} parties={[{ label: '客户确认签字' }, { label: `${company.name} 盖章` }]} />
+            <DocFooter className={layout === 'budget' ? 'mt-4' : 'mt-6'} left={address || project?.name || ''} center={date} right={company.name} />
           </section>
         </DocArticle>
       </DocRoot>

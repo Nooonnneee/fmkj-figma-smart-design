@@ -4,9 +4,11 @@
  * 所有文字都由真实项目数据推导；没有的东西不写、不承诺（与设计稿「边界清楚」的口吻一致）。
  */
 import { paymentAmounts } from '@/lib/contracts'
+import { relId } from '@/lib/access'
 import { categoryOfType, DEVICE_TYPE_ORDER, deviceTypeOf } from '@/lib/device-types'
 import { acceptanceChecks, docNumber, type DocPoint, type ProjectDocsData, type Room } from '@/lib/project-docs'
 import type { AreaInfo, SheetInfo } from '@/lib/point-scene'
+import { quoteTotals } from '@/lib/quotes'
 
 export const pad = (n: number) => String(n).padStart(2, '0')
 export const money = (n: number) => n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -179,51 +181,88 @@ export function buildDeck(d: ProjectDocsData) {
   const has = (...types: string[]) => d.points.some((p) => types.includes(p.deviceType))
   const pointsOf = (...types: string[]) => d.points.filter((p) => types.includes(p.deviceType))
 
-  // 条目：设备型号 Q01…（按设备类型顺序）；没有选型的点位按类型补在后面
+  // 已选报价按逐行快照交付，数量、型号和临时单价不随点位或产品库变化。
+  // 点位只关联可确认的编号和空间，不补齐报价里没有的设备或数量。
   const items: DeckItem[] = []
   const refOfProduct = new Map<string, string>()
-  for (const r of d.products) {
-    const ref = `Q${pad(items.length + 1)}`
-    refOfProduct.set(r.product.id, ref)
-    items.push({
-      ref,
-      deviceType: r.deviceType,
-      typeName: typeName(r.deviceType),
-      name: r.product.name,
-      sku: r.product.sku,
-      brand: r.product.brand?.name ?? null,
-      unit: r.product.unit || '个',
-      count: r.count,
-      price: r.product.price,
-      subtotal: r.subtotal,
-      pending: false,
-      codes: d.points.filter((p) => p.productId === r.product.id).map((p) => p.code),
-      rooms: r.rooms,
-    })
-  }
   const refOfPending = new Map<string, string>()
-  for (const t of DEVICE_TYPE_ORDER) {
-    const pts = d.points.filter((p) => !p.productId && p.deviceType === t)
-    if (!pts.length) continue
-    const ref = `Q${pad(items.length + 1)}`
-    refOfPending.set(t, ref)
-    items.push({
-      ref,
-      deviceType: t,
-      typeName: typeName(t),
-      name: `${typeName(t)}（待选型）`,
-      sku: '',
-      brand: null,
-      unit: CAT_UNIT[categoryOfType(t)?.slug ?? 'other'] ?? '个',
-      count: pts.length,
-      price: 0,
-      subtotal: 0,
-      pending: true,
-      codes: pts.map((p) => p.code),
-      rooms: [...new Set(pts.map(roomName))],
-    })
+  const refOfPoint = new Map<string, string>()
+  if (d.quote) {
+    const roomOfPoint = new Map(d.rooms.flatMap((r) => r.points.map((p) => [p.id, r.displayName] as const)))
+    for (const [index, item] of (d.quote.items ?? []).entries()) {
+      const ref = `Q${pad(items.length + 1)}`
+      const pid = relId(item.product)
+      const product = pid ? d.productById.get(pid) : undefined
+      const deviceType = item.deviceType ?? product?.deviceType ?? 'other'
+      const pointProductId = pid ?? `quote-item-${item.id ?? index}`
+      // 同一产品可有多行不同单价，每个点位最多关联一行，数量不够时不虚构点位。
+      const pts = d.points
+        .filter((p) => !refOfPoint.has(p.id) && p.deviceType === deviceType && p.productId === pointProductId)
+        .slice(0, Math.max(0, Math.floor(item.quantity)))
+      for (const p of pts) refOfPoint.set(p.id, ref)
+      items.push({
+        ref,
+        deviceType,
+        typeName: typeName(deviceType),
+        name: item.name,
+        sku: item.sku ?? '',
+        brand: product?.deviceType === deviceType ? (product.brand?.name ?? null) : null,
+        unit: item.unit ?? '个',
+        count: item.quantity,
+        price: item.price,
+        subtotal: Math.round(item.price * item.quantity * 100) / 100,
+        pending: false,
+        codes: pts.map((p) => p.code),
+        rooms: [...new Set(pts.map((p) => roomOfPoint.get(p.id) ?? roomName(p)))],
+      })
+    }
+  } else {
+    // 尚无报价时按当前点位估算，保留未选型设备。
+    for (const r of d.products) {
+      const ref = `Q${pad(items.length + 1)}`
+      refOfProduct.set(r.product.id, ref)
+      items.push({
+        ref,
+        deviceType: r.deviceType,
+        typeName: typeName(r.deviceType),
+        name: r.product.name,
+        sku: r.product.sku,
+        brand: r.product.brand?.name ?? null,
+        unit: r.product.unit || '个',
+        count: r.count,
+        price: r.product.price,
+        subtotal: r.subtotal,
+        pending: false,
+        codes: d.points.filter((p) => p.productId === r.product.id).map((p) => p.code),
+        rooms: r.rooms,
+      })
+    }
+    for (const t of DEVICE_TYPE_ORDER) {
+      const pts = d.points.filter((p) => !p.productId && p.deviceType === t)
+      if (!pts.length) continue
+      const ref = `Q${pad(items.length + 1)}`
+      refOfPending.set(t, ref)
+      items.push({
+        ref,
+        deviceType: t,
+        typeName: typeName(t),
+        name: `${typeName(t)}（待选型）`,
+        sku: '',
+        brand: null,
+        unit: CAT_UNIT[categoryOfType(t)?.slug ?? 'other'] ?? '个',
+        count: pts.length,
+        price: 0,
+        subtotal: 0,
+        pending: true,
+        codes: pts.map((p) => p.code),
+        rooms: [...new Set(pts.map(roomName))],
+      })
+    }
   }
   const itemOf = new Map(items.map((i) => [i.ref, i]))
+  const pointRef = (p: DocPoint) => d.quote
+    ? (refOfPoint.get(p.id) ?? null)
+    : p.productId ? (refOfProduct.get(p.productId) ?? null) : (refOfPending.get(p.deviceType) ?? null)
 
   // 点位编号：每张图纸按房间（自上而下、从左到右）→ 设备类型 → 代号排序，编号 01…；房间内编号连续
   const sheets: DeckSheet[] = []
@@ -256,7 +295,7 @@ export function buildDeck(d: ProjectDocsData) {
           no: ++no,
           room: name,
           typeName: typeName(p.deviceType),
-          ref: p.productId ? (refOfProduct.get(p.productId) ?? null) : (refOfPending.get(p.deviceType) ?? null),
+          ref: pointRef(p),
         }
         numbered.set(p.id, dp)
         return dp
@@ -276,7 +315,7 @@ export function buildDeck(d: ProjectDocsData) {
   }
   /** 带编号的点位（不在任何图纸上的点位编号为 0） */
   const deckPoint = (p: DocPoint): DeckPoint =>
-    numbered.get(p.id) ?? { ...p, no: 0, room: roomName(p), typeName: typeName(p.deviceType), ref: p.productId ? (refOfProduct.get(p.productId) ?? null) : null }
+    numbered.get(p.id) ?? { ...p, no: 0, room: roomName(p), typeName: typeName(p.deviceType), ref: pointRef(p) }
 
   // 场景章节：每类空间取点位最多的两间（进门章节玄关优先），其余房间进入「其余空间」
   const withPoints = d.rooms.filter((r) => r.total > 0)
@@ -316,12 +355,13 @@ export function buildDeck(d: ProjectDocsData) {
   const scopeText =
     d.scope === 'no-light' ? '智能控制方案（不含灯具）' : d.scope === 'switch' ? '智能开关面板方案' : d.scope === 'switch-light' ? '智能灯光开关方案' : '全屋智能设计方案'
 
-  // 金额：设备合计 + 报价单里的服务费用 − 优惠
+  // 金额与正式报价使用同一份快照。合同关联报价的已保存总额优先，保留签订时的金额语义。
   const fees: DeckFee[] = (d.quote?.fees ?? []).map((f, i) => ({ ref: `S${pad(i + 1)}`, name: f.name, amount: f.amount }))
-  const serviceTotal = Math.round(fees.reduce((s, f) => s + f.amount, 0) * 100) / 100
   const discount = d.quote?.discount ?? 0
-  const deviceTotal = d.total
-  const finalAmount = Math.max(0, Math.round((deviceTotal + serviceTotal - discount) * 100) / 100)
+  const totals = quoteTotals(d.quote?.items ?? [], d.quote?.fees ?? [], discount)
+  const serviceTotal = totals.feeTotal
+  const deviceTotal = d.quote ? totals.productTotal : d.total
+  const finalAmount = d.quote ? (d.quote.total ?? totals.total) : d.total
 
   // 第 02 章：需求色带
   const waterRoom = pointsOf('water-sensor')[0]

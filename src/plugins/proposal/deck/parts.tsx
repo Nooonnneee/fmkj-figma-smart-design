@@ -4,6 +4,7 @@
  * 颜色字体来自风格变量（bg-doc-* / doc-display / --deck-*），版式差异由主题的 cover / chapter / table 字段决定。
  */
 import { brandLatin } from '@/documents/parts'
+import { brandInitials } from '@/lib/brand'
 import { markerSrc } from '@/lib/point-marker-data'
 import { areaLabelAnchor, areaOutline, type AreaInfo, type SheetInfo } from '@/lib/point-scene'
 import { cn } from '@/lib/utils'
@@ -46,10 +47,9 @@ export function Slide({ ctx, no, total, name, cover = false, children }: { ctx: 
   )
 }
 
-/** 服务商品牌：有 Logo 用 Logo，否则用风格的品牌标记 */
+/** 服务商品牌：有 Logo 用 Logo，否则用公司名称缩写。 */
 export function Brand({ ctx, large = false, className }: { ctx: DeckCtx; large?: boolean; className?: string }) {
   const c = ctx.m.d.company
-  const t = ctx.theme
   return (
     <div className={cn('flex shrink-0 items-center gap-[10px] overflow-hidden', className)}>
       {c.logo ? (
@@ -58,12 +58,12 @@ export function Brand({ ctx, large = false, className }: { ctx: DeckCtx; large?:
         <span
           aria-hidden
           className={cn(
-            'shrink-0',
+            'inline-flex shrink-0 items-center justify-center rounded-sm border border-doc-rule text-[10px] font-semibold text-doc-accent',
             large ? 'size-[26px]' : 'size-[22px]',
-            t.brandMark === 'outline' ? 'border border-doc-accent' : 'bg-linear-to-r from-doc-soft to-doc-soft-to',
-            t.rounded && 'rounded-full',
           )}
-        />
+        >
+          {brandInitials(c.name)}
+        </span>
       )}
       <p className={cn('doc-display leading-normal whitespace-nowrap', large ? 'text-[21px]' : 'text-[17px]')}>{c.name}</p>
     </div>
