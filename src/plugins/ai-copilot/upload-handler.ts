@@ -15,10 +15,8 @@ import {
   collectLocalCandidates,
   fuseDetections,
   isSwitchFamily,
-  normalizeVerdictKind,
   normalizeVisionAnalysis,
   type FusionStats,
-  type VisionVerdict,
 } from '@/lib/cad-point-fusion'
 import { parseDxfAndRenderFloorPlan } from '@/lib/dxf-point-extractor'
 import type { Pixels } from '@/lib/floor-plan-crop'
@@ -29,8 +27,6 @@ import { recordUploadDiagnostic } from '@/lib/usage-diagnostics'
 
 import type { AiModelConfig } from './templates'
 import {
-  buildGridTiles,
-  buildPatchSheets,
   callVision,
   encodeImageForVision,
   extractJson,
@@ -63,7 +59,7 @@ export type VisionRecognitionMeta = {
   caption?: string
   stats?: FusionStats
   durationMs?: number
-  tiles?: number
+  profile?: RecognitionProfile
 }
 
 export type DetectedPointItem = { type: string; x: number; y: number; room?: string }
@@ -77,6 +73,7 @@ export type CachedDetectedBundle = {
   vision?: VisionRecognitionMeta
   /** 本地几何识别（视觉复核前）的数量，便于对比与排障 */
   local?: { total: number; switches: number; lights: number }
+  profile?: RecognitionProfile
 }
 
 const DETECTED_CACHE_FILE = '/tmp/fmkj-ai-detected-points.json'
@@ -272,30 +269,27 @@ async function classifyUploadImage(
 const FLOORPLAN_SYSTEM =
   '你是资深的全屋智能与建筑电气审图工程师，只陈述图中能确认的内容，看不清的不要编造。严格按要求只输出 JSON。'
 
-const FULL_IMAGE_PROMPT = [
-  '请仔细查看这张图纸，坐标用 0~1 归一化（左上角为 (0,0)，右下角为 (1,1)，保留 3 位小数）。',
-  '1. drawingType：switch-layout(开关布置图) / lighting-layout(灯具布置图) / socket-layout(插座图) / combined-electrical(水电/强电综合图) / floor-plan(无点位的原始户型图) / colored-plan(彩平图) / other。',
-  '2. legend：逐条写出图例与颜色约定的含义（如 "绿底白字双开=双联开关"、"蓝色小竖条=五孔插座"）。',
-  '3. annotatedCounts：图中若有文字汇总（如 "主卧三开*3、进门3开*2"），按设备类型合计数量，例如 {"switch-3":5,"switch-2":12,"switch-1":3,"touch-panel":1}；没有文字汇总就返回 {}。',
-  '4. points：逐个列出图中真实的设备点位——开关面板 switch-1/switch-2/switch-3/switch-4、智能屏 touch-panel、筒灯 downlight、射灯 spotlight、吸顶灯 ceiling-light、吊灯 pendant-light、灯带 light-strip、壁灯 wall-light、窗帘 curtain-track、人体传感器 motion-sensor、门磁 contact-sensor、水浸 water-sensor、烟感 smoke-sensor、门锁 smart-lock、摄像头 camera、AP ap-node、网关 gateway、风管机/中央空调温控 vrf-controller。插座只统计数量写进 socketCount，不要列点。图例表、标题栏、尺寸数字、家具、洁具、植物都不是设备。',
-  '5. areas：房间名称 + 外接框 rect=[x,y,w,h] + type(entrance/living/dining/kitchen/bedroom/kids/study/bathroom/balcony/corridor/stairs/closet/utility/other)。',
-  '只返回 JSON：{"drawingType":"","legend":[],"annotatedCounts":{},"socketCount":0,"points":[{"type":"switch-2","x":0.512,"y":0.341,"room":"主卧"}],"areas":[{"name":"主卧","type":"bedroom","rect":[0.6,0.1,0.3,0.3]}],"summary":"50字内概括","issues":["存疑之处"]}',
-].join('\n')
+export type RecognitionProfile = 'devices' | 'smart'
 
-const patchPrompt = (n: number) =>
-  [
-    `这是一张拼图，由 ${n} 个编号小格组成；每格是同一张图纸上某个候选位置的放大局部，格子正中的红色圆圈准星标出了候选点。`,
-    '请逐格判断准星位置是什么（结合格内文字、颜色块与符号形状）：',
-    'switch-1 / switch-2 / switch-3 / switch-4 = 开关面板（色块里写"单开/双开/三开/四开"或 CAD 开关符号的极数）；touch-panel = 智能屏/中控屏；light = 灯具符号；socket = 插座（五孔/四孔/16A/网线，含没有文字的纯色小竖条）；sensor = 传感器；curtain = 窗帘；other-device = 其他设备；none = 不是设备（文字、尺寸、家具、图例、墙线等）。',
-    '只返回 JSON：{"cells":[{"n":1,"kind":"switch-2","confidence":0.92,"text":"双开"}]}，每一格都要给出结论。',
-  ].join('\n')
+/** 识别提示词按需求分档：提示词就是 skill 的可执行版本。 */
+const PROFILE_EXTRA: Record<RecognitionProfile, string[]> = {
+  devices: [],
+  smart: [
+    '6. 智能设备布点：图中已画的按图识别；图中没有的按全屋智能常规规范补充建议点位——AP ap-node（客厅/过道吸顶 1~2 个）、摄像头 camera（入户/客厅/庭院墙角）、智能屏 touch-panel（玄关/客厅）、人体传感器 motion-sensor（过道/卫生间）、门磁 contact-sensor（入户门/窗）、水浸 water-sensor（厨房/卫生间）、烟感 smoke-sensor（厨房/卧室）、窗帘 curtain-track（有窗帘的窗）、网关 gateway（弱电箱/客厅）、风管机温控 vrf-controller（空调位）。',
+    '补充的建议点位也要给 room 与坐标，并在 issues 里说明哪些是图纸原有、哪些是按规范补充。',
+  ],
+}
 
-const gridTilePrompt = (index: number, total: number) =>
+const recognitionPrompt = (profile: RecognitionProfile) =>
   [
-    `这是同一张图纸的第 ${index + 1}/${total} 块放大图。请只列出本块内真实的开关面板、智能屏和灯具点位，插座不要列点。`,
-    '装置类型：switch-1/switch-2/switch-3/switch-4（开关面板）、touch-panel（智能屏）、downlight（筒灯）、spotlight（射灯）、ceiling-light（吸顶灯）、pendant-light（吊灯）、light-strip（灯带）、wall-light（壁灯）。',
-    '坐标用本块 0~1 归一化（本块左上角为 (0,0)，右下角为 (1,1)，保留 3 位小数）；家具、文字、尺寸、图框、连线不是点位。看不清的不要编造。',
-    '只返回 JSON：{"points":[{"type":"downlight","x":0.512,"y":0.341,"room":"主卧"}]}',
+    '这是一张住宅户型/电气图纸，房间名可能是中文或英文。请先按房间逐个扫描，再列出所有真实点位；坐标用 0~1 归一化（左上角 (0,0)，右下角 (1,1)，保留 3 位小数）。',
+    '1. drawingType：switch-layout / lighting-layout / socket-layout / combined-electrical / floor-plan / colored-plan / other。',
+    '2. legend：逐条写出图例与颜色约定；没有图例返回 []。',
+    '3. annotatedCounts：图中若有文字汇总，按设备类型合计，例如 {"switch-3":5,"switch-2":12,"switch-1":3,"touch-panel":1}；没有返回 {}。',
+    '4. points：逐个列出图中真实点位——switch-1/2/3/4（开关面板）、touch-panel（智能屏）、downlight（筒灯）、spotlight（射灯）、ceiling-light（吸顶灯）、pendant-light（吊灯）、light-strip（灯带）、wall-light（壁灯）、curtain-track（窗帘）、motion-sensor、contact-sensor、water-sensor、smoke-sensor、smart-lock、camera、ap-node、gateway、vrf-controller。插座只统计数量写进 socketCount，不要列点。家具、文字、尺寸、图框、连线、图例不是点位。',
+    '5. areas：房间名称 + 外接框 rect=[x,y,w,h] + type(entrance/living/dining/kitchen/bedroom/kids/study/bathroom/balcony/corridor/stairs/closet/utility/other)。',
+    ...PROFILE_EXTRA[profile],
+    '只返回 JSON：{"drawingType":"","legend":[],"annotatedCounts":{},"socketCount":0,"points":[{"type":"downlight","x":0.512,"y":0.341,"room":"Kitchen"}],"areas":[{"name":"Kitchen","type":"kitchen","rect":[0.6,0.1,0.3,0.3]}],"summary":"50字内概括","issues":["存疑之处"]}',
   ].join('\n')
 
 const shortModelName = (m: AiModelConfig) =>
@@ -307,6 +301,7 @@ async function runVisionFusion(args: {
   local: CadDetectionResult
   sheetName?: string
   models: AiModelConfig[]
+  profile: RecognitionProfile
 }): Promise<CachedDetectedBundle> {
   const t0 = Date.now()
   const localCounts = {
@@ -314,6 +309,7 @@ async function runVisionFusion(args: {
     switches: args.local.switchPoints.length,
     lights: args.local.lightPoints.length,
   }
+  // 本地识别只作模型失败时的兜底，不再参与主识别
   const base: CachedDetectedBundle = {
     points: args.local.points,
     switchPoints: args.local.switchPoints,
@@ -322,136 +318,42 @@ async function runVisionFusion(args: {
     summary: args.local.summary,
     imageKind: 'floor-plan',
     local: localCounts,
+    profile: args.profile,
   }
-  if (!args.models.length) return { ...base, vision: { status: 'unavailable' } }
+  if (!args.models.length)
+    return { ...base, vision: { status: 'unavailable', profile: args.profile } }
 
-  const candidates = collectLocalCandidates(args.local)
-  // 彩色铭牌图：候选拼图复核；黑白 CAD 图：整图缩小会糊掉小符号，改走 2×2 分块放大点数
-  const usePatches = Boolean(args.local.hasColorSymbols)
-  const [fullImage, sheets, tiles] = await Promise.all([
-    encodeImageForVision(args.png, { maxSide: 2048, quality: 88 }),
-    usePatches && candidates.length
-      ? buildPatchSheets(args.pixels, candidates)
-      : Promise.resolve([]),
-    usePatches
-      ? Promise.resolve([])
-      : buildGridTiles(args.png, { cols: 2, rows: 2, maxSide: 1600 }),
-  ])
-  // 先发起整图，再顺序补齐拼图/分块，避免同一秒发出 3~4 张大图把上游网关队列打满导致超时
-  const fullPromise = callVision({
+  // 直接走模型：原图 2400 + 逐房间提示词，不跑本地候选、不跑拼图
+  const fullImage = await encodeImageForVision(args.png, { maxSide: 2400, quality: 88 })
+  const full = await callVision({
     images: [fullImage],
     system: FLOORPLAN_SYSTEM,
-    prompt: FULL_IMAGE_PROMPT,
+    prompt: recognitionPrompt(args.profile),
     models: args.models,
-    maxTokens: 3600,
-    timeoutMs: 100_000,
-    thinking: false,
+    maxTokens: 6000,
+    timeoutMs: 150_000,
+    thinking: true,
     highResolution: true,
   })
-  const cellResults: Awaited<ReturnType<typeof callVision>>[] = []
-  for (const s of sheets) {
-    cellResults.push(
-      await callVision({
-        images: [s.dataUrl],
-        system: FLOORPLAN_SYSTEM,
-        prompt: patchPrompt(s.indices.length),
-        models: args.models,
-        maxTokens: 2400,
-        timeoutMs: 65_000,
-        thinking: false,
-        highResolution: false,
-      }),
-    )
-  }
-  const tileResults: Awaited<ReturnType<typeof callVision>>[] = []
-  for (let i = 0; i < tiles.length; i += 2) {
-    const batch = tiles.slice(i, i + 2)
-    tileResults.push(
-      ...(await Promise.all(
-        batch.map((tile, j) =>
-          callVision({
-            images: [tile.dataUrl],
-            system: FLOORPLAN_SYSTEM,
-            prompt: gridTilePrompt(i + j, tiles.length),
-            models: args.models,
-            maxTokens: 2200,
-            timeoutMs: 65_000,
-            thinking: false,
-            highResolution: false,
-          }),
-        ),
-      )),
-    )
-  }
-  const full = await fullPromise
-
-  const rawVision = extractJson<Record<string, unknown>>(full?.text)
-  const tilePoints: DetectedPointItem[] = []
-  tileResults.forEach((res, ti) => {
-    const parsed = extractJson<{ points?: Array<Record<string, unknown>> }>(res?.text)
-    const tile = tiles[ti]
-    if (!tile || !parsed?.points) return
-    for (const p of parsed.points.slice(0, 120)) {
-      const type = typeof p.type === 'string' ? p.type.trim() : ''
-      const lx = Number(p.x)
-      const ly = Number(p.y)
-      if (
-        !type ||
-        !Number.isFinite(lx) ||
-        !Number.isFinite(ly) ||
-        lx < 0 ||
-        lx > 1 ||
-        ly < 0 ||
-        ly > 1
-      )
-        continue
-      tilePoints.push({
-        type,
-        x: Math.round((tile.x + lx * tile.w) * 1000) / 1000,
-        y: Math.round((tile.y + ly * tile.h) * 1000) / 1000,
-        ...(typeof p.room === 'string' && p.room.trim()
-          ? { room: p.room.trim().slice(0, 24) }
-          : {}),
-      })
+  const vision = normalizeVisionAnalysis(extractJson(full?.text))
+  if (!full?.model || !vision || vision.points.length === 0) {
+    return {
+      ...base,
+      vision: {
+        status: 'failed',
+        ...(full?.model ? { model: shortModelName(full.model) } : {}),
+        profile: args.profile,
+        durationMs: Date.now() - t0,
+      },
     }
-  })
-  const rawPoints = Array.isArray(rawVision?.points) ? (rawVision.points as unknown[]) : []
-  const vision = normalizeVisionAnalysis({
-    ...(rawVision ?? {}),
-    points: [...rawPoints, ...tilePoints],
-  })
-  const verdicts = new Map<number, VisionVerdict>()
-  cellResults.forEach((res, si) => {
-    const parsed = extractJson<{
-      cells?: Array<{ n?: unknown; kind?: unknown; confidence?: unknown; text?: unknown }>
-    }>(res?.text)
-    for (const c of parsed?.cells ?? []) {
-      const n = Math.round(Number(c.n))
-      const kind = normalizeVerdictKind(c.kind)
-      const sheet = sheets[si]
-      if (!kind || !sheet || !Number.isFinite(n) || n < 1 || n > sheet.indices.length) continue
-      const conf = Number(c.confidence)
-      verdicts.set(sheet.indices[n - 1], {
-        kind,
-        confidence: Number.isFinite(conf) ? Math.min(1, Math.max(0, conf)) : 0.7,
-        ...(typeof c.text === 'string' && c.text.trim()
-          ? { text: c.text.trim().slice(0, 12) }
-          : {}),
-      })
-    }
-  })
-  const usedModel =
-    full?.model ?? cellResults.find(Boolean)?.model ?? tileResults.find(Boolean)?.model
-  if (!usedModel || (!vision && verdicts.size === 0)) {
-    return { ...base, vision: { status: 'failed', durationMs: Date.now() - t0 } }
   }
-  const modelLabel = shortModelName(usedModel)
+  const modelLabel = shortModelName(full.model)
   const fused = fuseDetections({
     local: args.local,
-    candidates,
-    verdicts,
+    candidates: [],
+    verdicts: new Map(),
     vision,
-    strategy: args.local.hasColorSymbols ? 'vision-first' : 'hybrid',
+    strategy: 'vision-first',
     snap: (p) => snapPointToInk(args.pixels, p.x, p.y, isSwitchFamily(p.type)),
     sheetName: args.sheetName,
     modelLabel,
@@ -464,18 +366,19 @@ async function runVisionFusion(args: {
     summary: fused.result.summary,
     imageKind: 'floor-plan',
     local: localCounts,
+    profile: args.profile,
     vision: {
       status: 'done',
       model: modelLabel,
-      drawingType: vision?.drawingType,
-      legend: vision?.legend,
-      annotatedCounts: vision?.annotatedCounts,
-      socketCount: vision?.socketCount,
-      summary: vision?.summary,
-      issues: vision?.issues,
+      profile: args.profile,
+      drawingType: vision.drawingType,
+      legend: vision.legend,
+      annotatedCounts: vision.annotatedCounts,
+      socketCount: vision.socketCount,
+      summary: vision.summary,
+      issues: vision.issues,
       stats: fused.stats,
       durationMs: Date.now() - t0,
-      tiles: tiles.length,
     },
   }
 }
@@ -489,6 +392,7 @@ function startVisionFusionJob(args: {
   local: CadDetectionResult
   sheetName?: string
   models: AiModelConfig[]
+  profile: RecognitionProfile
 }) {
   const job = runVisionFusion(args)
     .then((bundle) => {
@@ -542,6 +446,7 @@ export async function redetectFloorPlanFromUrl(opts: {
   url: string
   sheetName?: string
   userId?: string | number | null
+  profile?: RecognitionProfile
 }): Promise<CachedDetectedBundle | null> {
   try {
     const cleanUrl = opts.url.trim()
@@ -556,6 +461,7 @@ export async function redetectFloorPlanFromUrl(opts: {
       local,
       sheetName: opts.sheetName,
       models,
+      profile: opts.profile ?? 'devices',
     })
     saveDetectedBundle(opts.mediaId ?? '', cleanUrl, bundle)
     return bundle
@@ -567,6 +473,7 @@ export async function redetectFloorPlanFromUrl(opts: {
 
 function uploadFields(bundle: CachedDetectedBundle) {
   return {
+    profile: bundle.profile,
     detectedPointCount: bundle.points.length,
     detectedPoints: bundle.points,
     detectedSwitchCount: bundle.switchPoints.length,
@@ -586,10 +493,13 @@ function uploadFields(bundle: CachedDetectedBundle) {
  */
 export async function prepareFloorPlanUpload(
   request: Request,
-  opts: { awaitVision?: boolean; forceKind?: UploadImageKind } = {},
+  opts: { awaitVision?: boolean; forceKind?: UploadImageKind; profile?: RecognitionProfile } = {},
 ) {
   const t0 = Date.now()
   const form = await request.formData().catch(() => null)
+  const profileField = form?.get('profile')
+  const profile: RecognitionProfile =
+    opts.profile ?? (profileField === 'smart' ? 'smart' : 'devices')
   const file = form?.get('file')
   if (!(file instanceof File) || file.size === 0) return { error: fail(400, '请选择要上传的图片') }
   if (file.size > SHEET.maxUploadBytes)
@@ -804,6 +714,7 @@ export async function prepareFloorPlanUpload(
       local,
       sheetName: baseName,
       models,
+      profile,
     })
     if (opts.awaitVision) {
       bundle = (await awaitRecognition(mediaId, media.url, 55_000)) ?? bundle
@@ -854,6 +765,7 @@ export function recognitionStatusPayload(request: Request) {
     detectedLightCount: bundle?.lightPoints.length ?? 0,
     detectedAreaCount: bundle?.areas.length ?? 0,
     confirmText: bundle?.summary?.confirmText ?? null,
+    profile: bundle?.profile ?? null,
     vision: bundle?.vision ?? null,
   }
 }
