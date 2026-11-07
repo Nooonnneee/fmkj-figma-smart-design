@@ -65,6 +65,14 @@ export function rankVisionModels(
   return [...accessible, ...sorted.filter((m) => !accessible.includes(m))]
 }
 
+/** 两轮识别优先用 qwen3.8-flash：召回高、速度快；没有时退回排序第一个。 */
+export function pickPreferredVisionModel(
+  models: AiModelConfig[],
+  pattern = /qwen-?3\.8.*flash/i,
+): AiModelConfig | null {
+  return models.find((m) => pattern.test(modelText(m))) ?? models[0] ?? null
+}
+
 export async function getVisionModels(
   opts: { userId?: string | number | null; canAccessModel?: (m: AiModelConfig) => boolean } = {},
 ) {

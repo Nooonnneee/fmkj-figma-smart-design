@@ -29,6 +29,7 @@ import type { AiModelConfig } from './templates'
 import {
   callVision,
   encodeImageForVision,
+  pickPreferredVisionModel,
   extractJson,
   getVisionModels,
   isReasoningOnlyModel,
@@ -60,6 +61,7 @@ export type VisionRecognitionMeta = {
   stats?: FusionStats
   durationMs?: number
   profile?: RecognitionProfile
+  rounds?: number
 }
 
 export type DetectedPointItem = { type: string; x: number; y: number; room?: string }
@@ -280,14 +282,32 @@ const PROFILE_EXTRA: Record<RecognitionProfile, string[]> = {
   ],
 }
 
-const recognitionPrompt = (profile: RecognitionProfile) =>
+const SCAN_RULES = [
+  '这是一张住宅户型/电气图纸，房间名可能是中文或英文。请先按房间逐个扫描，不要只看大符号；开关通常在门边并连着弧线，灯具符号分布在各房间和走道。',
+  '逐个房间列出所有真实点位——switch-1/2/3/4（开关面板）、touch-panel（智能屏）、downlight（筒灯）、spotlight（射灯）、ceiling-light（吸顶灯）、pendant-light（吊灯）、light-strip（灯带）、wall-light（壁灯）、curtain-track、motion-sensor、contact-sensor、water-sensor、smoke-sensor、smart-lock、camera、ap-node、gateway、vrf-controller。插座只统计数量写进 socketCount，不要列点。家具、文字、尺寸、图框、连线、图例不是点位。',
+  '坐标用 0~1 归一化（左上角 (0,0)，右下角 (1,1)，保留 3 位小数）；每个点给 room。看不清不要编造。',
+]
+
+/** 第一轮：只负责尽可能全地列出点位。 */
+const pointScanPrompt = (profile: RecognitionProfile) =>
   [
-    '这是一张住宅户型/电气图纸，房间名可能是中文或英文。请先按房间逐个扫描，不要只看大符号；开关通常在门边并连着弧线，灯具符号分布在各房间和走道。',
-    '任务 A（必须完整）：逐个房间列出所有真实点位——switch-1/2/3/4（开关面板）、touch-panel（智能屏）、downlight（筒灯）、spotlight（射灯）、ceiling-light（吸顶灯）、pendant-light（吊灯）、light-strip（灯带）、wall-light（壁灯）、curtain-track、motion-sensor、contact-sensor、water-sensor、smoke-sensor、smart-lock、camera、ap-node、gateway、vrf-controller。插座只统计数量写进 socketCount，不要列点。家具、文字、尺寸、图框、连线、图例不是点位。',
-    '坐标用 0~1 归一化（左上角 (0,0)，右下角 (1,1)，保留 3 位小数）；每个点给 room。',
-    '任务 B（有就填，没有就留空）：drawingType；legend 图例；annotatedCounts 图中文字汇总（如 {"switch-3":5,"switch-2":12,"switch-1":3}）；areas 房间外接框 rect=[x,y,w,h] + type。',
-    ...PROFILE_EXTRA[profile],
-    '只返回 JSON：{"drawingType":"","legend":[],"annotatedCounts":{},"socketCount":0,"rooms":["Kitchen"],"points":[{"type":"downlight","x":0.512,"y":0.341,"room":"Kitchen"}],"areas":[{"name":"Kitchen","type":"kitchen","rect":[0.6,0.1,0.3,0.3]}],"summary":"50字内概括","issues":["存疑之处"]}',
+    ...SCAN_RULES,
+    ...PROFILE_EXTRA[profile].filter((r) => !r.startsWith('补充的')),
+    '只返回 JSON：{"rooms":["Kitchen"],"points":[{"type":"downlight","x":0.512,"y":0.341,"room":"Kitchen"}]}',
+  ].join('\n')
+
+/** 第二轮：拿第一轮点位复核、纠错、补漏，并读图例/文字汇总/房间。 */
+const refinePrompt = (profile: RecognitionProfile, points: unknown) =>
+  [
+    '下面是第一轮识别出的点位 JSON。请对照图纸逐条复核：',
+    '1. 删除重复点、误报点（灯位中心、连线端点、家具、文字、图例、尺寸都不算点位）；',
+    '2. 修正开关极数（单开/双开/三开/四开）和灯具类型；',
+    '3. 补上第一轮漏掉的点位；',
+    '4. 读出 drawingType、legend、annotatedCounts（图中文字汇总，如 {"switch-3":5,"switch-2":12}）、socketCount、areas 房间框。',
+    ...(profile === 'smart' ? PROFILE_EXTRA.smart : []),
+    '坐标保持整图 0~1 归一化，保留 3 位小数。',
+    `第一轮点位：${JSON.stringify(points).slice(0, 12000)}`,
+    '只返回 JSON：{"drawingType":"","legend":[],"annotatedCounts":{},"socketCount":0,"points":[{"type":"switch-2","x":0.512,"y":0.341,"room":"Kitchen"}],"areas":[{"name":"Kitchen","type":"kitchen","rect":[0.6,0.1,0.3,0.3]}],"summary":"50字内概括","issues":["存疑之处"]}',
   ].join('\n')
 
 const shortModelName = (m: AiModelConfig) =>
@@ -321,31 +341,52 @@ async function runVisionFusion(args: {
   if (!args.models.length)
     return { ...base, vision: { status: 'unavailable', profile: args.profile } }
 
-  // 直接走模型：原图 2400 + 逐房间提示词，不跑本地候选、不跑拼图
+  // 两轮直读：第一轮只求全量点位，第二轮复核纠错并读图例/文字统计
+  const picked = pickPreferredVisionModel(args.models)
+  const modelsForCall = picked ? [picked] : args.models
   const fullImage = await encodeImageForVision(args.png, { maxSide: 2400, quality: 88 })
-  const full = await callVision({
+  const round1 = await callVision({
     images: [fullImage],
     system: FLOORPLAN_SYSTEM,
-    prompt: recognitionPrompt(args.profile),
-    models: args.models,
+    prompt: pointScanPrompt(args.profile),
+    models: modelsForCall,
     maxTokens: 6000,
     timeoutMs: 150_000,
     thinking: true,
     highResolution: true,
   })
-  const vision = normalizeVisionAnalysis(extractJson(full?.text))
-  if (!full?.model || !vision || vision.points.length === 0) {
+  const firstRaw = extractJson<{ points?: unknown[] }>(round1?.text)
+  const firstPoints = Array.isArray(firstRaw?.points) ? firstRaw.points.slice(0, 240) : []
+  const round2 = firstPoints.length
+    ? await callVision({
+        images: [fullImage],
+        system: FLOORPLAN_SYSTEM,
+        prompt: refinePrompt(args.profile, firstPoints),
+        models: modelsForCall,
+        maxTokens: 6000,
+        timeoutMs: 150_000,
+        thinking: true,
+        highResolution: true,
+      })
+    : null
+  const vision =
+    normalizeVisionAnalysis(extractJson(round2?.text)) ??
+    (firstPoints.length
+      ? normalizeVisionAnalysis({ points: firstPoints })
+      : normalizeVisionAnalysis(extractJson(round1?.text)))
+  const used = round2?.model ?? round1?.model
+  if (!used || !vision || vision.points.length === 0) {
     return {
       ...base,
       vision: {
         status: 'failed',
-        ...(full?.model ? { model: shortModelName(full.model) } : {}),
+        ...(used ? { model: shortModelName(used) } : {}),
         profile: args.profile,
         durationMs: Date.now() - t0,
       },
     }
   }
-  const modelLabel = shortModelName(full.model)
+  const modelLabel = shortModelName(used)
   const fused = fuseDetections({
     local: args.local,
     // 本地候选只用于补齐模型自己读出的标注缺口，不参与点位主判断
@@ -378,6 +419,7 @@ async function runVisionFusion(args: {
       issues: vision.issues,
       stats: fused.stats,
       durationMs: Date.now() - t0,
+      rounds: 2,
     },
   }
 }
