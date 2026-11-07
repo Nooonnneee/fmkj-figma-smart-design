@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowLeft, Sparkles } from 'lucide-react'
+import { ArrowLeft, Palette, Sparkles } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { appAuth } from '@/lib/app-auth'
@@ -34,7 +34,7 @@ export default async function AiImagePage() {
           <h1 className="mt-1 text-2xl font-semibold">AI 生图</h1>
           <p className="mt-1 text-sm text-muted-foreground">用文字描述生成智能家居场景图、方案配图、材质意向图。</p>
         </div>
-        <Button asChild variant="ghost" size="sm"><Link href="/ai"><ArrowLeft className="size-4" />返回 AI 对话</Link></Button>
+        <div className="flex gap-2"><Button asChild variant="outline" size="sm"><Link href="/ai/image/style"><Palette className="size-4" />户型图风格化</Link></Button><Button asChild variant="ghost" size="sm"><Link href="/ai"><ArrowLeft className="size-4" />返回 AI 对话</Link></Button></div>
       </div>
       <ImageGenerator
         configured={imageGenerationConfigured()}
