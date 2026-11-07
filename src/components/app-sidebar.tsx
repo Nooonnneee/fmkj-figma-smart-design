@@ -10,12 +10,15 @@ import {
   Bot,
   Crown,
   FolderKanban,
+  Image as ImageIcon,
   LayoutGrid,
   LogOut,
   MessageSquareText,
   PackageSearch,
+  Palette,
   Plus,
   Settings,
+  WandSparkles,
 } from "lucide-react"
 
 import type { AiModelOption, AiProjectContext } from "@/components/ai/ai-elements"
@@ -239,6 +242,20 @@ export function AppSidebar({
                   <NavItem key={item.url} {...item} active={isActive(item.url) && pathname !== "/projects/new"} />
                 ))}
                 {aiCopilotEnabled ? <NavItem icon={Bot} label="AI 对话" url="/ai" active={isActive("/ai")} /> : null}
+              </SidebarMenu>
+            </SidebarGroup>
+
+            <SidebarGroup>
+              <SidebarGroupLabel>插件</SidebarGroupLabel>
+              <SidebarMenu>
+                <NavItem icon={Blocks} label="插件市场" url="/plugins" active={isActive("/plugins")} />
+                {aiCopilotEnabled ? (
+                  <>
+                    <NavItem icon={WandSparkles} label="插件功能" url="/plugins/tools" active={isActive("/plugins/tools")} />
+                    <NavItem icon={ImageIcon} label="AI 生图" url="/ai/image" active={isActive("/ai/image")} />
+                    <NavItem icon={Palette} label="户型图风格化" url="/ai/image/style" active={isActive("/ai/image/style")} />
+                  </>
+                ) : null}
               </SidebarMenu>
             </SidebarGroup>
 
