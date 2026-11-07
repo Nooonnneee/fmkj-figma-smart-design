@@ -7,14 +7,14 @@ import type { User } from '@/payload-types'
 
 import { isDeckTheme } from './deck/themes'
 import { frameworkOf, isDeckSection, isProposalFramework, kindOfFramework, normalizeSections } from './framework'
-import { BUILTIN_PROPOSAL_TEMPLATES, CONSTRUCTION_TEMPLATE, type ProposalTemplateDef } from './templates'
+import { BUILTIN_PROPOSAL_TEMPLATES, type ProposalTemplateDef } from './templates'
 
 /**
  * 方案模板清单（服务端）：后台「方案模板」里启用的模板；后台一个模板都没有时用内置模板。
  * 同一次请求里多处读取只查一次。
  * - 后台没填的「适合客户 / 使用时机 / 外观特点」沿用同标识内置模板的文案，再没有就用版式框架的默认说明；
  * - 章节按编排规范整理（封面置顶、投资与服务交付置底、去重，见 framework.ts）；
- * - 后台没有任何施工交底模板时补上内置的施工交底，保证交底资料始终可以生成。
+ * - 后台尚未建立的内置模板在读取时补齐，新增主题无需先写入后台才能预览；同标识的后台覆盖和停用始终优先。
  * user 为 null 时按系统身份读取（公开的模板库页面使用；模板本身不含任何成员数据）。
  */
 export const loadProposalTemplates = cache(async (user: User | null): Promise<ProposalTemplateDef[]> => {
@@ -59,11 +59,12 @@ export const loadProposalTemplates = cache(async (user: User | null): Promise<Pr
         accent: d.accent ?? null,
       }
     })
-  if (!list.length) return BUILTIN_PROPOSAL_TEMPLATES
-  // 后台完全没有施工交底模板（包括停用的）时补上内置版本；停用的不补，尊重后台设置
-  if (!res.docs.some((d) => d.framework === 'construction')) {
-    const builtin = builtinOf.get(CONSTRUCTION_TEMPLATE)
-    if (builtin) list.push(builtin)
+  const managedSlugs = new Set(res.docs.map((d) => d.slug))
+  const hasManagedConstruction = res.docs.some((d) => d.framework === 'construction')
+  // 已存在但停用的记录不能被兜底重新启用；后台自定义的交底框架也不重复补。
+  for (const builtin of BUILTIN_PROPOSAL_TEMPLATES) {
+    if (managedSlugs.has(builtin.value) || (builtin.kind === 'construction' && hasManagedConstruction)) continue
+    list.push(builtin)
   }
   return list
 })

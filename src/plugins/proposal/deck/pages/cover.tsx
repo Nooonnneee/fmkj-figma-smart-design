@@ -1,12 +1,13 @@
 /* eslint-disable @next/next/no-img-element -- 导出 PDF / 图片需要同源普通 <img> */
 /**
  * 01 封面（主题的 cover 决定版式）：band = 顶部照片色带 + 下方标题（栖序设计稿原样）；
- * immersive = 整幅照片 + 纸色渐变；split = 左文右图；type = 纯文字大字封面（不用照片）。
+ * immersive = 整幅照片 + 纸色渐变；split = 左文右图；type = 纯文字大字封面（不用照片）；
+ * gallery = 画廊横幅；arch = 拱窗照片；architectural = 左图右文的建筑目录。
  */
 import { pointScopeLabel } from '@/lib/point-scopes'
 
-import { pad, yuanShort } from '../model'
-import { Brand, headerTagline, imgLoading, Slide, type DeckCtx } from '../parts'
+import { yuanShort } from '../model'
+import { Brand, headerTagline, imgLoading, PageNumber, Slide, type DeckCtx } from '../parts'
 
 const SUBTITLE = '全屋智能 · 点位设计与服务报价'
 
@@ -16,7 +17,7 @@ function facts(ctx: DeckCtx) {
   return {
     tags: ['生活场景', `${d.points.length}点位设计`, '透明报价', '安心交付'],
     who: `${m.customer}　/　${m.layoutText}`,
-    doc: `${m.docNo} · ${m.version} · ${m.date}`,
+    doc: m.date,
     accent: [m.platform ? `${m.platform}生态` : null, d.scope === 'all' ? null : pointScopeLabel(d.scope), m.advisor ? `顾问 ${m.advisor}` : null].filter(Boolean).join(' · ') || '全屋智能设计方案',
     year: m.date.slice(0, 4),
   }
@@ -27,6 +28,9 @@ export function CoverPage({ ctx, no, total }: { ctx: DeckCtx; no: number; total:
   if (t.cover === 'immersive') return <ImmersiveCover ctx={ctx} no={no} total={total} />
   if (t.cover === 'split') return <SplitCover ctx={ctx} no={no} total={total} />
   if (t.cover === 'type') return <TypeCover ctx={ctx} no={no} total={total} />
+  if (t.cover === 'gallery') return <GalleryCover ctx={ctx} no={no} total={total} />
+  if (t.cover === 'arch') return <ArchCover ctx={ctx} no={no} total={total} />
+  if (t.cover === 'architectural') return <ArchitecturalCover ctx={ctx} no={no} total={total} />
   const f = facts(ctx)
   return (
     <Slide ctx={ctx} no={no} total={total} name="01 封面" cover>
@@ -49,12 +53,11 @@ export function CoverPage({ ctx, no, total }: { ctx: DeckCtx; no: number; total:
       <div className="absolute top-[650px] left-[930px] flex w-[454px] flex-col gap-[6px] border-l border-doc-rule pl-[28px]">
         <p className="doc-strong truncate text-[24px] leading-normal">{ctx.m.place}</p>
         <p className="doc-body truncate text-[17px] leading-normal text-doc-muted">{f.who}</p>
-        <p className="doc-latin text-[13px] leading-normal text-doc-muted">{f.doc}</p>
         <p className="doc-body truncate text-[13px] leading-normal text-doc-accent">{f.accent}</p>
       </div>
-      <div className="absolute inset-x-[56px] top-[906px] flex justify-between leading-normal">
-        <p className="doc-latin text-[11px] whitespace-pre text-doc-muted">{`${headerTagline(ctx)}      ${f.year}`}</p>
-        <p className="doc-latin text-[12px] text-doc-ink">{`${pad(no)} / ${pad(total)}`}</p>
+      <div className="absolute inset-x-[56px] top-[906px] flex h-[44px] items-center justify-between leading-normal">
+        <p className="doc-latin text-[11px] whitespace-pre text-doc-muted">{`${headerTagline(ctx)}      ${f.doc}`}</p>
+        <PageNumber ctx={ctx} no={no} total={total} />
       </div>
     </Slide>
   )
@@ -95,9 +98,9 @@ function ImmersiveCover({ ctx, no, total }: { ctx: DeckCtx; no: number; total: n
           </div>
         ))}
       </div>
-      <div className="absolute inset-x-[56px] top-[906px] flex justify-between leading-normal">
+      <div className="absolute inset-x-[56px] top-[906px] flex h-[44px] items-center justify-between leading-normal">
         <p className="doc-latin text-[11px] text-doc-muted">{f.doc}　 ·　 {f.accent}</p>
-        <p className="doc-latin text-[12px] text-doc-ink">{`${pad(no)} / ${pad(total)}`}</p>
+        <PageNumber ctx={ctx} no={no} total={total} />
       </div>
       <span className="doc-body absolute right-[56px] bottom-[96px] text-[11px] text-doc-muted">{t.photoNote}</span>
     </Slide>
@@ -147,9 +150,9 @@ function SplitCover({ ctx, no, total }: { ctx: DeckCtx; no: number; total: numbe
         <img src={t.coverPhoto} alt="" {...imgLoading(ctx)} className="size-full object-cover" />
         <span className="doc-body absolute bottom-[22px] left-[22px] rounded-full bg-(--deck-chip) px-[12px] py-[5px] text-[11px] text-(--deck-chip-ink)">{t.photoNote}</span>
       </div>
-      <div className="absolute top-[906px] left-[56px] flex w-[640px] justify-between leading-normal">
+      <div className="absolute top-[906px] left-[56px] flex h-[44px] w-[640px] items-center justify-between leading-normal">
         <p className="doc-latin text-[11px] text-doc-muted">{f.doc}</p>
-        <p className="doc-latin text-[12px] text-doc-ink">{`${pad(no)} / ${pad(total)}`}</p>
+        <PageNumber ctx={ctx} no={no} total={total} />
       </div>
       <p className="doc-body absolute top-[836px] left-[56px] w-[640px] truncate text-[12px] text-doc-accent">{f.accent}</p>
     </Slide>
@@ -193,10 +196,122 @@ function TypeCover({ ctx, no, total }: { ctx: DeckCtx; no: number; total: number
           </div>
         ))}
       </div>
-      <div className="absolute inset-x-[56px] top-[906px] flex justify-between leading-normal">
+      <div className="absolute inset-x-[56px] top-[906px] flex h-[44px] items-center justify-between leading-normal">
         <p className="doc-latin text-[11px] text-doc-muted">{f.doc}</p>
-        <p className="doc-latin text-[12px] text-doc-ink">{`${pad(no)} / ${pad(total)}`}</p>
+        <PageNumber ctx={ctx} no={no} total={total} />
       </div>
+    </Slide>
+  )
+}
+
+function CoverFooter({ ctx, no, total }: { ctx: DeckCtx; no: number; total: number }) {
+  return (
+    <div className="absolute inset-x-[72px] top-[906px] flex h-[44px] items-center justify-between border-t border-doc-rule">
+      <p className="doc-latin text-[11px] text-doc-muted">{facts(ctx).doc}</p>
+      <PageNumber ctx={ctx} no={no} total={total} />
+    </div>
+  )
+}
+
+/** 赤陶中古：标题在上，留边横幅照片与侧边项目签条构成画廊式封面。 */
+function GalleryCover({ ctx, no, total }: { ctx: DeckCtx; no: number; total: number }) {
+  const t = ctx.theme
+  const f = facts(ctx)
+  return (
+    <Slide ctx={ctx} no={no} total={total} name="01 封面" cover>
+      <div className="absolute inset-x-[72px] top-[36px] flex h-[34px] items-center justify-between">
+        <Brand ctx={ctx} large />
+        <p className="doc-latin text-[11px] tracking-[0.16em] text-doc-muted">{t.coverTagline}</p>
+      </div>
+      <div className="absolute top-[132px] left-[72px] w-[1296px] border-t border-doc-rule pt-[24px]">
+        <h1 className="doc-display line-clamp-2 text-[52px] leading-[1.25]">{t.headline}</h1>
+        <p className="doc-body mt-[12px] text-[22px] text-doc-muted">{SUBTITLE}</p>
+      </div>
+      <div className="absolute top-[306px] left-[72px] h-[480px] w-[1008px] border border-doc-rule bg-(--deck-panel) p-[12px]">
+        <img src={t.coverPhoto} alt="" {...imgLoading(ctx)} className="size-full object-cover" />
+      </div>
+      <div className="absolute top-[306px] right-[72px] flex w-[244px] flex-col border-t border-doc-accent pt-[20px]">
+        <p className="doc-display text-[25px] leading-[1.45]">{ctx.m.place}</p>
+        <p className="doc-body mt-[14px] text-[16px] leading-[1.7] text-doc-muted">{f.who}</p>
+        <p className="doc-body mt-[30px] border-t border-doc-rule pt-[18px] text-[14px] leading-[1.7] text-doc-accent">{f.accent}</p>
+        <dl className="doc-body mt-[34px] space-y-[18px] text-[14px]">
+          <div><dt className="text-doc-muted">方案内容</dt><dd className="mt-[6px]">{ctx.m.d.points.length} 个点位 · {ctx.m.d.rooms.length} 个空间</dd></div>
+          <div><dt className="text-doc-muted">方案预算</dt><dd className="doc-numeral mt-[6px] text-[27px]">{yuanShort(ctx.m.finalAmount)}</dd></div>
+        </dl>
+      </div>
+      <p className="doc-body absolute top-[806px] left-[72px] text-[11px] text-doc-muted">{t.photoNote}</p>
+      <p className="doc-body absolute top-[844px] left-[72px] text-[14px] text-doc-muted">{f.tags.join('　 /　 ')}</p>
+      <CoverFooter ctx={ctx} no={no} total={total} />
+    </Slide>
+  )
+}
+
+/** 海盐柔雅：拱窗照片与下方题注，左侧以舒展留白承载完整项目信息。 */
+function ArchCover({ ctx, no, total }: { ctx: DeckCtx; no: number; total: number }) {
+  const t = ctx.theme
+  const f = facts(ctx)
+  return (
+    <Slide ctx={ctx} no={no} total={total} name="01 封面" cover>
+      <div className="absolute inset-x-[72px] top-[36px] flex h-[34px] items-center justify-between">
+        <Brand ctx={ctx} large />
+        <p className="doc-latin text-[11px] tracking-[0.16em] text-doc-muted">{t.coverTagline}</p>
+      </div>
+      <div className="absolute top-[232px] left-[72px] w-[620px]">
+        <h1 className="doc-display line-clamp-2 text-[56px] leading-[1.35]">{t.headline}</h1>
+        <p className="doc-body mt-[24px] text-[23px] leading-normal text-doc-muted">{SUBTITLE}</p>
+        <span aria-hidden className="mt-[32px] block h-px w-[96px] bg-doc-accent" />
+      </div>
+      <div className="absolute top-[536px] left-[72px] w-[620px]">
+        <p className="doc-display text-[26px] leading-normal">{ctx.m.place}</p>
+        <p className="doc-body mt-[14px] text-[17px] text-doc-muted">{f.who}</p>
+        <p className="doc-body mt-[12px] text-[14px] text-doc-accent">{f.accent}</p>
+        <p className="doc-body mt-[30px] border-t border-doc-rule pt-[18px] text-[16px] text-doc-muted">{ctx.m.d.points.length} 个智能点位　/　{ctx.m.d.rooms.length} 个空间　/　{yuanShort(ctx.m.finalAmount)}</p>
+      </div>
+      <div className="absolute top-[130px] right-[72px] h-[650px] w-[560px] overflow-hidden rounded-t-[280px] border border-doc-rule bg-(--deck-panel) p-[12px]">
+        <div className="size-full overflow-hidden rounded-t-[268px]">
+          <img src={t.coverPhoto} alt="" {...imgLoading(ctx)} className="size-full object-cover" />
+        </div>
+      </div>
+      <p className="doc-body absolute top-[800px] right-[72px] w-[560px] text-center text-[11px] text-doc-muted">{t.photoNote}</p>
+      <CoverFooter ctx={ctx} no={no} total={total} />
+    </Slide>
+  )
+}
+
+/** 岩灰建筑：左侧整张竖幅照片，右侧标题与逐行项目目录；无圆角和照片叠字。 */
+function ArchitecturalCover({ ctx, no, total }: { ctx: DeckCtx; no: number; total: number }) {
+  const t = ctx.theme
+  const f = facts(ctx)
+  const rows: [string, string][] = [
+    ['项目', ctx.m.place],
+    ['业主与户型', f.who],
+    ['设计规模', `${ctx.m.d.points.length} 个点位 / ${ctx.m.d.rooms.length} 个空间`],
+    ['方案预算', yuanShort(ctx.m.finalAmount)],
+  ]
+  return (
+    <Slide ctx={ctx} no={no} total={total} name="01 封面" cover>
+      <div className="absolute inset-x-[72px] top-[36px] flex h-[34px] items-center justify-between">
+        <Brand ctx={ctx} large />
+        <p className="doc-latin text-[11px] tracking-[0.12em] text-doc-muted">{t.coverTagline}</p>
+      </div>
+      <div className="absolute top-[136px] left-[72px] h-[664px] w-[584px] overflow-hidden border border-doc-rule">
+        <img src={t.coverPhoto} alt="" {...imgLoading(ctx)} className="size-full object-cover" />
+      </div>
+      <p className="doc-body absolute top-[822px] left-[72px] w-[584px] text-[11px] text-doc-muted">{t.photoNote}</p>
+      <div className="absolute top-[136px] right-[72px] w-[640px] border-t border-doc-ink pt-[30px]">
+        <h1 className="doc-display line-clamp-2 text-[56px] leading-[1.3]">{t.headline}</h1>
+        <p className="doc-body mt-[24px] text-[23px] text-doc-muted">{SUBTITLE}</p>
+        <dl className="mt-[70px] border-t border-doc-rule">
+          {rows.map(([label, value]) => (
+            <div key={label} className="grid grid-cols-[116px_1fr] items-start gap-[20px] border-b border-doc-rule py-[22px]">
+              <dt className="doc-body text-[14px] text-doc-muted">{label}</dt>
+              <dd className="doc-strong text-[18px] leading-[1.6]">{value}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="doc-body mt-[24px] text-[14px] text-doc-accent">{f.accent}</p>
+      </div>
+      <CoverFooter ctx={ctx} no={no} total={total} />
     </Slide>
   )
 }

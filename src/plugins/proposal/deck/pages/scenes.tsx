@@ -8,6 +8,7 @@ import Image from 'next/image'
 import { BUILTIN_SCENES } from '@/lib/builtin-scenes'
 import type { Room } from '@/lib/project-docs'
 import { sceneVisualForScene } from '@/lib/scene-visuals'
+import { nightScenePhotoForScene } from '@/lib/scene-night-photos'
 import type { ManagedScene } from '@/lib/scenes'
 
 import type { DeckItem, DeckModel } from '../model'
@@ -44,7 +45,7 @@ function usesBuiltinPhoto(scene: ManagedScene) {
     return false
   }
   const file = path.split('/').pop()
-  return BUILTIN_SCENES.some((builtin) => path === builtin.image?.url || file === `scene-${builtin.slug}.jpg`)
+  return BUILTIN_SCENES.some((builtin) => path === builtin.image?.url || path === `/proposal/photos/scenes/${builtin.slug}.jpg` || file === `scene-${builtin.slug}.jpg` || file === `scene-${builtin.slug}.png`)
 }
 
 function productPhoto(ctx: DeckCtx, item: DeckItem) {
@@ -84,18 +85,19 @@ function scenePhoto(ctx: DeckCtx, entry: DeckScene) {
 export function ScenesPage({ ctx, no, total, scenes, part }: { ctx: DeckCtx; no: number; total: number; scenes: DeckScene[]; part: string }) {
   return (
     <Slide ctx={ctx} no={no} total={total} name={`生活场景${part}`}>
-      <Chapter ctx={ctx} no={no} title="每一个场景，都由真实的设备支撑。" subtitle={`本方案匹配 ${deckScenes(ctx.m).length} 个场景${part} / 只列出本项目实际配置的设备`} tag="SCENES" />
+      <Chapter ctx={ctx} no={no} title="每一个场景，都由真实的设备支撑。" tag="SCENES" />
       <div className="grid min-h-0 w-full flex-1 grid-cols-2 gap-[28px] overflow-hidden">
         {scenes.map((entry) => {
           const { scene, rooms, items } = entry
-          const photo = scenePhoto(ctx, entry)
+          const night = usesBuiltinPhoto(scene) ? nightScenePhotoForScene(scene.name) : null
+          const photo = night ? null : scenePhoto(ctx, entry)
           return (
           <div key={scene.id} className="flex min-h-0 flex-col overflow-hidden rounded-(--deck-radius) border border-doc-rule bg-(--deck-diagram)">
             <div className="relative h-[300px] shrink-0 overflow-hidden bg-doc-stripe">
               {photo ? (
                 <SceneProductFigure visual={photo.visual} callouts={photo.match.callouts} width={648} height={300} maxCallouts={3} lazy={ctx.lazy} note="" />
               ) : (
-                <img src={scene.image?.url ?? `/proposal/photos/${CHAPTER_PHOTO[scene.chapter] ?? 'home'}.jpg`} alt={scene.image?.alt ?? scene.name} {...imgLoading(ctx)} className="absolute inset-0 size-full object-cover" />
+                <img src={night?.url ?? scene.image?.url ?? `/proposal/photos/${CHAPTER_PHOTO[scene.chapter] ?? 'home'}.jpg`} alt={night?.alt ?? scene.image?.alt ?? scene.name} {...imgLoading(ctx)} className="absolute inset-0 size-full object-cover" />
               )}
               {scene.tagline ? (
                 <span className="doc-latin absolute top-[16px] left-[16px] rounded-[calc(var(--deck-radius-sm)/2)] bg-(--deck-chip) px-[10px] py-[4px] text-[11px] tracking-[0.2em] text-(--deck-chip-ink)">{scene.tagline}</span>
@@ -129,7 +131,7 @@ export function ScenesPage({ ctx, no, total, scenes, part }: { ctx: DeckCtx; no:
                 })}
                 {items.length > 5 ? <span className="doc-body self-center text-[11px] text-doc-muted">另 {items.length - 5} 项见报价</span> : null}
               </div>
-              {photo ? <p className="doc-body truncate text-[11px] leading-[1.4] text-doc-muted" title={photo.room.displayName}>{photo.match.callouts.length ? `示意空间：${photo.room.displayName}` : '本空间暂无对应标注位'}{photo.remainingGroups ? `；其余 ${photo.remainingGroups} 组见报价 / 房间配置` : '；产品以本次选型为准'}</p> : <p className="doc-body text-[11px] leading-[1.4] text-doc-muted">场景图片保留原样，实际产品见本页清单与报价。</p>}
+              {photo ? <p className="doc-body truncate text-[11px] leading-[1.4] text-doc-muted" title={photo.room.displayName}>{photo.match.callouts.length ? `示意空间：${photo.room.displayName}` : '本空间暂无对应标注位'}{photo.remainingGroups ? `；其余 ${photo.remainingGroups} 组见报价 / 房间配置` : '；产品以本次选型为准'}</p> : <p className="doc-body text-[11px] leading-[1.4] text-doc-muted">{night ? '夜间场景氛围意向，实际产品见本页清单与报价。' : '场景图片保留原样，实际产品见本页清单与报价。'}</p>}
             </div>
           </div>
           )

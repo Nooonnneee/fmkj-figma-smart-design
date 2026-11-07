@@ -62,6 +62,8 @@ export type PointInfo = {
   /** 相对所在图纸的比例坐标（0–1） */
   rx: number | null
   ry: number | null
+  /** 已有图标旋转，供展示扇形与灯带在各出图入口保持同向。 */
+  angle?: number
   areaId: string | null
 }
 
@@ -237,6 +239,7 @@ export function scenePoints(elements: readonly SceneEl[], sheets: SheetInfo[], a
         deviceType: isDeviceType(e.customData?.deviceType) ? (e.customData!.deviceType as string) : 'other',
         productId,
         code: str(e.customData?.pointCode),
+        angle: typeof e.angle === 'number' && Number.isFinite(e.angle) ? e.angle : 0,
         cx,
         cy,
         sheetId: sheet?.id ?? null,

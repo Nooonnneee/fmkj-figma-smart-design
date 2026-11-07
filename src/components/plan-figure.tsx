@@ -1,12 +1,14 @@
 import { useId } from 'react'
 
+import { PointDisplayEffects } from '@/components/point-display-effects'
 import { categoryOfType, deviceTypeOf } from '@/lib/device-types'
+import { buildPointDisplayEffects } from '@/lib/point-display-effects'
 import { markerSrc } from '@/lib/point-marker-data'
 import type { PlanAreaShape } from '@/lib/point-scene'
-import { SHEET } from '@/lib/sheet-spec'
+import { MARKER, SHEET } from '@/lib/sheet-spec'
 import { cn } from '@/lib/utils'
 
-export type PlanPoint = { id: string; deviceType: string; code: string; rx: number | null; ry: number | null; image?: string | null }
+export type PlanPoint = { id: string; deviceType: string; code: string; rx: number | null; ry: number | null; image?: string | null; angle?: number }
 /** 区域：比例坐标的外接框，多边形区域带 poly 轮廓（用 planAreaOf 生成） */
 export type PlanArea = PlanAreaShape
 
@@ -39,6 +41,7 @@ export function PlanFigure({
   mode = 'symbol',
   showCodes = false,
   showAreas = true,
+  effects = false,
   dim = 0.55,
   className,
 }: {
@@ -48,6 +51,8 @@ export function PlanFigure({
   mode?: 'symbol' | 'product'
   showCodes?: boolean
   showAreas?: boolean
+  /** 仅按设备类型叠加范围波纹与灯光氛围，不影响点位、选型或金额。 */
+  effects?: boolean
   dim?: number
   className?: string
 }) {
@@ -56,10 +61,14 @@ export function PlanFigure({
   const S = mode === 'product' ? 78 : 64
   const productClipPrefix = useId().replace(/:/g, '')
   const placed = points.filter((p) => p.rx !== null && p.ry !== null)
+  const displayEffects = effects
+    ? buildPointDisplayEffects(placed.map((p) => ({ id: p.id, deviceType: p.deviceType, x: p.rx! * W, y: p.ry! * H, angle: p.angle })), MARKER.size * W / SHEET.width)
+    : []
   return (
     <div className={cn('relative aspect-[3/2] overflow-hidden bg-white', className)}>
       <svg viewBox={`0 0 ${W} ${H}`} className="pointer-events-none absolute inset-0 size-full" role="img" aria-label="点位方案图">
         {sheetUrl ? <image href={sheetUrl} x={0} y={0} width={W} height={H} opacity={dim} preserveAspectRatio="xMidYMid meet" /> : null}
+        {effects ? <PointDisplayEffects effects={displayEffects} idPrefix="plan-figure" /> : null}
         {showAreas
           ? areas.map((a) => {
               const [lx, ly] = planAreaLabelAt(a)

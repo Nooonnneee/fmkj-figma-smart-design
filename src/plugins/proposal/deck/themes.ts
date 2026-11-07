@@ -8,11 +8,13 @@
  * - noir 墨金臻选：深色画面、香槟金、衬线标题、整幅照片封面、金线表头，适合屏幕演示；
  * - grove 原木自然：燕麦纸、橄榄绿、衬线标题、左右分栏封面、圆角照片与卡片；
  * - azure 晨岚现代（「智域科技」模板使用）：冷白纸面、深海蓝强调、细线卡片、照片色带封面；
- * - terra 陶土暖阳：米杏纸色、陶土橙、分栏封面与圆角卡片；
+ * - terra 赤陶中古：羊皮纸色、赤陶棕、画廊式横幅照片与衬线标题；
  * - mono 素白极简：纯白纸面、墨黑文字、纯文字封面，不用照片也有质感；
  * - dawn 晨曦暖调：奶油纸色、陶土橙、圆角卡片与竖幅照片，温暖亲和；
- * - jade 东方雅韵：宣纸色、青瓷绿、衬线标题与茶室照片，适合新中式与东方风住宅。
- * 每个主题使用自己的封面照片（public/proposal/photos/cover-*.jpg），模板缩略图因此一眼可辨。
+ * - jade 东方雅韵：宣纸色、青瓷绿、衬线标题与茶室照片，适合新中式与东方风住宅；
+ * - linen 海盐柔雅：海盐蓝灰、拱窗照片、柔和衬线与居家留白；
+ * - slate 岩灰建筑：冷灰纸色、直角线框、左图右文的建筑目录封面。
+ * 封面照片来自 public/proposal/photos；主题同时改变纸面、字体与构图，缩略图由真实封面渲染。
  */
 import type { CSSProperties } from 'react'
 
@@ -40,16 +42,63 @@ const AZURE_STYLE: DocStyle = {
 
 const TERRA_STYLE: DocStyle = {
   id: 'terra',
-  name: '陶土暖阳',
-  description: '米杏纸色、陶土橙',
-  colors: { paper: '#fbf5ee', ink: '#3a2a22', muted: '#7c6658', accent: '#b5603a', soft: '#f4e3d7', softTo: '#f8ece1', rule: '#ead8c8', headBg: '#f1dccd', headFg: '#6e3a22', stripe: '#f7eee5' },
+  name: '赤陶中古',
+  description: '羊皮纸色、赤陶棕与温厚衬线',
+  colors: { paper: '#f5eee4', ink: '#3e2d25', muted: '#766257', accent: '#994b32', soft: '#ead9c9', softTo: '#f3e8dc', rule: '#d6c3b2', headBg: '#583d30', headFg: '#fff7eb', stripe: '#eee3d5' },
   fonts: { display: SERIF, strong: `'Noto Sans SC:Medium', ${NOTO_FALLBACK}`, body: `'Noto Sans SC:Regular', ${NOTO_FALLBACK}`, numeral: SERIF, latin: `'Inter:Regular', ${SANS}` },
   weights: { display: 600, strong: 500, numeral: 400 },
   header: 'line',
-  title: 'numbered',
+  title: 'underline',
   table: 'ruled',
-  radius: '12px',
-  tagline: 'WARM HOME',
+  radius: '0px',
+  tagline: 'TIMELESS LIVING',
+}
+
+const LINEN_STYLE: DocStyle = {
+  ...TERRA_STYLE,
+  id: 'linen',
+  name: '海盐柔雅',
+  description: '海盐蓝灰、柔和衬线与浅色留白',
+  colors: { paper: '#f3f7f6', ink: '#293f45', muted: '#5c747a', accent: '#526f78', soft: '#e0e9e8', softTo: '#edf2ef', rule: '#cbd8d7', headBg: '#dfe9e9', headFg: '#29464f', stripe: '#eaf0ee' },
+  radius: '16px',
+  tagline: 'QUIET EVERYDAY',
+}
+
+const SLATE_STYLE: DocStyle = {
+  ...AZURE_STYLE,
+  id: 'slate',
+  name: '岩灰建筑',
+  description: '冷灰纸色、石墨文字与建筑线框',
+  colors: { paper: '#eff0ed', ink: '#252c30', muted: '#626e73', accent: '#46545b', soft: '#dde2df', softTo: '#e8ebe7', rule: '#bec7c4', headBg: '#303b40', headFg: '#f4f5ef', stripe: '#e5e9e5' },
+  fonts: { ...AZURE_STYLE.fonts, numeral: `'Inter:Bold', ${SANS}` },
+  weights: { display: 500, strong: 500, numeral: 700 },
+  radius: '0px',
+  tagline: 'SPACES IN ORDER',
+}
+
+/** 新主题的卡片、图纸和标签沿用同一纸面色系，保留设备本身的类别色。 */
+function paperVars(style: DocStyle): Record<string, string> {
+  const c = style.colors
+  return {
+    '--deck-panel': c.soft,
+    '--deck-panel-border': c.rule,
+    '--deck-card': c.paper,
+    '--deck-card-border': c.rule,
+    '--deck-diagram': c.paper,
+    '--deck-muted-panel': c.stripe,
+    '--deck-box': c.stripe,
+    '--deck-marker': c.accent,
+    '--deck-marker-ring': c.paper,
+    '--deck-marker-fg': '#ffffff',
+    '--deck-plan-code': c.accent,
+    '--deck-chip': c.paper,
+    '--deck-chip-fg': c.accent,
+    '--deck-chip-ink': c.ink,
+    '--deck-badge': c.soft,
+    '--deck-service-row': c.soft,
+    '--deck-radius': style.radius,
+    '--deck-radius-sm': style.radius === '0px' ? '0px' : '10px',
+  }
 }
 
 const MONO_STYLE: DocStyle = {
@@ -98,8 +147,8 @@ const NOIR_DECK_STYLE: DocStyle = {
   tagline: 'PRIVATE RESIDENCE',
 }
 
-/** 版式框架：内置的六套方案框架（布局骨架 + 配色字体）；后台「方案模板」在框架之上换强调色、封面图和标语 */
-export type DeckThemeId = 'qixu' | 'noir' | 'grove' | 'azure' | 'terra' | 'mono' | 'dawn' | 'jade'
+/** 方案视觉主题；后台「方案模板」可进一步换强调色、封面图和标语。 */
+export type DeckThemeId = 'qixu' | 'noir' | 'grove' | 'azure' | 'terra' | 'mono' | 'dawn' | 'jade' | 'linen' | 'slate'
 
 export type DeckTheme = {
   id: DeckThemeId
@@ -109,8 +158,8 @@ export type DeckTheme = {
   style: DocStyle
   /** 方案专用颜色与圆角 */
   vars: Record<string, string>
-  /** 封面：照片色带 / 整幅照片 / 左文右图 / 纯文字 */
-  cover: 'band' | 'immersive' | 'split' | 'type'
+  /** 封面：照片色带 / 整幅照片 / 左文右图 / 纯文字 / 画廊 / 拱窗 / 建筑目录 */
+  cover: 'band' | 'immersive' | 'split' | 'type' | 'gallery' | 'arch' | 'architectural'
   chapter: 'numeral' | 'eyebrow' | 'badge'
   table: 'dark' | 'gold' | 'soft'
   /** 深色画面（底图和点位标注需要调亮） */
@@ -297,41 +346,22 @@ export const DECK_THEMES: Record<DeckThemeId, DeckTheme> = {
   },
   terra: {
     id: 'terra',
-    label: '陶土暖阳',
-    description: '米杏纸色、陶土橙、圆角卡片，适合温暖的家庭住宅',
+    label: '赤陶中古',
+    description: '羊皮纸色、赤陶棕、画廊式横幅照片，适合中古与复古住宅',
     style: TERRA_STYLE,
-    vars: {
-      '--deck-panel': '#f4e3d7',
-      '--deck-panel-border': 'transparent',
-      '--deck-card': '#fffaf5',
-      '--deck-card-border': '#ead8c8',
-      '--deck-diagram': '#fffaf5',
-      '--deck-muted-panel': '#f1e6db',
-      '--deck-box': '#f6ece2',
-      '--deck-marker': '#b5603a',
-      '--deck-marker-ring': '#ffffff',
-      '--deck-marker-fg': '#ffffff',
-      '--deck-plan-code': '#8f4a2b',
-      '--deck-chip': '#fffaf5',
-      '--deck-chip-fg': '#b5603a',
-      '--deck-chip-ink': '#3a2a22',
-      '--deck-badge': '#f4e3d7',
-      '--deck-service-row': '#f7eae0',
-      '--deck-radius': '14px',
-      '--deck-radius-sm': '10px',
-    },
-    cover: 'split',
-    chapter: 'numeral',
+    vars: paperVars(TERRA_STYLE),
+    cover: 'gallery',
+    chapter: 'eyebrow',
     table: 'soft',
     mood: 'light',
     amount: 'numeral',
     accentAmount: true,
-    brandMark: 'gradient',
-    rounded: true,
+    brandMark: 'outline',
+    rounded: false,
     trackedTagline: true,
-    headline: '温暖的光，留给回家的人。',
-    tagline: 'WARM HOME',
-    coverTagline: 'A WARM PLACE TO COME HOME',
+    headline: '把时光的温度，留在家里。',
+    tagline: 'TIMELESS LIVING',
+    coverTagline: 'A HOME WITH CHARACTER',
     coverPhoto: '/proposal/photos/dining.jpg',
     photoNote: '氛围意向图 · 非项目实景',
   },
@@ -453,6 +483,48 @@ export const DECK_THEMES: Record<DeckThemeId, DeckTheme> = {
     tagline: 'ORIENTAL LIVING',
     coverTagline: 'ORIENTAL SERENITY',
     coverPhoto: '/proposal/photos/cover-jade.jpg',
+    photoNote: '氛围意向图 · 非项目实景',
+  },
+  linen: {
+    id: 'linen',
+    label: '海盐柔雅',
+    description: '海盐蓝灰、拱窗照片与柔和衬线，适合法式与浅色住宅',
+    style: LINEN_STYLE,
+    vars: paperVars(LINEN_STYLE),
+    cover: 'arch',
+    chapter: 'badge',
+    table: 'soft',
+    mood: 'light',
+    amount: 'numeral',
+    accentAmount: false,
+    brandMark: 'outline',
+    rounded: true,
+    trackedTagline: true,
+    headline: '让日常，轻柔而从容。',
+    tagline: 'QUIET EVERYDAY',
+    coverTagline: 'LIGHT, SPACE AND EVERYDAY LIFE',
+    coverPhoto: '/proposal/photos/cover-qixu.jpg',
+    photoNote: '氛围意向图 · 非项目实景',
+  },
+  slate: {
+    id: 'slate',
+    label: '岩灰建筑',
+    description: '冷灰纸色、直角线框与建筑目录封面，适合现代建筑住宅',
+    style: SLATE_STYLE,
+    vars: paperVars(SLATE_STYLE),
+    cover: 'architectural',
+    chapter: 'eyebrow',
+    table: 'dark',
+    mood: 'light',
+    amount: 'latin',
+    accentAmount: false,
+    brandMark: 'outline',
+    rounded: false,
+    trackedTagline: false,
+    headline: '空间有序，生活自如。',
+    tagline: 'SPACES IN ORDER',
+    coverTagline: 'RESIDENTIAL DESIGN STUDY',
+    coverPhoto: '/proposal/photos/study.jpg',
     photoNote: '氛围意向图 · 非项目实景',
   },
 }

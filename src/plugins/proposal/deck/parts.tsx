@@ -3,10 +3,14 @@
  * 8 章提案的公共部件（尺寸来自 Figma 设计稿 1440 × 960 画布，节点 8:6729 等）。
  * 颜色字体来自风格变量（bg-doc-* / doc-display / --deck-*），版式差异由主题的 cover / chapter / table 字段决定。
  */
+import { PointDisplayEffects } from '@/components/point-display-effects'
+import { MiniAppCode } from '@/components/mini-app-code'
 import { brandLatin } from '@/documents/parts'
 import { brandInitials } from '@/lib/brand'
 import { markerSrc } from '@/lib/point-marker-data'
+import { buildPointDisplayEffects, type PointDisplayEffect } from '@/lib/point-display-effects'
 import { areaLabelAnchor, areaOutline, type AreaInfo, type SheetInfo } from '@/lib/point-scene'
+import { MARKER } from '@/lib/sheet-spec'
 import { cn } from '@/lib/utils'
 
 import type { ProposalMarkers } from '../templates'
@@ -66,6 +70,7 @@ export function Brand({ ctx, large = false, className }: { ctx: DeckCtx; large?:
         </span>
       )}
       <p className={cn('doc-display leading-normal whitespace-nowrap', large ? 'text-[21px]' : 'text-[17px]')}>{c.name}</p>
+      <MiniAppCode companyName={c.name} size={large ? 32 : 28} dark={ctx.theme.mood === 'dark'} />
     </div>
   )
 }
@@ -82,24 +87,33 @@ export function DeckHeader({ ctx }: { ctx: DeckCtx }) {
   )
 }
 
-/** 页脚（节点 8:6810）：分隔线 + 项目 / 客户 · 方案类型 | 编号 / 版本 / 日期 | 页码 */
+/** 页码保持简洁，小程序入口统一位于左上品牌旁。 */
+export function PageNumber({ ctx, no, total }: { ctx: DeckCtx; no: number; total: number }) {
+  return (
+    <div data-page-number className="doc-latin flex shrink-0 items-center gap-[8px] text-[12px] whitespace-nowrap text-doc-ink">
+      <span>{`${pad(no)} / ${pad(total)}`}</span>
+    </div>
+  )
+}
+
+/** 页脚：分隔线 + 项目 / 客户 · 方案类型 | 日期 | 页码 */
 export function DeckFooter({ ctx, no, total }: { ctx: DeckCtx; no: number; total: number }) {
   const { m } = ctx
   const left = `${m.place} / ${m.customer}　 ·　 ${m.platform ? `${m.platform} · ` : ''}${m.scopeText}`
   return (
-    <div className="absolute inset-x-[56px] top-[906px] flex flex-col gap-[12px] overflow-hidden">
+    <div data-deck-footer className="absolute inset-x-[56px] top-[906px] flex flex-col gap-[4px] overflow-hidden">
       <div className="h-px w-full bg-doc-rule" />
-      <div className="flex w-full items-start justify-between gap-6 leading-normal">
+      <div className="flex h-[42px] w-full items-center justify-between gap-6 leading-normal">
         <p className="doc-body max-w-[640px] overflow-hidden text-[11px] text-ellipsis whitespace-pre text-doc-muted">{left}</p>
-        <p className="doc-latin text-[11px] whitespace-pre text-doc-muted">{`${m.docNo}  /  ${m.version}  /  ${m.date}`}</p>
-        <p className="doc-latin text-[12px] whitespace-nowrap text-doc-ink">{`${pad(no)} / ${pad(total)}`}</p>
+        <p className="doc-latin text-[11px] whitespace-pre text-doc-muted">{m.date}</p>
+        <PageNumber ctx={ctx} no={no} total={total} />
       </div>
     </div>
   )
 }
 
 /** 章节标题（节点 8:6735）：栖序 = 细体大编号；墨金 = 金色眉标 + 淡金大编号；原木 = 圆形编号徽章 */
-export function Chapter({ ctx, no, title, subtitle, tag }: { ctx: DeckCtx; no: number; title: string; subtitle: string; tag: string }) {
+export function Chapter({ ctx, no, title, subtitle, tag }: { ctx: DeckCtx; no: number; title: string; subtitle?: string; tag: string }) {
   const style = ctx.theme.chapter
   if (style === 'eyebrow') {
     return (
@@ -107,7 +121,7 @@ export function Chapter({ ctx, no, title, subtitle, tag }: { ctx: DeckCtx; no: n
         <div className="flex min-w-px flex-1 flex-col gap-[4px] overflow-hidden">
           <p className="doc-latin text-[11px] leading-normal tracking-[0.32em] whitespace-nowrap text-doc-accent">{`CHAPTER ${pad(no)}  ·  ${tag}`}</p>
           <p className="doc-display w-full truncate text-[36px] leading-[1.3]">{title}</p>
-          <p className="doc-body w-full truncate text-[14px] leading-normal text-doc-muted">{subtitle}</p>
+          {subtitle ? <p className="doc-body w-full truncate text-[14px] leading-normal text-doc-muted">{subtitle}</p> : null}
         </div>
         <p className="doc-numeral text-[96px] leading-[0.8] whitespace-nowrap text-doc-accent/25">{pad(no)}</p>
       </div>
@@ -119,7 +133,7 @@ export function Chapter({ ctx, no, title, subtitle, tag }: { ctx: DeckCtx; no: n
         <span className="doc-numeral mb-[2px] flex size-[72px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-doc-accent text-[28px] text-doc-accent">{pad(no)}</span>
         <div className="flex min-w-px flex-1 flex-col gap-[6px] overflow-hidden">
           <p className="doc-display w-full truncate text-[38px] leading-[1.25]">{title}</p>
-          <p className="doc-body w-full truncate text-[14px] leading-normal text-doc-muted">{subtitle}</p>
+          {subtitle ? <p className="doc-body w-full truncate text-[14px] leading-normal text-doc-muted">{subtitle}</p> : null}
         </div>
         <p className="doc-latin text-[11px] leading-normal tracking-[0.22em] whitespace-nowrap text-doc-accent">{tag}</p>
       </div>
@@ -130,7 +144,7 @@ export function Chapter({ ctx, no, title, subtitle, tag }: { ctx: DeckCtx; no: n
       <p className="doc-numeral text-[68px] leading-normal whitespace-nowrap text-doc-accent">{pad(no)}</p>
       <div className="flex min-w-px flex-1 flex-col gap-[6px] overflow-hidden">
         <p className="doc-display w-full truncate text-[40px] leading-[1.25]">{title}</p>
-        <p className="doc-body w-full truncate text-[14px] leading-normal text-doc-muted">{subtitle}</p>
+        {subtitle ? <p className="doc-body w-full truncate text-[14px] leading-normal text-doc-muted">{subtitle}</p> : null}
       </div>
       <p className="doc-latin text-[11px] leading-normal whitespace-nowrap text-doc-muted">{tag}</p>
     </div>
@@ -268,6 +282,7 @@ export function Photo({
 /** 标准图纸的场景单位（见 sheet-spec：1200 × 800） */
 const SW = 1200
 const SH = 800
+const COVERAGE_SCALE: Partial<Record<PointDisplayEffect['kind'], number>> = { wireless: 2.5, motion: 1.8, smoke: 1.4, water: 1.1 }
 export type Crop = { x: number; y: number; w: number; h: number }
 
 /** 房间在图纸上的范围（场景单位），四周留一点边，用于房间小平面 */
@@ -326,6 +341,7 @@ export function PlanView({
   width,
   height,
   crop,
+  coverage = false,
 }: {
   ctx: DeckCtx
   sheet: SheetInfo
@@ -334,6 +350,8 @@ export function PlanView({
   width: number
   height: number
   crop?: Crop | null
+  /** 覆盖展示页放大信号与感应波形，沿用点位图的类型化效果。 */
+  coverage?: boolean
 }) {
   const box = crop ?? { x: 0, y: 0, w: SW, h: SH }
   const k = Math.min(width / box.w, height / box.h)
@@ -345,6 +363,13 @@ export function PlanView({
   const vy = fit(box.y, box.h, vh, SH)
   const u = (px: number) => px / k
   const dense = points.length > 48
+  const displayEffects = buildPointDisplayEffects(
+    points.flatMap((p) => p.rx == null || p.ry == null ? [] : [{ id: p.id, deviceType: p.deviceType, x: p.rx * SW, y: p.ry * SH, angle: p.angle }]),
+    MARKER.size,
+  ).map((effect) => coverage ? {
+    ...effect,
+    size: effect.size * (COVERAGE_SCALE[effect.kind] ?? 1),
+  } : effect)
   return (
     <div className="relative shrink-0 overflow-hidden" style={{ width, height }}>
       {sheet.url ? (
@@ -358,6 +383,7 @@ export function PlanView({
         />
       ) : null}
       <svg className="absolute inset-0" width={width} height={height} viewBox={`${vx} ${vy} ${vw} ${vh}`} aria-hidden>
+        <PointDisplayEffects effects={displayEffects} idPrefix="proposal-plan" />
         {areas.map((a) => {
           const px = (x: number) => ((x - sheet.x) / sheet.width) * SW
           const py = (y: number) => ((y - sheet.y) / sheet.height) * SH
@@ -388,6 +414,7 @@ export function PlanView({
           return (
             <g key={p.id}>
               <image href={markerSrc(p.deviceType)} x={cx - s / 2} y={cy - s / 2} width={s} height={s} />
+              {coverage && p.code ? <text x={cx} y={cy + s / 2 + u(12)} textAnchor="middle" fontSize={u(10)} fill="#334155" stroke="#ffffff" strokeWidth={u(3)} paintOrder="stroke">{p.code}</text> : null}
             </g>
           )
         })}

@@ -7,14 +7,15 @@
  * - roomTypes：适用的房间类型，留空 = 任何房间；
  * - requiredDevices：全部都有才出现；anyDevices：至少有一种才出现（留空不限）；
  * - scope：room = 在每个符合条件的房间里判断；house = 按整套房子判断，只出现一次。
- * 照片为 Unsplash 授权图片（credit 字段记录作者），存放在 public/proposal/photos/scenes/<slug>.jpg。
+ * 日间照片为 Unsplash 授权图片（credit 字段记录作者）；观影、睡眠与起夜使用 AI 夜景意向图。
  */
 import type { ManagedScene } from './scenes'
+import { nightScenePhotoForScene } from './scene-night-photos'
 
 export type BuiltinScene = ManagedScene & {
   slug: string
   sortOrder: number
-  /** 照片作者（Unsplash） */
+  /** 照片作者或生成来源 */
   credit: string
 }
 
@@ -261,11 +262,15 @@ const INPUTS: SceneInput[] = [
   },
 ]
 
-export const BUILTIN_SCENES: BuiltinScene[] = INPUTS.map(({ alt, ...s }) => ({
-  ...s,
-  id: `builtin-${s.slug}`,
-  image: { url: `/proposal/photos/scenes/${s.slug}.jpg`, alt },
-}))
+export const BUILTIN_SCENES: BuiltinScene[] = INPUTS.map(({ alt, ...s }) => {
+  const night = nightScenePhotoForScene(s.name)
+  return {
+    ...s,
+    credit: night ? 'AI 夜间场景意向图 / image_gen' : s.credit,
+    id: `builtin-${s.slug}`,
+    image: night ? { url: night.url, alt: night.alt } : { url: `/proposal/photos/scenes/${s.slug}.jpg`, alt },
+  }
+})
 
 export const SCENE_CHAPTERS = [
   { value: 'arrive', label: '回家与离家' },

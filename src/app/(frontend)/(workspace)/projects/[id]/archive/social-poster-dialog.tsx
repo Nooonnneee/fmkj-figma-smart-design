@@ -1,313 +1,328 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { Check, Copy, ImageDown, Loader2, Share2, Sparkles } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  FileArchive,
+  ImageDown,
+  Loader2,
+  Share2,
+  Sparkles,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
-import { PlanFigure, type PlanArea, type PlanPoint } from '@/components/plan-figure'
-import { PointMarker } from '@/components/point-marker'
+import { ScaledFrame } from '@/components/scaled-frame'
+import { SocialPoster, type SocialPosterTheme } from '@/components/social-poster'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
-import { cn } from '@/lib/utils'
+import { downloadBlob } from '@/lib/export-pdf'
+import {
+  buildSocialPosterPages,
+  socialPosterCaption,
+  socialPosterFilename,
+  SOCIAL_POSTER_HEIGHT,
+  SOCIAL_POSTER_WIDTH,
+  type SocialPosterData,
+} from '@/lib/social-poster'
+import { zipFiles } from '@/lib/zip'
 
-export type SocialPosterData = {
-  title: string
-  platform: string
-  pointCount: number
-  roomCount: number
-  floorCount: number
-  totalAmount: number | null
-  companyName: string
-  qrCodeUrl: string | null
-  sheet: {
-    name: string
-    url: string
-    points: PlanPoint[]
-    areas: PlanArea[]
-  } | null
-  topTypes: { type: string; name: string; count: number }[]
-}
+export type { SocialPosterData } from '@/lib/social-poster'
 
-function budgetBand(amount: number | null, hideExact: boolean): string {
-  if (!amount || amount <= 0) return '按需定制'
-  if (!hideExact) return `¥${amount.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}`
-  if (amount < 10000) return '1W 以内'
-  const w = Math.floor(amount / 5000) * 0.5
-  return `${w}W+ 整装方案`
+const pngBytes = (url: string) =>
+  Uint8Array.from(atob(url.split(',')[1] ?? ''), (char) => char.charCodeAt(0))
+
+async function waitForPosterImages(node: HTMLElement) {
+  await document.fonts.ready
+  await Promise.all(
+    [...node.querySelectorAll('img')].map(async (image) => {
+      if (!image.complete)
+        await new Promise<void>((resolve, reject) => {
+          image.onload = () => resolve()
+          image.onerror = () => reject(new Error('图片加载失败，请检查场景图或二维码'))
+        })
+      if (!image.naturalWidth) throw new Error('图片加载失败，请检查场景图或二维码')
+      await image.decode().catch(() => {})
+    }),
+  )
 }
 
 export function SocialPosterDialog({ data }: { data: SocialPosterData }) {
-  const cardRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
-  const [theme, setTheme] = useState<'qixu' | 'noir'>('qixu')
+  const [theme, setTheme] = useState<SocialPosterTheme>('qixu')
   const [hideExactPrice, setHideExactPrice] = useState(true)
   const [showQr, setShowQr] = useState(true)
   const [busy, setBusy] = useState(false)
-  const [generatedPng, setGeneratedPng] = useState<string | null>(null)
+  const [progress, setProgress] = useState(0)
+  const [current, setCurrent] = useState(0)
+  const [generated, setGenerated] = useState<Record<string, string>>({})
   const [copiedText, setCopiedText] = useState(false)
+  const exportNodes = useRef<(HTMLDivElement | null)[]>([])
+  const pages = useMemo(() => buildSocialPosterPages(data), [data])
+  const active = Math.min(current, pages.length - 1)
+  const socialCaption = socialPosterCaption(data, hideExactPrice)
 
-  const priceDisplay = budgetBand(data.totalAmount, hideExactPrice)
-  const isDark = theme === 'noir'
+  useEffect(() => {
+    setGenerated({})
+    setCurrent(0)
+  }, [data, theme, hideExactPrice, showQr])
 
-  const socialCaption = [
-    `【全屋智能落地案例】${data.title}`,
-    `生态平台：${data.platform || '全屋智能'} · 共 ${data.pointCount} 个智能点位（覆盖 ${data.roomCount || 1} 个空间）`,
-    data.topTypes.length
-      ? `核心配置：${data.topTypes.slice(0, 5).map((t) => `${t.name}×${t.count}`).join('、')}`
-      : '',
-    `预算参考：${priceDisplay}`,
-    `从户型图点位落位、全屋 Wi-Fi/中控组网到水电交底清单一次配齐。需要同款全屋智能方案或点位图设计的业主/设计师欢迎交流！`,
-    `#全屋智能 #智能家居设计 #${(data.platform || '米家').replace(/\s+/g, '')}全屋智能 #全屋智能点位图 #智能家居报价 #繁梦空间`,
-  ]
-    .filter(Boolean)
-    .join('\n')
-
-  const handleCopyCaption = async () => {
+  const copyCaption = async () => {
     try {
       await navigator.clipboard.writeText(socialCaption)
       setCopiedText(true)
-      toast.success('已复制小红书 / 朋友圈晒单文案')
+      toast.success('已复制图组配套文案')
       setTimeout(() => setCopiedText(false), 2000)
     } catch {
-      toast.error('复制失败，请手动选中复制')
+      toast.error('复制失败，请手动选中文案复制')
     }
   }
 
-  const handleDownloadPoster = async () => {
-    if (!cardRef.current || busy) return
+  const renderPoster = async (index: number) => {
+    const node = exportNodes.current[index]
+    if (!node) throw new Error('海报画布尚未准备好，请稍后重试')
+    await waitForPosterImages(node)
+    const { toPng } = await import('html-to-image')
+    return toPng(node, {
+      pixelRatio: 3,
+      width: SOCIAL_POSTER_WIDTH,
+      height: SOCIAL_POSTER_HEIGHT,
+      cacheBust: false,
+    })
+  }
+
+  const downloadCurrent = async () => {
+    if (busy) return
     setBusy(true)
     try {
-      const { toPng } = await import('html-to-image')
-      const dataUrl = await toPng(cardRef.current, {
-        pixelRatio: 3,
-        cacheBust: false,
-      })
-      setGeneratedPng(dataUrl)
-      const a = document.createElement('a')
-      a.href = dataUrl
-      a.download = `${data.title}-小红书晒单海报.png`
-      a.style.display = 'none'
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      toast.success('已生成 3:4 高清晒单海报（手机端可直接长按下方预览图保存）')
-    } catch {
-      toast.error('生成海报失败，请稍后重试')
+      const url = await renderPoster(active)
+      setGenerated((prev) => ({ ...prev, [pages[active].key]: url }))
+      downloadBlob(
+        new Blob([pngBytes(url)], { type: 'image/png' }),
+        `${socialPosterFilename(data.title)}-${String(active + 1).padStart(2, '0')}-${pages[active].label}.png`,
+      )
+      toast.success('当前图片已生成，手机端也可长按下方图片保存')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '生成图片失败，请稍后重试')
     } finally {
       setBusy(false)
     }
   }
 
+  const downloadGroup = async () => {
+    if (busy) return
+    setBusy(true)
+    setProgress(0)
+    const rendered: Record<string, string> = {}
+    try {
+      const entries = []
+      for (let i = 0; i < pages.length; i++) {
+        const url = await renderPoster(i)
+        rendered[pages[i].key] = url
+        entries.push({
+          name: `${String(i + 1).padStart(2, '0')}-${socialPosterFilename(pages[i].label)}.png`,
+          data: pngBytes(url),
+        })
+        setProgress(i + 1)
+      }
+      entries.push({ name: '配套文案.txt', data: new TextEncoder().encode(socialCaption) })
+      setGenerated(rendered)
+      downloadBlob(
+        zipFiles(entries),
+        `${socialPosterFilename(data.title)}-小红书图组-${pages.length}张.zip`,
+      )
+      toast.success(`已打包 ${pages.length} 张独立图片与配套文案`)
+    } catch (error) {
+      setGenerated((prev) => ({ ...prev, ...rendered }))
+      toast.error(error instanceof Error ? error.message : '图组生成失败，请稍后重试')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const posterProps = { data, theme, hideExactPrice, showQr, totalPages: pages.length }
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(value) => {
+        if (!busy) setOpen(value)
+      }}
+    >
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <Share2 className="size-4" />
-          生成小红书 / 朋友圈晒单图
+          生成小红书 / 朋友圈图组
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[92vh] max-w-4xl gap-5 overflow-y-auto p-5 sm:max-w-4xl">
+      <DialogContent className="max-h-[92vh] w-[calc(100vw-1.5rem)] max-w-5xl gap-5 overflow-y-auto p-4 sm:p-5 sm:max-w-5xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base font-semibold">
+          <DialogTitle className="flex items-center gap-2 text-base">
             <Sparkles className="size-4 text-primary" />
-            小红书 / 朋友圈 3:4 案例晒单生成器
+            小红书 / 朋友圈多图分享
           </DialogTitle>
           <DialogDescription className="text-xs">
-            自动隐藏业主真实姓名与门牌号，一键生成 3:4 黄金比例高清案例图与种草文案，适合发小红书、朋友圈与业主群。
+            每张都是独立的 3:4
+            图片，按封面、楼层点位、配置、预算与方案确认分开讲。只使用公开案例简称，隐藏业主姓名、电话和门牌。
           </DialogDescription>
         </DialogHeader>
-
-        <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
-          {/* 左侧：3:4 竖版海报画布（360×480 预览，3倍导出为 1080×1440） */}
-          <div className="flex flex-col items-center gap-3">
+        <div className="grid min-w-0 gap-5 lg:grid-cols-[380px_minmax(0,1fr)]">
+          <div className="min-w-0 space-y-3">
+            <div className="overflow-hidden rounded-xl border bg-muted/20 p-2">
+              <ScaledFrame
+                width={SOCIAL_POSTER_WIDTH}
+                height={SOCIAL_POSTER_HEIGHT}
+                label={`第${active + 1}张：${pages[active].label}`}
+              >
+                <SocialPoster {...posterProps} page={pages[active]} pageNumber={active + 1} />
+              </ScaledFrame>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                variant="outline"
+                size="icon-sm"
+                aria-label="上一张"
+                disabled={busy || active === 0}
+                onClick={() => setCurrent(active - 1)}
+              >
+                <ChevronLeft />
+              </Button>
+              <span className="text-xs tabular-nums" aria-live="polite">
+                {active + 1} / {pages.length} · {pages[active].label}
+              </span>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                aria-label="下一张"
+                disabled={busy || active === pages.length - 1}
+                onClick={() => setCurrent(active + 1)}
+              >
+                <ChevronRight />
+              </Button>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4" aria-label="图组内容">
+              {pages.map((page, i) => (
+                <Button
+                  key={page.key}
+                  type="button"
+                  variant={i === active ? 'secondary' : 'ghost'}
+                  size="xs"
+                  disabled={busy}
+                  aria-pressed={i === active}
+                  onClick={() => setCurrent(i)}
+                  className="h-auto min-w-0 justify-start whitespace-normal py-1.5 text-left leading-snug"
+                >
+                  <span className="shrink-0 tabular-nums">{String(i + 1).padStart(2, '0')}</span>
+                  <span className="truncate">{page.label}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+          <div className="min-w-0 space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary">{pages.length} 张独立图片</Badge>
+              <Badge variant="outline">1080 × 1440 / 张</Badge>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">图组风格</p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant={theme === 'qixu' ? 'default' : 'outline'}
+                  disabled={busy}
+                  onClick={() => setTheme('qixu')}
+                >
+                  栖序雅致
+                </Button>
+                <Button
+                  size="sm"
+                  variant={theme === 'noir' ? 'default' : 'outline'}
+                  disabled={busy}
+                  onClick={() => setTheme('noir')}
+                >
+                  墨金臻选
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-3 rounded-xl border bg-muted/20 p-3 text-xs">
+              <label className="flex items-center justify-between gap-3">
+                <span>隐藏具体金额，使用预算区间</span>
+                <Switch
+                  checked={hideExactPrice}
+                  disabled={busy}
+                  onCheckedChange={setHideExactPrice}
+                />
+              </label>
+              <label className="flex items-center justify-between gap-3">
+                <span>{data.miniAppCodeUrl ? '收尾页附带小程序码' : '收尾页附带服务方联系二维码'}</span>
+                <Switch checked={showQr} disabled={busy} onCheckedChange={setShowQr} />
+              </label>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-muted-foreground">配套分享文案</p>
+                <Button variant="ghost" size="xs" onClick={() => void copyCaption()}>
+                  {copiedText ? <Check /> : <Copy />}
+                  {copiedText ? '已复制' : '复制文案'}
+                </Button>
+              </div>
+              <pre className="whitespace-pre-wrap break-words rounded-xl border bg-muted/20 p-3 font-sans text-xs leading-relaxed">
+                {socialCaption}
+              </pre>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button disabled={busy} onClick={() => void downloadCurrent()}>
+                {busy ? <Loader2 className="animate-spin" /> : <ImageDown />}保存当前图片
+              </Button>
+              <Button variant="secondary" disabled={busy} onClick={() => void downloadGroup()}>
+                {busy ? <Loader2 className="animate-spin" /> : <FileArchive />}下载整组 ZIP
+              </Button>
+            </div>
+            {busy ? (
+              <p className="text-xs text-muted-foreground" role="status">
+                正在生成高清图组{progress > 0 ? `：${progress}/${pages.length}` : '…'}
+              </p>
+            ) : null}
+            {generated[pages[active].key] ? (
+              <div className="space-y-2 rounded-xl border bg-muted/20 p-3">
+                <p className="text-xs text-muted-foreground">
+                  当前高清图已生成，手机端可长按保存。
+                </p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={generated[pages[active].key]}
+                  alt={`高清分享图：${pages[active].label}`}
+                  className="mx-auto max-h-56 w-auto rounded-lg"
+                />
+              </div>
+            ) : null}
+          </div>
+        </div>
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed top-0 left-[-20000px] w-[360px]"
+        >
+          {pages.map((page, i) => (
             <div
-              ref={cardRef}
-              style={{ width: 360, height: 480 }}
-              className={cn(
-                'relative flex shrink-0 flex-col justify-between overflow-hidden rounded-xl p-5 shadow-md select-none',
-                isDark ? 'bg-[#141413] text-[#F5F2EB]' : 'bg-[#FAF8F5] text-[#1C1B18]',
-              )}
+              key={page.key}
+              ref={(node) => {
+                exportNodes.current[i] = node
+              }}
+              className="h-[480px] w-[360px]"
             >
-              {/* 顶部项目抬头 */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className={cn('text-[10px] font-semibold tracking-[0.22em]', isDark ? 'text-[#D4AF37]' : 'text-[#6E5D4F]')}>
-                    SMART HOME CASE STUDY
-                  </span>
-                  <span
-                    className={cn(
-                      'rounded-full px-2 py-0.5 text-[10px] font-medium',
-                      isDark ? 'bg-[#262522] text-[#D4AF37]' : 'bg-[#EDE8E0] text-[#57493E]',
-                    )}
-                  >
-                    {data.platform || '全屋智能'}
-                  </span>
-                </div>
-                <h3 className="truncate text-lg font-semibold tracking-tight">{data.title} · 全屋智能方案</h3>
-              </div>
-
-              {/* 中间户型点位图（直接显示高清设备图标） */}
-              <div className="my-2.5 flex flex-1 flex-col justify-center overflow-hidden rounded-xl border border-black/10 bg-white p-2 shadow-2xs">
-                {data.sheet ? (
-                  <>
-                    <PlanFigure
-                      sheetUrl={data.sheet.url}
-                      points={data.sheet.points}
-                      areas={data.sheet.areas}
-                      mode="symbol"
-                      showCodes={false}
-                      className="w-full rounded-lg"
-                    />
-                    <div className="mt-1.5 flex items-center justify-between px-1 text-[10px] text-neutral-500">
-                      <span className="truncate font-medium text-neutral-700">{data.sheet.name}</span>
-                      <span>设备图标点位实景落位</span>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex h-40 items-center justify-center text-xs text-neutral-400">暂无户型点位图</div>
-                )}
-              </div>
-
-              {/* 核心指标三宫格 + 代表设备图标 */}
-              <div className="space-y-2.5">
-                <div
-                  className={cn(
-                    'grid grid-cols-3 divide-x rounded-xl border py-2 text-center',
-                    isDark ? 'divide-white/10 border-white/10 bg-[#1E1D1B]' : 'divide-black/8 border-black/8 bg-white/80',
-                  )}
-                >
-                  <div>
-                    <p className={cn('text-[10px]', isDark ? 'text-neutral-400' : 'text-neutral-500')}>智能点位</p>
-                    <p className="mt-0.5 text-sm font-bold tabular-nums">{data.pointCount} 点</p>
-                  </div>
-                  <div>
-                    <p className={cn('text-[10px]', isDark ? 'text-neutral-400' : 'text-neutral-500')}>覆盖空间</p>
-                    <p className="mt-0.5 text-sm font-bold tabular-nums">
-                      {data.floorCount > 1 ? `${data.floorCount}层 · ` : ''}
-                      {Math.max(1, data.roomCount)} 间
-                    </p>
-                  </div>
-                  <div>
-                    <p className={cn('text-[10px]', isDark ? 'text-neutral-400' : 'text-neutral-500')}>方案预算</p>
-                    <p className={cn('mt-0.5 text-sm font-bold tabular-nums', isDark ? 'text-[#D4AF37]' : 'text-[#7C5836]')}>{priceDisplay}</p>
-                  </div>
-                </div>
-
-                {data.topTypes.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {data.topTypes.slice(0, 5).map((t) => (
-                      <span
-                        key={t.type}
-                        className={cn(
-                          'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px]',
-                          isDark ? 'bg-white/8 text-neutral-200' : 'bg-black/5 text-neutral-700',
-                        )}
-                      >
-                        <PointMarker type={t.type} className="size-3.5" />
-                        {t.name} ×{t.count}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-
-                {/* 底部署名与微信二维码 */}
-                <div
-                  className={cn(
-                    'flex items-center justify-between border-t pt-2.5',
-                    isDark ? 'border-white/10' : 'border-black/10',
-                  )}
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-semibold">{data.companyName}</p>
-                    <p className={cn('text-[10px]', isDark ? 'text-neutral-400' : 'text-neutral-500')}>
-                      繁梦空间 FMKJ · 全屋智能方案工作台
-                    </p>
-                  </div>
-                  {showQr && data.qrCodeUrl ? (
-                    <div className="shrink-0 overflow-hidden rounded-md bg-white p-0.5 shadow-2xs">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={data.qrCodeUrl} alt="微信二维码" className="size-9 object-contain" />
-                    </div>
-                  ) : null}
-                </div>
-              </div>
+              <SocialPoster {...posterProps} page={page} pageNumber={i + 1} />
             </div>
-          </div>
-
-          {/* 右侧：海报设置、爆款文案复制与导出 */}
-          <div className="flex flex-col justify-between gap-4">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">海报视觉主题</p>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={theme === 'qixu' ? 'default' : 'outline'}
-                    onClick={() => setTheme('qixu')}
-                  >
-                    栖序雅致（暖白高定）
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={theme === 'noir' ? 'default' : 'outline'}
-                    onClick={() => setTheme('noir')}
-                  >
-                    墨金臻选（黑金大宅）
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-2.5 rounded-xl border bg-muted/25 p-3.5 text-xs">
-                <label className="flex items-center justify-between gap-3 cursor-pointer">
-                  <span>隐藏具体成交金额（仅显示「1.5W+ 整装方案」脱敏区间）</span>
-                  <Switch checked={hideExactPrice} onCheckedChange={setHideExactPrice} />
-                </label>
-                <label className="flex items-center justify-between gap-3 cursor-pointer">
-                  <span>在海报右下角附带微信联系二维码</span>
-                  <Switch checked={showQr} onCheckedChange={setShowQr} />
-                </label>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-muted-foreground">自动生成的小红书 / 朋友圈文案</p>
-                  <Button type="button" variant="ghost" size="xs" onClick={() => void handleCopyCaption()}>
-                    {copiedText ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                    {copiedText ? '已复制文案' : '复制文案'}
-                  </Button>
-                </div>
-                <pre className="whitespace-pre-wrap rounded-xl border bg-muted/30 p-3 font-sans text-xs leading-relaxed text-foreground">
-                  {socialCaption}
-                </pre>
-              </div>
-
-              {generatedPng ? (
-                <div className="space-y-1.5 rounded-xl border bg-muted/20 p-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium">已生成高清图（手机端可直接长按图片保存相册）：</span>
-                    <Badge variant="secondary">1080 × 1440</Badge>
-                  </div>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={generatedPng} alt="生成的小红书晒单海报" className="mx-auto max-h-44 w-auto rounded-lg border shadow-2xs" />
-                </div>
-              ) : null}
-            </div>
-
-            <div className="flex flex-wrap gap-2.5 border-t pt-3">
-              <Button type="button" onClick={() => void handleDownloadPoster()} disabled={busy} className="flex-1">
-                {busy ? <Loader2 className="size-4 animate-spin" /> : <ImageDown className="size-4" />}
-                {busy ? '正在渲染高清海报…' : '下载 3:4 高清晒单海报 (PNG)'}
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => void handleCopyCaption()}>
-                {copiedText ? <Check className="size-4" /> : <Copy className="size-4" />}
-                一键复制配套文案
-              </Button>
-            </div>
-          </div>
+          ))}
         </div>
       </DialogContent>
     </Dialog>

@@ -26,16 +26,16 @@ export function paginateRows<T>(list: T[], full: number, last: number): T[][] {
   return pages
 }
 
-function Summary({ ctx }: { ctx: DeckCtx }) {
+function Summary({ ctx, compact = false }: { ctx: DeckCtx; compact?: boolean }) {
   const { m } = ctx
   const rooms = m.d.rooms.filter((r) => r.subtotal > 0).sort((a, b) => b.subtotal - a.subtotal)
   const shown = rooms.slice(0, 7)
   const restSum = rooms.slice(7).reduce((s, r) => s + r.subtotal, 0)
   return (
-    <div className="flex w-[300px] shrink-0 flex-col gap-[14px] overflow-hidden">
-      <div className={cn('flex flex-col gap-[8px] rounded-(--deck-radius-sm) border border-(--deck-panel-border) bg-linear-to-br from-doc-soft to-doc-soft-to px-[24px] py-[22px]')}>
+    <div className={cn('flex w-[300px] shrink-0 flex-col overflow-hidden', compact ? 'gap-[7px]' : 'gap-[14px]')}>
+      <div className={cn('flex flex-col gap-[8px] rounded-(--deck-radius-sm) border border-(--deck-panel-border) bg-linear-to-br from-doc-soft to-doc-soft-to px-[24px]', compact ? 'py-[12px]' : 'py-[22px]')}>
         <p className="doc-body text-[13px] text-doc-muted">方案总价 / 设备{m.fees.length ? ' + 服务' : ''}</p>
-        <p className={cn(amountFont(ctx), 'truncate text-[38px] leading-tight', ctx.theme.accentAmount && 'text-doc-accent')}>{`¥${money(m.finalAmount)}`}</p>
+        <p className={cn(amountFont(ctx), 'truncate leading-tight', compact ? 'text-[34px]' : 'text-[38px]', ctx.theme.accentAmount && 'text-doc-accent')}>{`¥${money(m.finalAmount)}`}</p>
         <p className="doc-body truncate text-[11px] text-doc-muted">{m.d.quote ? `依据报价单「${m.d.quote.title}」` : '按当前选型售价核算，未含服务费用'}</p>
       </div>
       {[
@@ -51,7 +51,7 @@ function Summary({ ctx }: { ctx: DeckCtx }) {
       <div className="h-px w-full bg-doc-rule" />
       <p className="doc-strong text-[16px] leading-normal">{m.d.quote ? '当前点位测算 / 仅设备' : '按空间核对 / 仅设备'}</p>
       {m.d.quote ? <p className="doc-body text-[12px] leading-relaxed text-doc-muted">用于核对空间配置，正式报价以本页条目及方案总价为准。</p> : null}
-      <div className="flex flex-col gap-[7px]">
+      <div className={cn('flex flex-col', compact ? 'gap-[4px]' : 'gap-[7px]')}>
         {shown.map((r) => (
           <div key={r.areaId} className="doc-body flex justify-between gap-3 text-[14px] leading-normal">
             <span className="truncate text-doc-muted">{r.displayName}</span>
@@ -137,7 +137,7 @@ export function InvestmentPage({
             </p>
           ) : null}
         </div>
-        <Summary ctx={ctx} />
+        <Summary ctx={ctx} compact={isLast} />
       </div>
       {isLast ? (
         <div className="absolute inset-x-[56px] top-[756px] flex h-[120px] gap-[40px] overflow-hidden rounded-(--deck-radius-sm) border border-(--deck-panel-border) bg-(--deck-muted-panel) px-[20px] py-[18px]">

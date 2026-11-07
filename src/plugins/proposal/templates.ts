@@ -1,5 +1,5 @@
 /**
- * 方案模板：同一份点位与报价数据，六套版式框架的 8 章横版提案（前三套来自 Figma 设计稿 FGGahF8jZGnRLwcgZfJloK），
+ * 方案模板：同一份点位与报价数据，完整、故事与预算框架的横版提案（前三套来自 Figma 设计稿 FGGahF8jZGnRLwcgZfJloK），
  * 外加不含价格、给安装团队的施工交底版。后台「方案模板」有数据时以后台为准（版式框架 × 视觉风格），这里是兜底的内置模板。
  *
  * 每个模板都要回答三个问题（选择器、模板库、知识库导出都会展示）：
@@ -95,6 +95,24 @@ export const BUILTIN_PROPOSAL_TEMPLATES: ProposalTemplateDef[] = [
     audience: '新中式、东方风别墅与高端住宅业主',
     occasion: '顶奢项目正式提案、需要文化调性的汇报',
     highlights: ['宣纸青瓷', '衬线标题', '东方意境'],
+  }),
+  builtin('terra', '赤陶中古', 'full', 'terra', 'free', {
+    description: '羊皮纸底、赤陶棕与衬线标题，画廊式横幅照片呈现中古住宅的温厚质感',
+    audience: '中古、复古与胡桃木风格住宅的业主',
+    occasion: '设计深化汇报、软装与全屋智能联合提案',
+    highlights: ['画廊式封面', '羊皮纸赤陶棕', '8 章完整'],
+  }),
+  builtin('linen', '海盐柔雅', 'full', 'linen', 'free', {
+    description: '海盐蓝灰纸面、拱窗照片与柔和衬线，适合明亮从容的法式居家提案',
+    audience: '法式、轻复古与浅色自然风住宅的家庭',
+    occasion: '家庭方案沟通、与室内设计师联合汇报',
+    highlights: ['拱窗照片封面', '海盐蓝灰', '8 章完整'],
+  }),
+  builtin('slate', '岩灰建筑', 'full', 'slate', 'free', {
+    description: '冷灰纸面、石墨文字与直角线框，左图右文的建筑目录式封面',
+    audience: '现代建筑、清水混凝土与工业风住宅的业主',
+    occasion: '建筑师联合提案、需要清楚核对点位与预算的正式汇报',
+    highlights: ['建筑目录封面', '石墨直角线框', '8 章完整'],
   }),
   builtin('construction', '施工交底', 'construction', 'qixu', 'free', {
     description: '点位代号、安装位置、房间配置与逐点核对表，不含任何价格',

@@ -87,6 +87,7 @@ export default async function PlansPrintPage({
                 points={pts.map((p) => ({ ...p, image: p.productId ? d.productById.get(p.productId)?.image?.url : null }))}
                 areas={areas}
                 mode={markers}
+                effects
                 dim={0.7}
                 className="max-h-full w-full"
               />

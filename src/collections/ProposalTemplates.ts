@@ -10,10 +10,12 @@ const THEMES = [
   { label: '墨金臻选（深色 · 香槟金 · 整幅封面）', value: 'noir' },
   { label: '原木自然（燕麦 · 橄榄绿 · 分栏封面）', value: 'grove' },
   { label: '晨岚现代（冷白 · 深海蓝 · 细线卡片）', value: 'azure' },
-  { label: '陶土暖阳（米杏 · 陶土橙 · 圆角）', value: 'terra' },
+  { label: '赤陶中古（羊皮纸 · 赤陶棕 · 画廊封面）', value: 'terra' },
   { label: '素白极简（纯白 · 纯文字大字封面）', value: 'mono' },
   { label: '晨曦暖调（奶油 · 陶土橙 · 竖幅照片）', value: 'dawn' },
   { label: '东方雅韵（宣纸 · 青瓷绿 · 衬线）', value: 'jade' },
+  { label: '海盐柔雅（海盐蓝灰 · 拱窗封面 · 衬线）', value: 'linen' },
+  { label: '岩灰建筑（冷灰 · 直角线框 · 建筑目录）', value: 'slate' },
 ]
 
 /**

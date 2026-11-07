@@ -116,8 +116,9 @@ export async function seedBuiltinTemplates(payload: Payload, opts: { fill?: bool
   return out
 }
 
-async function sceneImage(payload: Payload, slug: string, alt: string, origin?: string): Promise<string | null> {
-  const rel = `proposal/photos/scenes/${slug}.jpg`
+async function sceneImage(payload: Payload, slug: string, alt: string, origin?: string, builtinUrl?: string): Promise<string | null> {
+  const rel = builtinUrl?.startsWith('/proposal/') ? builtinUrl.slice(1) : `proposal/photos/scenes/${slug}.jpg`
+  const png = rel.endsWith('.png')
   let data: Buffer | null = await fs.readFile(path.join(process.cwd(), 'public', rel)).catch(() => null)
   if (!data && origin) {
     const res = await fetch(`${origin.replace(/\/+$/, '')}/${rel}`).catch(() => null)
@@ -127,7 +128,7 @@ async function sceneImage(payload: Payload, slug: string, alt: string, origin?: 
   const media = await payload.create({
     collection: 'media',
     data: { alt },
-    file: { data, mimetype: 'image/jpeg', name: `scene-${slug}.jpg`, size: data.length },
+    file: { data, mimetype: png ? 'image/png' : 'image/jpeg', name: `scene-${slug}.${png ? 'png' : 'jpg'}`, size: data.length },
     overrideAccess: true,
     depth: 0,
   })
@@ -145,7 +146,7 @@ export async function seedBuiltinScenes(payload: Payload, opts: { origin?: strin
       continue
     }
     try {
-      const image = await sceneImage(payload, s.slug, `${s.image?.alt ?? s.name}（${s.credit}）`, opts.origin).catch(() => null)
+      const image = await sceneImage(payload, s.slug, `${s.image?.alt ?? s.name}（${s.credit}）`, opts.origin, s.image?.url).catch(() => null)
       await payload.create({
         collection: 'scenes',
         data: {

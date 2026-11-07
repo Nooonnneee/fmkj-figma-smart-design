@@ -1,10 +1,11 @@
-/** 全屋网络与摄像头的组合页，只依据当前点位的设备类型和所在区域匹配。 */
-import type { SheetInfo } from '@/lib/point-scene'
+/** 全屋网络、检测与摄像头的独立方案页，只依据设备类型和所在区域匹配。 */
+import type { AreaInfo, SheetInfo } from '@/lib/point-scene'
 
 import type { DeckItem, DeckModel, DeckPoint } from './model'
 
 const NETWORK_TYPES = new Set(['ac-router', 'ap-node', 'ceiling-ap', 'network-panel'])
 const AP_TYPES = new Set(['ap-node', 'ceiling-ap'])
+const SENSOR_TYPES = new Set(['motion-sensor', 'smoke-sensor', 'water-sensor', 'contact-sensor', 'temp-sensor'])
 
 export type NetworkCameraRoom = {
   key: string
@@ -15,13 +16,15 @@ export type NetworkCameraRoom = {
   points: DeckPoint[]
   networkPoints: DeckPoint[]
   cameraPoints: DeckPoint[]
+  sensorPoints: DeckPoint[]
 }
 
-export type NetworkCameraSheet = { sheet: SheetInfo; floorName: string; points: DeckPoint[] }
+export type NetworkCameraSheet = { sheet: SheetInfo; floorName: string; points: DeckPoint[]; areas: AreaInfo[] }
 
 export type NetworkCameraModel = {
   networkPoints: DeckPoint[]
   cameraPoints: DeckPoint[]
+  sensorPoints: DeckPoint[]
   apPoints: DeckPoint[]
   corePoints: DeckPoint[]
   rooms: NetworkCameraRoom[]
@@ -31,10 +34,11 @@ export type NetworkCameraModel = {
 }
 
 export function buildNetworkCamera(m: DeckModel): NetworkCameraModel | null {
-  const points = m.d.points.filter((p) => NETWORK_TYPES.has(p.deviceType) || p.deviceType === 'camera').map(m.deckPoint)
+  const points = m.d.points.filter((p) => NETWORK_TYPES.has(p.deviceType) || SENSOR_TYPES.has(p.deviceType) || p.deviceType === 'camera').map(m.deckPoint)
   const networkPoints = points.filter((p) => NETWORK_TYPES.has(p.deviceType))
   const cameraPoints = points.filter((p) => p.deviceType === 'camera')
-  if (!networkPoints.length || !cameraPoints.length) return null
+  const sensorPoints = points.filter((p) => SENSOR_TYPES.has(p.deviceType))
+  if (!points.length) return null
 
   const sheetById = new Map(m.sheets.map((s) => [s.sheet.id, s]))
   const sheetOrder = new Map(m.sheets.map((s, i) => [s.sheet.id, i]))
@@ -57,11 +61,13 @@ export function buildNetworkCamera(m: DeckModel): NetworkCameraModel | null {
         points: [],
         networkPoints: [],
         cameraPoints: [],
+        sensorPoints: [],
       }
       groups.set(key, group)
     }
     group.points.push(p)
     if (NETWORK_TYPES.has(p.deviceType)) group.networkPoints.push(p)
+    else if (SENSOR_TYPES.has(p.deviceType)) group.sensorPoints.push(p)
     else group.cameraPoints.push(p)
   }
 
@@ -74,15 +80,16 @@ export function buildNetworkCamera(m: DeckModel): NetworkCameraModel | null {
   return {
     networkPoints,
     cameraPoints,
+    sensorPoints,
     apPoints: networkPoints.filter((p) => AP_TYPES.has(p.deviceType)),
     corePoints: networkPoints.filter((p) => !AP_TYPES.has(p.deviceType)),
     rooms,
     sheets: m.sheets.flatMap((s) => {
       const related = points.filter((p) => p.sheetId === s.sheet.id)
-      return related.length ? [{ sheet: s.sheet, floorName: s.floorName, points: related }] : []
+      return related.length ? [{ sheet: s.sheet, floorName: s.floorName, points: related, areas: s.areas ?? [] }] : []
     }),
-    // 型号只取能够确认关联到本页点位的报价条目，不把整份报价的网络/摄像头都当成本页选型。
-    items: m.items.filter((item) => refs.has(item.ref) && (NETWORK_TYPES.has(item.deviceType) || item.deviceType === 'camera')),
+    // 型号只取能够确认关联到本页点位的报价条目，不把整份报价的网络/检测/摄像头都当成本页选型。
+    items: m.items.filter((item) => refs.has(item.ref) && (NETWORK_TYPES.has(item.deviceType) || SENSOR_TYPES.has(item.deviceType) || item.deviceType === 'camera')),
     unmappedPoints: points.filter((p) => !p.sheetId || !sheetById.has(p.sheetId)),
   }
 }

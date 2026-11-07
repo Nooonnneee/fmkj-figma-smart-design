@@ -8,6 +8,7 @@ import { fittingScale, formatMm, PAPERS } from '../core/paper'
 import { LABEL_SIZE, symbolGeom } from '../core/symbols'
 import type { BoardDoc, BoardFile, SheetObj, ViewSettings } from '../core/types'
 import { downloadBlob } from '@/lib/export-pdf'
+import { renderPointDisplayEffectsSvg } from '@/lib/point-display-effects'
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 
@@ -27,7 +28,7 @@ async function toDataUrl(url: string, cache: Map<string, string>) {
 }
 
 /**
- * 导出一张图纸为 PNG（A3 / A4 横版，150dpi）：图纸 + 区域 + 点位 + 图例 + 标题栏。
+ * 导出一张图纸为 PNG（A3 / A4 横版，150dpi）：图纸 + 区域 + 展示效果 + 点位 + 图例 + 标题栏。
  * 图纸已标定时按标准比例（1:20 / 1:50 / 1:100）出图，打印时选「实际大小 100%」即为准确比例；
  * 未标定时按纸张铺满，标题栏注明「比例未标定」。网格、标尺不出图。图片全部内嵌，不会漏图。
  */
@@ -65,6 +66,14 @@ export async function exportSheetPng(opts: { doc: BoardDoc; files: Record<string
       parts.push(`<polygon points="${pts}" fill="none" stroke="#64748b" stroke-opacity="0.85" stroke-width="${1.2 / u}" stroke-linejoin="round"/>`)
       parts.push(`<text x="${a.x + 4}" y="${a.y + 13}" font-size="11" font-weight="600" fill="#475569" stroke="#fff" stroke-width="3" paint-order="stroke" font-family="system-ui,sans-serif">${esc(o.name)}</text>`)
     }
+  if (view.layers.symbol) {
+    const visibleDoc = { objects: doc.objects.filter((o) => o.kind !== 'symbol' || (!hidden.has(o.id) && inside(o.x, o.y))) }
+    const effects = (pack.overlays ?? []).filter((o) => view.overlays?.[o.id]).flatMap((o) => o.build(visibleDoc).effects ?? [])
+    if (effects.length) {
+      parts.push(`<defs><clipPath id="board-export-effects-clip"><rect x="${sheet.x}" y="${sheet.y}" width="${sheet.w}" height="${sheet.h}"/></clipPath></defs>`)
+      parts.push(`<g clip-path="url(#board-export-effects-clip)">${renderPointDisplayEffectsSvg(effects, 'board-export-effects')}</g>`)
+    }
+  }
   const used = new Set<string>()
   for (const o of doc.objects) {
     if (o.kind !== 'symbol' || hidden.has(o.id) || !inside(o.x, o.y)) continue

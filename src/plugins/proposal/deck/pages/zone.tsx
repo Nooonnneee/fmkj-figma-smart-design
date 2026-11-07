@@ -5,6 +5,7 @@
  */
 import type { Room } from '@/lib/project-docs'
 import { sceneVisualForRoom } from '@/lib/scene-visuals'
+import { nightScenePhotoForScene } from '@/lib/scene-night-photos'
 import { cn } from '@/lib/utils'
 
 import { installNote, roomScenes, yuanShort, ZONE_COPY, type DeckZone, type SceneItem } from '../model'
@@ -158,11 +159,12 @@ export function ZonePage({ ctx, no, total, zone, insights }: { ctx: DeckCtx; no:
   const priced = zone.key === 'rest'
   // 一张氛围图只展示一个真实房间的选型，不把同名或邻近空间的型号混进来。
   const sceneRoom = rooms.find((room) => sceneVisualForRoom(room.areaType))
-  const visual = sceneRoom ? sceneVisualForRoom(sceneRoom.areaType) : null
+  const nightPhoto = zone.key === 'rest' ? nightScenePhotoForScene('睡眠模式') : null
+  const visual = !nightPhoto && sceneRoom ? sceneVisualForRoom(sceneRoom.areaType) : null
   const products = visual && sceneRoom
     ? matchSceneProducts(visual, sceneRoom.points, ctx.m.d.productById, { roomType: sceneRoom.areaType, maxCallouts: 6 })
     : null
-  const photoNote = sceneRoom
+  const photoNote = nightPhoto ? '夜间睡眠氛围意向 · 实际设备见本次配置' : sceneRoom
     ? `AI场景意向 · ${sceneRoom.displayName}产品位置示意${products?.unplaced.length ? ` · 另${products.unplaced.length}组见报价` : ''}`
     : ctx.theme.photoNote
   return (
@@ -173,7 +175,7 @@ export function ZonePage({ ctx, no, total, zone, insights }: { ctx: DeckCtx; no:
           {visual && products ? (
             <SceneProductFigure visual={visual} callouts={products.callouts} width={864} height={photoH} lazy={ctx.lazy} note={photoNote} />
           ) : (
-            <Photo src={zone.photo} width={864} height={photoH} note={photoNote} />
+            <Photo src={nightPhoto?.url ?? zone.photo} width={864} height={photoH} note={photoNote} />
           )}
           {minis ? (
             rooms.length > 1 ? (

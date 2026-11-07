@@ -442,11 +442,13 @@ async function renderElementToCanvas(
   const { toSvg, toCanvas } = await import('html-to-image')
   const w = opts.width || Math.max(1, el.offsetWidth || Math.round(el.getBoundingClientRect().width) || 794)
   const h = opts.height || Math.max(1, el.offsetHeight || Math.round(el.getBoundingClientRect().height) || 1123)
+  const bg = opts.isSlide ? getComputedStyle(el).backgroundColor : ''
+  const backgroundColor = bg && bg !== 'transparent' && !/^rgba\([^)]*,\s*0\)$/.test(bg) ? bg : '#ffffff'
   const baseOptions = {
     pixelRatio: opts.pixelRatio,
     width: w,
     height: h,
-    backgroundColor: '#ffffff',
+    backgroundColor,
     cacheBust: false,
     includeQueryParams: true,
     imagePlaceholder: TRANSPARENT_PNG,
@@ -464,7 +466,7 @@ async function renderElementToCanvas(
     canvas.width = Math.round(w * opts.pixelRatio)
     canvas.height = Math.round(h * opts.pixelRatio)
     const ctx = canvas.getContext('2d')!
-    ctx.fillStyle = '#ffffff'
+    ctx.fillStyle = backgroundColor
     ctx.fillRect(0, 0, canvas.width, canvas.height)
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
     return canvas

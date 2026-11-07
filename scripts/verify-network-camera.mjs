@@ -37,11 +37,19 @@ const freeze = (value) => {
 }
 
 assert.equal(buildNetworkCamera(model([])), null)
-assert.equal(buildNetworkCamera(model([point('N1', 'ap-node')])), null)
-assert.equal(buildNetworkCamera(model([point('V1', 'camera')])), null)
-assert.equal(buildNetworkCamera(model([point('N1', 'ap-node'), point('B1', 'doorbell')])), null)
-assert.equal(buildNetworkCamera(model([point('G1', 'gateway'), point('V1', 'camera')])), null)
-assert.equal(buildNetworkCamera(model([point('N1', 'ap-node')], [item('Q1', 'camera')])), null)
+assert.equal(buildNetworkCamera(model([point('K1', 'switch-1'), point('L1', 'downlight'), point('G1', 'gateway')])), null)
+const networkOnly = buildNetworkCamera(model([point('N1', 'ap-node')]))
+assert.equal(networkOnly.networkPoints.length, 1)
+assert.equal(networkOnly.cameraPoints.length, 0)
+assert.equal(networkOnly.rooms.length, 1)
+const cameraOnly = buildNetworkCamera(model([point('V1', 'camera')]))
+assert.equal(cameraOnly.networkPoints.length, 0)
+assert.equal(cameraOnly.cameraPoints.length, 1)
+assert.equal(cameraOnly.apPoints.length, 0)
+assert.equal(buildNetworkCamera(model([point('N1', 'ap-node'), point('B1', 'doorbell')])).cameraPoints.length, 0)
+assert.equal(buildNetworkCamera(model([point('G1', 'gateway'), point('V1', 'camera')])).networkPoints.length, 0)
+assert.deepEqual(buildNetworkCamera(model([point('N1', 'ap-node')], [item('Q1', 'camera')])).items, [])
+assert.equal(buildNetworkCamera(model([], [item('Q1', 'camera')])), null)
 
 const allTypes = [point('N1', 'ac-router'), point('N2', 'ap-node'), point('N3', 'ceiling-ap'), point('N4', 'network-panel'), point('V1', 'camera'), point('B1', 'doorbell'), point('G1', 'gateway')]
 const all = buildNetworkCamera(model(allTypes))
@@ -88,4 +96,64 @@ assert.deepEqual(wrongItem.items, [])
 assert.equal(wrongItem.networkPoints[0].productId, null)
 assert.equal(wrongItem.cameraPoints[0].ref, null)
 
-console.log(`PASS ${checks} assertions: network+camera matching, excluded device types, floor/area identity, unmapped points, complete counts/codes, quote-only product references and immutable inputs`)
+// Detector-only projects still get a coverage page; no controls or lights enter this model.
+const sensorTypes = ['motion-sensor', 'smoke-sensor', 'water-sensor', 'contact-sensor', 'temp-sensor']
+const sensors = sensorTypes.map((type, i) => point(`S${i + 1}`, type, { ref: `QS${i + 1}`, angle: i * Math.PI / 4 }))
+const sensorOnly = buildNetworkCamera(model(sensors, [
+  ...sensorTypes.map((type, i) => item(`QS${i + 1}`, type)),
+  item('UNLINKED', 'motion-sensor'),
+]))
+assert.equal(sensorOnly.networkPoints.length, 0)
+assert.equal(sensorOnly.cameraPoints.length, 0)
+assert.equal(sensorOnly.sensorPoints.length, 5)
+assert.deepEqual(sensorOnly.sensorPoints.map((p) => p.deviceType), sensorTypes)
+assert.deepEqual(sensorOnly.items.map((i) => i.ref), ['QS1', 'QS2', 'QS3', 'QS4', 'QS5'])
+assert.equal(sensorOnly.rooms[0].sensorPoints.length, 5)
+assert.equal(sensorOnly.rooms[0].cameraPoints.length, 0)
+assert.equal(sensorOnly.sheets[0].points.length, 5)
+assert.deepEqual(sensorOnly.sheets[0].areas, [])
+assert.equal(sensorOnly.sensorPoints[2].angle, Math.PI / 2)
+assert.equal(sensorOnly.sheets[0].points[2].angle, Math.PI / 2)
+
+// Identical room names retain floor identity with mixed WiFi, camera and detector points.
+const mixedSensors = buildNetworkCamera(model([
+  point('S1', 'motion-sensor'),
+  point('N1', 'ap-node'),
+  point('V1', 'camera'),
+  point('S2', 'water-sensor', { sheetId: 'f2', areaId: 'r2', angle: 1.25 }),
+  point('N2', 'ceiling-ap', { sheetId: 'f2', areaId: 'r2' }),
+  point('K1', 'switch-1'), point('L1', 'downlight'), point('G1', 'gateway'), point('B1', 'doorbell'),
+]))
+assert.equal(mixedSensors.sensorPoints.length, 2)
+assert.deepEqual(mixedSensors.rooms.map((r) => [r.floorName, r.name, r.networkPoints.length, r.cameraPoints.length, r.sensorPoints.length]), [['一层', '客厅', 1, 1, 1], ['二层', '客厅', 1, 0, 1]])
+assert.deepEqual(mixedSensors.sheets.map((s) => [s.floorName, s.points.length]), [['一层', 3], ['二层', 2]])
+assert.equal(mixedSensors.rooms.flatMap((r) => r.points).length, 5)
+assert.equal(mixedSensors.sheets[1].points.find((p) => p.id === 'S2').angle, 1.25)
+
+// Room geometry comes from the already-normalized deck sheet, without mutation or recalculation.
+const sheetAreas = [areas[0], { id: 'r3', name: '过道', sheetId: 'f1' }]
+const areaModel = freeze({ ...model([point('N1', 'ap-node'), point('S1', 'smoke-sensor')]), sheets: [
+  { ...sheets[0], areas: sheetAreas },
+  { ...sheets[1], areas: [areas[1]] },
+] })
+const areaBefore = JSON.stringify(areaModel)
+const withAreas = buildNetworkCamera(areaModel)
+assert.equal(withAreas.sheets.length, 1)
+assert.equal(withAreas.sheets[0].areas, sheetAreas)
+assert.deepEqual(withAreas.sheets[0].areas.map((a) => a.id), ['r1', 'r3'])
+assert.equal(JSON.stringify(areaModel), areaBefore)
+
+// Missing or invalid relative coordinates are a drawing concern, not an unmapped-sheet change.
+const missingPositions = buildNetworkCamera(model([
+  point('S1', 'motion-sensor', { rx: null, ry: null }),
+  point('S2', 'smoke-sensor', { rx: Number.NaN }),
+  point('S3', 'water-sensor', { sheetId: null, areaId: null }),
+  point('S4', 'contact-sensor', { sheetId: 'missing-sheet', areaId: null }),
+]))
+assert.equal(missingPositions.sensorPoints.length, 4)
+assert.equal(missingPositions.sheets[0].points.length, 2)
+assert.deepEqual(missingPositions.unmappedPoints.map((p) => p.id), ['S3', 'S4'])
+assert.equal(missingPositions.sensorPoints[0].rx, null)
+assert.equal(Number.isNaN(missingPositions.sensorPoints[1].rx), true)
+
+console.log(`PASS ${checks} assertions: network/camera/detector matching, excluded controls and lighting, floor/area identity and geometry, rotation, unmapped versus undrawable positions, complete counts/codes, quote-only product references and immutable inputs`)

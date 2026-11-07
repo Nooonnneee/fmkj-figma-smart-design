@@ -1,9 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Ruler } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { PointDisplayEffects } from '@/components/point-display-effects'
 
 import { boxContains, boxInside, normBox, normAngle, polyBox, snapAngle, toDeg } from '../core/geometry'
 import { areaPoly, moveObjects, rawBox, rotateSymbols, setAreaPoly, sheetAt } from '../core/ops'
@@ -118,6 +119,7 @@ export function BoardCanvas(props: BoardCanvasProps) {
   const latest = useRef(props)
   latest.current = props
   const spaceRef = useRef(false)
+  const effectsClipId = `board-effects-${useId().replace(/:/g, '')}`
 
   const shown = preview?.doc ?? doc
 
@@ -132,8 +134,11 @@ export function BoardCanvas(props: BoardCanvasProps) {
 
   // 系统包的辅助图层（覆盖圈、开关控灯关联……）：只在打开时计算
   const overlayShapes = useMemo(
-    () => (pack.overlays ?? []).filter((o) => view.overlays?.[o.id]).map((o) => ({ id: o.id, shapes: o.build(shown) })),
-    [pack, view.overlays, shown],
+    () => {
+      const visibleDoc = { objects: shown.objects.filter((o) => o.kind !== 'symbol' || !hidden.has(o.id)) }
+      return (pack.overlays ?? []).filter((o) => view.overlays?.[o.id]).map((o) => ({ id: o.id, shapes: o.build(visibleDoc) }))
+    },
+    [pack, view.overlays, shown, hidden],
   )
 
   useEffect(() => {
@@ -542,6 +547,9 @@ export function BoardCanvas(props: BoardCanvasProps) {
     >
       <svg className={cn('absolute inset-0 size-full transition-opacity', props.ready === false && 'opacity-0')} aria-hidden>
         <defs>
+          <clipPath id={effectsClipId}>
+            {sheets.map((s) => <rect key={s.id} x={s.x} y={s.y} width={s.w} height={s.h} />)}
+          </clipPath>
           <filter id="board-paper-shadow" x="-5%" y="-5%" width="110%" height="110%">
             <feDropShadow dx="0" dy="2" stdDeviation="6" floodColor="#0f172a" floodOpacity={dark ? 0.48 : 0.08} />
           </filter>
@@ -573,7 +581,12 @@ export function BoardCanvas(props: BoardCanvasProps) {
           {view.layers.shape
             ? objs.map((o) => (o.kind === 'raw' ? <RawView key={o.id} el={o.el} href={typeof o.el.fileId === 'string' ? (files[o.el.fileId]?.dataURL ?? null) : null} /> : null))
             : null}
-          {view.layers.symbol ? overlayShapes.map((ov) => <OverlayView key={ov.id} shapes={ov.shapes} zoom={z} />) : null}
+          {view.layers.symbol ? overlayShapes.map((ov) => (
+            <g key={ov.id}>
+              {ov.shapes.effects?.length ? <g clipPath={`url(#${effectsClipId})`}><PointDisplayEffects effects={ov.shapes.effects} /></g> : null}
+              <OverlayView shapes={ov.shapes} zoom={z} />
+            </g>
+          )) : null}
           {view.layers.symbol
             ? objs.map((o) => {
                 if (o.kind !== 'symbol' || hidden.has(o.id)) return null

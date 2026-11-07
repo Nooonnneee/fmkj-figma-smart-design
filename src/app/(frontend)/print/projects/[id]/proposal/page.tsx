@@ -1,7 +1,9 @@
 import { Fragment } from 'react'
+import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 
 import { PrintToolbar } from '@/components/print-toolbar'
+import { Button } from '@/components/ui/button'
 import { DocEmpty } from '@/documents/parts'
 import { appAuth } from '@/lib/app-auth'
 import { featureAccess, tierBadge } from '@/lib/membership'
@@ -56,6 +58,15 @@ export default async function ProposalPage({
   const docs = d
   const [flags, templates, access] = await Promise.all([getPluginFlags(docs.owner?.id ?? user.id), templatesP, accessP])
   if (!flags.proposal) notFound()
+  if (!templates.length) {
+    return (
+      <section className="mx-auto my-12 flex max-w-xl flex-col items-center gap-4 rounded-xl border border-dashed bg-background px-6 py-12 text-center">
+        <h1 className="text-lg font-semibold">暂无启用的方案模板</h1>
+        <p className="text-sm leading-relaxed text-muted-foreground">请联系管理员启用方案模板，再打开本项目生成方案。</p>
+        <Button asChild variant="outline" size="sm"><Link href={`/projects/${id}/archive`}>返回项目归档</Link></Button>
+      </section>
+    )
+  }
   // 模板：网址参数 → 项目在「归档」里选定的交付方案模板 → 设置里的默认方案模板 → 栖序雅致
   const saved = d.company.documentDefaults.proposal?.layout
   const tpl =

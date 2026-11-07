@@ -1,5 +1,6 @@
 /**
  * 智能家居点位的辅助图层（只影响显示，不写进图纸）：
+ * - 展示效果：按设备类型绘制无线波纹、人体扇形、传感器提示与灯光光晕，不表示实际覆盖或照度。
  * - 信号覆盖圈：吸顶 AP / 面板 AP / 路由 / 网关按理想无遮挡半径画圈，一眼看出大平层、别墅的信号盲区；
  * - 开关控灯关联：按房间自动推断，同一房间里的每盏灯连到最近的开关；有灯却没有开关（也没有人体传感器）的灯具标红提示。
  * 半径按图纸标定换算成真实米数；图纸未标定时按标准图纸（户型宽约 14 m）估算，并用虚线和「估算」标注。
@@ -9,6 +10,7 @@ import { pointInPolygon, polyArea } from '@/board/core/geometry'
 import { areaPoly, areasOf, sheetAt, symbolsOf } from '@/board/core/ops'
 import type { AreaObj, BoardDoc, SymbolObj } from '@/board/core/types'
 import { categoryOfType } from '@/lib/device-types'
+import { buildPointDisplayEffects } from '@/lib/point-display-effects'
 import { SHEET } from '@/lib/sheet-spec'
 
 /** 各类无线主控设备的理想覆盖半径（米，无遮挡；每穿一堵承重墙信号明显衰减，需按现场复核） */
@@ -25,6 +27,12 @@ export const ESTIMATED_MM_PER_UNIT = 14_000 / (SHEET.width * (1 - 2 * SHEET.padd
 const deviceTypeOf = (o: SymbolObj) => (typeof o.data.deviceType === 'string' ? o.data.deviceType : '')
 const categoryOf = (o: SymbolObj) => categoryOfType(deviceTypeOf(o))?.slug ?? null
 const dist2 = (a: { x: number; y: number }, b: { x: number; y: number }) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2
+
+function displayEffects(doc: BoardDoc): OverlayShapes {
+  return {
+    effects: buildPointDisplayEffects(symbolsOf(doc).map((o) => ({ id: o.id, deviceType: deviceTypeOf(o), x: o.x, y: o.y, angle: o.angle })), 24),
+  }
+}
 
 function coverage(doc: BoardDoc): OverlayShapes {
   const circles: OverlayCircle[] = []
@@ -136,6 +144,7 @@ function lightLinks(doc: BoardDoc): OverlayShapes {
 }
 
 export const SMART_HOME_OVERLAYS: PackOverlay[] = [
+  { id: 'display-effects', name: '展示效果', hint: '无线波纹、人体扇形、传感器提示与灯光光晕', build: displayEffects },
   { id: 'coverage', name: '信号覆盖圈', hint: '吸顶 AP 8m · 面板 AP / 路由 6m · 网关 10m', build: coverage },
   { id: 'light-links', name: '开关控灯关联', hint: '按房间推断，无开关的灯具标红', build: lightLinks },
 ]

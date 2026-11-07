@@ -20,7 +20,7 @@ import { PlanPage } from './pages/plan'
 import { paginateRooms, RoomsPage } from './pages/rooms'
 import { deckScenes, ScenesPage } from './pages/scenes'
 import { ServicePage } from './pages/service'
-import { SystemPage } from './pages/system'
+import { hasSwitchLightingPoints, SystemPage } from './pages/system'
 import { ZonePage } from './pages/zone'
 import type { DeckCtx } from './parts'
 import { deckVars, type DeckTheme } from './themes'
@@ -66,8 +66,11 @@ function deckPageRenders(d: ProjectDocsData, theme: DeckTheme, opts: { markers: 
     cover: () => pages.push((no, total) => <CoverPage ctx={ctx} no={no} total={total} />),
     plans: () => m.sheets.forEach((s, i) => pages.push((no, total) => <PlanPage ctx={ctx} no={no} total={total} s={s} first={i === 0} />)),
     system: () => {
-      pages.push((no, total) => <SystemPage ctx={ctx} no={no} total={total} />)
-      if (network) pages.push((no, total) => <NetworkCameraPage ctx={ctx} no={no} total={total} network={network} />)
+      if (hasSwitchLightingPoints(m)) pages.push((no, total) => <SystemPage ctx={ctx} no={no} total={total} />)
+      if (network) {
+        network.sheets.forEach((s) => pages.push((no, total) => <NetworkCameraPage ctx={ctx} no={no} total={total} network={network} s={s} />))
+        if (network.unmappedPoints.length || !network.sheets.length) pages.push((no, total) => <NetworkCameraPage ctx={ctx} no={no} total={total} network={network} />)
+      }
     },
     zones: () => {
       for (const zone of m.zones) pages.push((no, total) => <ZonePage ctx={ctx} no={no} total={total} zone={zone} insights={opts.insights} />)

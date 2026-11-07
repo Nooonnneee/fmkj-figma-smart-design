@@ -7,7 +7,10 @@ import { contractStatusLabel, fmtLongDate, paymentAmounts } from '@/lib/contract
 import { FINAL_QUOTE_SOURCE_LABEL, resolveFinalQuote } from '@/lib/deliverables'
 import { FEATURE_TIERS, featureAccess, tierBadge } from '@/lib/membership'
 import { getMembershipContext } from '@/lib/membership-policy'
-import { deviceTypeOf } from '@/lib/device-types'
+import { categoryOfType, deviceTypeOf } from '@/lib/device-types'
+import { nightScenePhotoForScene } from '@/lib/scene-night-photos'
+import { miniAppCodeForCompany } from '@/lib/mini-app-code'
+import { socialCaseTitle, socialSheetTitle } from '@/lib/social-poster'
 import { inferScopeFromTitle } from '@/lib/point-scopes'
 import { normalizeScene, planAreaOf, sceneAreas, scenePoints, sceneSheets } from '@/lib/point-scene'
 import { projectDisplayName, quoteShortTitle } from '@/lib/project-name'
@@ -63,7 +66,6 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
   const allSheets = sceneSheets(normalized.elements, normalized.files).filter((s) => s.url)
   const allAreas = sceneAreas(normalized.elements, allSheets)
   const allPoints = scenePoints(normalized.elements, allSheets, allAreas)
-  const firstSheet = allSheets[0] ?? null
   const typeCounter = new Map<string, number>()
   for (const pt of allPoints) {
     typeCounter.set(pt.deviceType, (typeCounter.get(pt.deviceType) ?? 0) + 1)
@@ -71,26 +73,36 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
   const topTypes = [...typeCounter.entries()]
     .sort((a, b) => b[1] - a[1])
     .map(([type, count]) => ({ type, name: deviceTypeOf(type)?.name ?? '设备', count }))
+  const hasLighting = allPoints.some((p) => categoryOfType(p.deviceType)?.slug === 'lighting')
+  const sceneIdeas = [
+    ...(hasLighting ? [{ name: '观影模式', title: '灯光退场，电影开场。', description: '观影场景 · 从客厅灯光开始讨论' }] : []),
+    ...(allPoints.some((p) => p.deviceType === 'curtain-track') ? [{ name: '睡眠模式', title: '把一天，留在灯光之外。', description: '睡眠场景 · 窗帘与休息习惯一起确认' }] : []),
+    ...(hasLighting && allPoints.some((p) => p.deviceType === 'motion-sensor') ? [{ name: '起夜模式', title: '夜里起身，脚下有光。', description: '夜间引导 · 感应与低亮度照明意向' }] : []),
+  ]
   const posterData: SocialPosterData = {
-    title: project.community?.trim() || projectDisplayName(project.name),
+    title: socialCaseTitle(project.community, [project.customerName, project.customerPhone]),
     platform: project.platform || '全屋智能',
     pointCount: allPoints.length || points,
     roomCount: new Set(allPoints.map((p) => p.areaId).filter(Boolean)).size || allAreas.length,
     floorCount: allSheets.length,
     totalAmount: finalQuote?.total ?? project.budget ?? null,
+    budgetLabel: finalQuote ? '本次方案报价参考' : '项目预算参考',
     companyName: company.name,
     qrCodeUrl: company.qrCode?.url ?? '/brand/wechat-contact-qr.jpg',
-    sheet: firstSheet
-      ? {
-          name: firstSheet.name,
-          url: firstSheet.url!,
+    miniAppCodeUrl: miniAppCodeForCompany(company.name),
+    sheets: allSheets.map((sheet, index) => ({
+          name: socialSheetTitle(sheet.name, index),
+          url: sheet.url!,
           points: allPoints
-            .filter((p) => p.sheetId === firstSheet.id && p.rx !== null && p.ry !== null)
-            .map((p) => ({ id: p.id, deviceType: p.deviceType, code: p.code, rx: p.rx, ry: p.ry })),
-          areas: allAreas.filter((a) => a.sheetId === firstSheet.id).map((a) => planAreaOf(a, firstSheet)),
-        }
-      : null,
+            .filter((p) => p.sheetId === sheet.id && p.rx !== null && p.ry !== null)
+            .map((p) => ({ id: p.id, deviceType: p.deviceType, code: p.code, rx: p.rx, ry: p.ry, angle: p.angle })),
+          areas: allAreas.filter((a) => a.sheetId === sheet.id).map((a) => planAreaOf(a, sheet)),
+        })),
     topTypes,
+    scenePhotos: sceneIdeas.flatMap((idea) => {
+      const photo = nightScenePhotoForScene(idea.name)
+      return photo ? [{ key: photo.key, title: idea.title, description: idea.description, url: photo.url, alt: photo.alt }] : []
+    }),
   }
   const payments = contract?.payments ?? []
   const amounts = paymentAmounts(contract?.amount ?? 0, payments)

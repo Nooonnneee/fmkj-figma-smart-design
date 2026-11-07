@@ -1,3 +1,5 @@
+import type { PointDisplayEffect } from '@/lib/point-display-effects'
+
 import type { PaperId } from './paper'
 import type { SymbolLook } from './symbols'
 import type { BoardDoc, LayerId, SymbolObj, Vec } from './types'
@@ -14,7 +16,7 @@ export type OverlayCircle = { id: string; x: number; y: number; r: number; color
 export type OverlayLink = { id: string; from: Vec; to: Vec; color: string }
 /** 需要关注的点（例如没有开关控制的灯具）：画一个醒目的提示圈 */
 export type OverlayMark = { id: string; x: number; y: number; color: string; title?: string }
-export type OverlayShapes = { circles?: OverlayCircle[]; links?: OverlayLink[]; marks?: OverlayMark[] }
+export type OverlayShapes = { circles?: OverlayCircle[]; links?: OverlayLink[]; marks?: OverlayMark[]; effects?: PointDisplayEffect[] }
 
 /** 系统包提供的智能辅助图层（只影响显示，不写进图纸；在「显示与隐藏」里开关） */
 export type PackOverlay = { id: string; name: string; hint: string; build: (doc: BoardDoc) => OverlayShapes }
