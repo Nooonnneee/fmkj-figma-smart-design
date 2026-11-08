@@ -46,6 +46,26 @@ Alma 先写提案（修改前/修改后/影响范围/迁移/回滚/谁批），n
 
 **下一步**：按复杂度从低到高推进（quotes → docs → membership → ai → projects → 首页）
 
+**已完成的设计系统统一（PR #21~#25）**：
+- 登录页 Astryx 左右分栏（认证逻辑零改动）
+- PageHeader 换 Astryx 排版（影响 9 页）
+- Button / Input 圆角与间距（影响 75 + 23 文件）
+- Card 圆角 → container token（影响 14 文件）
+- Dialog / Select / DropdownMenu / Tabs / Textarea 圆角统一（5 文件）
+
+**圆角体系（已全站统一）**：
+```
+--radius-inner     = 6px   小尺寸（xs 按钮、图标小按钮）
+--radius-element   = 8px   按钮 / 输入框 / 菜单项
+--radius-container = 12px  卡片 / 弹层
+```
+
+**刻意不跟 Astryx 的项（有意识决策，非遗漏）**：
+- **字号**：本仓 12/14/16/18 阶梯保留。Astryx 是 9/11/14/18（Meta 企业后台风），
+  照搬会让全站文字集体缩小，中文阅读吃力；全站已有 1126 处字号类。
+- **间距**：3000+ 处 Tailwind 间距类，阶梯本身合理，动它风险大收益小。
+- **导航结构**：项目板块导航（PROJECT_SECTIONS）功能完整，换 Astryx Stepper 属架构变更，需提案。
+
 **踩过的坑（必看）**：
 
 - `layers.css` 是 CSS 层序声明，**必须是 layout 第一个 import**，否则 Tailwind preflight 压死 Astryx 整层样式
