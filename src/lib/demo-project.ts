@@ -8,7 +8,7 @@ import {
 } from '@/lib/contracts'
 import { relId } from '@/lib/access'
 import { BUILTIN_DEMO_SHEETS } from '@/lib/builtin-demo-sheets'
-import { DEVICE_TYPE_ORDER } from '@/lib/device-types'
+import { DEVICE_TYPE_ORDER, deviceTypeLabel } from '@/lib/device-types'
 import { getPayloadClient } from '@/lib/payload'
 import {
   buildAreaElements,
@@ -226,8 +226,12 @@ export async function ensureDemoTemplateProject(): Promise<Project | null> {
         product: prod ? String(prod.id) : null,
         deviceType: dtype,
         image: prod ? relId(prod.image) || null : null,
-        name: prod?.name ?? `智能${dtype}设备`,
-        sku: prod?.sku ?? `DEMO-${dtype.toUpperCase()}`,
+        // 兜底名称必须走中文映射：直接把内部枚举名（switch-2）拼进产品名，
+        // 会在首页方案演示、合同附件里把「智能switch-2设备」暴露给客户。
+        name: prod?.name ?? deviceTypeLabel(dtype),
+        // 型号同理：DEMO-SWITCH-2 这种内部编号会直接印在客户合同附件上。
+        // 没有真实产品时留空，让渲染层决定怎么显示（而不是编一个假型号）。
+        sku: prod?.sku ?? '',
         unit: prod?.unit ?? '个',
         price: typeof prod?.price === 'number' ? prod.price : 199,
         quantity: qty,
