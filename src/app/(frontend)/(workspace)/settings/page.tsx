@@ -51,6 +51,30 @@ export default async function SettingsPage() {
         title="设置"
         description="外观主题、报价单与合同抬头、联系方式，以及报价内部成本与毛利规则"
       />
+
+      {/*
+        页内分区导航：设置页把外观、品牌与联系、成本串成一条长表单，
+        首屏只能看到主题选择，后面的业务设置要靠滚动找。吸顶的一排锚点
+        让三块内容一眼可见（纯文本链接，不做 Tab——Tab 会打断浏览的连续性）。
+      */}
+      <nav
+        aria-label="设置分区"
+        className="sticky top-0 z-10 -mx-1 flex flex-wrap items-center gap-1 rounded-[var(--radius-container)] border bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+      >
+        {[
+          { href: '#settings-appearance', label: '外观' },
+          { href: '#settings-brand', label: '品牌与联系' },
+          { href: '#settings-cost', label: '成本与毛利' },
+        ].map((item) => (
+          <a
+            key={item.href}
+            href={item.href}
+            className="rounded-[var(--radius-inner)] px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            {item.label}
+          </a>
+        ))}
+      </nav>
       {operator ? (
         <Link
           href="/settings/reports"
@@ -70,38 +94,44 @@ export default async function SettingsPage() {
           <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
         </Link>
       ) : null}
-      <AppearanceSettings />
-      <CompanyForm
-        initial={{
-          name: company.name ?? '',
-          slogan: company.slogan ?? '',
-          phone: company.phone ?? '',
-          email: company.email ?? '',
-          address: company.address ?? '',
-          qrCaption: company.qrCaption ?? '',
-          quoteNotes: company.quoteNotes ?? '',
-          contractTerms: company.contractTerms ?? DEFAULT_CONTRACT_TERMS,
-          printProductImages: company.printProductImages !== false,
-          logoUrl: company.logo?.url ?? null,
-          qrCodeUrl: company.qrCode?.url ?? null,
-        }}
-        documents={{
-          kinds: DOC_KIND_LIST.map((kind) => ({
-            kind,
-            label: DOC_KINDS[kind].label,
-            layouts: DOC_KINDS[kind].layouts.map((l) => ({ value: l.value, label: l.label })),
-          })),
-          styles: allStyles().map((s) => ({
-            id: s.id,
-            name: s.name,
-            description: s.description,
-            swatch: [s.colors.paper, s.colors.accent, s.colors.headBg],
-            enabled: enabledStyles.has(s.id),
-          })),
-          defaults: company.documentDefaults,
-        }}
-      />
-      <CostSettingsCard initial={costSettings} brands={costBrands} />
+      <div id="settings-appearance" className="scroll-mt-16">
+        <AppearanceSettings />
+      </div>
+      <div id="settings-brand" className="scroll-mt-16">
+        <CompanyForm
+          initial={{
+            name: company.name ?? '',
+            slogan: company.slogan ?? '',
+            phone: company.phone ?? '',
+            email: company.email ?? '',
+            address: company.address ?? '',
+            qrCaption: company.qrCaption ?? '',
+            quoteNotes: company.quoteNotes ?? '',
+            contractTerms: company.contractTerms ?? DEFAULT_CONTRACT_TERMS,
+            printProductImages: company.printProductImages !== false,
+            logoUrl: company.logo?.url ?? null,
+            qrCodeUrl: company.qrCode?.url ?? null,
+          }}
+          documents={{
+            kinds: DOC_KIND_LIST.map((kind) => ({
+              kind,
+              label: DOC_KINDS[kind].label,
+              layouts: DOC_KINDS[kind].layouts.map((l) => ({ value: l.value, label: l.label })),
+            })),
+            styles: allStyles().map((s) => ({
+              id: s.id,
+              name: s.name,
+              description: s.description,
+              swatch: [s.colors.paper, s.colors.accent, s.colors.headBg],
+              enabled: enabledStyles.has(s.id),
+            })),
+            defaults: company.documentDefaults,
+          }}
+        />
+      </div>
+      <div id="settings-cost" className="scroll-mt-16">
+        <CostSettingsCard initial={costSettings} brands={costBrands} />
+      </div>
     </section>
   )
 }
