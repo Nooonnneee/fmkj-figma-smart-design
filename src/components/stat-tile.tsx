@@ -30,10 +30,32 @@ export function StatTile({
   hint?: React.ReactNode
   /** 强调色；warning 用于待处理数据 */
   tone?: 'warning'
-  /** default 用于页面级指标；sm 用于卡片内嵌 */
-  size?: 'default' | 'sm'
+  /** default 用于页面级指标；sm 用于卡片内嵌；inline 用于「指标条」里的一格 */
+  size?: 'default' | 'sm' | 'inline'
   className?: string
 }) {
+  // inline：不画卡片，由外层指标条用发丝线分隔。官网风格要求「容器感轻」——
+  // 一排四张浮起的等权卡片会让页面像通用后台。
+  if (size === 'inline') {
+    return (
+      <div className={cn('flex flex-col gap-1 px-5 py-4', className)}>
+        <div className="text-xs font-medium text-muted-foreground">{label}</div>
+        <div className="flex items-baseline gap-1.5">
+          <span
+            className={cn(
+              'text-xl font-semibold tracking-tight tabular-nums',
+              tone === 'warning' ? 'text-warning' : 'text-foreground',
+            )}
+          >
+            {value}
+          </span>
+          {unit ? <span className="text-xs text-muted-foreground">{unit}</span> : null}
+        </div>
+        {hint ? <div className="text-xs text-muted-foreground">{hint}</div> : null}
+      </div>
+    )
+  }
+
   return (
     <div
       className={cn(

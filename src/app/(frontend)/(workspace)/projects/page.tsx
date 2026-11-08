@@ -225,24 +225,31 @@ export default async function ProjectsPage({
         }
       />
 
-      {/* Untitled UI 顶部 4 格业务数据概览卡片 */}
+      {/*
+        指标条：一条带发丝分隔线的横条，而不是四张浮起的等权卡片。
+        四张卡片会让首屏视觉中心停在数字上、把真正要操作的「项目列表」压下去，
+        也带来最重的「通用后台」观感（视觉评审指出的首要问题）。
+      */}
       {projects.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 divide-x divide-y divide-border overflow-hidden rounded-[var(--radius-container)] border bg-card sm:grid-cols-4 sm:divide-y-0">
           <StatTile
+            size="inline"
             label={archived ? '已归档项目' : '进行中项目'}
             value={projects.length}
             unit="个项目"
           />
           <StatTile
+            size="inline"
             label="累计设计点位"
             value={totalPoints.toLocaleString('zh-CN')}
-            unit="个智能点位"
+            unit="个点位"
           />
-          <StatTile label="方案报价总额" value={yuan(totalQuoteAmount)} />
+          <StatTile size="inline" label="方案报价总额" value={yuan(totalQuoteAmount)} />
           <StatTile
-            label="已生成报价 / 签约"
+            size="inline"
+            label="报价 / 签约"
             value={quotes.docs.length}
-            unit={`份报价 · ${signedContractsCount} 份已签合同`}
+            unit={`份 · 已签 ${signedContractsCount}`}
           />
         </div>
       ) : null}
