@@ -100,14 +100,14 @@ const capabilityNav = [
     ],
   },
   {
-    key: 'template',
-    label: '模板',
-    items: [{ icon: LayoutTemplate, label: '模板中心', url: '/plugins/templates' }],
-  },
-  {
-    key: 'tool',
-    label: '工具',
-    items: [{ icon: Wrench, label: '全部工具', url: '/plugins/tools' }],
+    // 模板与工具原来分成两个分组，每组只有 1 项——侧边栏出现「模板」「工具」
+    // 两个只有一行内容的小标题，层级显得很碎。合并成「模板与工具」。
+    key: 'library',
+    label: '模板与工具',
+    items: [
+      { icon: LayoutTemplate, label: '模板中心', url: '/plugins/templates' },
+      { icon: Wrench, label: '全部工具', url: '/plugins/tools' },
+    ],
   },
 ] as const
 
