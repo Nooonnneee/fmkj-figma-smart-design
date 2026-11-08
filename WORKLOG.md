@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-11-08 · 修复单测暴露的 4 个缺陷（PR #13）
+
+- 修 `floorTagFromSheetName`（B1F≠1F，避免楼层合并）、`normalizeVerdictKind`（否定词前置+收紧为独立词）、
+  `rmbUpper`（扩到万亿+越界返空）、`quoteTotals`/`yuan`（负数优惠、NaN）
+- 断言翻转（只增不减），补误伤面用例 → 测试 82 → 84
+- 独立验收：fmkj-reviewer 含变异测试（4 处修复全被守住），**并否决了初版第 2 项修复的误伤**（no.1/socket-no/node）
+- CI **success**
+
 ## 2026-11-08 · 知识库重导 + 测试框架（PR #11 / #12）
 
 - **PR #11** 重新导出领域知识库 JSON：同步会员分级移除与插件摘除（plugins.json 8 个插件、无 tier）
