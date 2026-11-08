@@ -4,6 +4,15 @@
 
 ---
 
+## 2026-11-08 · 知识库重导 + 测试框架（PR #11 / #12）
+
+- **PR #11** 重新导出领域知识库 JSON：同步会员分级移除与插件摘除（plugins.json 8 个插件、无 tier）
+- **PR #12** 引入 vitest + 首批 82 个纯函数单测，接进 CI（`pnpm test`）
+  - 用 fmkj-builder 实施、fmkj-reviewer 独立验收（含变异测试：注入 6 处缺陷全被抓红）
+  - lockfile 用仓库 pin 的 pnpm 10.34.3 重生成，无运行时依赖版本变更
+  - **顺带暴露 4 个真实缺陷**（只断言不修，见 PLAN §5b）
+- 两 PR 均 CI **success**
+
 ## 2026-11-08 · 会员分级移除 + 能力中心（owner 决策后实施）
 
 - **PR #7** 取消会员分级 → 纯积分（Q1=删字段）：删 users.membershipTier/ExpiresAt、兑换码等级、
