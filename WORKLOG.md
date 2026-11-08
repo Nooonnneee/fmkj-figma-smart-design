@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-11-08 · 三个 PR 已合并进 main
+
+- 自动化基建 Phase 0 → PR [#3](https://github.com/lynnliuyu/fmkj-figma-smart-design/pull/3)（squash）
+- 两份架构提案 → PR [#5](https://github.com/lynnliuyu/fmkj-figma-smart-design/pull/5)（squash）
+- Beta 文档回落 + 摘除四个已封存插件 → PR [#6](https://github.com/lynnliuyu/fmkj-figma-smart-design/pull/6)（squash）
+- main 合并后 CI 结论：**success**（`39ae177`）
+- 注：PR #4 因与已合并的文档提交冲突被替换为从最新 main cherry-pick 的 PR #6
+
 ## 2026-11-08 · 自动化基建 Phase 0
 
 - 分支 `chore/automation-phase0`
