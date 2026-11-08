@@ -4,6 +4,15 @@
 
 ---
 
+## 2026-11-08 · 全仓格式化 + CI 格式门禁（PR #14）
+
+- 一次性格式化 427 文件（纯格式化，无语义变化）
+- CI 增加 `oxfmt --check` 门禁
+- oxfmt 排除：生成文件（payload-types.ts、src/app/(payload)/**）与独立运行时（miniprogram/、desktop/）
+- 踩坑：本地验证时反复 checkout 生成文件 importMap.js 导致它呈未格式化态，干净检出才暴露——
+  生成文件本就不该纳入格式化，最终以排除解决
+- CI **success**
+
 ## 2026-11-08 · 修复单测暴露的 4 个缺陷（PR #13）
 
 - 修 `floorTagFromSheetName`（B1F≠1F，避免楼层合并）、`normalizeVerdictKind`（否定词前置+收紧为独立词）、
