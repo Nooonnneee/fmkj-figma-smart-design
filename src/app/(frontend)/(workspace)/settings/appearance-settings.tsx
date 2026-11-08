@@ -21,8 +21,14 @@ const MODES = [
 const tile =
   'relative cursor-pointer rounded-[var(--radius-container)] border bg-card font-normal leading-normal transition-colors hover:bg-accent/50 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/30'
 
-/** 主题风格的示意小窗：侧栏 + 内容 + 主按钮 */
-function AccentPreview({ swatch }: { swatch: string }) {
+/**
+ * 主题风格的示意小窗：侧栏 + 内容 + 主按钮。
+ *
+ * `pill` 用来反映该主题真实的按钮形态——「官网」主题的按钮是全圆胶囊，
+ * 如果预览里仍画成小圆角方块，几套主题的缩略图会长得几乎一样，
+ * 用户看图看不出差别（视觉评审指出过这一点）。
+ */
+function AccentPreview({ swatch, pill = false }: { swatch: string; pill?: boolean }) {
   return (
     <span aria-hidden className="flex h-16 overflow-hidden rounded-lg border bg-background">
       <span className="flex w-1/3 flex-col gap-1.5 border-r bg-muted/60 p-2">
@@ -33,7 +39,7 @@ function AccentPreview({ swatch }: { swatch: string }) {
       <span className="flex flex-1 flex-col gap-1.5 p-2">
         <span className="h-1.5 w-1/2 rounded-full bg-foreground/50" />
         <span className="h-1.5 w-5/6 rounded-full bg-muted-foreground/25" />
-        <span className={cn('mt-auto h-3 w-10 rounded-sm', swatch)} />
+        <span className={cn('mt-auto h-3 w-10', pill ? 'rounded-full' : 'rounded-sm', swatch)} />
       </span>
     </span>
   )
@@ -97,7 +103,7 @@ export function AppearanceSettings() {
                 htmlFor={`appearance-accent-${a.id}`}
                 className={cn(tile, 'flex-col items-stretch gap-2.5 p-3')}
               >
-                <AccentPreview swatch={ACCENT_SWATCH[a.id]} />
+                <AccentPreview swatch={ACCENT_SWATCH[a.id]} pill={a.id === 'official'} />
                 <span className="flex items-center justify-between gap-2">
                   <span className="text-sm font-medium">
                     {a.label}
