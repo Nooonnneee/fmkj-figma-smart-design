@@ -598,7 +598,8 @@ export const DECK_THEMES: Record<DeckThemeId, DeckTheme> = {
     headline: '让日常，轻柔而从容。',
     tagline: 'QUIET EVERYDAY',
     coverTagline: 'LIGHT, SPACE AND EVERYDAY LIFE',
-    coverPhoto: '/proposal/photos/cover-qixu.jpg',
+    // 原来复用了 cover-qixu.jpg，和海盐蓝灰的拱窗封面对不上，也和「栖序雅致」撞图。
+    coverPhoto: '/proposal/photos/living.jpg',
     photoNote: '氛围意向图 · 非项目实景',
   },
   slate: {
@@ -619,7 +620,8 @@ export const DECK_THEMES: Record<DeckThemeId, DeckTheme> = {
     headline: '空间有序，生活自如。',
     tagline: 'SPACES IN ORDER',
     coverTagline: 'RESIDENTIAL DESIGN STUDY',
-    coverPhoto: '/proposal/photos/study.jpg',
+    // 原来复用了 study.jpg，和「素白极简」撞图；岩灰建筑需要更建筑感的画面。
+    coverPhoto: '/proposal/photos/stairs.jpg',
     photoNote: '氛围意向图 · 非项目实景',
   },
 }
