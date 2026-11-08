@@ -3,15 +3,20 @@
  * 主题风格写在 <html data-accent="…">，CSS 变量见 styles.css；页面绘制前由内联脚本恢复，避免闪烁。
  */
 export const ACCENTS = [
+  { id: 'official', label: '官网', description: '默认：墨色胶囊、克制留白' },
   { id: 'fanmeng', label: '繁梦紫', description: '品牌紫，灵动有梦想感' },
   { id: 'jade', label: '青碧', description: '清爽青绿，适合长时间工作' },
   { id: 'classic', label: '经典', description: '黑白灰为主，专注内容本身' },
-  { id: 'official', label: '官网', description: '官网同款：墨色胶囊、克制留白' },
 ] as const
 
 export type AccentId = (typeof ACCENTS)[number]['id']
 
-export const DEFAULT_ACCENT: AccentId = 'fanmeng'
+/**
+ * 新用户默认主题。用「官网」：墨色主操作 + 克制留白，和公开站的视觉语言一致，
+ * 也更适合「设计 / 报价 / 签约」这种偏严肃的交付工具。
+ * 「繁梦紫」作为品牌主题保留为可选项，老用户 localStorage 里已有的选择不受影响。
+ */
+export const DEFAULT_ACCENT: AccentId = 'official'
 export const ACCENT_STORAGE_KEY = 'fmkj-accent'
 
 export const isAccent = (v: unknown): v is AccentId => ACCENTS.some((a) => a.id === v)
