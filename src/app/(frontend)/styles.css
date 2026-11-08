@@ -787,3 +787,30 @@ html[data-accent='official'] [data-slot='card'] {
   color: var(--sidebar-accent-foreground) !important;
   font-weight: 500;
 }
+
+/*
+ * 屏幕上的文档预览：给纸张一个明确的边界（而不是一条看不见尽头的长白条）。
+ *
+ * 打印时由 @media print 的 @page 接管（见文件上方），这里只影响屏幕。
+ * 需求来源：视觉评审指出「合同正文、签字区和报价附件连成一张超长白纸，
+ * 屏幕预览没有清晰纸张分页」——用户看不出这份文档有几页、页面在哪结束。
+ *
+ * 做法：给文档根节点加轻微的纸张投影 + 圆角，外面留出灰底间隙；
+ * 页码与真实分页仍由浏览器打印引擎决定，屏幕侧不伪造分页线。
+ */
+@media screen {
+  /* DocArticle（A4 纵向文档：合同 / 报价单 / 交底 / 勘测单） */
+  [data-export-page='flow'] {
+    border-radius: 3px;
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.05),
+      0 12px 32px -16px rgb(0 0 0 / 0.22);
+  }
+  /* 横向 A4 单页（点位图 / 布线图等 DocSheetPage） */
+  section[data-export-page]:not([data-export-page='flow']) {
+    border-radius: 3px;
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.05),
+      0 12px 32px -16px rgb(0 0 0 / 0.22);
+  }
+}
