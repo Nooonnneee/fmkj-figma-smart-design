@@ -10,10 +10,17 @@ const MOBILE_LOGOS = 11
 
 /** 产品库：品牌墙（浅色主题用原色标识，深色主题用白色单色版），数量来自产品库。 */
 export function LibrarySection({ products, brands }: { products: number; brands: number }) {
+  // 产品库为空时不能把「0 款在售产品」当标题——那是把内部状态当卖点，
+  // 访客看到的会是「0 款在售产品，一键选好型号」这种自相矛盾的宣传。
+  // 部署方还没导入产品时，标题退回到不依赖数量的说法。
+  const hasProducts = products > 0
+  const title = hasProducts ? `${products} 款在售产品，一键选好型号` : '选好型号，报价一步到位'
+  const desc =
+    '布好点位后，按主平台和「经济 / 标准 / 高端」档次一键配好默认型号，报价里再逐行调整。'
   return (
     <Section id="library" labelledBy="library-title">
-      <SectionHeader id="library-title" title={`${products} 款在售产品，一键选好型号`}>
-        布好点位后，按主平台和「经济 / 标准 / 高端」档次一键配好默认型号，报价里再逐行调整。
+      <SectionHeader id="library-title" title={title}>
+        {desc}
       </SectionHeader>
       <ul
         aria-label="产品库中的部分品牌"
@@ -45,9 +52,11 @@ export function LibrarySection({ products, brands }: { products: number; brands:
             />
           </li>
         ))}
-        <li className="col-span-1 flex h-20 items-center justify-center border-r border-b border-border px-3 text-center text-xs leading-relaxed text-muted-foreground sm:col-span-4 sm:h-24 lg:col-span-2">
-          共 {brands} 个品牌、{products} 款在售产品
-        </li>
+        {hasProducts ? (
+          <li className="col-span-1 flex h-20 items-center justify-center border-r border-b border-border px-3 text-center text-xs leading-relaxed text-muted-foreground sm:col-span-4 sm:h-24 lg:col-span-2">
+            共 {brands} 个品牌、{products} 款在售产品
+          </li>
+        ) : null}
       </ul>
     </Section>
   )
