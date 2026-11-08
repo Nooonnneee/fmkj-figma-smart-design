@@ -1,13 +1,14 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowUpRight, Sparkles } from 'lucide-react'
 
 import { EmptyState } from '@/components/empty-state'
 import { PageHeader } from '@/components/page-header'
-import { Badge } from '@/components/ui/badge'
+import { TemplateCard } from '@/components/proposal-template-card'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { pageTitle } from '@/lib/brand'
 import { allStyles } from '@/documents/registry'
+import { buildTemplateGallery } from '@/plugins/proposal/preview'
 import { BUILTIN_PROPOSAL_TEMPLATES } from '@/plugins/proposal/templates'
 
 export const metadata = { title: pageTitle('模板中心') }
@@ -25,7 +26,12 @@ export const metadata = { title: pageTitle('模板中心') }
  * 模板清单用内置常量（BUILTIN_PROPOSAL_TEMPLATES），文档风格用 allStyles()（同步）。
  */
 export default function TemplateCenterPage() {
-  const proposalTemplates = BUILTIN_PROPOSAL_TEMPLATES
+  // 用与 /templates 公开页、插件详情页完全一致的图库构造：
+  // buildTemplateGallery 是**同步**函数（传 docs=null 时用内置样张数据），
+  // 所以本页仍然不查库、不读 searchParams，不会掉回 Suspense 骨架屏。
+  const gallery = buildTemplateGallery(BUILTIN_PROPOSAL_TEMPLATES, null)
+  const ownerTemplates = gallery.items.filter((t) => t.kind === 'owner')
+  const constructionTemplates = gallery.items.filter((t) => t.kind === 'construction')
   const docStyles = allStyles()
 
   return (
@@ -43,39 +49,35 @@ export default function TemplateCenterPage() {
             方案演示的章节编排、版式与主题色。在项目里选用后，方案会按所选模板生成。
           </p>
         </div>
-        {proposalTemplates.length === 0 ? (
+        {ownerTemplates.length === 0 && constructionTemplates.length === 0 ? (
           <EmptyState
             title="还没有可用的方案模板"
             description="管理员在后台「方案模板」里添加后，这里会出现。"
           />
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {proposalTemplates.map((t) => (
-              <Card key={t.value}>
-                <CardHeader>
-                  <CardTitle className="flex flex-wrap items-center justify-between gap-2">
-                    <span>{t.label}</span>
-                    <Badge variant="outline">{t.kind === 'owner' ? '业主方案' : '施工交底'}</Badge>
-                  </CardTitle>
-                  <CardDescription>{t.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-2">
-                  {t.highlights?.length ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {t.highlights.map((h) => (
-                        <Badge key={h} variant="secondary">
-                          {h}
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : null}
-                  {t.audience ? (
-                    <p className="text-xs text-muted-foreground">适合：{t.audience}</p>
-                  ) : null}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <>
+            {/* 业主方案：带真实封面缩略图。原来这里是纯文字卡片，
+                用户看不出「墨金 / 原木 / 海盐」的视觉差别。 */}
+            {ownerTemplates.length ? (
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {ownerTemplates.map((t) => (
+                  <TemplateCard key={t.value} t={t} thumb={gallery.thumbs[t.value]} />
+                ))}
+              </div>
+            ) : null}
+
+            {/* 施工交底：不含价格的 A4 横版，和业主方案分开列。 */}
+            {constructionTemplates.length ? (
+              <div className="mt-2 flex flex-col gap-3">
+                <h3 className="text-sm font-medium text-muted-foreground">施工交底（不含价格）</h3>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {constructionTemplates.map((t) => (
+                    <TemplateCard key={t.value} t={t} thumb={gallery.thumbs[t.value]} />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </>
         )}
       </section>
 
@@ -111,26 +113,42 @@ export default function TemplateCenterPage() {
         {docStyles.length === 0 ? (
           <EmptyState title="还没有可用的文档风格" />
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {docStyles.map((s) => (
-              <Card key={s.id}>
-                <CardHeader>
-                  <CardTitle>{s.name}</CardTitle>
-                  <CardDescription>{s.description}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex gap-1.5">
-                    {[s.colors.paper, s.colors.ink, s.colors.muted, s.colors.accent].map((c, i) => (
-                      <span
-                        key={`${s.id}-${i}`}
-                        className="size-6 rounded-[var(--radius-inner)] ring-1 ring-border"
-                        style={{ backgroundColor: c }}
-                        aria-label={`色值 ${c}`}
-                      />
-                    ))}
+              <div
+                key={s.id}
+                className="group flex flex-col overflow-hidden rounded-[var(--radius-container)] border bg-card"
+              >
+                {/* 真实样张：同一份报价内容在不同风格下的排版，用户能直接比字体与留白。
+                    只有色块看不出差别——原来那样用户选不出来。 */}
+                <div className="relative aspect-[4/3] overflow-hidden border-b bg-muted/40">
+                  <Image
+                    src={`/doc-styles/style-${s.id}.png`}
+                    alt={`${s.name} 文档风格样张`}
+                    fill
+                    sizes="(min-width: 1024px) 360px, (min-width: 640px) 45vw, 92vw"
+                    className="object-cover object-top transition-transform duration-300 group-hover:scale-[1.02]"
+                  />
+                </div>
+                <div className="flex flex-1 flex-col gap-2 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-base font-semibold tracking-tight">{s.name}</h3>
+                    <div className="flex gap-1">
+                      {[s.colors.paper, s.colors.ink, s.colors.muted, s.colors.accent].map(
+                        (c, i) => (
+                          <span
+                            key={`${s.id}-${i}`}
+                            className="size-4 rounded-full ring-1 ring-border"
+                            style={{ backgroundColor: c }}
+                            aria-label={`色值 ${c}`}
+                          />
+                        ),
+                      )}
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
+                  <p className="text-sm leading-relaxed text-muted-foreground">{s.description}</p>
+                </div>
+              </div>
             ))}
           </div>
         )}
