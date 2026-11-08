@@ -298,7 +298,16 @@ export function CompanyForm({
         标题会从半透明背景里透出来，看起来像「保存条压住了标题」。
         用实心 bg-background，并加 border-t 与阴影把它与内容明确分开。
       */}
-      <div className="sticky bottom-0 z-10 -mx-1 flex justify-end border-t border-border bg-background px-1 py-3 shadow-[0_-4px_12px_-6px_rgb(0_0_0/0.12)]">
+      {/*
+        保存条：不用 sticky。原因有两点：
+        1. sticky bottom-0 在「整页截图 / 打印 / 滚动到中间」时会被冻结在视口底部，
+           视觉上像一条浮在表单中间的横条，把上下内容切断——实测长截图里它正好
+           落在「名称/副标题」与「Logo」之间，看起来像遮挡。
+        2. 这个表单本身不长（外观 + 抬头 + 联系方式 + 文档默认值），
+           滚到底点保存是自然的操作，不需要吸底常驻。
+        改为普通文档流 + 上边框，保存按钮始终跟着表单末尾走。
+      */}
+      <div className="flex justify-end border-t border-border pt-4">
         <Button type="submit" disabled={saving}>
           {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}保存
         </Button>
