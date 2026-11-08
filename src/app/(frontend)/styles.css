@@ -321,6 +321,7 @@
   --sidebar-primary-foreground: oklch(0.985 0.005 285);
   --sidebar-accent: oklch(0.955 0.016 285);
   --sidebar-accent-foreground: oklch(0.28 0.1 280);
+  --sidebar-active-bg: oklch(0.925 0.028 285);
   --sidebar-border: oklch(0.918 0.009 285);
   --sidebar-ring: oklch(0.62 0.17 281);
 }
@@ -353,9 +354,85 @@
   --sidebar-primary-foreground: oklch(0.16 0.04 283);
   --sidebar-accent: oklch(0.255 0.03 283);
   --sidebar-accent-foreground: oklch(0.97 0.006 285);
+  --sidebar-active-bg: oklch(0.3 0.042 283);
   --sidebar-border: oklch(1 0 0 / 8%);
   --sidebar-ring: oklch(0.6 0.15 282);
 }
+/*
+ * 主题风格「官网」（<html data-accent="official">）。
+ *
+ * 取自公开站（Linear / OpenAI 式产品官网）实测的语言：墨色主色、全圆胶囊按钮、
+ * 16px 圆角卡片、极浅画布。配色与「经典」同族（中性近黑），差别在**形态**——
+ * 按钮与输入框走 --radius-full 胶囊，卡片圆角放大到 16px，也就是官网那种更松弛的观感。
+ * 形态类 token（--radius-*）在这里覆盖即可全站生效：Button/Input/Card 都引用它们。
+ */
+[data-accent='official'] {
+  --background: oklch(1 0 0);
+  --canvas: oklch(0.9788 0.001 260);
+  --foreground: oklch(0.205 0.012 265);
+  --fg-secondary: oklch(0.37 0.012 265);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.205 0.012 265);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.205 0.012 265);
+  --primary: oklch(0.205 0.012 265);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.968 0.003 265);
+  --secondary-foreground: oklch(0.24 0.012 265);
+  --muted: oklch(0.968 0.003 265);
+  --muted-foreground: oklch(0.51 0.012 265);
+  --subtle: oklch(0.982 0.002 265);
+  --accent: oklch(0.958 0.003 265);
+  --accent-foreground: oklch(0.205 0.012 265);
+  --border: oklch(0.912 0.004 265);
+  --border-strong: oklch(0.862 0.006 265);
+  --input: oklch(0.878 0.006 265);
+  --ring: oklch(0.35 0.01 265);
+  --sidebar: oklch(0.992 0.001 265);
+  --sidebar-foreground: oklch(0.205 0.012 265);
+  --sidebar-primary: oklch(0.205 0.012 265);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  /* 选中态要比未选中明显——实测 0.958 太浅，肉眼几乎看不出当前在哪一页。 */
+  --sidebar-accent: oklch(0.915 0.005 265);
+  --sidebar-accent-foreground: oklch(0.18 0.012 265);
+  --sidebar-active-bg: oklch(0.895 0.006 265);
+  --sidebar-border: oklch(0.912 0.004 265);
+  --sidebar-ring: oklch(0.35 0.01 265);
+}
+.dark[data-accent='official'],
+.dark [data-accent='official'] {
+  --background: oklch(0.165 0.006 265);
+  --canvas: oklch(0.14 0.005 265);
+  --foreground: oklch(0.97 0.002 265);
+  --fg-secondary: oklch(0.86 0.005 265);
+  --card: oklch(0.196 0.007 265);
+  --card-foreground: oklch(0.97 0.002 265);
+  --popover: oklch(0.215 0.008 265);
+  --popover-foreground: oklch(0.97 0.002 265);
+  --primary: oklch(0.955 0.002 265);
+  --primary-foreground: oklch(0.17 0.008 265);
+  --secondary: oklch(0.25 0.008 265);
+  --secondary-foreground: oklch(0.97 0.002 265);
+  --muted: oklch(0.25 0.008 265);
+  --muted-foreground: oklch(0.71 0.008 265);
+  --subtle: oklch(0.215 0.007 265);
+  --accent: oklch(0.272 0.01 265);
+  --accent-foreground: oklch(0.97 0.002 265);
+  --border: oklch(1 0 0 / 10%);
+  --border-strong: oklch(1 0 0 / 17%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.78 0.006 265);
+  --sidebar: oklch(0.165 0.006 265);
+  --sidebar-foreground: oklch(0.97 0.002 265);
+  --sidebar-primary: oklch(0.955 0.002 265);
+  --sidebar-primary-foreground: oklch(0.17 0.008 265);
+  --sidebar-accent: oklch(0.255 0.009 265);
+  --sidebar-accent-foreground: oklch(0.97 0.002 265);
+  --sidebar-active-bg: oklch(0.305 0.011 265);
+  --sidebar-border: oklch(1 0 0 / 9%);
+  --sidebar-ring: oklch(0.78 0.006 265);
+}
+
 [data-accent='jade'] {
   --background: oklch(1 0 0);
   --canvas: oklch(0.982 0.004 185);
@@ -425,6 +502,7 @@
   --color-swatch-fanmeng: oklch(0.55 0.22 280);
   --color-swatch-jade: oklch(0.56 0.11 180);
   --color-swatch-classic: oklch(0.205 0 0);
+  --color-swatch-official: oklch(0.205 0.012 265);
   --color-brand-violet: #8b6dff;
   --color-brand-indigo: #3f3bdb;
   --color-brand-gold: #ffc24b;
@@ -658,4 +736,54 @@ html:has([data-landing]) {
   section[data-export-page]:not([data-figma-frame]) {
     zoom: var(--sheet-zoom, 1);
   }
+}
+
+/*
+ * 「官网」主题的形态：按钮 / 输入框走全圆胶囊，卡片圆角 16px。
+ *
+ * 为什么不能用 `html[data-accent='official'] { --radius-element: … }`：
+ * CSS 变量按**最近的祖先**取值，不看选择器优先级。Astryx 的 `<Theme>` 会渲染一个
+ * 带 `.xrw1vgx` 的 div，并在那里重新定义 `--radius-element: 8px`
+ * （见 @astryxdesign/core/dist/astryx.css 的 `:root, .xrw1vgx{…}`），
+ * 于是 html 上的值被这一层截胡，按钮拿到的仍是 8px。
+ *
+ * 所以改成在**按钮元素自己身上**覆盖：Button 用的是
+ * `rounded-[var(--radius-element)]`，但只有图标尺寸的部分才带这个类，
+ * 主按钮的圆角来自基类。这里直接对 data-slot="button" 与表单控件下最终值，
+ * 用 `!important` 是因为要盖过 Tailwind 的 utilities 层（它排在 astryx 之后）。
+ */
+html[data-accent='official'] {
+  --radius-inner: 9999px;
+  --radius-element: 9999px;
+  --radius-container: 1rem;
+}
+
+/* 元素级兜底：变量被 Astryx 的中间层重置，就直接在元素上给终值。
+ *
+ * 胶囊只给「操作按钮」（data-slot="button"）。导航项、菜单项、Tab 一律不动——
+ * 实测把它们也做成胶囊后，239px 宽的侧边栏条目会变成一根根药丸，很难看。
+ * 输入框同理保持 8px：胶囊输入框像搜索栏，与选择卡片几何语言不协调。 */
+html[data-accent='official'] [data-slot='button'] {
+  border-radius: var(--radius-full, 9999px) !important;
+}
+
+html[data-accent='official'] input:not([type='checkbox']):not([type='radio']),
+html[data-accent='official'] textarea,
+html[data-accent='official'] [data-slot='select-trigger'] {
+  border-radius: 0.5rem !important;
+}
+
+html[data-accent='official'] [data-slot='card'] {
+  border-radius: 1rem !important;
+}
+
+/*
+ * 侧边栏选中项：默认的 --sidebar-accent 在几套主题里都偏浅（约 oklch 0.95~0.96），
+ * 实测和未选中项几乎分不出，用户看不出自己在哪一页。这里统一加深一级，
+ * 并给文字一个更实的字重，保证「当前页」一眼可辨。
+ */
+[data-slot='sidebar-menu-button'][data-active='true'] {
+  background: var(--sidebar-active-bg, var(--sidebar-accent)) !important;
+  color: var(--sidebar-accent-foreground) !important;
+  font-weight: 500;
 }
