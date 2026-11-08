@@ -17,6 +17,10 @@ const TITLES: [RegExp, string][] = [
   [/^\/projects/, '项目'],
   [/^\/quotes/, '报价'],
   [/^\/products/, '产品库'],
+  // 细分路由必须排在通配前面：/plugins/templates 的顶栏应显示「模板中心」，
+  // 不是父级「能力中心」——否则面包屑与页面标题对不上。
+  [/^\/plugins\/templates/, '模板中心'],
+  [/^\/plugins\/tools/, '全部工具'],
   [/^\/plugins/, '能力中心'],
   [/^\/ai/, 'AI 对话'],
   [/^\/membership/, '会员与积分'],
