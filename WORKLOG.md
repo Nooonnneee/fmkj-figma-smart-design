@@ -4,6 +4,16 @@
 
 ---
 
+## 2026-11-08 · 会员分级移除 + 能力中心（owner 决策后实施）
+
+- **PR #7** 取消会员分级 → 纯积分（Q1=删字段）：删 users.membershipTier/ExpiresAt、兑换码等级、
+  模板/插件/模型 tier、membership-settings.enforcement；新增可回滚迁移；重生成类型；约 40 文件清理。
+- **PR #8** 能力中心（第二大步）：侧边栏「插件」→「能力中心」（AI 能力/模板/工具）；
+  删用户启停（开关 UI + toggle 路由）；插件加 category 分类；全站「插件市场」字样清零。
+- 两 PR 均 CI **success**，已 squash 合并进 main。
+- 刻意留后续：/plugins/templates 模板中心新页、/plugins URL 改名、点位图显示方案（全新功能）、
+  getPluginFlags 的 28 处读取点语义改造。
+
 ## 2026-11-08 · 三个 PR 已合并进 main
 
 - 自动化基建 Phase 0 → PR [#3](https://github.com/lynnliuyu/fmkj-figma-smart-design/pull/3)（squash）
