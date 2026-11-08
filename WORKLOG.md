@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-11-08 · Astryx 设计系统试点（PR #15）
+
+- 接入 Astryx（Meta 开源设计系统，Beta）：core + theme-neutral + stylex + cli，精确版本锁定
+- 加法式接入：styles.css 追加组件样式与主题（@layer 内）、layout.tsx 包 `<Theme>`、新增 `/design-pilot`
+- 三条取舍：不引 reset.css（全局 reset）、不引 tailwind-theme.css（会改品牌色）、不引 fonts.css（Google Fonts 外链）
+- 真渲染验证：dev server + 浏览器读 DOM —— 试点页完整渲染、品牌 token 未变、/login 不受影响、产物无外链字体
+- CI **success**
+
 ## 2026-11-08 · 全仓格式化 + CI 格式门禁（PR #14）
 
 - 一次性格式化 427 文件（纯格式化，无语义变化）
