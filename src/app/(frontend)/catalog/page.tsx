@@ -36,9 +36,12 @@ export default async function PublicCatalogPage() {
       <main className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
         <div className="max-w-3xl">
           <h1 className="text-display font-medium">点位图例与产品选型库</h1>
+          {/* 产品库为空时不能写「覆盖 0 个品牌、0 款在售产品」——那是把内部状态
+              当宣传。部署方还没导入产品时改成只讲图例与规范本身。 */}
           <p className="mt-5 text-lead text-muted-foreground">
-            统一全屋智能点位图符号、代号前缀与水电预留规范，覆盖 {brandNames.length} 个主流品牌、
-            {active.length} 款在售产品。
+            {active.length > 0
+              ? `统一全屋智能点位图符号、代号前缀与水电预留规范，覆盖 ${brandNames.length} 个主流品牌、${active.length} 款在售产品。`
+              : '统一全屋智能点位图符号、代号前缀与水电预留规范，涵盖 11 大系统与 30+ 种 CAD 标准图例。'}
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button
@@ -57,7 +60,9 @@ export default async function PublicCatalogPage() {
               variant="outline"
               className="h-11 rounded-full px-6 text-base"
             >
-              <Link href="#products">浏览在售产品 ({active.length})</Link>
+              <Link href="#products">
+                {active.length > 0 ? `浏览在售产品 (${active.length})` : '查看点位图例'}
+              </Link>
             </Button>
           </div>
         </div>
@@ -118,7 +123,7 @@ export default async function PublicCatalogPage() {
         <section id="products" aria-labelledby="products-title" className="mt-24 scroll-mt-20">
           <div className="flex flex-wrap items-baseline justify-between gap-4 border-b border-border pb-4">
             <h2 id="products-title" className="text-2xl font-medium tracking-tight">
-              各系统主流选型参考
+              {active.length > 0 ? '各系统主流选型参考' : '各系统图例与施工规范'}
             </h2>
             <span className="text-sm text-muted-foreground">
               共 {active.length} 款在售型号 · 登录工作台可查看完整产品库与批量选型
