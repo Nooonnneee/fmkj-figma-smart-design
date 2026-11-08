@@ -78,7 +78,9 @@ const DOC_GROUPS: NavGroup[] = [
     items: [
       {
         id: 'overview',
-        title: '平台架构与总览',
+        // 与正文 H1「繁梦空间使用手册」保持一致——侧栏叫「平台架构」、
+        // 正文叫「使用手册」会让用户以为进了两个不同的页面。
+        title: '使用手册总览',
         keywords: '介绍 概览 架构 核心链路 繁梦空间',
         headings: [
           { id: 'overview-intro', label: '产品定位' },
