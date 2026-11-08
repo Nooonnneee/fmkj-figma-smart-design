@@ -123,7 +123,7 @@ const DOC_GROUPS: NavGroup[] = [
       },
       {
         id: 'point-map',
-        title: '02. 点位图画板（fmkj-board）',
+        title: '02. 点位图画板',
         keywords: '点位图 画板 户型图 DWG 标定比例 网格 多边形 区域 灯光',
         headings: [
           { id: 'pm-sheet', label: '上传户型图与 DWG 转换' },
@@ -628,9 +628,7 @@ function SectionOverview({
   return (
     <article className="space-y-6">
       <div className="space-y-2 border-b pb-5">
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-          繁梦空间（FMKJ）平台架构与文档总览
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">繁梦空间使用手册</h1>
         <p className="text-sm leading-relaxed text-muted-foreground">
           面向个人全屋智能设计师、设计工作室与工程集成商的一体化方案设计、点位绘制、自动选型报价、合同与多模板交付平台。
         </p>
@@ -660,7 +658,7 @@ function SectionOverview({
               id: 'point-map' as const,
               step: '02',
               title: '点位图工作台',
-              desc: '多边形房间划分、标准 SVG 图标落图、一键智能生成点位（可撤销）',
+              desc: '多边形房间划分、标准设备图标落图、一键智能生成点位（可撤销）',
             },
             {
               id: 'quotes' as const,
@@ -715,7 +713,7 @@ function SectionOverview({
             <Check className="mt-0.5 size-3.5 shrink-0 text-primary" />
             <span>
               <strong className="text-foreground">直接展示标准设备图标：</strong>
-              全站画布、导出的 PNG 点位图与 8 章方案演示平面图统一直接显示标准化 SVG
+              画布、导出的点位图与 8 章方案演示平面图，统一直接显示标准化矢量图形
               设备与灯具图标，直观易读。
             </span>
           </li>
@@ -733,7 +731,7 @@ function SectionOverview({
             <span>
               <strong className="text-foreground">文档与系统配置实时同步：</strong>
               本文档中心（<code className="font-mono">/docs</code>）直接绑定系统的 AI
-              计费常量、后台启用的国产大模型列表与插件注册表，任何配置调整均会自动反映在文档表格中。
+              计费规则、可用的大模型列表与功能清单，任何配置调整都会自动反映在文档表格中。
             </span>
           </li>
         </ul>
@@ -924,9 +922,7 @@ function SectionPointMap({ onNavigate }: { onNavigate: (id: DocSectionId) => voi
   return (
     <article className="space-y-6">
       <div className="space-y-2 border-b pb-5">
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-          02. 点位图画板（fmkj-board-system）
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">02. 点位图画板</h1>
         <p className="text-sm text-muted-foreground">
           专为全屋智能与灯光设计打造的矢量画板引擎，支持多图纸、比例标定、任意多边形房间区域与标准图例导出。
         </p>
