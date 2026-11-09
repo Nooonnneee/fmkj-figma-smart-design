@@ -27,6 +27,10 @@ import { PLUGIN_DOC_STYLES } from '@/plugins/doc-styles/styles'
 
 import { ClientDecisionPanel, type CompareQuote } from './client-decision-panel'
 import { ShareExportButton } from './share-export-button'
+import { SharedLinkExpired } from './share-gate'
+import { UnlockForm } from './unlock-form'
+import { isShareUnlocked } from './actions'
+import { parseShareConfig, shareLinkState, type ShareLinkState } from '@/lib/project-access'
 
 export const metadata: Metadata = {
   title: `方案与报价预览 · ${APP_NAME}`,
@@ -43,6 +47,9 @@ async function loadSharedShowcase(token: string) {
   const payload = await getPayloadClient()
 
   let project: Project | null = null
+  // 分享链接的校验状态：demo 链接恒为 ok；正式链接由 shareLinkState 判定。
+  // 显式标注成 ShareLinkState —— 否则 TS 会把类型收窄成初始值的字面量。
+  let state: ShareLinkState = { status: 'ok' }
   if (trimmed === 'demo') {
     const demoRes = await payload.find({
       collection: 'projects',
@@ -61,11 +68,19 @@ async function loadSharedShowcase(token: string) {
       overrideAccess: true,
       select: { shareConfig: true } as never,
     })
-    const matched = (res.docs as Project[]).find((p) => {
-      const sc = (p as unknown as { shareConfig?: { enabled?: boolean; token?: string } | null })
-        .shareConfig
-      return sc && sc.enabled !== false && sc.token === trimmed
-    })
+    // 用 shareLinkState 统一校验：一并检查「链接是否开启 / 凭证是否匹配 / 是否过期」。
+    // 过期的链接不再展示客户方案——2026-11-09 新增有效期能力时一并接上。
+    // 这里放行 password-required 只是为了让页面能渲染「输入密码」那一屏；
+    // 密码是否正确由 resolveShareGate() 再判一次。
+    // 注意：不要在 find 的回调里给 state 赋值——TS 的控制流分析看不到回调内的写入，
+    // 会把 state 的类型收窄成初始值。先算出命中项和状态，再在外面赋值。
+    const candidates = (res.docs as Project[]).map((p) => ({
+      project: p,
+      st: shareLinkState((p as unknown as { shareConfig?: unknown }).shareConfig, trimmed),
+    }))
+    const hit = candidates.find((c) => c.st.status !== 'invalid')
+    state = hit ? hit.st : { status: 'invalid' }
+    const matched = hit?.project
     if (matched) {
       project = (await payload
         .findByID({
@@ -242,7 +257,15 @@ async function loadSharedShowcase(token: string) {
   }
 
   // 演示链接（/share/demo）只能浏览，不能提交意向
-  return { data, company, compare, canSubmit: trimmed !== 'demo' }
+  const shareCfg = parseShareConfig((project as unknown as { shareConfig?: unknown }).shareConfig)
+  return {
+    data,
+    company,
+    compare,
+    canSubmit: trimmed !== 'demo',
+    state,
+    passwordHash: shareCfg.passwordHash ?? null,
+  }
 }
 
 /** 业主免登录只读预览页：展示交互式点位图、横版方案与定稿报价单，支持一键导出方案与报价 PDF。 */
@@ -250,7 +273,17 @@ export default async function ClientSharePage({ params }: { params: Promise<{ to
   const { token } = await params
   const shared = await loadSharedShowcase(token)
   if (!shared) notFound()
-  const { data, company, compare, canSubmit } = shared
+  const { data, company, compare, canSubmit, state, passwordHash } = shared
+
+  // 链接已过期：给出明确说明，而不是 404——客户看到「链接已过期」才知道该找谁重发。
+  if (state.status === 'expired') {
+    return <SharedLinkExpired />
+  }
+
+  // 设了访问密码且本次会话还没通过校验：先给密码屏，不渲染任何方案内容。
+  if (passwordHash && !(await isShareUnlocked(token, passwordHash))) {
+    return <UnlockForm token={token} />
+  }
   const address = [data.project.community, data.project.address].filter(Boolean).join(' ')
 
   return (

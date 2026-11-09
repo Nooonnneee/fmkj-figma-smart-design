@@ -27,6 +27,7 @@ import { getPluginFlags } from '@/plugins/state'
 import { getProject, getProjectDeals } from '../project-data'
 import { ArchiveButton } from './archive-button'
 import { CopyClientLinkButton } from './copy-client-link'
+import { ShareSettings } from './share-settings'
 import { DeliveryPackage, type DeliveryDoc } from './delivery-package'
 import { SocialPosterDialog, type SocialPosterData } from './social-poster-dialog'
 import { ArchiveTemplatePicker } from './template-picker-field'
@@ -372,6 +373,8 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
       />
 
       {afterSales ? <AfterSalesSummary projectId={pid} data={afterSales} /> : null}
+
+      {role !== 'read' ? <ShareSettings projectId={pid} config={shareConfig} /> : null}
 
       {role !== 'read' ? (
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed px-5 py-4">
