@@ -8,11 +8,21 @@ ARG NODE_IMAGE=node:24-bookworm-slim
 
 FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@10.28.2 --activate
+# pnpm 版本必须与 .mise.toml 的 `"npm:pnpm" = "10.34.3"` 一致——版本不同会用不同的
+# lockfile 解析规则，可能装出与本地/CI 不同的依赖树。改版本时两处一起改。
+RUN corepack enable && corepack prepare pnpm@10.34.3 --activate
 # 国内可设置 NPM_REGISTRY=https://registry.npmmirror.com
 ARG NPM_REGISTRY=https://registry.npmjs.org
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm config set registry ${NPM_REGISTRY} && pnpm install --frozen-lockfile
+# 构建机内存要求：pnpm install 峰值约 1.5–2 GB。实测 Docker 只分配 1 GB 时
+# 进程会被 OOM Killed（日志里是 `Killed` + `ResourceExhausted: cannot allocate memory`）。
+# 这里做的两件事：
+#   - --child-concurrency=2 降低并行安装的子进程数，显著压平内存峰值
+#   - NODE_OPTIONS 限制 V8 堆，避免单个 worker 无节制增长
+# 服务器侧仍建议 ≥ 2 核 4 GB（deploy/DEPLOY.md 已写），或临时加 swap。
+ENV NODE_OPTIONS=--max-old-space-size=2048
+RUN pnpm config set registry ${NPM_REGISTRY} \
+ && pnpm install --frozen-lockfile --child-concurrency=2
 
 # tools：带完整依赖和源码，用来跑数据导入、设置密码、手动迁移等 payload 命令。
 FROM deps AS tools
