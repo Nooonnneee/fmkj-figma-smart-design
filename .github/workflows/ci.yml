@@ -63,3 +63,87 @@ jobs:
         run: |
           pnpm exec payload generate:importmap
           pnpm build
+
+  # ── 页面冒烟测试 ─────────────────────────────────────────────────────
+  # 前面六道门禁全都只看代码，看不到页面：类型过了、单测过了、构建过了，
+  # 页面照样可能把内部枚举名印到客户合同上，或者整页卡在骨架屏。
+  # 这个 job 起真实 PostgreSQL + 真服务 + 真浏览器，断言用户能感知的东西。
+  smoke:
+    runs-on: ubuntu-latest
+    needs: verify
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: fmkj
+          POSTGRES_PASSWORD: fmkj
+          POSTGRES_DB: fmkj
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      PAYLOAD_CONFIG_PATH: src/payload.selfhost.config.ts
+      PAYLOAD_SECRET: ci-smoke-placeholder-not-for-runtime
+      DATABASE_URI: postgres://fmkj:fmkj@127.0.0.1:5432/fmkj
+      PUBLIC_URL: http://localhost:3000
+      NEXT_TELEMETRY_DISABLED: '1'
+      SMOKE_BASE: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: 切换到自托管构建配置
+        run: printf "export { default } from './payload.selfhost.config'\n" > src/payload.config.ts
+
+      - name: 跑数据库迁移
+        run: pnpm exec payload migrate
+
+      - name: 造种子数据（账号 + 示例项目）
+        id: seed
+        run: |
+          pnpm exec payload run --input '{"scriptPath":"scripts/seed-smoke.ts"}' | tee /tmp/seed.log
+          echo "project_id=$(grep -oE 'SMOKE_PROJECT_ID=\S+' /tmp/seed.log | tail -1 | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: 装 Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: 启动服务并等待就绪
+        run: |
+          pnpm exec next dev --port 3000 --hostname 127.0.0.1 > /tmp/dev.log 2>&1 &
+          for i in $(seq 1 40); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://localhost:3000/login || true)
+            if [ "$code" = "200" ]; then echo "服务就绪（${i} 次探测）"; exit 0; fi
+            sleep 3
+          done
+          echo "服务 120 秒内未就绪，dev 日志："
+          tail -40 /tmp/dev.log
+          exit 1
+
+      - name: 页面冒烟测试
+        env:
+          SMOKE_PROJECT_ID: ${{ steps.seed.outputs.project_id }}
+        run: node e2e/smoke.mjs
+
+      - name: 失败时上传证据
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-failure
+          path: |
+            /tmp/fmkj-smoke
+            /tmp/dev.log
+          retention-days: 7

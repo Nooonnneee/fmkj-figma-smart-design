@@ -63,6 +63,23 @@ export default tseslint.config(
     },
   },
   {
+    // e2e 冒烟脚本跑在 Node + 浏览器上下文里（playwright 的 page.evaluate 内部
+    // 是浏览器环境），document/location/process/console 都是合法的运行时全局。
+    files: ['e2e/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        setTimeout: 'readonly',
+        document: 'readonly',
+        location: 'readonly',
+        window: 'readonly',
+        getComputedStyle: 'readonly',
+      },
+    },
+    rules: { 'no-undef': 'off' },
+  },
+  {
     // 代码里现有 25 处 `// eslint-disable-next-line @next/next/no-img-element` 注释，
     // 说明历史上就配过这个插件；装上它这些注释才有意义，也真能查出 <img> 的用法问题。
     files: ['**/*.{ts,tsx}'],
