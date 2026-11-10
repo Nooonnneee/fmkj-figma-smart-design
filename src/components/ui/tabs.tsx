@@ -158,39 +158,49 @@ function TabsList({
    * （它的 active 态本来就有背景）。调用点传 `bg-muted p-0.5` 之类的仍可覆盖。
    */
   return (
+    /*
+     * 结构说明（三层，各有职责）：
+     *
+     * 1. 外层 div：承接调用点的栅格类（`grid-cols-3` / `grid-cols-2`）和灰槽底色。
+     * 2. 内层 div：`contents` —— 不参与布局，只是把官方 TabList 从外层 grid
+     *    的「第一个格子」里解放出来。**没有这层的话官方 TabList 只拿到 1/3 宽度**
+     *    （实测 111px），六个选项全挤在三分之一里。
+     * 3. 官方 TabList：真正渲染 tab 的地方。
+     *
+     * 另外不要写「检测到调用点有 bg-* 就退让成 bg-transparent」这种逻辑：
+     * 第一版那样写时正则会匹配到**我自己刚加的 bg-muted**，把灰槽盖成透明
+     * （线上实测 background: rgba(0,0,0,0)、border-radius: 0px）。
+     * Tailwind 的类冲突由后写的赢，调用点 className 放最后即可，不需要提前让位。
+     */
     <div
       data-slot="tabs-list"
-      className={cn(
-        'w-full rounded-[var(--radius-element)] bg-muted p-0.5',
-        // 调用点自己声明了背景/内边距就尊重它（避免和我这层打架）
-        /(^|\s)bg-/.test(className ?? '') && 'bg-transparent',
-        /(^|\s)p-[\d.]/.test(className ?? '') && 'p-0',
-        className,
-      )}
+      className={cn('w-full rounded-[var(--radius-element)] bg-muted p-0.5', className)}
     >
-      <TabList
-        value={ctx?.value ?? ''}
-        onChange={(v) => ctx?.setValue(v)}
-        size="md"
-        layout={wantsFill ? 'fill' : 'hug'}
-        role="tablist"
-        hasDivider={false}
-        aria-label={ariaLabel ?? '标签页'}
-        className="w-full"
-      >
-        {items.map((it) => (
-          // 官方 Tab 不收 children：文案走 `label`（同时是无障碍名称），
-          // 额外的富内容（如「(12)」计数）走 `endContent`。
-          <Tab
-            key={it.value}
-            value={it.value}
-            label={it.label || it.value}
-            isLabelHidden={!it.label}
-            icon={it.icon as never}
-            endContent={it.end as never}
-          />
-        ))}
-      </TabList>
+      <div className="contents">
+        <TabList
+          value={ctx?.value ?? ''}
+          onChange={(v) => ctx?.setValue(v)}
+          size="md"
+          layout={wantsFill ? 'fill' : 'hug'}
+          role="tablist"
+          hasDivider={false}
+          aria-label={ariaLabel ?? '标签页'}
+          className="w-full"
+        >
+          {items.map((it) => (
+            // 官方 Tab 不收 children：文案走 `label`（同时是无障碍名称），
+            // 额外的富内容（如「(12)」计数）走 `endContent`。
+            <Tab
+              key={it.value}
+              value={it.value}
+              label={it.label || it.value}
+              isLabelHidden={!it.label}
+              icon={it.icon as never}
+              endContent={it.end as never}
+            />
+          ))}
+        </TabList>
+      </div>
     </div>
   )
 }
