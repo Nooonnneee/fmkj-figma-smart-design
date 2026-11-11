@@ -1,0 +1,230 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CI（自托管 runner 版）
+#
+# 为什么有这个文件
+# ----------------
+# GitHub 托管的 runner 每月只有 2000 分钟免费额度（私有仓库）。
+# 本项目实测 2026-11 单月跑掉约 2800 分钟 —— 超支后 Actions 直接分配不到机器，
+# 表现为「3 秒就失败、steps 为空、runner_name 为空」，而不是报一个明确的错。
+#
+# 所以把门禁搬到自己的机器上跑（`runs-on: self-hosted`）：
+#   · 不消耗 GitHub 额度
+#   · 速度更快（M4 上冷构建 11.5 秒，GitHub runner 要 6 分钟一轮）
+#
+# 与另一个 workflow 的分工
+# ------------------------
+# · `ci.yml`          —— 保留 GitHub 托管 runner（`ubuntu-latest`），作为**兜底**：
+#                        自己的机器关机/离线时，至少还有一条能跑的路径。
+# · `ci-selfhosted.yml` —— 本文件，机器在线时优先走这条（快且免费）。
+#
+# 两者靠 concurrency group 互斥：同一个分支只会有一个在跑，避免重复消耗。
+#
+# 自托管与托管环境的差异（踩过的坑）
+# --------------------------------
+# 1. **不能用 `actions/setup-node`** —— 它在自托管上会去改系统 node，
+#    本机已装 v24（≥ 项目要求的 24.22.1 之前也够用），直接用即可。
+# 2. **不能用 `services:`** —— 那是 Docker 容器，macOS runner 不支持。
+#    冒烟测试改用**本机已有的 PostgreSQL**（`scripts/dev-up.sh` 起的 :55432）。
+# 3. **不能用 `pnpm/action-setup`** —— 本机 pnpm 已经是仓库 pin 的 10.34.3。
+# 4. 工作区默认不清理，所以要在开头显式 `git clean`，否则上一轮的残留会污染这一轮。
+# ─────────────────────────────────────────────────────────────────────────────
+name: CI (self-hosted)
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['main']
+  workflow_dispatch:
+
+# 与 ci.yml 用同一个 group 前缀 —— 同一分支只跑一条，避免两边同时消耗。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    # 自己的机器；离线时这个 job 会排队等待，不会失败。
+    # 需要兜底时用 ci.yml（GitHub 托管）。
+    runs-on: [self-hosted, macOS, local]
+    timeout-minutes: 25
+
+    env:
+      PAYLOAD_CONFIG_PATH: src/payload.selfhost.config.ts
+      PAYLOAD_SECRET: ci-build-placeholder-not-for-runtime
+      DATABASE_URI: postgres://fmkj@127.0.0.1:55432/fmkj_ci
+      PUBLIC_URL: http://localhost:3000
+      NEXT_TELEMETRY_DISABLED: '1'
+      # 自托管上复用本机 pnpm store，装依赖从「分钟级」降到「秒级」
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 自托管工作区是持久化的：先清掉上一轮留下的构建产物与配置改写，
+      # 否则 .next 缓存会让「生产构建」这一步变成空跑（实测 18 秒就"成功"）。
+      - name: 清理上一轮残留
+        run: |
+          rm -rf .next node_modules/.cache tsconfig.tsbuildinfo
+          git checkout -- src/payload.config.ts 2>/dev/null || true
+          echo "已清理"
+
+      # CI 里没有 Figma Make 环境（FIGMA_EID），默认的 src/payload.config.ts
+      # 会让任何 payload 命令直接抛 "Environment ID could not be resolved"。
+      - name: 切换到自托管构建配置
+        run: printf "export { default } from './payload.selfhost.config'\n" > src/payload.config.ts
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 代码格式检查
+        run: pnpm exec oxfmt --check
+
+      - name: ESLint 语义检查
+        run: pnpm exec eslint . --max-warnings 0
+
+      - name: TypeScript 类型检查
+        run: pnpm exec tsc --noEmit
+
+      - name: 领域知识库与规则回归测试
+        run: pnpm run knowledge:check
+
+      - name: 单元测试
+        run: pnpm test
+
+      - name: 生产构建
+        run: |
+          pnpm exec payload generate:importmap
+          pnpm build
+          # 构建产物必须真的存在 —— 防止「缓存命中导致空跑」被当成通过
+          test -f .next/BUILD_ID || { echo "缺少 .next/BUILD_ID，构建没有真正跑"; exit 1; }
+
+      - name: 还原配置改写
+        if: always()
+        run: git checkout -- src/payload.config.ts 2>/dev/null || true
+
+  # ── 页面冒烟测试 ─────────────────────────────────────────────────────────
+  # 前面六道门禁只看代码，看不到页面。这个 job 起真库 + 真服务 + 真浏览器，
+  # 断言用户能感知的东西。
+  smoke:
+    runs-on: [self-hosted, macOS, local]
+    timeout-minutes: 25
+
+    env:
+      PAYLOAD_CONFIG_PATH: src/payload.selfhost.config.ts
+      PAYLOAD_SECRET: ci-smoke-placeholder-not-for-runtime
+      # 本机 PostgreSQL（scripts/dev-up.sh 起的那个），不额外起容器 ——
+      # macOS runner 不支持 `services:`。
+      DATABASE_URI: postgres://fmkj@127.0.0.1:55432/fmkj_ci
+      FMKJ_PG_PORT: '55432'
+      PUBLIC_URL: http://localhost:3000
+      NEXT_TELEMETRY_DISABLED: '1'
+      SMOKE_BASE: http://localhost:3100
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 检查本机数据库可用
+        run: |
+          if ! nc -z 127.0.0.1 "${FMKJ_PG_PORT}"; then
+            echo "本机 PostgreSQL (:${FMKJ_PG_PORT}) 没有运行。"
+            echo "先跑 scripts/dev-up.sh，或直接把冒烟测试交给 ci.yml（GitHub 托管）。"
+            exit 1
+          fi
+          echo "本机库可用"
+
+      # ⚠️ 用的是 **CI 专用库 fmkj_ci**，不是开发用的 fmkj。
+      #
+      # 必须 drop database 重建（不是 drop schema）—— 实测教训：
+      # 如果这个库曾经被 `next dev` 的 push 模式建过表，Payload 会在启动时
+      # 认为「你跑过 dev 模式」，然后**在生产服务启动前弹一个交互式提问**：
+      #   ? It looks like you've run Payload in dev mode...
+      #     If you'd like to run migrations, data loss will occur. Would you like to proceed? (y/N)
+      # 生产服务没有 stdin，于是**永远卡在这里**，冒烟测试挂死到超时。
+      # 从零 create database + 只用 `payload migrate` 建表就没有这个问题。
+      - name: 重建 CI 专用库
+        run: |
+          node -e "
+          const path=require('path'),{execSync}=require('child_process');
+          let pg; try{pg=require('pg')}catch{const d=execSync('ls -d node_modules/.pnpm/pg@*/node_modules/pg | head -1').toString().trim();pg=require(path.resolve(d))}
+          (async()=>{
+            const c=new pg.Client({host:'127.0.0.1',port:Number(process.env.FMKJ_PG_PORT||55432),user:'fmkj',database:'postgres'});
+            await c.connect();
+            await c.query('drop database if exists fmkj_ci');
+            await c.query('create database fmkj_ci');
+            console.log('  fmkj_ci 已重建（全新，无 dev 模式残留）');
+            await c.end();
+          })().catch(e=>{console.error(e.message);process.exit(1)});
+          "
+
+      - name: 清理上一轮残留
+        run: |
+          pkill -f "standalone/server.js" 2>/dev/null || true
+          rm -rf .next tsconfig.tsbuildinfo
+          git checkout -- src/payload.config.ts 2>/dev/null || true
+
+      - name: 切换到自托管构建配置
+        run: printf "export { default } from './payload.selfhost.config'\n" > src/payload.config.ts
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 跑数据库迁移
+        run: pnpm exec payload migrate
+
+      - name: 造种子数据（账号 + 示例项目）
+        id: seed
+        run: |
+          pnpm exec payload run --input '{"scriptPath":"scripts/seed-smoke.ts"}' | tee /tmp/seed.log
+          echo "project_id=$(grep -oE 'SMOKE_PROJECT_ID=\S+' /tmp/seed.log | tail -1 | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+
+      # 用**生产构建 + next start**，不用 next dev：
+      #   ① Next 16 在同一个项目目录只允许一个 dev server（.next/dev 锁），
+      #      自托管机器上用户可能正开着 :3000 —— CI 再起一个会被拒。
+      #   ② 生产模式更接近线上，冒烟的价值更高。
+      # 切到 :3100 是为了不和用户的 :3000 撞端口。
+      - name: 生产构建
+        run: |
+          pnpm exec payload generate:importmap
+          pnpm build
+          test -f .next/BUILD_ID || { echo "缺少 .next/BUILD_ID，构建没有真正跑"; exit 1; }
+
+      # ⚠️ 项目是 `output: 'standalone'`，`next start` 不支持它
+      #    （会警告 "next start does not work with output: standalone"）。
+      #    Dockerfile 的 CMD 是 `node server.js` —— 这里照抄同样的方式，
+      #    好处是**冒烟测的就是生产镜像里跑的那份产物**。
+      # standalone 产物不自带静态资源，要手工把 .next/static 和 public 拷进去。
+      - name: 组装 standalone 产物
+        run: |
+          cp -r .next/static .next/standalone/.next/static
+          if [ -d public ]; then cp -r public .next/standalone/public; fi
+          # standalone 的 server.js 期望在 .next（相对 cwd）下找产物；
+          # 在仓库根启动、用 HOSTNAME/PORT 指定监听地址即可。
+          ls .next/standalone/server.js
+
+      - name: 启动服务并等待就绪
+        env:
+          PORT: '3100'
+          HOSTNAME: '127.0.0.1'
+        run: |
+          node .next/standalone/server.js > /tmp/serve.log 2>&1 &
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://localhost:3100/login || true)
+            if [ "$code" = "200" ]; then echo "服务就绪（第 ${i} 次探测）"; exit 0; fi
+            sleep 2
+          done
+          echo "服务未在时限内就绪，日志："
+          tail -40 /tmp/serve.log
+          exit 1
+
+      - name: 页面冒烟测试
+        env:
+          SMOKE_PROJECT_ID: ${{ steps.seed.outputs.project_id }}
+        run: node e2e/smoke.mjs
+
+      - name: 收尾（停服务 + 还原配置）
+        if: always()
+        run: |
+          pkill -f "standalone/server.js" 2>/dev/null || true
+          git checkout -- src/payload.config.ts 2>/dev/null || true

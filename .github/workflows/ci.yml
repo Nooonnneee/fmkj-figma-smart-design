@@ -1,11 +1,18 @@
-name: CI & Domain Knowledge Check
+# ⚠️ 这是**兜底** workflow，平时不自动跑。
+#
+# 主路径是 `ci-selfhosted.yml` —— 在自己机器上跑，不消耗 GitHub 免费额度
+# （私有仓库只有 2000 分钟/月，实测本项目单月跑掉约 2800 分钟，超支后
+#  Actions 会直接分配不到机器，表现为「3 秒失败 + steps 为空」）。
+#
+# 什么时候用这条：
+#   · 自己的机器关机 / 离线，又急着要一次 CI 结果
+#   · 想在干净环境里复现一个只在本机出现的问题
+#
+# 用法：GitHub 仓库 → Actions → 左侧选这个 workflow → Run workflow。
+name: CI (GitHub-hosted fallback)
 
 on:
-  # 每个分支推送都跑门禁：自动化开发时，分支一推就有反馈，不必等开 PR。
-  push:
-    branches: ['**']
-  pull_request:
-    branches: ['main']
+  # 只保留手动触发 —— 不再跟着每次 push 自动跑，那正是烧额度的原因。
   workflow_dispatch:
 
 concurrency:
