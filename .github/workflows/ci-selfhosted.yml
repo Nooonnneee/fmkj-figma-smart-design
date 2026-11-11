@@ -145,9 +145,19 @@ jobs:
       # 从零 create database + 只用 `payload migrate` 建表就没有这个问题。
       - name: 重建 CI 专用库
         run: |
-          echo "▸ node: $(command -v node || echo 找不到)  $(node --version 2>/dev/null)"
-          echo "▸ cwd: $(pwd)"
-          echo "▸ 库端口探测: $(nc -z 127.0.0.1 ${FMKJ_PG_PORT} && echo 通 || echo 不通)"
+          set +e   # 诊断阶段不许任何命令中断我们
+          {
+            echo "node=$(command -v node) ver=$(node --version 2>&1)"
+            echo "cwd=$(pwd)"
+            echo "port=${FMKJ_PG_PORT:-unset}"
+            echo "ls-scripts=$(ls scripts/ci-reset-db.mjs 2>&1)"
+            echo "ls-pg=$(ls -d node_modules/.pnpm/pg@*/node_modules/pg 2>&1 | head -1)"
+            echo "--- run ---"
+            node scripts/ci-reset-db.mjs 2>&1
+            echo "--- exit=$? ---"
+          } > /tmp/ci-reset-db.log 2>&1
+          cat /tmp/ci-reset-db.log
+          set -e
           node scripts/ci-reset-db.mjs
 
       - name: 清理上一轮残留
