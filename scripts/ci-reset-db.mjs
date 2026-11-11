@@ -32,7 +32,7 @@ let pg
 try {
   pg = require('pg')
 } catch {
-  const dir = execSync("ls -d node_modules/.pnpm/pg@*/node_modules/pg | head -1", {
+  const dir = execSync('ls -d node_modules/.pnpm/pg@*/node_modules/pg | head -1', {
     encoding: 'utf8',
   }).trim()
   if (!dir) {

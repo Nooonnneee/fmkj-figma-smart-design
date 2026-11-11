@@ -144,7 +144,11 @@ jobs:
       # 生产服务没有 stdin，于是**永远卡在这里**，冒烟测试挂死到超时。
       # 从零 create database + 只用 `payload migrate` 建表就没有这个问题。
       - name: 重建 CI 专用库
-        run: node scripts/ci-reset-db.mjs
+        run: |
+          echo "▸ node: $(command -v node || echo 找不到)  $(node --version 2>/dev/null)"
+          echo "▸ cwd: $(pwd)"
+          echo "▸ 库端口探测: $(nc -z 127.0.0.1 ${FMKJ_PG_PORT} && echo 通 || echo 不通)"
+          node scripts/ci-reset-db.mjs
 
       - name: 清理上一轮残留
         run: |
