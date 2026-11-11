@@ -144,19 +144,7 @@ jobs:
       # 生产服务没有 stdin，于是**永远卡在这里**，冒烟测试挂死到超时。
       # 从零 create database + 只用 `payload migrate` 建表就没有这个问题。
       - name: 重建 CI 专用库
-        run: |
-          node -e "
-          const path=require('path'),{execSync}=require('child_process');
-          let pg; try{pg=require('pg')}catch{const d=execSync('ls -d node_modules/.pnpm/pg@*/node_modules/pg | head -1').toString().trim();pg=require(path.resolve(d))}
-          (async()=>{
-            const c=new pg.Client({host:'127.0.0.1',port:Number(process.env.FMKJ_PG_PORT||55432),user:'fmkj',database:'postgres'});
-            await c.connect();
-            await c.query('drop database if exists fmkj_ci');
-            await c.query('create database fmkj_ci');
-            console.log('  fmkj_ci 已重建（全新，无 dev 模式残留）');
-            await c.end();
-          })().catch(e=>{console.error(e.message);process.exit(1)});
-          "
+        run: node scripts/ci-reset-db.mjs
 
       - name: 清理上一轮残留
         run: |
