@@ -143,6 +143,18 @@ jobs:
       #     If you'd like to run migrations, data loss will occur. Would you like to proceed? (y/N)
       # 生产服务没有 stdin，于是**永远卡在这里**，冒烟测试挂死到超时。
       # 从零 create database + 只用 `payload migrate` 建表就没有这个问题。
+      - name: 清理上一轮残留
+        run: |
+          pkill -f "standalone/server.js" 2>/dev/null || true
+          rm -rf .next tsconfig.tsbuildinfo
+          git checkout -- src/payload.config.ts 2>/dev/null || true
+
+      - name: 切换到自托管构建配置
+        run: printf "export { default } from './payload.selfhost.config'\n" > src/payload.config.ts
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
       - name: 重建 CI 专用库
         run: |
           set +e   # 诊断阶段不许任何命令中断我们
@@ -159,18 +171,6 @@ jobs:
           cat /tmp/ci-reset-db.log
           set -e
           node scripts/ci-reset-db.mjs
-
-      - name: 清理上一轮残留
-        run: |
-          pkill -f "standalone/server.js" 2>/dev/null || true
-          rm -rf .next tsconfig.tsbuildinfo
-          git checkout -- src/payload.config.ts 2>/dev/null || true
-
-      - name: 切换到自托管构建配置
-        run: printf "export { default } from './payload.selfhost.config'\n" > src/payload.config.ts
-
-      - name: 安装依赖
-        run: pnpm install --frozen-lockfile
 
       - name: 跑数据库迁移
         run: pnpm exec payload migrate
