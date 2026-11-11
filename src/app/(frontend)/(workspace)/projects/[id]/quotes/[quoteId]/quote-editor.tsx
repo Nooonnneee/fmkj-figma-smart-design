@@ -611,7 +611,7 @@ export function QuoteEditor({
                   className="h-8 border-border bg-background text-xs font-medium text-fg-secondary shadow-2xs"
                   aria-label="切换到项目里的其他报价"
                   icon={<ChevronDown />}
-                  label="切换报价 ( )"
+                  label={projectQuotes.length ? `切换报价（${projectQuotes.length}）` : '切换报价'}
                 />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-64">
@@ -898,7 +898,7 @@ export function QuoteEditor({
                     )}
                     onClick={() => setViewMode('floors')}
                     icon={<Layers />}
-                    label="按房间（ ）"
+                    label={`按房间（${floorGroups.reduce((s, f) => s + f.rooms.length, 0)}）`}
                   />
                   <Button
                     type="button"
