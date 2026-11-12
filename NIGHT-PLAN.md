@@ -215,3 +215,34 @@ design-pilot/page.tsx     ← 按三档策略 T3 永久保留（左右对照页�
 4. **派活时明确告诉 agent：如果发现文件已被改过，先停下报告，不要覆盖。**
 
 这条是今晚最贵的一课：三个 agent 里有两个在并发上浪费了时间。
+
+### 批次 C/D 收官记录（2026-11-13 03:00）
+
+**Card 全部清零：**
+
+| PR   | 内容                          | 结果                                  |
+| ---- | ----------------------------- | ------------------------------------- |
+| #134 | card ×4 + 纠正文档错判        | 像素 diff bbox = None                 |
+| #135 | T1 档 8 张                    | CI 双 success                         |
+| #136 | reports 7/11 张               | 4 张 KPI 零漂移                       |
+| #137 | reports 后 4 张 + 修 3 处底距 | CI success                            |
+| #138 | 剩余 6 文件 13 张             | **全部零漂移，T3 保留项一个都没出现** |
+
+→ 全仓只剩 `design-pilot/page.tsx` 引用 `card.tsx`（对照页，定案跳过）。
+
+**Label（P3 已有规则复用）：** PR #141，转 2 处 / 跳过 15 处，逐条标了规则编号。
+
+**新增零引用删除：** PR #139，avatar + checkbox（card 迁移后归零）。
+
+### 🔴 又踩到的坑（补充进四条规则）
+
+**agent 会把提交推到错误的分支上。**
+label 那批 agent 报告「已推送 refactor/p5-label」，实际提交落在 `chore/p5-drop-orphan-adapters` 上，
+而远端 `refactor/p5-label` 仍指向 main。
+
+**规则 5：agent 汇报「已推送」后，必须自己核对 `git ls-remote --heads origin <branch>`。**
+不能只信它的 sha。
+
+**规则 6：`git add -A` 会把 agent 留下的临时脚本一起提交。**
+实测 #139 和 #140 都混进了 `e2e/_*.tmp.mjs`。
+→ 提交前必须先 `git status --short` 逐个确认，或改用 `git add <具体文件>`。
