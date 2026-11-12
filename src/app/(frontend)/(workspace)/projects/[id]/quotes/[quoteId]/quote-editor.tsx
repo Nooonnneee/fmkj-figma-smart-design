@@ -39,7 +39,7 @@ import { ProductThumb } from '@/components/product-thumb'
 import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
 import { IconButton } from '@astryxdesign/core/IconButton'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card as AstryxCard } from '@astryxdesign/core/Card'
 import { CheckboxInput } from '@astryxdesign/core/CheckboxInput'
 import { Field } from '@astryxdesign/core/Field'
 import {
@@ -785,7 +785,11 @@ export function QuoteEditor({
         </div>
       ) : null}
 
-      <Card className="gap-0 overflow-hidden border-border py-0 shadow-2xs">
+      {/* 主表卡：工具条 header + 全出血表格 content，两槽 padding={0}，内边距由内层自管 */}
+      <AstryxCard
+        padding={0}
+        className="gap-0 overflow-hidden border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+      >
         {/* IBM Carbon 数据表格工具条（当勾选行时切换为品牌蓝紫批量操作条） */}
         {activeSelectedKeys.size > 0 && viewMode === 'summary' && !readOnly ? (
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary bg-primary px-4 py-2.5 text-primary-foreground sm:px-6">
@@ -853,11 +857,11 @@ export function QuoteEditor({
           </div>
         ) : null}
 
-        <CardHeader className="flex flex-wrap items-center justify-between gap-2.5 border-b border-border bg-subtle/40 px-4 py-3 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-border bg-subtle/40 px-4 py-3 sm:px-6">
           <div className="flex flex-wrap items-center gap-2.5">
-            <CardTitle className="shrink-0 text-sm font-semibold whitespace-nowrap text-foreground">
+            <div className="shrink-0 font-heading text-sm font-semibold whitespace-nowrap text-foreground">
               设备明细清单
-            </CardTitle>
+            </div>
             {floorGroups.length > 0 ? (
               <div className="flex flex-wrap items-center gap-2">
                 <div
@@ -1054,8 +1058,8 @@ export function QuoteEditor({
               </Popover>
             </div>
           )}
-        </CardHeader>
-        <CardContent className="p-0">
+        </div>
+        <div>
           {quote.items.length === 0 ? (
             <p className="px-6 py-10 text-center text-sm text-muted-foreground">
               还没有产品。可以在点位图里放置设备后重新生成，或点击「添加产品」。
@@ -1536,13 +1540,16 @@ export function QuoteEditor({
               </div>
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </AstryxCard>
 
       <div className="grid items-start gap-5 md:grid-cols-2">
-        <Card className="border-border shadow-2xs">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">附加费用</CardTitle>
+        <AstryxCard
+          padding={0}
+          className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+        >
+          <div className="flex flex-row items-center justify-between gap-1.5 px-5 pt-5 pb-1.5">
+            <div className="font-heading text-base font-semibold tracking-tight">附加费用</div>
             {readOnly ? null : (
               <Button
                 variant="secondary"
@@ -1563,8 +1570,8 @@ export function QuoteEditor({
                 label="添加费用"
               />
             )}
-          </CardHeader>
-          <CardContent className="space-y-2.5">
+          </div>
+          <div className="space-y-2.5 px-5 pt-1.5 pb-5">
             {!readOnly ? (
               <div className="flex flex-wrap items-center gap-1.5 pb-1">
                 <span className="text-xs text-muted-foreground">快捷填入：</span>
@@ -1628,12 +1635,15 @@ export function QuoteEditor({
                 )}
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </AstryxCard>
 
-        <Card className="border-border shadow-2xs">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">结算汇总</CardTitle>
+        <AstryxCard
+          padding={0}
+          className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+        >
+          <div className="flex flex-row items-center justify-between gap-1.5 px-5 pt-5 pb-1.5">
+            <div className="font-heading text-base font-semibold tracking-tight">结算汇总</div>
             {!readOnly && totals.productTotal + totals.feeTotal > 100 ? (
               <div className="flex items-center gap-1">
                 <Button
@@ -1659,8 +1669,8 @@ export function QuoteEditor({
                 ) : null}
               </div>
             ) : null}
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
+          </div>
+          <div className="space-y-2 px-5 pt-1.5 pb-5 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">产品小计</span>
               <span className="tabular-nums">{yuan(totals.productTotal)}</span>
@@ -1684,8 +1694,8 @@ export function QuoteEditor({
                 className="mt-3 rounded-lg bg-muted/60 p-3"
               />
             ) : null}
-          </CardContent>
-        </Card>
+          </div>
+        </AstryxCard>
       </div>
 
       <Field label="报价备注" inputID="notes">

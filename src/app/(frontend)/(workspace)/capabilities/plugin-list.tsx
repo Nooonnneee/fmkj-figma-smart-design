@@ -3,7 +3,7 @@ import { Blocks, ChevronRight } from 'lucide-react'
 
 import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card as AstryxCard } from '@astryxdesign/core/Card'
 import { cn } from '@/lib/utils'
 import type { PluginId } from '@/plugins/types'
 
@@ -44,16 +44,20 @@ export function PluginList({
     const selected = selectedId === p.id
     const Icon = PLUGIN_ICONS[p.id as PluginId] ?? Blocks
     return (
-      <Card
+      // 逐槽反推（非标准卡）：原卡 `py-4` 改由各槽内层 div 的 py-4 承接，
+      // 槽本身 padding={0}，避开 Layout 对无 divider 槽的块向内边距坍缩。
+      <AstryxCard
         key={p.id}
         id={p.id}
+        padding={0}
         className={cn(
-          'flex flex-col justify-between gap-4 py-4 transition-shadow hover:shadow-md',
+          'flex flex-col justify-between gap-4 border-0 bg-card py-4 text-sm text-card-foreground shadow-xs ring-1 ring-border transition-shadow hover:shadow-md',
           pending && 'bg-muted/25',
           selected && 'ring-2 ring-primary',
         )}
       >
-        <CardHeader className="flex flex-row items-start justify-between gap-3 pb-0">
+        {/* 原 CardHeader：横排（图标 + 标题） / 右侧状态徽标 */}
+        <div className="flex flex-row items-start justify-between gap-3 px-5">
           <div className="flex min-w-0 items-center gap-3">
             <div
               className={cn(
@@ -65,7 +69,7 @@ export function PluginList({
             >
               <Icon className="size-4.5" />
             </div>
-            <CardTitle className="min-w-0 truncate text-base leading-snug">
+            <div className="min-w-0 truncate font-heading text-base leading-snug font-semibold tracking-tight">
               <Link
                 href={`/plugins/${p.id}`}
                 className={cn(
@@ -75,7 +79,7 @@ export function PluginList({
               >
                 {p.name}
               </Link>
-            </CardTitle>
+            </div>
           </div>
           {pending ? (
             <Badge
@@ -84,13 +88,15 @@ export function PluginList({
               label={'规划中'}
             />
           ) : null}
-        </CardHeader>
+        </div>
 
-        <CardContent className="flex-1 py-0">
+        {/* 原 CardContent：flex-1 撑满，上下不留内边距 */}
+        <div className="flex-1 px-5">
           <p className="text-sm leading-relaxed text-muted-foreground">{p.tagline}</p>
-        </CardContent>
+        </div>
 
-        <CardFooter className="flex items-center justify-between gap-2 border-t pt-3 pb-0 text-xs text-muted-foreground">
+        {/* 原 CardFooter：顶部描边 + pt-3 */}
+        <div className="flex items-center justify-between gap-2 border-t px-5 pt-3 text-xs text-muted-foreground">
           <span className="truncate">{p.entry ? `入口：${p.entry}` : null}</span>
           <Button
             variant="ghost"
@@ -100,8 +106,8 @@ export function PluginList({
             icon={<ChevronRight />}
             label="详情"
           />
-        </CardFooter>
-      </Card>
+        </div>
+      </AstryxCard>
     )
   }
 

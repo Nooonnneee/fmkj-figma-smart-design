@@ -11,7 +11,6 @@ import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
 import { Card as AstryxCard } from '@astryxdesign/core/Card'
 import { Layout, LayoutContent, LayoutHeader } from '@astryxdesign/core/Layout'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import {
   Table,
@@ -137,8 +136,12 @@ export function MembershipClient({
         </div>
       </AstryxCard>
 
-      <Card className="py-4">
-        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {/* py-4 反推：block 16px → padding={4}，槽的块向坍缩不影响（无 header） */}
+      <AstryxCard
+        padding={0}
+        className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+      >
+        <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-center gap-2 text-sm font-medium">
             <Gift className="size-4 text-muted-foreground" />
             输入兑换码充值 AI 积分
@@ -165,19 +168,23 @@ export function MembershipClient({
               label="兑换"
             />
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </AstryxCard>
 
       {/* 积分任务与绑定奖励中心 */}
       {initial.creditTasks && initial.creditTasks.length > 0 ? (
-        <Card className="py-5">
-          <CardHeader className="pb-3">
+        // py-5 反推：block 20px；header 到 content 再 12px → pb-3（pb-5 的 header 与 content 的 pt-5 取 max）
+        <AstryxCard
+          padding={0}
+          className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+        >
+          <div className="px-5 pt-5 pb-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <CardTitle className="flex items-center gap-2 text-base">
+                <div className="flex items-center gap-2 font-heading text-base font-semibold tracking-tight">
                   <Gift className="size-4 text-primary" />
                   积分任务与绑定奖励
-                </CardTitle>
+                </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   绑定邮箱赠 10 积分、绑定微信小程序赠 10 积分、关注公众号赠 5
                   积分；每项任务每个账号限领一次，自动记入积分流水。
@@ -189,8 +196,8 @@ export function MembershipClient({
                 label={`已完成 ${initial.creditTasks.filter((t) => t.claimed).length} /${' '}${initial.creditTasks.length}`}
               />
             </div>
-          </CardHeader>
-          <CardContent className="grid gap-2.5 sm:grid-cols-2">
+          </div>
+          <div className="grid gap-2.5 px-5 pt-3 pb-5 sm:grid-cols-2">
             {initial.creditTasks.map((task) => {
               const isBusy = claimingTaskId === task.id && pending
               return (
@@ -253,8 +260,8 @@ export function MembershipClient({
                 </div>
               )
             })}
-          </CardContent>
-        </Card>
+          </div>
+        </AstryxCard>
       ) : null}
 
       {/* 最近积分明细 */}

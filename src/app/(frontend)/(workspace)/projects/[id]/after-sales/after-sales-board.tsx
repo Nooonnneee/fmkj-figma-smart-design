@@ -30,9 +30,17 @@ import { Badge } from '@astryxdesign/core/Badge'
 import { Selector } from '@astryxdesign/core/Selector'
 import { Button } from '@astryxdesign/core/Button'
 import { IconButton } from '@astryxdesign/core/IconButton'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card as AstryxCard } from '@astryxdesign/core/Card'
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
-import { Layout, LayoutContent, LayoutFooter } from '@astryxdesign/core/Layout'
+// 本文件已用 Layout 承接 Dialog 的三槽，卡片槽位改用别名，避免标识符冲突
+import {
+  Layout,
+  Layout as CardLayout,
+  LayoutContent,
+  LayoutContent as CardContent,
+  LayoutFooter,
+  LayoutHeader as CardHeader,
+} from '@astryxdesign/core/Layout'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -312,75 +320,94 @@ export function AfterSalesBoard({
       </dl>
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_19rem]">
-        <Card className="gap-0 py-0">
-          <CardHeader className="flex flex-wrap items-center justify-between gap-2 border-b py-3.5">
-            <CardTitle className="text-base">维保记录</CardTitle>
-            <div role="tablist" aria-label="筛选维保记录" className="flex flex-wrap gap-1">
-              {FILTERS.map((f) => (
-                <button
-                  key={f.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={filter === f.key}
-                  onClick={() => setFilter(f.key)}
-                  className={cn(
-                    'h-7 rounded-full px-3 text-xs transition-colors',
-                    filter === f.key
-                      ? 'bg-foreground text-background'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                  )}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {visible.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 px-6 py-14 text-center">
-                <Shield className="size-6 text-muted-foreground/60" />
-                <p className="text-sm font-medium">
-                  {data.records.length ? '这个分类下还没有记录' : '还没有维保记录'}
-                </p>
-                <p className="max-w-sm text-xs text-muted-foreground">
-                  交付时先登记一次「交付验收」，质保就会从那天开始计算；之后的巡检、检修和设备更换都记在这里。
-                </p>
-                {canEdit && !data.records.length ? (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="mt-2"
-                    onClick={() => openNew('acceptance')}
-                    icon={<BadgeCheck />}
-                    label="登记交付验收"
-                  />
-                ) : null}
-              </div>
-            ) : (
-              <ol className="divide-y">
-                {visible.map((r) => (
-                  <RecordItem
-                    key={r.id}
-                    r={r}
-                    canEdit={canEdit}
-                    busy={busyId === r.id}
-                    onEdit={() => openEdit(r)}
-                    onDone={() => markDone(r)}
-                    onDelete={() => remove(r)}
-                  />
-                ))}
-              </ol>
-            )}
-          </CardContent>
-        </Card>
+        {/* 横排工具条 header + 全出血列表 content：两槽 padding={0}，内边距由内层自管 */}
+        <AstryxCard
+          padding={0}
+          className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+        >
+          <CardLayout
+            height="auto"
+            header={
+              <CardHeader padding={0}>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-3.5">
+                  <div className="font-heading text-base font-semibold tracking-tight">
+                    维保记录
+                  </div>
+                  <div role="tablist" aria-label="筛选维保记录" className="flex flex-wrap gap-1">
+                    {FILTERS.map((f) => (
+                      <button
+                        key={f.key}
+                        type="button"
+                        role="tab"
+                        aria-selected={filter === f.key}
+                        onClick={() => setFilter(f.key)}
+                        className={cn(
+                          'h-7 rounded-full px-3 text-xs transition-colors',
+                          filter === f.key
+                            ? 'bg-foreground text-background'
+                            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                        )}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </CardHeader>
+            }
+            content={
+              <CardContent padding={0} isScrollable={false}>
+                {visible.length === 0 ? (
+                  <div className="flex flex-col items-center gap-2 px-6 py-14 text-center">
+                    <Shield className="size-6 text-muted-foreground/60" />
+                    <p className="text-sm font-medium">
+                      {data.records.length ? '这个分类下还没有记录' : '还没有维保记录'}
+                    </p>
+                    <p className="max-w-sm text-xs text-muted-foreground">
+                      交付时先登记一次「交付验收」，质保就会从那天开始计算；之后的巡检、检修和设备更换都记在这里。
+                    </p>
+                    {canEdit && !data.records.length ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="mt-2"
+                        onClick={() => openNew('acceptance')}
+                        icon={<BadgeCheck />}
+                        label="登记交付验收"
+                      />
+                    ) : null}
+                  </div>
+                ) : (
+                  <ol className="divide-y">
+                    {visible.map((r) => (
+                      <RecordItem
+                        key={r.id}
+                        r={r}
+                        canEdit={canEdit}
+                        busy={busyId === r.id}
+                        onEdit={() => openEdit(r)}
+                        onDone={() => markDone(r)}
+                        onDelete={() => remove(r)}
+                      />
+                    ))}
+                  </ol>
+                )}
+              </CardContent>
+            }
+          />
+        </AstryxCard>
 
         <div className="flex flex-col gap-5">
-          <Card className="gap-3">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">配置备份</CardTitle>
+          {/* 卡级 gap-3：槽 padding={0}，槽内 div 自带 px-5 / py-3 复现「20px 左右 + 12px 块间」 */}
+          <AstryxCard
+            padding={0}
+            className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+          >
+            <div className="flex flex-row items-center justify-between gap-1.5 px-5 pt-5 pb-3">
+              <div className="font-heading text-base font-semibold tracking-tight">配置备份</div>
               <DatabaseBackup className="size-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
+            </div>
+            <div className="space-y-3 px-5 pt-3 pb-5 text-sm">
               <p className="text-xs leading-relaxed text-muted-foreground">
                 把当前点位图与定稿报价整理成全屋设备台账留存，日后更换设备、重新配网时以它为基准核对。
               </p>
@@ -428,14 +455,17 @@ export function AfterSalesBoard({
                   共 {backups.length} 份备份，旧的备份保留在维保记录里
                 </p>
               ) : null}
-            </CardContent>
-          </Card>
+            </div>
+          </AstryxCard>
 
-          <Card className="gap-3">
-            <CardHeader>
-              <CardTitle className="text-base">服务依据</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
+          <AstryxCard
+            padding={0}
+            className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+          >
+            <div className="px-5 pt-5 pb-3 font-heading text-base font-semibold tracking-tight">
+              服务依据
+            </div>
+            <div className="space-y-2 px-5 pt-3 pb-5 text-sm">
               <Row label="合同">
                 {data.contract ? (
                   <Link
@@ -451,8 +481,8 @@ export function AfterSalesBoard({
               <Row label="签订日期">{data.contract?.signedAt ?? '—'}</Row>
               <Row label="质保期">{warranty.months} 个月</Row>
               <Row label="交付验收">{data.acceptance ? data.acceptance.serviceDate : '未登记'}</Row>
-            </CardContent>
-          </Card>
+            </div>
+          </AstryxCard>
         </div>
       </div>
 
