@@ -9,7 +9,8 @@ import { toast } from 'sonner'
 import { Badge } from '@astryxdesign/core/Badge'
 import { Field } from '@astryxdesign/core/Field'
 import { Button } from '@astryxdesign/core/Button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card } from '@astryxdesign/core/Card'
+import { Layout, LayoutContent, LayoutHeader } from '@astryxdesign/core/Layout'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -70,135 +71,157 @@ export function CostSettingsCard({
     })
 
   return (
-    <Card id="cost">
-      <CardHeader>
-        <CardTitle className="flex flex-wrap items-center gap-2">
-          报价成本与毛利
-          <Badge variant="neutral" label={'仅自己可见'} />
-        </CardTitle>
-        <CardDescription>
-          设置你的拿货折扣后，报价台会实时估算成本、毛利率和最低成交价。打印的报价单、合同和业主分享页都不会出现任何成本信息。
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <NumberField
-            id="cost-min"
-            label="毛利率底线"
-            suffix="%"
-            value={minMargin}
-            onChange={setMinMargin}
-            error={errors.minMarginPercent}
-            hint="低于它时报价台标红，并算出最低成交价"
-          />
-          <NumberField
-            id="cost-fee"
-            label="附加费用成本占比"
-            suffix="%"
-            value={feeCost}
-            onChange={setFeeCost}
-            error={errors.feeCostPercent}
-            hint="安装调试、布线等费用里的人工与辅材成本"
-          />
-          <NumberField
-            id="cost-default"
-            label="其他品牌默认折扣"
-            suffix="折"
-            value={defaultDiscount}
-            placeholder="不估算"
-            onChange={setDefaultDiscount}
-            error={errors.defaultDiscount}
-            hint="未单独设置、产品库也没有成本价时按此估算"
-          />
-        </div>
+    <Card
+      id="cost"
+      padding={0}
+      className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+    >
+      <Layout
+        height="auto"
+        header={
+          <LayoutHeader padding={5} paddingBlockEnd={0}>
+            <div className="grid gap-1.5">
+              <div className="flex flex-wrap items-center gap-2 font-heading text-base font-semibold tracking-tight">
+                报价成本与毛利
+                <Badge variant="neutral" label={'仅自己可见'} />
+              </div>
+              <div className="text-sm text-muted-foreground">
+                设置你的拿货折扣后，报价台会实时估算成本、毛利率和最低成交价。打印的报价单、合同和业主分享页都不会出现任何成本信息。
+              </div>
+            </div>
+          </LayoutHeader>
+        }
+        content={
+          <LayoutContent padding={5} isScrollable={false}>
+            <div className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <NumberField
+                  id="cost-min"
+                  label="毛利率底线"
+                  suffix="%"
+                  value={minMargin}
+                  onChange={setMinMargin}
+                  error={errors.minMarginPercent}
+                  hint="低于它时报价台标红，并算出最低成交价"
+                />
+                <NumberField
+                  id="cost-fee"
+                  label="附加费用成本占比"
+                  suffix="%"
+                  value={feeCost}
+                  onChange={setFeeCost}
+                  error={errors.feeCostPercent}
+                  hint="安装调试、布线等费用里的人工与辅材成本"
+                />
+                <NumberField
+                  id="cost-default"
+                  label="其他品牌默认折扣"
+                  suffix="折"
+                  value={defaultDiscount}
+                  placeholder="不估算"
+                  onChange={setDefaultDiscount}
+                  error={errors.defaultDiscount}
+                  hint="未单独设置、产品库也没有成本价时按此估算"
+                />
+              </div>
 
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <div className="space-y-1">
-              <Label>品牌拿货折扣</Label>
-              <p className="text-xs text-muted-foreground">
-                按零售价打几折计算成本，例如 Aqara 填 6.5 即零售价 ×
-                0.65；留空则用产品库里的成本价。已设置 {configured} 个品牌。
-              </p>
-            </div>
-            <div className="relative">
-              <Search
-                aria-hidden
-                className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
-              />
-              <TextInput
-                label={'搜索品牌'}
-                isLabelHidden
-                value={query}
-                onChange={(v) => setQuery(v)}
-                placeholder="搜索品牌"
-                aria-label="搜索品牌"
-                controlClassName="h-8 w-44 pl-8"
-              />
-            </div>
-          </div>
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {shown.map((b) => {
-              const err = errors[`brand:${b.slug}`]
-              const value = discounts[b.slug] ?? ''
-              return (
-                <li
-                  key={b.slug}
-                  className={cn(
-                    'flex items-center gap-3 rounded-lg border px-3 py-2',
-                    value.trim() && 'border-foreground/20 bg-muted/40',
-                    err && 'border-destructive/50',
-                  )}
-                >
-                  <span className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-white">
-                    {b.logo ? (
-                      <Image
-                        src={b.logo}
-                        alt=""
-                        width={28}
-                        height={28}
-                        className="size-full object-contain p-0.5"
-                      />
-                    ) : (
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {b.name.slice(0, 1)}
-                      </span>
-                    )}
-                  </span>
-                  <label htmlFor={`brand-${b.slug}`} className="min-w-0 flex-1 text-sm">
-                    <span className="block truncate font-medium">{b.name}</span>
-                    <span className="block text-xs text-muted-foreground">
-                      {err ?? `${b.products} 款在售`}
-                    </span>
-                  </label>
-                  <div className="flex items-center gap-1">
-                    <Input
-                      id={`brand-${b.slug}`}
-                      type="number"
-                      inputMode="decimal"
-                      min={0.5}
-                      max={10}
-                      step={0.1}
-                      value={value}
-                      placeholder="—"
-                      onChange={(e) => setDiscounts((d) => ({ ...d, [b.slug]: e.target.value }))}
-                      className="h-8 w-20 text-right tabular-nums"
-                    />
-                    <span className="w-4 text-xs text-muted-foreground">折</span>
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                  <div className="space-y-1">
+                    <Label>品牌拿货折扣</Label>
+                    <p className="text-xs text-muted-foreground">
+                      按零售价打几折计算成本，例如 Aqara 填 6.5 即零售价 ×
+                      0.65；留空则用产品库里的成本价。已设置 {configured} 个品牌。
+                    </p>
                   </div>
-                </li>
-              )
-            })}
-          </ul>
-          {shown.length === 0 ? (
-            <p className="py-4 text-center text-sm text-muted-foreground">没有匹配的品牌</p>
-          ) : null}
-        </div>
+                  <div className="relative">
+                    <Search
+                      aria-hidden
+                      className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+                    />
+                    <TextInput
+                      label={'搜索品牌'}
+                      isLabelHidden
+                      value={query}
+                      onChange={(v) => setQuery(v)}
+                      placeholder="搜索品牌"
+                      aria-label="搜索品牌"
+                      controlClassName="h-8 w-44 pl-8"
+                    />
+                  </div>
+                </div>
+                <ul className="grid gap-2 sm:grid-cols-2">
+                  {shown.map((b) => {
+                    const err = errors[`brand:${b.slug}`]
+                    const value = discounts[b.slug] ?? ''
+                    return (
+                      <li
+                        key={b.slug}
+                        className={cn(
+                          'flex items-center gap-3 rounded-lg border px-3 py-2',
+                          value.trim() && 'border-foreground/20 bg-muted/40',
+                          err && 'border-destructive/50',
+                        )}
+                      >
+                        <span className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-white">
+                          {b.logo ? (
+                            <Image
+                              src={b.logo}
+                              alt=""
+                              width={28}
+                              height={28}
+                              className="size-full object-contain p-0.5"
+                            />
+                          ) : (
+                            <span className="text-xs font-medium text-muted-foreground">
+                              {b.name.slice(0, 1)}
+                            </span>
+                          )}
+                        </span>
+                        <label htmlFor={`brand-${b.slug}`} className="min-w-0 flex-1 text-sm">
+                          <span className="block truncate font-medium">{b.name}</span>
+                          <span className="block text-xs text-muted-foreground">
+                            {err ?? `${b.products} 款在售`}
+                          </span>
+                        </label>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            id={`brand-${b.slug}`}
+                            type="number"
+                            inputMode="decimal"
+                            min={0.5}
+                            max={10}
+                            step={0.1}
+                            value={value}
+                            placeholder="—"
+                            onChange={(e) =>
+                              setDiscounts((d) => ({ ...d, [b.slug]: e.target.value }))
+                            }
+                            className="h-8 w-20 text-right tabular-nums"
+                          />
+                          <span className="w-4 text-xs text-muted-foreground">折</span>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+                {shown.length === 0 ? (
+                  <p className="py-4 text-center text-sm text-muted-foreground">没有匹配的品牌</p>
+                ) : null}
+              </div>
 
-        <div className="flex justify-end">
-          <Button onClick={save} isDisabled={pending} icon={<Loader2 />} label="保存成本设置" />
-        </div>
-      </CardContent>
+              <div className="flex justify-end">
+                <Button
+                  onClick={save}
+                  isDisabled={pending}
+                  icon={<Loader2 />}
+                  label="保存成本设置"
+                />
+              </div>
+            </div>
+          </LayoutContent>
+        }
+      />
     </Card>
   )
 }

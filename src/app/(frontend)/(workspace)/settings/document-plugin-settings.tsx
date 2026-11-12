@@ -1,6 +1,8 @@
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card } from '@astryxdesign/core/Card'
+import { Layout, LayoutContent, LayoutHeader } from '@astryxdesign/core/Layout'
+
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -47,54 +49,66 @@ export function DocumentTemplateSettings({
   defaults: Record<string, { style?: string; layout?: string }>
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>文档模板</CardTitle>
-      </CardHeader>
-      <CardContent className="grid gap-4">
-        {kinds.map((k) => {
-          const d = defaults[k.kind] ?? {}
-          const style = styles.some((s) => s.id === d.style) ? d.style! : styles[0]?.id
-          const layout = k.layouts.some((l) => l.value === d.layout)
-            ? d.layout!
-            : k.layouts[0]?.value
-          return (
-            <div key={k.kind} className="grid items-center gap-2 sm:grid-cols-[7rem_1fr_1fr]">
-              <Label className="text-sm">{k.label}</Label>
-              <Select name={`doc-${k.kind}-style`} defaultValue={style}>
-                <SelectTrigger className="w-full" aria-label={`${k.label}风格`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {styles.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      <Swatch colors={s.swatch} />
-                      {s.name}
-                      {s.enabled ? null : (
-                        <span className="text-xs text-muted-foreground">
-                          （插件已关闭，暂用简约）
-                        </span>
-                      )}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select name={`doc-${k.kind}-layout`} defaultValue={layout}>
-                <SelectTrigger className="w-full" aria-label={`${k.label}版式`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {k.layouts.map((l) => (
-                    <SelectItem key={l.value} value={l.value}>
-                      {l.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+    <Card
+      padding={0}
+      className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+    >
+      <Layout
+        height="auto"
+        header={
+          <LayoutHeader padding={5} paddingBlockEnd={0}>
+            <div className="font-heading text-base font-semibold tracking-tight">文档模板</div>
+          </LayoutHeader>
+        }
+        content={
+          <LayoutContent padding={5} isScrollable={false}>
+            <div className="grid gap-4">
+              {kinds.map((k) => {
+                const d = defaults[k.kind] ?? {}
+                const style = styles.some((s) => s.id === d.style) ? d.style! : styles[0]?.id
+                const layout = k.layouts.some((l) => l.value === d.layout)
+                  ? d.layout!
+                  : k.layouts[0]?.value
+                return (
+                  <div key={k.kind} className="grid items-center gap-2 sm:grid-cols-[7rem_1fr_1fr]">
+                    <Label className="text-sm">{k.label}</Label>
+                    <Select name={`doc-${k.kind}-style`} defaultValue={style}>
+                      <SelectTrigger className="w-full" aria-label={`${k.label}风格`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {styles.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            <Swatch colors={s.swatch} />
+                            {s.name}
+                            {s.enabled ? null : (
+                              <span className="text-xs text-muted-foreground">
+                                （插件已关闭，暂用简约）
+                              </span>
+                            )}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select name={`doc-${k.kind}-layout`} defaultValue={layout}>
+                      <SelectTrigger className="w-full" aria-label={`${k.label}版式`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {k.layouts.map((l) => (
+                          <SelectItem key={l.value} value={l.value}>
+                            {l.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )
+              })}
             </div>
-          )
-        })}
-      </CardContent>
+          </LayoutContent>
+        }
+      />
     </Card>
   )
 }

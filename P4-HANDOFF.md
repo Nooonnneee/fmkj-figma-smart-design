@@ -95,14 +95,30 @@ point-map-editor（#117）：Dialog ×4（384/384/384/448）+ ScrollArea + Selec
 > `<div><Label htmlFor><Input/></div>` 直接换 `<Field label inputID><Input/></Field>` 即可，
 > #122/#123/#124 共 17 处一次通过。
 
-```
+````
 Label          ✅ 已完成（#122/#123/#124/#126/#127/#128）
                37 处转换 + 16 处按规则保留 —— 剩余全部是规则保留项，无需再动
 Select 14 处   数据带 hint / 动态 filter 的要跳过
 Textarea       ✅ 受控的 2 处已转（#130）；剩 3 处非受控**不可转**（见下）
 Input 20 处    已判定的保留项（type=number/date、defaultValue 非受控）
-Card 40 处     官方只有单 Card，本仓 6 个复合组件 → 需重写结构
-```
+Card  14 处引用 ❌→✅ **判断已纠正**（2026-11-13 实测）
+               旧结论「官方只有单 Card、需重写结构」**是错的**。
+               官方 `Card.d.ts` 第 95 行 `@compositionHint` 明确写：
+               「Pair with Layout for structured header/content/footer layouts」
+               → `Card` + `Layout` 三槽（header/content/footer）可等价承接复合结构。
+               已验证的像素级忠实配方（document-plugin-settings 全页 diff bbox = None）：
+               ```tsx
+               <Card padding={0} className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border">
+                 <Layout height="auto"
+                   header={<LayoutHeader padding={5} paddingBlockEnd={0}>…</LayoutHeader>}
+                   content={<LayoutContent padding={5} isScrollable={false}>…</LayoutContent>}
+                 />
+               </Card>
+               ```
+               要点：`padding={0}` 防双层缩进；`padding={5}`=20px 对齐 `--card-spacing`；
+               `paddingBlockEnd={0}` 复现「标题→内容 20px」；`border-0`+`ring-1 ring-border` 复现本仓描边。
+               另：`CardAction` 全仓零引用，可从适配层直接删。
+````
 
 #### Label 迁移的四条跳过规则（实测固化，别每次重新盘点）
 
