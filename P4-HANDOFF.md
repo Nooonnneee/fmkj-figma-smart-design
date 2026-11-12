@@ -150,6 +150,18 @@ Card  14 处引用 ❌→✅ **判断已纠正**（2026-11-13 实测）
 **`reports-client.tsx` 单独一个批次。**
 11 张卡分在 4 个 Tab 里，是这批的风险集中点。必须先做它、单独验收，再动其余。
 
+**🔴 T3「保留」档已被推翻（2026-11-13 实测）：**
+交接文档原把「横排 flex header / text-center / gap-3」列为 T3 保留项，
+理由是 Layout 对**无 divider 槽**会施加 `--_layout-flush-block-*` 块向坍缩。
+
+**实测这个坍缩可以绕开**：把槽设为 `padding={0}`，内边距交给槽内 div 自管即可。
+
+结果：PR #138 里 13 张卡（plugin-list / project-form / after-sales-board /
+quote-editor / membership-client / join）**全部零漂移转换，0 保留**。
+
+→ **结论：Card 没有必须保留的卡型。** 只有 `design-pilot/page.tsx` 整页跳过
+  （它是对照页，转了就没意义）。这条对 P5 至关重要：Card 能删干净。
+
 **逐槽反推的已知坑（实测）**：
 `LayoutContent` 的 `padding={5}` 会盖掉 `--_layout-flush-block-*` 的坍缩，
 所以 header→content 的间距**来自 content 自己的 padding，不是 gap**。
