@@ -452,3 +452,22 @@ input 14 · label 11(剩保留项) · dropdown-menu 11 · sidebar 5
 删除文件前必须**逐个 grep 核实**，不能相信评估报告的汇总结论。
 实测：评估说 dialog/input-group/badge/sheet 四个都归零，实际 input-group 和 sheet 仍有引用
 （引用方是 command.tsx / sidebar.tsx，它们本身也是适配层）。
+
+### #148 清 4 处死代码（-245 行）
+
+| 位置                             | 删除                            | 核实方式                            |
+| -------------------------------- | ------------------------------- | ----------------------------------- |
+| `plugins/ai-import/ai-panel.tsx` | 整个文件 192 行                 | 全仓 grep `ai-panel` 零引用         |
+| `ui/command.tsx`                 | `CommandDialog` + Dialog import | 全仓 grep `CommandDialog` 零引用    |
+| `ui/sidebar.tsx`                 | `SidebarSeparator` + 导出       | 全仓 grep `SidebarSeparator` 零引用 |
+| `archive/delivery-package.tsx`   | 未使用的 `Badge` import         | 文件内无 Badge 用法                 |
+
+**归零情况**：`dialog` 0 / `badge` 0（可直接删）；`input-group` 1 / `sheet` 1 ——
+但这两处**是真实用法，不能删**：
+
+- `command.tsx:31` 用了 `InputGroup` + `InputGroupAddon`（命令面板输入框）
+- `sidebar.tsx:204` 用了 `Sheet` 系列（移动端侧栏抽屉）
+
+→ 这两个适配层文件要等 `command` / `sidebar` 自己迁移完才能删。
+
+### 适配层现状（20 个文件）
