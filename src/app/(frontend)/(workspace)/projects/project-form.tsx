@@ -18,7 +18,6 @@ import { Button } from '@astryxdesign/core/Button'
 import { Field } from '@astryxdesign/core/Field'
 import { Card as AstryxCard } from '@astryxdesign/core/Card'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -257,22 +256,23 @@ export function ProjectForm({
               <div
                 className={cn('grid content-start gap-2', owners && !isNew ? '' : 'sm:col-span-2')}
               >
-                <div className="flex items-baseline justify-between gap-2">
-                  <Label htmlFor="name">项目名称</Label>
-                  <span id="name-hint" className="text-xs text-muted-foreground">
-                    留空自动生成
-                  </span>
-                </div>
-                <Input
-                  id="name"
-                  name="name"
-                  defaultValue={initial.name ?? ''}
-                  placeholder={suggestedName}
-                  maxLength={120}
-                  aria-invalid={errors.name ? true : undefined}
-                  aria-describedby="name-hint"
-                  disabled={readOnly}
-                />
+                <Field
+                  label="项目名称"
+                  inputID="name"
+                  description="留空自动生成"
+                  descriptionID="name-hint"
+                >
+                  <Input
+                    id="name"
+                    name="name"
+                    defaultValue={initial.name ?? ''}
+                    placeholder={suggestedName}
+                    maxLength={120}
+                    aria-invalid={errors.name ? true : undefined}
+                    aria-describedby="name-hint"
+                    disabled={readOnly}
+                  />
+                </Field>
               </div>
             </>,
           )}
@@ -281,18 +281,17 @@ export function ProjectForm({
             '项目备注与需求',
             '记录家庭常住成员、装修阶段、特殊联动场景或网路条件。',
             <div className="grid gap-2 sm:col-span-2">
-              <Label htmlFor="notes" className="sr-only">
-                备注
-              </Label>
-              <Textarea
-                id="notes"
-                name="notes"
-                rows={3}
-                maxLength={2000}
-                defaultValue={initial.notes ?? ''}
-                disabled={readOnly}
-                placeholder="户型、装修进度、客户偏好等"
-              />
+              <Field label="备注" inputID="notes" isLabelHidden>
+                <Textarea
+                  id="notes"
+                  name="notes"
+                  rows={3}
+                  maxLength={2000}
+                  defaultValue={initial.notes ?? ''}
+                  disabled={readOnly}
+                  placeholder="户型、装修进度、客户偏好等"
+                />
+              </Field>
             </div>,
           )}
         </div>
