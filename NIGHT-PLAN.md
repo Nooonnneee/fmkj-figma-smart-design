@@ -246,3 +246,59 @@ label 那批 agent 报告「已推送 refactor/p5-label」，实际提交落在 
 **规则 6：`git add -A` 会把 agent 留下的临时脚本一起提交。**
 实测 #139 和 #140 都混进了 `e2e/_*.tmp.mjs`。
 → 提交前必须先 `git status --short` 逐个确认，或改用 `git add <具体文件>`。
+
+---
+
+## 阶段性结论（2026-11-13 04:00）
+
+### 已经跑完的批次
+
+| 批次    | 内容                                         | PR                       | 状态          |
+| ------- | -------------------------------------------- | ------------------------ | ------------- |
+| A       | 合并悬挂 PR                                  | #132                     | ✅            |
+| B       | 删 6 个零引用文件                            | #133                     | ✅            |
+| C-1~C-5 | Card 全档迁移（14 文件 → 只剩 design-pilot） | #134 #135 #136 #137 #138 | ✅            |
+| D       | Label（转 2 / 跳 15）                        | #141                     | ✅            |
+| E       | 删 avatar / checkbox                         | #139                     | ✅            |
+| F       | **Input 档：A=0，适配层保留**                | 无代码                   | ✅ 结论已固化 |
+| G       | **DropdownMenu 档：A=0，适配层保留**         | #143 文档                | ⏳ 待 CI      |
+
+### 🔴 今晚最重要的发现：P5 的边界比预想的小得多
+
+**Input 和 DropdownMenu 两档都是 A=0。** 原因完全相同：
+
+> **适配层存在的意义，就是承接官方组件不收的东西。**
+> 只要调用点用到其中任何一样，就必须改调用点，而不是换 import。
+
+| 组件         | 官方不收的                                                                           | 本仓调用点依赖度 |
+| ------------ | ------------------------------------------------------------------------------------ | ---------------- |
+| Input        | 原生 `onChange` 签名 / `className` / `defaultValue` / `maxLength` / number-date type | 18/18 处         |
+| DropdownMenu | `asChild` / 自由 children / 三段式 Sub / `onSelect`                                  | 45/45 处         |
+
+**所以 P5 剩下的不是「迁移」，是「逐个调用点重写」。** 这是独立工程量，不是换 import 能解决的。
+
+### 剩余 22 个适配层文件的真实分类
+
+**可以继续「换 import」型迁移的（Card 已清零，剩下这些）：**
+
+```
+textarea 6 · select 5 · tooltip 4 · separator 3 · table 3
+kbd 2 · progress 2 · radio-group 2 · scroll-area 2 · badge 1
+switch 1 · sonner 1 · dialog 1 · card 1(design-pilot) · sheet 1 · input-group 1 · command 1
+```
+
+**已知需要重写调用点的（不要再派「迁移」任务）：**
+
+```
+input 14 · label 11(剩保留项) · dropdown-menu 11 · sidebar 5
+```
+
+### 给 owner 的结论
+
+**P5「删适配层」不能按原计划一次删完。** 真正的路径是：
+
+1. 先把「换 import」型的（textarea/select/tooltip/separator/table 等）清掉
+2. 剩下的（input/dropdown-menu/sidebar）需要单独立项，逐个调用点重写
+3. `design-pilot/page.tsx` 是永久的例外（对照页）
+
+**这不是失败，是把工作量认清了。** 旧文档说「P5 删 30 个文件」，实际能删的远少于这个数。
