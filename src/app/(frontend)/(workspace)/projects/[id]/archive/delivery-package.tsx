@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 import { ExternalLink, FileArchive, FileStack, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@astryxdesign/core/Button'
 import { CheckboxInput } from '@astryxdesign/core/CheckboxInput'
 import { Progress } from '@/components/ui/progress'
