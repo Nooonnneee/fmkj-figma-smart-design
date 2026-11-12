@@ -59,7 +59,8 @@ button 2       switch 1       sonner 1      command 1     badge 1
 ### 批次 B —— 删 8 个零引用文件 ⬜
 
 - 逐个 `grep -r` 二次确认零引用（含 `__tests__` 与动态 import）
-- 删除：`toggle tabs skeleton sheet popover input-otp input-group field`
+- 删除：`toggle tabs skeleton popover input-otp field`（6 个）
+- **不删**：`sheet`（sidebar 依赖）/ `input-group`（command 依赖）
 - 验收：`tsc --noEmit` + `oxfmt --check` + `pnpm build` 全绿
 - 分支 `chore/p5-drop-unused-adapters`，走 PR
 - **产出**：适配层 30 → 22
@@ -124,8 +125,22 @@ button 2       switch 1       sonner 1      command 1     badge 1
 ## 7. 游标（每轮更新）
 
 ```
-当前批次：A（未开始）
-已完成：  —
-剩余引用总数：47（22 个文件）
-最后更新：2026-11-13 00:30
+当前批次：C（card 迁移）
+已完成：  A ✅  B ✅
+剩余引用总数：47（22 个文件）→ 待重算
+最后更新：2026-11-13 01:00
 ```
+
+### 执行记录
+
+| 批次 | 结果                                           | 证据                             |
+| ---- | ---------------------------------------------- | -------------------------------- |
+| A    | ✅ 合并 PR #132（受控 Select → 官方 Selector） | squash `6946748`                 |
+| B    | ✅ 合并 PR #133（删 6 个零引用文件）           | squash `8d09e1a`；适配层 30 → 24 |
+
+**批次 B 的实测偏差（重要，已修正计划）**：
+文档说「P5 删 30 个文件」，实际逐文件扫引用后发现只能删 6 个，不是 8 个：
+
+- `sheet.tsx` 被 `sidebar.tsx` 依赖（sidebar 自己还有 5 处引用）
+- `input-group.tsx` 被 `command.tsx` 依赖（command 还有 1 处引用）
+  → 这两个留到 sidebar / command 迁移完之后再删。
