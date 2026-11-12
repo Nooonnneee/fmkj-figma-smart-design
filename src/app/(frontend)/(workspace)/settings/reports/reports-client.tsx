@@ -25,7 +25,6 @@ import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
 import { Card as AstryxCard } from '@astryxdesign/core/Card'
 import { Layout, LayoutContent, LayoutHeader } from '@astryxdesign/core/Layout'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { Tab, TabList } from '@astryxdesign/core/TabList'
 import type { CustomerUsageReport } from '@/lib/usage-diagnostics'
@@ -763,201 +762,267 @@ export function UsageReportsClient({ report }: { report: CustomerUsageReport }) 
         {activeTab === 'ai' ? (
           <div className="mt-4 space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">模型调用与 Auto 路由分布</CardTitle>
-                  <CardDescription className="text-xs">
-                    统计各底层模型的实际调用次数、Auto 自动路由命中次数与消耗积分
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {report.modelStats.length === 0 ? (
-                    <div className="py-6 text-center text-xs text-muted-foreground">
-                      暂无模型调用记录
-                    </div>
-                  ) : (
-                    report.modelStats.map((m) => (
-                      <div
-                        key={m.model}
-                        className="flex items-center justify-between rounded-lg border bg-muted/25 px-3 py-2 text-xs"
-                      >
-                        <div>
-                          <span className="font-medium text-foreground">{m.model}</span>
-                          {m.autoRoutedCount > 0 ? (
-                            <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.2 text-[10px] text-primary">
-                              Auto 路由 {m.autoRoutedCount} 次
-                            </span>
-                          ) : null}
+              <AstryxCard
+                padding={0}
+                className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+              >
+                <Layout
+                  height="auto"
+                  header={
+                    <LayoutHeader padding={5} paddingBlockEnd={0}>
+                      <div className="grid gap-1.5 pb-2">
+                        <div className="font-heading text-sm font-semibold tracking-tight">
+                          模型调用与 Auto 路由分布
                         </div>
-                        <div className="text-right tabular-nums">
-                          <span className="font-medium">{m.calls} 次</span>
-                          <span className="ml-2 text-muted-foreground">· {m.credits} 积分</span>
+                        <div className="text-xs text-muted-foreground">
+                          统计各底层模型的实际调用次数、Auto 自动路由命中次数与消耗积分
                         </div>
                       </div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
+                    </LayoutHeader>
+                  }
+                  content={
+                    <LayoutContent padding={5} isScrollable={false}>
+                      <div className="space-y-2">
+                        {report.modelStats.length === 0 ? (
+                          <div className="py-6 text-center text-xs text-muted-foreground">
+                            暂无模型调用记录
+                          </div>
+                        ) : (
+                          report.modelStats.map((m) => (
+                            <div
+                              key={m.model}
+                              className="flex items-center justify-between rounded-lg border bg-muted/25 px-3 py-2 text-xs"
+                            >
+                              <div>
+                                <span className="font-medium text-foreground">{m.model}</span>
+                                {m.autoRoutedCount > 0 ? (
+                                  <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.2 text-[10px] text-primary">
+                                    Auto 路由 {m.autoRoutedCount} 次
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="text-right tabular-nums">
+                                <span className="font-medium">{m.calls} 次</span>
+                                <span className="ml-2 text-muted-foreground">
+                                  · {m.credits} 积分
+                                </span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </LayoutContent>
+                  }
+                />
+              </AstryxCard>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">系统工具调用排行榜</CardTitle>
-                  <CardDescription className="text-xs">
-                    客户在 AI 对话中最常触发的自动化工具
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {report.toolStats.length === 0 ? (
-                    <div className="py-6 text-center text-xs text-muted-foreground">
-                      暂无工具调用记录
-                    </div>
-                  ) : (
-                    report.toolStats.map((t) => (
-                      <div
-                        key={t.toolName}
-                        className="flex items-center justify-between rounded-lg border bg-muted/25 px-3 py-2 text-xs"
-                      >
-                        <span className="font-medium text-foreground">{t.toolName}</span>
-                        <span className="font-medium tabular-nums">{t.calls} 次</span>
+              <AstryxCard
+                padding={0}
+                className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+              >
+                <Layout
+                  height="auto"
+                  header={
+                    <LayoutHeader padding={5} paddingBlockEnd={0}>
+                      <div className="grid gap-1.5 pb-2">
+                        <div className="font-heading text-sm font-semibold tracking-tight">
+                          系统工具调用排行榜
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          客户在 AI 对话中最常触发的自动化工具
+                        </div>
                       </div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
+                    </LayoutHeader>
+                  }
+                  content={
+                    <LayoutContent padding={5} isScrollable={false}>
+                      <div className="space-y-2">
+                        {report.toolStats.length === 0 ? (
+                          <div className="py-6 text-center text-xs text-muted-foreground">
+                            暂无工具调用记录
+                          </div>
+                        ) : (
+                          report.toolStats.map((t) => (
+                            <div
+                              key={t.toolName}
+                              className="flex items-center justify-between rounded-lg border bg-muted/25 px-3 py-2 text-xs"
+                            >
+                              <span className="font-medium text-foreground">{t.toolName}</span>
+                              <span className="font-medium tabular-nums">{t.calls} 次</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </LayoutContent>
+                  }
+                />
+              </AstryxCard>
             </div>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">最近客户 AI 对话会话追踪</CardTitle>
-                <CardDescription className="text-xs">
-                  查看客户最近在用 AI 处理什么项目、调用了几个工具以及最后回复摘要
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="border-y bg-muted/50 text-muted-foreground">
-                      <tr>
-                        <th className="px-4 py-2.5 font-medium">时间</th>
-                        <th className="px-3 py-2.5 font-medium">客户</th>
-                        <th className="px-3 py-2.5 font-medium">对话标题 / 关联项目</th>
-                        <th className="px-3 py-2.5 font-medium">调度模型</th>
-                        <th className="px-3 py-2.5 text-right font-medium">消息 / 工具 / 积分</th>
-                        <th className="px-4 py-2.5 font-medium">AI 最后回复摘要</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {report.recentConversations.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                            暂无对话记录
-                          </td>
-                        </tr>
-                      ) : (
-                        report.recentConversations.map((c) => (
-                          <tr key={c.id} className="hover:bg-muted/35">
-                            <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground tabular-nums">
-                              {formatDateTime(c.updatedAt)}
-                            </td>
-                            <td className="px-3 py-2.5 font-medium whitespace-nowrap">
-                              {c.userName}
-                            </td>
-                            <td className="px-3 py-2.5">
-                              <div className="max-w-48 truncate font-medium">{c.title}</div>
-                              {c.projectName ? (
-                                <div className="max-w-48 truncate text-[11px] text-muted-foreground">
-                                  项目：{c.projectName}
-                                </div>
-                              ) : null}
-                            </td>
-                            <td className="px-3 py-2.5 whitespace-nowrap">
-                              <span className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
-                                {c.model}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2.5 text-right whitespace-nowrap tabular-nums">
-                              {c.messageCount} 条 · {c.toolCount} 工具 · {c.totalCost} 分
-                            </td>
-                            <td className="max-w-xs truncate px-4 py-2.5 text-muted-foreground">
-                              {c.lastAssistantPreview || '—'}
-                            </td>
+            <AstryxCard
+              padding={0}
+              className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+            >
+              <Layout
+                height="auto"
+                header={
+                  <LayoutHeader padding={5} paddingBlockEnd={0}>
+                    <div className="grid gap-1.5 pb-2">
+                      <div className="font-heading text-sm font-semibold tracking-tight">
+                        最近客户 AI 对话会话追踪
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        查看客户最近在用 AI 处理什么项目、调用了几个工具以及最后回复摘要
+                      </div>
+                    </div>
+                  </LayoutHeader>
+                }
+                content={
+                  <LayoutContent padding={0} isScrollable={false}>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="border-y bg-muted/50 text-muted-foreground">
+                          <tr>
+                            <th className="px-4 py-2.5 font-medium">时间</th>
+                            <th className="px-3 py-2.5 font-medium">客户</th>
+                            <th className="px-3 py-2.5 font-medium">对话标题 / 关联项目</th>
+                            <th className="px-3 py-2.5 font-medium">调度模型</th>
+                            <th className="px-3 py-2.5 text-right font-medium">
+                              消息 / 工具 / 积分
+                            </th>
+                            <th className="px-4 py-2.5 font-medium">AI 最后回复摘要</th>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
+                        </thead>
+                        <tbody className="divide-y">
+                          {report.recentConversations.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan={6}
+                                className="px-4 py-8 text-center text-muted-foreground"
+                              >
+                                暂无对话记录
+                              </td>
+                            </tr>
+                          ) : (
+                            report.recentConversations.map((c) => (
+                              <tr key={c.id} className="hover:bg-muted/35">
+                                <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground tabular-nums">
+                                  {formatDateTime(c.updatedAt)}
+                                </td>
+                                <td className="px-3 py-2.5 font-medium whitespace-nowrap">
+                                  {c.userName}
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <div className="max-w-48 truncate font-medium">{c.title}</div>
+                                  {c.projectName ? (
+                                    <div className="max-w-48 truncate text-[11px] text-muted-foreground">
+                                      项目：{c.projectName}
+                                    </div>
+                                  ) : null}
+                                </td>
+                                <td className="px-3 py-2.5 whitespace-nowrap">
+                                  <span className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
+                                    {c.model}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2.5 text-right whitespace-nowrap tabular-nums">
+                                  {c.messageCount} 条 · {c.toolCount} 工具 · {c.totalCost} 分
+                                </td>
+                                <td className="max-w-xs truncate px-4 py-2.5 text-muted-foreground">
+                                  {c.lastAssistantPreview || '—'}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </LayoutContent>
+                }
+              />
+            </AstryxCard>
           </div>
         ) : null}
 
         {/* Tab 4: 异常与排障日志 */}
         {activeTab === 'errors' ? (
           <div className="mt-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Activity className="size-4 text-primary" />
-                  AI 与接口异常排障中心
-                </CardTitle>
-                <CardDescription>
-                  自动捕获 AI
-                  密钥失效（401）、余额不足（402）、网关拦截（403）、限流（429）或超时等异常。点击右侧复制按钮即可将完整排障上下文复制出来定位问题。
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {report.errorLogs.length === 0 ? (
-                  <EmptyState
-                    compact
-                    title="当前系统运行良好"
-                    description="没有捕获到 AI 对话或工具异常记录"
-                  />
-                ) : (
-                  <div className="space-y-2.5">
-                    {report.errorLogs.map((err) => (
-                      <div
-                        key={err.id}
-                        className="flex flex-col gap-1.5 rounded-xl border border-destructive/25 bg-destructive/5 p-3 text-xs"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant="error"
-                              className="px-1.5 py-0 text-[10px]"
-                              label={'异常'}
-                            />
-                            <span className="font-semibold text-foreground">
-                              {err.errorMessage}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <span>{formatDateTime(err.createdAt)}</span>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="h-6 px-2 text-[11px]"
-                              onClick={() => {
-                                const text = `[排障日志] 时间: ${err.createdAt}\n客户: ${err.userName} (${err.userId})\n模型: ${err.modelName} (${err.modelId})\n项目ID: ${err.projectId ?? '无'}\n用户指令: ${err.promptPreview}\n报错信息: ${err.errorMessage}`
-                                void navigator.clipboard?.writeText(text)
-                                toast.success('已复制该条排障上下文')
-                              }}
-                              icon={<Copy />}
-                              label="复制排障信息"
-                            />
-                          </div>
+            <AstryxCard
+              padding={0}
+              className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+            >
+              <Layout
+                height="auto"
+                header={
+                  <LayoutHeader padding={5} paddingBlockEnd={0}>
+                    <div className="flex items-center gap-2 pt-5 font-heading text-base font-semibold tracking-tight">
+                      <Activity className="size-4 text-primary" />
+                      AI 与接口异常排障中心
+                    </div>
+                    <div className="pt-1.5 text-sm text-muted-foreground">
+                      自动捕获 AI
+                      密钥失效（401）、余额不足（402）、网关拦截（403）、限流（429）或超时等异常。点击右侧复制按钮即可将完整排障上下文复制出来定位问题。
+                    </div>
+                  </LayoutHeader>
+                }
+                content={
+                  <LayoutContent padding={5} isScrollable={false}>
+                    <div>
+                      {report.errorLogs.length === 0 ? (
+                        <EmptyState
+                          compact
+                          title="当前系统运行良好"
+                          description="没有捕获到 AI 对话或工具异常记录"
+                        />
+                      ) : (
+                        <div className="space-y-2.5">
+                          {report.errorLogs.map((err) => (
+                            <div
+                              key={err.id}
+                              className="flex flex-col gap-1.5 rounded-xl border border-destructive/25 bg-destructive/5 p-3 text-xs"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <Badge
+                                    variant="error"
+                                    className="px-1.5 py-0 text-[10px]"
+                                    label={'异常'}
+                                  />
+                                  <span className="font-semibold text-foreground">
+                                    {err.errorMessage}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                  <span>{formatDateTime(err.createdAt)}</span>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    className="h-6 px-2 text-[11px]"
+                                    onClick={() => {
+                                      const text = `[排障日志] 时间: ${err.createdAt}\n客户: ${err.userName} (${err.userId})\n模型: ${err.modelName} (${err.modelId})\n项目ID: ${err.projectId ?? '无'}\n用户指令: ${err.promptPreview}\n报错信息: ${err.errorMessage}`
+                                      void navigator.clipboard?.writeText(text)
+                                      toast.success('已复制该条排障上下文')
+                                    }}
+                                    icon={<Copy />}
+                                    label="复制排障信息"
+                                  />
+                                </div>
+                              </div>
+                              <div className="text-muted-foreground">
+                                客户：<strong className="text-foreground">{err.userName}</strong> ·
+                                模型：
+                                <strong className="text-foreground">{err.modelName}</strong>
+                                {err.promptPreview ? ` · 触发指令：「${err.promptPreview}」` : ''}
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        <div className="text-muted-foreground">
-                          客户：<strong className="text-foreground">{err.userName}</strong> · 模型：
-                          <strong className="text-foreground">{err.modelName}</strong>
-                          {err.promptPreview ? ` · 触发指令：「${err.promptPreview}」` : ''}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                      )}
+                    </div>
+                  </LayoutContent>
+                }
+              />
+            </AstryxCard>
           </div>
         ) : null}
       </div>
