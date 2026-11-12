@@ -8,7 +8,9 @@ import { toast } from 'sonner'
 import { Button } from '@astryxdesign/core/Button'
 import { IconButton } from '@astryxdesign/core/IconButton'
 import { Field } from '@astryxdesign/core/Field'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card } from '@astryxdesign/core/Card'
+import { Layout, LayoutContent, LayoutHeader } from '@astryxdesign/core/Layout'
+
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -208,84 +210,131 @@ export function CompanyForm({
           {error.message}
         </div>
       ) : null}
-      <Card>
-        <CardHeader>
-          <CardTitle>抬头</CardTitle>
-          <CardDescription>用于报价单、方案、合同页眉及侧边栏标识</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          {field('name', '名称', {
-            required: true,
-            maxLength: 60,
-            placeholder: '公司、工作室或个人名称',
-          })}
-          {field('slogan', '副标题', { maxLength: 80 })}
-          <div className="md:col-span-2">
-            <ImageField
-              name="logo"
-              label="Logo"
-              url={initial.logoUrl}
-              hint="PNG 或 SVG，透明背景，≤ 3MB"
-            />
-          </div>
-        </CardContent>
+      <Card
+        padding={0}
+        className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+      >
+        <Layout
+          height="auto"
+          header={
+            <LayoutHeader padding={5} paddingBlockEnd={0}>
+              <div className="grid gap-1.5">
+                <div className="font-heading text-base font-semibold tracking-tight">抬头</div>
+                <div className="text-sm text-muted-foreground">
+                  用于报价单、方案、合同页眉及侧边栏标识
+                </div>
+              </div>
+            </LayoutHeader>
+          }
+          content={
+            <LayoutContent padding={5} isScrollable={false}>
+              <div className="grid gap-4 md:grid-cols-2">
+                {field('name', '名称', {
+                  required: true,
+                  maxLength: 60,
+                  placeholder: '公司、工作室或个人名称',
+                })}
+                {field('slogan', '副标题', { maxLength: 80 })}
+                <div className="md:col-span-2">
+                  <ImageField
+                    name="logo"
+                    label="Logo"
+                    url={initial.logoUrl}
+                    hint="PNG 或 SVG，透明背景，≤ 3MB"
+                  />
+                </div>
+              </div>
+            </LayoutContent>
+          }
+        />
       </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>联系方式</CardTitle>
-          <CardDescription>用于报价单页脚与合同乙方信息</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          {field('phone', '联系电话', { inputMode: 'tel', maxLength: 30 })}
-          {field('email', '邮箱', { type: 'email', maxLength: 80 })}
-          <div className="md:col-span-2">{field('address', '地址', { maxLength: 200 })}</div>
-          <div className="md:col-span-2">
-            <ImageField
-              name="qrCode"
-              label="二维码"
-              url={initial.qrCodeUrl}
-              hint="微信或公众号二维码，上传后可裁剪为正方形"
-              squareCrop
-            />
-          </div>
-          {field('qrCaption', '二维码说明', { maxLength: 40, placeholder: '扫码添加微信' })}
-        </CardContent>
+      <Card
+        padding={0}
+        className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+      >
+        <Layout
+          height="auto"
+          header={
+            <LayoutHeader padding={5} paddingBlockEnd={0}>
+              <div className="grid gap-1.5">
+                <div className="font-heading text-base font-semibold tracking-tight">联系方式</div>
+                <div className="text-sm text-muted-foreground">用于报价单页脚与合同乙方信息</div>
+              </div>
+            </LayoutHeader>
+          }
+          content={
+            <LayoutContent padding={5} isScrollable={false}>
+              <div className="grid gap-4 md:grid-cols-2">
+                {field('phone', '联系电话', { inputMode: 'tel', maxLength: 30 })}
+                {field('email', '邮箱', { type: 'email', maxLength: 80 })}
+                <div className="md:col-span-2">{field('address', '地址', { maxLength: 200 })}</div>
+                <div className="md:col-span-2">
+                  <ImageField
+                    name="qrCode"
+                    label="二维码"
+                    url={initial.qrCodeUrl}
+                    hint="微信或公众号二维码，上传后可裁剪为正方形"
+                    squareCrop
+                  />
+                </div>
+                {field('qrCaption', '二维码说明', {
+                  maxLength: 40,
+                  placeholder: '扫码添加微信',
+                })}
+              </div>
+            </LayoutContent>
+          }
+        />
       </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>默认内容</CardTitle>
-          <CardDescription>新建报价与合同时自动带入</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-5">
-          <Field label="报价备注" inputID="quoteNotes">
-            <Textarea
-              id="quoteNotes"
-              name="quoteNotes"
-              rows={3}
-              maxLength={2000}
-              defaultValue={initial.quoteNotes}
-              placeholder="例如：报价有效期 30 天；设备质保一年，含一年免费上门维护"
-            />
-          </Field>
-          <Field label="合同条款" inputID="contractTerms">
-            <Textarea
-              id="contractTerms"
-              name="contractTerms"
-              rows={7}
-              maxLength={5000}
-              defaultValue={initial.contractTerms}
-              className="leading-relaxed"
-            />
-          </Field>
-          <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-            <Label htmlFor="printProductImages">打印报价单时显示产品缩略图</Label>
-            <Switch
-              id="printProductImages"
-              name="printProductImages"
-              defaultChecked={initial.printProductImages}
-            />
-          </div>
-        </CardContent>
+      <Card
+        padding={0}
+        className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+      >
+        <Layout
+          height="auto"
+          header={
+            <LayoutHeader padding={5} paddingBlockEnd={0}>
+              <div className="grid gap-1.5">
+                <div className="font-heading text-base font-semibold tracking-tight">默认内容</div>
+                <div className="text-sm text-muted-foreground">新建报价与合同时自动带入</div>
+              </div>
+            </LayoutHeader>
+          }
+          content={
+            <LayoutContent padding={5} isScrollable={false}>
+              <div className="grid gap-5">
+                <Field label="报价备注" inputID="quoteNotes">
+                  <Textarea
+                    id="quoteNotes"
+                    name="quoteNotes"
+                    rows={3}
+                    maxLength={2000}
+                    defaultValue={initial.quoteNotes}
+                    placeholder="例如：报价有效期 30 天；设备质保一年，含一年免费上门维护"
+                  />
+                </Field>
+                <Field label="合同条款" inputID="contractTerms">
+                  <Textarea
+                    id="contractTerms"
+                    name="contractTerms"
+                    rows={7}
+                    maxLength={5000}
+                    defaultValue={initial.contractTerms}
+                    className="leading-relaxed"
+                  />
+                </Field>
+                <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                  <Label htmlFor="printProductImages">打印报价单时显示产品缩略图</Label>
+                  <Switch
+                    id="printProductImages"
+                    name="printProductImages"
+                    defaultChecked={initial.printProductImages}
+                  />
+                </div>
+              </div>
+            </LayoutContent>
+          }
+        />
       </Card>
       <DocumentTemplateSettings
         kinds={documents.kinds}

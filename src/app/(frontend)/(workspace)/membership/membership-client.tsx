@@ -9,6 +9,8 @@ import { toast } from 'sonner'
 import { PageHeader } from '@/components/page-header'
 import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
+import { Card as AstryxCard } from '@astryxdesign/core/Card'
+import { Layout, LayoutContent, LayoutHeader } from '@astryxdesign/core/Layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import {
@@ -117,7 +119,10 @@ export function MembershipClient({
         }
       />
 
-      <Card className="gap-0 overflow-hidden py-0">
+      <AstryxCard
+        padding={0}
+        className="overflow-hidden border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+      >
         <div className="flex flex-wrap items-start justify-between gap-4 bg-linear-to-br from-primary/10 via-transparent to-transparent px-6 py-5">
           <div className="space-y-1">
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -130,7 +135,7 @@ export function MembershipClient({
             <p className="text-xs text-muted-foreground">{initial.upgradeHint}</p>
           </div>
         </div>
-      </Card>
+      </AstryxCard>
 
       <Card className="py-4">
         <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -254,52 +259,62 @@ export function MembershipClient({
 
       {/* 最近积分明细 */}
       {initial.ledger.length > 0 ? (
-        <Card className="gap-0 overflow-hidden py-0">
-          <CardHeader className="border-b py-4">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <History className="size-4 text-muted-foreground" />
-              最近积分明细
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="pl-6">说明</TableHead>
-                  <TableHead className="text-right">变动</TableHead>
-                  <TableHead className="text-right">结余</TableHead>
-                  <TableHead className="pr-6 text-right">时间</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {initial.ledger.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="pl-6">
-                      <span className="font-medium">{row.reason}</span>
-                      {row.model ? (
-                        <span className="ml-2 text-xs text-muted-foreground">{row.model}</span>
-                      ) : null}
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        'text-right font-medium tabular-nums',
-                        row.delta > 0 ? 'text-success' : 'text-foreground',
-                      )}
-                    >
-                      {row.delta > 0 ? `+${row.delta}` : row.delta}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground tabular-nums">
-                      {row.balanceAfter}
-                    </TableCell>
-                    <TableCell className="pr-6 text-right text-xs text-muted-foreground tabular-nums">
-                      {fmtDateTime(row.createdAt)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <AstryxCard
+          padding={0}
+          className="overflow-hidden border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+        >
+          <Layout
+            height="auto"
+            header={
+              <LayoutHeader padding={0}>
+                <div className="flex items-center gap-2 border-b px-5 pt-4 pb-5 font-heading text-base font-semibold tracking-tight">
+                  <History className="size-4 text-muted-foreground" />
+                  最近积分明细
+                </div>
+              </LayoutHeader>
+            }
+            content={
+              <LayoutContent padding={0} isScrollable={false}>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="pl-6">说明</TableHead>
+                      <TableHead className="text-right">变动</TableHead>
+                      <TableHead className="text-right">结余</TableHead>
+                      <TableHead className="pr-6 text-right">时间</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {initial.ledger.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell className="pl-6">
+                          <span className="font-medium">{row.reason}</span>
+                          {row.model ? (
+                            <span className="ml-2 text-xs text-muted-foreground">{row.model}</span>
+                          ) : null}
+                        </TableCell>
+                        <TableCell
+                          className={cn(
+                            'text-right font-medium tabular-nums',
+                            row.delta > 0 ? 'text-success' : 'text-foreground',
+                          )}
+                        >
+                          {row.delta > 0 ? `+${row.delta}` : row.delta}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground tabular-nums">
+                          {row.balanceAfter}
+                        </TableCell>
+                        <TableCell className="pr-6 text-right text-xs text-muted-foreground tabular-nums">
+                          {fmtDateTime(row.createdAt)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </LayoutContent>
+            }
+          />
+        </AstryxCard>
       ) : null}
     </section>
   )

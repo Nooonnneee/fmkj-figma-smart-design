@@ -6,7 +6,9 @@ import { PageHeader } from '@/components/page-header'
 import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
 import { EmptyState } from '@/components/empty-state'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card } from '@astryxdesign/core/Card'
+import { Layout, LayoutContent, LayoutHeader } from '@astryxdesign/core/Layout'
+
 import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
 import { getCompanyInfo } from '@/lib/cached-data'
@@ -100,194 +102,225 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
         <span>{plugin.tagline}</span>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>插件能力与接入位置</CardTitle>
-          <CardDescription>
-            {pending
-              ? `规划接入：${stage.label}（${stage.hint}）`
-              : `接入阶段：${stage.label}（${stage.hint}）${plugin.entry ? ` · 入口：${plugin.entry.label}` : ''}`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            {plugin.provides.map((item) => (
-              <Badge key={item} variant="neutral" label={item} />
-            ))}
-          </div>
-
-          {plugin.id === 'ai-copilot' ? (
-            <div className="space-y-4 border-t pt-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    内置对话技能模板（{DEFAULT_AI_TEMPLATES.length} 套）
-                  </span>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    href="/ai"
-                    icon={<Bot />}
-                    label="打开 AI 对话工作台"
-                  />
+      <Card
+        padding={0}
+        className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+      >
+        <Layout
+          height="auto"
+          header={
+            <LayoutHeader padding={5} paddingBlockEnd={0}>
+              <div className="grid gap-1.5">
+                <div className="font-heading text-base font-semibold tracking-tight">
+                  插件能力与接入位置
                 </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {DEFAULT_AI_TEMPLATES.map((tpl) => {
-                    const m =
-                      activeAiModels.find((x) => x.id === tpl.recommendedModelId) ??
-                      activeAiModels[0]
-                    return (
-                      <div key={tpl.id} className="rounded-lg border p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium">{tpl.name}</span>
-                          <Badge
-                            variant="neutral"
-                            className="h-4 px-1.5 text-xs"
-                            label={tpl.category}
-                          />
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">{tpl.description}</p>
-                        <div className="mt-1.5 text-xs text-muted-foreground tabular-nums">
-                          推荐：{m?.name} · 连接 {tpl.requiredPlugins.length} 个插件
-                        </div>
-                      </div>
-                    )
-                  })}
+                <div className="text-sm text-muted-foreground">
+                  {pending
+                    ? `规划接入：${stage.label}（${stage.hint}）`
+                    : `接入阶段：${stage.label}（${stage.hint}）${plugin.entry ? ` · 入口：${plugin.entry.label}` : ''}`}
                 </div>
               </div>
-
-              <div className="space-y-2 border-t pt-3">
-                <div className="text-xs font-medium text-muted-foreground">可用模型</div>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {activeAiModels.map((m) => (
-                    <div key={m.id} className="rounded-lg border p-2.5 text-xs">
-                      <div className="flex items-center justify-between font-medium">
-                        <span>{m.name}</span>
-                        <span className="text-muted-foreground tabular-nums">×{m.cost}</span>
-                      </div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">{m.tag}</div>
-                    </div>
+            </LayoutHeader>
+          }
+          content={
+            <LayoutContent padding={5} isScrollable={false}>
+              <div className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  {plugin.provides.map((item) => (
+                    <Badge key={item} variant="neutral" label={item} />
                   ))}
                 </div>
-              </div>
-            </div>
-          ) : null}
 
-          {plugin.id === 'doc-styles' ? (
-            <div className="space-y-2 border-t pt-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">
-                  包含的 {PLUGIN_DOC_STYLES.length} 套扩展打印风格
-                </span>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  href="/settings"
-                  icon={<Settings />}
-                  label="设置默认模板"
-                />
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {PLUGIN_DOC_STYLES.map((s) => (
-                  <div key={s.id} className="flex items-start gap-2.5 rounded-lg border p-3">
-                    <span
-                      className="mt-0.5 flex shrink-0 overflow-hidden rounded-sm ring-1 ring-foreground/10"
-                      aria-hidden
-                    >
-                      <span className="size-3.5" style={{ backgroundColor: s.colors.paper }} />
-                      <span className="size-3.5" style={{ backgroundColor: s.colors.accent }} />
-                      <span className="size-3.5" style={{ backgroundColor: s.colors.headBg }} />
-                    </span>
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium">{s.name}</div>
-                      <p className="text-xs text-muted-foreground">{s.description}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {gallery ? (
-            <div className="space-y-3 border-t pt-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-medium text-muted-foreground">
-                  可用的方案模板（业主方案 {gallery.items.filter((t) => t.kind === 'owner').length}{' '}
-                  套 · 施工交底 {gallery.items.filter((t) => t.kind === 'construction').length} 套）
-                </span>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  href="/templates"
-                  icon={<ExternalLink />}
-                  label="打开模板库"
-                />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {gallery.items.map((t) => (
-                  <TemplateCard key={t.value} t={t} thumb={gallery.thumbs[t.value]} />
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {plugin.ai ? (
-            <div className="space-y-3 border-t pt-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-medium text-muted-foreground">
-                  插件 AI 元数据（工具 {plugin.ai.tools.length} · 技能 {plugin.ai.skills.length} ·
-                  知识条目 {plugin.ai.knowledge.length}）
-                </span>
-                <div className="flex flex-wrap gap-1">
-                  {plugin.ai.permissions.map((perm) => {
-                    const meta = AI_PERMISSIONS.find((p) => p.value === perm)
-                    return (
-                      <Badge
-                        key={perm}
-                        variant="neutral"
-                        className="font-mono text-[10px] font-normal"
-                        aria-label={meta?.label}
-                        label={perm}
-                      />
-                    )
-                  })}
-                </div>
-              </div>
-
-              {plugin.ai.tools.length > 0 ? (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {plugin.ai.tools.map((tool) => (
-                    <div key={tool.name} className="rounded-lg border p-3 text-xs">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-medium">{tool.title}</span>
-                        <Badge
-                          variant="neutral"
-                          className="font-mono text-[10px]"
-                          label={`+${tool.cost} 积分 · ${tool.mutates ? '写入' : '只读'}`}
+                {plugin.id === 'ai-copilot' ? (
+                  <div className="space-y-4 border-t pt-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          内置对话技能模板（{DEFAULT_AI_TEMPLATES.length} 套）
+                        </span>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          href="/ai"
+                          icon={<Bot />}
+                          label="打开 AI 对话工作台"
                         />
                       </div>
-                      <code className="mt-0.5 block font-mono text-[11px] text-muted-foreground">
-                        {tool.name}
-                      </code>
-                      <p className="mt-1 text-muted-foreground">{tool.description}</p>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {DEFAULT_AI_TEMPLATES.map((tpl) => {
+                          const m =
+                            activeAiModels.find((x) => x.id === tpl.recommendedModelId) ??
+                            activeAiModels[0]
+                          return (
+                            <div key={tpl.id} className="rounded-lg border p-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-sm font-medium">{tpl.name}</span>
+                                <Badge
+                                  variant="neutral"
+                                  className="h-4 px-1.5 text-xs"
+                                  label={tpl.category}
+                                />
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {tpl.description}
+                              </p>
+                              <div className="mt-1.5 text-xs text-muted-foreground tabular-nums">
+                                推荐：{m?.name} · 连接 {tpl.requiredPlugins.length} 个插件
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
-                  ))}
-                </div>
-              ) : null}
 
-              {plugin.ai.knowledge.length > 0 ? (
-                <div className="space-y-1.5">
-                  {plugin.ai.knowledge.map((k) => (
-                    <div key={k.id} className="rounded-lg border bg-muted/20 px-3 py-2 text-xs">
-                      <span className="font-medium">{k.title}：</span>
-                      <span className="text-muted-foreground">{k.summary}</span>
+                    <div className="space-y-2 border-t pt-3">
+                      <div className="text-xs font-medium text-muted-foreground">可用模型</div>
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        {activeAiModels.map((m) => (
+                          <div key={m.id} className="rounded-lg border p-2.5 text-xs">
+                            <div className="flex items-center justify-between font-medium">
+                              <span>{m.name}</span>
+                              <span className="text-muted-foreground tabular-nums">×{m.cost}</span>
+                            </div>
+                            <div className="mt-0.5 text-xs text-muted-foreground">{m.tag}</div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </CardContent>
+                  </div>
+                ) : null}
+
+                {plugin.id === 'doc-styles' ? (
+                  <div className="space-y-2 border-t pt-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        包含的 {PLUGIN_DOC_STYLES.length} 套扩展打印风格
+                      </span>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        href="/settings"
+                        icon={<Settings />}
+                        label="设置默认模板"
+                      />
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {PLUGIN_DOC_STYLES.map((s) => (
+                        <div key={s.id} className="flex items-start gap-2.5 rounded-lg border p-3">
+                          <span
+                            className="mt-0.5 flex shrink-0 overflow-hidden rounded-sm ring-1 ring-foreground/10"
+                            aria-hidden
+                          >
+                            <span
+                              className="size-3.5"
+                              style={{ backgroundColor: s.colors.paper }}
+                            />
+                            <span
+                              className="size-3.5"
+                              style={{ backgroundColor: s.colors.accent }}
+                            />
+                            <span
+                              className="size-3.5"
+                              style={{ backgroundColor: s.colors.headBg }}
+                            />
+                          </span>
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium">{s.name}</div>
+                            <p className="text-xs text-muted-foreground">{s.description}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {gallery ? (
+                  <div className="space-y-3 border-t pt-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        可用的方案模板（业主方案{' '}
+                        {gallery.items.filter((t) => t.kind === 'owner').length} 套 · 施工交底{' '}
+                        {gallery.items.filter((t) => t.kind === 'construction').length} 套）
+                      </span>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        href="/templates"
+                        icon={<ExternalLink />}
+                        label="打开模板库"
+                      />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {gallery.items.map((t) => (
+                        <TemplateCard key={t.value} t={t} thumb={gallery.thumbs[t.value]} />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {plugin.ai ? (
+                  <div className="space-y-3 border-t pt-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        插件 AI 元数据（工具 {plugin.ai.tools.length} · 技能{' '}
+                        {plugin.ai.skills.length} · 知识条目 {plugin.ai.knowledge.length}）
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {plugin.ai.permissions.map((perm) => {
+                          const meta = AI_PERMISSIONS.find((p) => p.value === perm)
+                          return (
+                            <Badge
+                              key={perm}
+                              variant="neutral"
+                              className="font-mono text-[10px] font-normal"
+                              aria-label={meta?.label}
+                              label={perm}
+                            />
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    {plugin.ai.tools.length > 0 ? (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {plugin.ai.tools.map((tool) => (
+                          <div key={tool.name} className="rounded-lg border p-3 text-xs">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-medium">{tool.title}</span>
+                              <Badge
+                                variant="neutral"
+                                className="font-mono text-[10px]"
+                                label={`+${tool.cost} 积分 · ${tool.mutates ? '写入' : '只读'}`}
+                              />
+                            </div>
+                            <code className="mt-0.5 block font-mono text-[11px] text-muted-foreground">
+                              {tool.name}
+                            </code>
+                            <p className="mt-1 text-muted-foreground">{tool.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {plugin.ai.knowledge.length > 0 ? (
+                      <div className="space-y-1.5">
+                        {plugin.ai.knowledge.map((k) => (
+                          <div
+                            key={k.id}
+                            className="rounded-lg border bg-muted/20 px-3 py-2 text-xs"
+                          >
+                            <span className="font-medium">{k.title}：</span>
+                            <span className="text-muted-foreground">{k.summary}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </LayoutContent>
+          }
+        />
       </Card>
 
       {pending ? (
@@ -303,58 +336,74 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
           }
         />
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>在项目中使用</CardTitle>
-            <CardDescription>
-              {`选择下方项目，直接进入该能力在项目里的入口（${plugin.entry?.label ?? stage.hint}）`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="divide-y">
-            {projects.length === 0 ? (
-              <p className="py-4 text-sm text-muted-foreground">
-                还没有进行中的项目，请先在「项目」中创建。
-              </p>
-            ) : (
-              projects.map((proj) => {
-                const targetHref = plugin.entry
-                  ? plugin.entry.href(proj.id)
-                  : `/projects/${proj.id}`
-                const targetLabel =
-                  plugin.id === 'proposal'
-                    ? '打开方案'
-                    : plugin.id === 'doc-styles'
-                      ? '预览风格'
-                      : plugin.id === 'ai-copilot'
-                        ? '打开 AI 对话'
-                        : '打开点位图'
-                return (
-                  <div
-                    key={proj.id}
-                    className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <FolderKanban className="size-4 shrink-0 text-muted-foreground" />
-                        <span className="truncate text-sm font-medium">{proj.name}</span>
-                      </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
-                        {proj.customerName ? `${proj.customerName} · ` : ''}
-                        {proj.platform || '平台待定'} · {proj.points} 个点位
-                      </p>
-                    </div>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      href={targetHref}
-                      icon={<ExternalLink />}
-                      label={targetLabel}
-                    />
+        <Card
+          padding={0}
+          className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+        >
+          <Layout
+            height="auto"
+            header={
+              <LayoutHeader padding={5} paddingBlockEnd={0}>
+                <div className="grid gap-1.5">
+                  <div className="font-heading text-base font-semibold tracking-tight">
+                    在项目中使用
                   </div>
-                )
-              })
-            )}
-          </CardContent>
+                  <div className="text-sm text-muted-foreground">
+                    {`选择下方项目，直接进入该能力在项目里的入口（${plugin.entry?.label ?? stage.hint}）`}
+                  </div>
+                </div>
+              </LayoutHeader>
+            }
+            content={
+              <LayoutContent padding={5} isScrollable={false}>
+                <div className="divide-y">
+                  {projects.length === 0 ? (
+                    <p className="py-4 text-sm text-muted-foreground">
+                      还没有进行中的项目，请先在「项目」中创建。
+                    </p>
+                  ) : (
+                    projects.map((proj) => {
+                      const targetHref = plugin.entry
+                        ? plugin.entry.href(proj.id)
+                        : `/projects/${proj.id}`
+                      const targetLabel =
+                        plugin.id === 'proposal'
+                          ? '打开方案'
+                          : plugin.id === 'doc-styles'
+                            ? '预览风格'
+                            : plugin.id === 'ai-copilot'
+                              ? '打开 AI 对话'
+                              : '打开点位图'
+                      return (
+                        <div
+                          key={proj.id}
+                          className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <FolderKanban className="size-4 shrink-0 text-muted-foreground" />
+                              <span className="truncate text-sm font-medium">{proj.name}</span>
+                            </div>
+                            <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                              {proj.customerName ? `${proj.customerName} · ` : ''}
+                              {proj.platform || '平台待定'} · {proj.points} 个点位
+                            </p>
+                          </div>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            href={targetHref}
+                            icon={<ExternalLink />}
+                            label={targetLabel}
+                          />
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </LayoutContent>
+            }
+          />
         </Card>
       )}
     </section>
