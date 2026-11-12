@@ -194,3 +194,24 @@ membership/membership-client.tsx
 join/[id]/page.tsx
 design-pilot/page.tsx     ← 按三档策略 T3 永久保留（左右对照页），不动
 ```
+
+### 🔴 夜间踩到的协作坑（必须记住）
+
+**两个 agent 在同一个工作区并发写文件 → 互相踩。**
+
+实测经过：我派了一个 agent 做 reports 剩余 4 张卡，同时上一个 agent 的 PR #136 被合并。
+结果：
+
+- 后一个 agent 开工时，前一个已经把同样 4 张卡改完了
+- 它的 `git commit` 一度提交到 `main` 上（因为并发 agent 切了分支）
+- 它自己把 main 强制还原，才没造成污染
+- 分支基线也乱了（不是「最新 main」）
+
+**规则（写死）：**
+
+1. **同一时间只派一个改同一个文件的 agent。** 文件组必须互不重叠。
+2. **合并 PR 和派新 agent 不要同时进行。** 先合并、先 pull，再派下一个。
+3. **agent 完成后必须核对 `git branch --show-current` 和 `git status`**，不要假定它在对的分支上。
+4. **派活时明确告诉 agent：如果发现文件已被改过，先停下报告，不要覆盖。**
+
+这条是今晚最贵的一课：三个 agent 里有两个在并发上浪费了时间。
