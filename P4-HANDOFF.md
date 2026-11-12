@@ -229,6 +229,40 @@ quote-editor / membership-client / join）**全部零漂移转换，0 保留**�
 
 ### P5
 
+#### Input 档结论（2026-11-13 实测，别再重复评估）
+
+**A 档 = 0 处。** 全仓 18 个 `<Input>` 使用点（分布在 11 个文件），无一能直接换官方 `TextInput`。
+
+原因：**本仓 `input.tsx` 适配层存在的意义，就是承接官方不收的三样东西** ——
+原生 `onChange` 签名、`className`、`defaultValue`。现有调用点几乎都用到其中之一。
+
+| 档  | 数量 | 原因                                                                                                                                                   |
+| --- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| B   | 12   | `className` 做尺寸/图标内边距（`h-8`/`w-20`/`pl-9`/`pr-8`…）；5 处 `defaultValue` 非受控；7 处 `type` 不受支持（number×6 / date×3 / datetime-local×1） |
+| C   | 6    | 包装层/表单机制耦合（`quote-editor:158` 的 EditableNumber 用本地 state 覆盖 value；`point-map-editor:2034` 靠 defaultValue+onBlur+key 重置）           |
+
+**唯一候选（`contract-preview.tsx:147`）也被否决**，实测原因：
+
+1. `controlClassName` 挂的是**外层 wrapper div**，不是 `<input>`。`font-mono` 类名能渲染，
+   但 `<input>` 上有 stylex 的 `fontFamily: --font-family-body`，**字体族不生效** ——
+   正是「看着转了、其实静默没生效」。`containerClassName` 同样无效。
+2. **`maxLength` 也是静默丢失**：`TextInputProps` 整条继承链都不含 `maxLength`，
+   而 4 处调用点全带它（合同编号 40 / 名称 60 / 电话 30 / 地址 200）。
+   走官方组件要么改渲染路径透传，要么删掉输入长度约束（数据模型收紧，不能擅自做）。
+
+→ **结论：Input 这一档不转。** 适配层保留。
+P5 要删掉 `input.tsx`，前置是逐个调用点重写（去 className 依赖、改受控 state、
+number/date 换 inputMode 或保留原生），那是独立工程，不是「迁移」。
+
+#### 既存问题（不是本次造成的，但要知道）
+
+`src/payload.config.ts` 在 main 上就是垫片（`export { default } from './payload.selfhost.config'`），
+来自 PR #38（`f92046f`）。仓库里 Figma 托管配置已丢失。
+CI 有补救（`ci-selfhosted.yml` 先 `git checkout --` 再重写垫片），所以 CI 能过。
+→ 待 owner 决定是否恢复。
+
+### 原 P5 计划
+
 ```
 删适配层 31 个文件（src/components/ui/*.tsx）
 ```
