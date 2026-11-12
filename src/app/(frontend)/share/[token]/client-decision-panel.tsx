@@ -11,7 +11,6 @@ import { CheckboxInput } from '@astryxdesign/core/CheckboxInput'
 import { Field } from '@astryxdesign/core/Field'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 
 import { submitIntent } from './actions'
