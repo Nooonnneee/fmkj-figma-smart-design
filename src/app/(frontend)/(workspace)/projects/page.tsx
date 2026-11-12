@@ -10,7 +10,7 @@ import { PageHeader } from '@/components/page-header'
 import { SearchSubmit } from '@/components/search-submit'
 import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
-import { Card } from '@/components/ui/card'
+import { Card } from '@astryxdesign/core/Card'
 import { Input } from '@/components/ui/input'
 import {
   Table,
@@ -310,7 +310,10 @@ export default async function ProjectsPage({
           }
         />
       ) : (
-        <Card className="overflow-hidden border-border py-0 shadow-2xs">
+        <Card
+          padding={0}
+          className="overflow-hidden border-0 bg-card text-sm text-card-foreground shadow-2xs ring-1 ring-border"
+        >
           <Table>
             <TableHeader>
               <TableRow>
