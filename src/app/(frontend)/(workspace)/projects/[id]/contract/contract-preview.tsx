@@ -16,6 +16,7 @@ import {
 import { toast } from 'sonner'
 
 import { Button } from '@astryxdesign/core/Button'
+import { Selector } from '@astryxdesign/core/Selector'
 import { TextArea } from '@astryxdesign/core/TextArea'
 import { IconButton } from '@astryxdesign/core/IconButton'
 import { CheckboxInput } from '@astryxdesign/core/CheckboxInput'
@@ -197,29 +198,20 @@ export function ContractSectionEdit({
         return (
           <>
             <Field label="依据报价" inputID="contract-quote">
-              <Select
+              <Selector
+                label="依据报价"
+                isLabelHidden
                 value={draft.quoteId}
-                onValueChange={(v) => {
+                onChange={(v) => {
                   const q = quotes.find((x) => x.id === v)
                   set({ quoteId: v, ...(q ? { amount: q.total } : {}) })
                 }}
-              >
-                <SelectTrigger id="contract-quote" className="w-full min-w-0">
-                  <SelectValue className="min-w-0" />
-                </SelectTrigger>
-                <SelectContent>
-                  {quotes.map((q) => (
-                    <SelectItem key={q.id} value={q.id}>
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="truncate">{q.title}</span>
-                        <span className="shrink-0 text-muted-foreground tabular-nums">
-                          {yuan(q.total)}
-                        </span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                width="100%"
+                options={quotes.map((q) => ({
+                  value: q.id,
+                  label: `${q.title} ${yuan(q.total)}`,
+                }))}
+              />
             </Field>
             <div className="grid gap-2">
               <div className="flex items-center justify-between gap-2">
