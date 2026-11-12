@@ -118,6 +118,43 @@ Card  14 处引用 ❌→✅ **判断已纠正**（2026-11-13 实测）
                要点：`padding={0}` 防双层缩进；`padding={5}`=20px 对齐 `--card-spacing`；
                `paddingBlockEnd={0}` 复现「标题→内容 20px」；`border-0`+`ring-1 ring-border` 复现本仓描边。
                另：`CardAction` 全仓零引用，可从适配层直接删。
+
+#### Card 迁移的三档策略（2026-11-13 实测后拍板，不要再重新讨论）
+
+实测剩余 10 个文件共 **31 个 `<Card>`**，className 变体分布：
+
+```
+13x  plain（标准形，四边统一）          ← 直接套配方，零漂移
+ 5x  py-4（纵向 16px）                 ← 需逐槽反推
+ 2x  gap-3 / 2x gap-0 overflow-hidden ← 卡级 gap 被改过
+ 2x  border-border shadow-2xs         ← 仅为复现描边，配方已覆盖
+ 5x  py-0 / p-0（子元素自己管内边距）   ← 天然适配 padding={0}
+ 1x  w-full max-w-md text-center      ← 居中排版需额外处理
+```
+
+**决策（我拍的，理由附后）：**
+
+| 档 | 范围 | 策略 | 理由 |
+| --- | --- | --- | --- |
+| **T1 直接转** | `plain`(13) + `py-0`/`p-0`(5) + 仅描边变体(3) | 套基础配方 | 21/31，占 68%，零漂移 |
+| **T2 逐槽反推** | `py-4`/`py-5`(6) | 逐卡算 `padding` + 必要时 wrapper | reports 的 4 张 KPI 卡在首屏，8px 会被看出 |
+| **T3 保留** | `text-center` / 横排 flex header / 复杂 gap-0 | **登记为保留项，不转** | 硬转破坏布局，得不偿失 |
+
+**理由（对应 Label 迁移的先例）**：P3 的 Label 迁移之所以质量高，就是因为定了「四条跳过规则 + 三项永久保留」，
+**该跳就跳**。Card 同理——把 68% 干净的做掉，剩下的登记清楚，比硬转 100% 但破坏布局有价值。
+
+**特例：`design-pilot/page.tsx` 整页跳过。**
+它是「本仓旧组件 vs Astryx」的左右对照页，左栏**故意**保留旧组件作为对照组。
+转换它会消掉这个页面的存在意义。→ 除非 owner 要求整页重做，否则不动。
+
+**`reports-client.tsx` 单独一个批次。**
+11 张卡分在 4 个 Tab 里，是这批的风险集中点。必须先做它、单独验收，再动其余。
+
+**逐槽反推的已知坑（实测）**：
+`LayoutContent` 的 `padding={5}` 会盖掉 `--_layout-flush-block-*` 的坍缩，
+所以 header→content 的间距**来自 content 自己的 padding，不是 gap**。
+每张非标准卡必须逐槽算一遍，不能套公式。
+
 ````
 
 #### Label 迁移的四条跳过规则（实测固化，别每次重新盘点）
