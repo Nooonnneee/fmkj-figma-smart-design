@@ -706,49 +706,51 @@ export function UsageReportsClient({ report }: { report: CustomerUsageReport }) 
                   }
                   content={
                     <LayoutContent padding={0} isScrollable={false}>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                          <thead className="border-y bg-muted/50 text-muted-foreground">
-                            <tr>
-                              <th className="px-4 py-2 font-medium">时间</th>
-                              <th className="px-3 py-2 font-medium">上传文件名</th>
-                              <th className="px-3 py-2 font-medium">识别通道</th>
-                              <th className="px-3 py-2 text-right font-medium">
-                                开关 / 灯具 / 区域
-                              </th>
-                              <th className="px-4 py-2 text-right font-medium">识别耗时</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y">
-                            {report.uploadLogs.slice(0, 15).map((u) => {
-                              const mb = methodLabel(u.method)
-                              return (
-                                <tr key={u.id}>
-                                  <td className="px-4 py-2 text-muted-foreground tabular-nums">
-                                    {formatDateTime(u.createdAt)}
-                                  </td>
-                                  <td className="px-3 py-2 font-medium">{u.fileName}</td>
-                                  <td className="px-3 py-2">
-                                    <span
-                                      className={cn(
-                                        'rounded border px-1.5 py-0.2 text-[10px]',
-                                        mb.cls,
-                                      )}
-                                    >
-                                      {mb.text}
-                                    </span>
-                                  </td>
-                                  <td className="px-3 py-2 text-right tabular-nums">
-                                    开关 {u.switches} · 灯具 {u.lights} · 区域 {u.areas}
-                                  </td>
-                                  <td className="px-4 py-2 text-right text-muted-foreground tabular-nums">
-                                    {u.durationMs} ms
-                                  </td>
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                        </table>
+                      <div className="py-5">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="border-y bg-muted/50 text-muted-foreground">
+                              <tr>
+                                <th className="px-4 py-2 font-medium">时间</th>
+                                <th className="px-3 py-2 font-medium">上传文件名</th>
+                                <th className="px-3 py-2 font-medium">识别通道</th>
+                                <th className="px-3 py-2 text-right font-medium">
+                                  开关 / 灯具 / 区域
+                                </th>
+                                <th className="px-4 py-2 text-right font-medium">识别耗时</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                              {report.uploadLogs.slice(0, 15).map((u) => {
+                                const mb = methodLabel(u.method)
+                                return (
+                                  <tr key={u.id}>
+                                    <td className="px-4 py-2 text-muted-foreground tabular-nums">
+                                      {formatDateTime(u.createdAt)}
+                                    </td>
+                                    <td className="px-3 py-2 font-medium">{u.fileName}</td>
+                                    <td className="px-3 py-2">
+                                      <span
+                                        className={cn(
+                                          'rounded border px-1.5 py-0.2 text-[10px]',
+                                          mb.cls,
+                                        )}
+                                      >
+                                        {mb.text}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2 text-right tabular-nums">
+                                      开关 {u.switches} · 灯具 {u.lights} · 区域 {u.areas}
+                                    </td>
+                                    <td className="px-4 py-2 text-right text-muted-foreground tabular-nums">
+                                      {u.durationMs} ms
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </LayoutContent>
                   }
@@ -879,63 +881,65 @@ export function UsageReportsClient({ report }: { report: CustomerUsageReport }) 
                 }
                 content={
                   <LayoutContent padding={0} isScrollable={false}>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead className="border-y bg-muted/50 text-muted-foreground">
-                          <tr>
-                            <th className="px-4 py-2.5 font-medium">时间</th>
-                            <th className="px-3 py-2.5 font-medium">客户</th>
-                            <th className="px-3 py-2.5 font-medium">对话标题 / 关联项目</th>
-                            <th className="px-3 py-2.5 font-medium">调度模型</th>
-                            <th className="px-3 py-2.5 text-right font-medium">
-                              消息 / 工具 / 积分
-                            </th>
-                            <th className="px-4 py-2.5 font-medium">AI 最后回复摘要</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {report.recentConversations.length === 0 ? (
+                    <div className="py-5">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead className="border-y bg-muted/50 text-muted-foreground">
                             <tr>
-                              <td
-                                colSpan={6}
-                                className="px-4 py-8 text-center text-muted-foreground"
-                              >
-                                暂无对话记录
-                              </td>
+                              <th className="px-4 py-2.5 font-medium">时间</th>
+                              <th className="px-3 py-2.5 font-medium">客户</th>
+                              <th className="px-3 py-2.5 font-medium">对话标题 / 关联项目</th>
+                              <th className="px-3 py-2.5 font-medium">调度模型</th>
+                              <th className="px-3 py-2.5 text-right font-medium">
+                                消息 / 工具 / 积分
+                              </th>
+                              <th className="px-4 py-2.5 font-medium">AI 最后回复摘要</th>
                             </tr>
-                          ) : (
-                            report.recentConversations.map((c) => (
-                              <tr key={c.id} className="hover:bg-muted/35">
-                                <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground tabular-nums">
-                                  {formatDateTime(c.updatedAt)}
-                                </td>
-                                <td className="px-3 py-2.5 font-medium whitespace-nowrap">
-                                  {c.userName}
-                                </td>
-                                <td className="px-3 py-2.5">
-                                  <div className="max-w-48 truncate font-medium">{c.title}</div>
-                                  {c.projectName ? (
-                                    <div className="max-w-48 truncate text-[11px] text-muted-foreground">
-                                      项目：{c.projectName}
-                                    </div>
-                                  ) : null}
-                                </td>
-                                <td className="px-3 py-2.5 whitespace-nowrap">
-                                  <span className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
-                                    {c.model}
-                                  </span>
-                                </td>
-                                <td className="px-3 py-2.5 text-right whitespace-nowrap tabular-nums">
-                                  {c.messageCount} 条 · {c.toolCount} 工具 · {c.totalCost} 分
-                                </td>
-                                <td className="max-w-xs truncate px-4 py-2.5 text-muted-foreground">
-                                  {c.lastAssistantPreview || '—'}
+                          </thead>
+                          <tbody className="divide-y">
+                            {report.recentConversations.length === 0 ? (
+                              <tr>
+                                <td
+                                  colSpan={6}
+                                  className="px-4 py-8 text-center text-muted-foreground"
+                                >
+                                  暂无对话记录
                                 </td>
                               </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
+                            ) : (
+                              report.recentConversations.map((c) => (
+                                <tr key={c.id} className="hover:bg-muted/35">
+                                  <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground tabular-nums">
+                                    {formatDateTime(c.updatedAt)}
+                                  </td>
+                                  <td className="px-3 py-2.5 font-medium whitespace-nowrap">
+                                    {c.userName}
+                                  </td>
+                                  <td className="px-3 py-2.5">
+                                    <div className="max-w-48 truncate font-medium">{c.title}</div>
+                                    {c.projectName ? (
+                                      <div className="max-w-48 truncate text-[11px] text-muted-foreground">
+                                        项目：{c.projectName}
+                                      </div>
+                                    ) : null}
+                                  </td>
+                                  <td className="px-3 py-2.5 whitespace-nowrap">
+                                    <span className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
+                                      {c.model}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2.5 text-right whitespace-nowrap tabular-nums">
+                                    {c.messageCount} 条 · {c.toolCount} 工具 · {c.totalCost} 分
+                                  </td>
+                                  <td className="max-w-xs truncate px-4 py-2.5 text-muted-foreground">
+                                    {c.lastAssistantPreview || '—'}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </LayoutContent>
                 }
@@ -955,13 +959,15 @@ export function UsageReportsClient({ report }: { report: CustomerUsageReport }) 
                 height="auto"
                 header={
                   <LayoutHeader padding={5} paddingBlockEnd={0}>
-                    <div className="flex items-center gap-2 pt-5 font-heading text-base font-semibold tracking-tight">
-                      <Activity className="size-4 text-primary" />
-                      AI 与接口异常排障中心
-                    </div>
-                    <div className="pt-1.5 text-sm text-muted-foreground">
-                      自动捕获 AI
-                      密钥失效（401）、余额不足（402）、网关拦截（403）、限流（429）或超时等异常。点击右侧复制按钮即可将完整排障上下文复制出来定位问题。
+                    <div className="pb-3">
+                      <div className="flex items-center gap-2 font-heading text-base font-semibold tracking-tight">
+                        <Activity className="size-4 text-primary" />
+                        AI 与接口异常排障中心
+                      </div>
+                      <div className="mt-1.5 text-sm text-muted-foreground">
+                        自动捕获 AI
+                        密钥失效（401）、余额不足（402）、网关拦截（403）、限流（429）或超时等异常。点击右侧复制按钮即可将完整排障上下文复制出来定位问题。
+                      </div>
                     </div>
                   </LayoutHeader>
                 }
