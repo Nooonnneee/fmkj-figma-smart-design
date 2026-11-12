@@ -302,3 +302,68 @@ input 14 · label 11(剩保留项) · dropdown-menu 11 · sidebar 5
 3. `design-pilot/page.tsx` 是永久的例外（对照页）
 
 **这不是失败，是把工作量认清了。** 旧文档说「P5 删 30 个文件」，实际能删的远少于这个数。
+
+---
+
+## 夜间收尾总结（2026-11-13 04:30）
+
+### 产出（11 个 PR）
+
+```
+已合并 7 个：
+#132  受控 Select → 官方 Selector（4 处）
+#133  删 6 个零引用适配层文件
+#134  card ×4 + 纠正文档错判
+#135  Card T1 档 8 张
+#136  reports 7/11 张（4 张 KPI 零漂移）
+#137  reports 后 4 张 + 修 3 处底距
+#138  Card 剩余 6 文件 13 张（全部零漂移）
+#139  删 avatar / checkbox
+#141  project-form Label → Field（2 转 / 15 跳过）
+
+待合并 2 个：
+#143  DropdownMenu 档评估（A=0）
+#144  textarea/select 评估 + 清 3 处死导入（A=0）
+```
+
+### 三个「A 档为 0」的档
+
+| 组件                  | 官方不收的                                                                   | 结论                  |
+| --------------------- | ---------------------------------------------------------------------------- | --------------------- |
+| **Input**             | 原生 onChange 签名 / className / defaultValue / maxLength / number-date type | 18/18 处都依赖 → 不转 |
+| **DropdownMenu**      | asChild / 自由 children / 三段式 Sub / onSelect                              | 45/45 处都依赖 → 不转 |
+| **textarea + select** | defaultValue / className 静默丢弃；select 是结构差异                         | 7/7 处都依赖 → 不转   |
+
+**共同原因：适配层存在的意义，就是承接官方组件不收的东西。**
+
+### 今晚纠正的三条错误文档
+
+1. **Card「官方只有单 Card，需重写结构」** → 错。官方 `Card` + `Layout` 三槽可等价承接。
+2. **Card T3「必须保留」档** → 错。`padding={0}` + 内层 div 自管可绕开坍缩，**没有必须保留的卡型**。
+3. **Textarea「因为不会把 name 输出到 FormData 所以不可转」** → 错。官方 `htmlName` 会渲染 name。
+   真正原因是官方无 `defaultValue` + `className` 静默丢弃。
+
+### P5 的真实边界（给 owner）
+
+**旧文档说「P5 删 30 个文件」—— 实际能删的远少于这个数。**
+
+适配层 30 个文件的真实分类：
+
+| 类型                             | 数量  | 能否删                                                          |
+| -------------------------------- | ----- | --------------------------------------------------------------- |
+| 已删（零引用）                   | 8     | ✅ toggle/tabs/skeleton/popover/input-otp/field/avatar/checkbox |
+| Card（只剩 design-pilot 对照页） | 1     | ⚠️ 需 owner 决定对照页                                          |
+| 可继续「换 import」型            | 约 17 | ⚠️ 待逐档评估（多数可能是 A=0）                                 |
+| 已知需重写调用点                 | 4     | ❌ input / dropdown-menu / sidebar / label(保留项)              |
+
+**结论：P5 不是「删文件」任务，是「逐个调用点重写」工程。**
+需要 owner 明确：是否值得投入这个工程量，还是接受适配层长期存在。
+
+### 今晚踩到的坑（已写进规则 1-6）
+
+1. 同工作区并发写文件 → 提交落到错误分支
+2. 合并 PR 与派 agent 同时进行 → 分支基线错乱
+3. agent 报告「已推送」但实际没推到指定分支
+4. `git add -A` 把临时脚本一起提交
+5. 三个 agent 都在自建脚手架/起 dev server 上浪费过时间
+6. 陈旧分支占用目标分支名 → agent 停下来报告（这个做对了）
