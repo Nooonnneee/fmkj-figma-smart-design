@@ -27,6 +27,7 @@ import {
 import { toast } from 'sonner'
 
 import { Badge } from '@astryxdesign/core/Badge'
+import { Selector } from '@astryxdesign/core/Selector'
 import { Button } from '@astryxdesign/core/Button'
 import { IconButton } from '@astryxdesign/core/IconButton'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -478,24 +479,16 @@ export function AfterSalesBoard({
                 <div className="grid gap-4 py-1">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Field label="类型" error={errors.type}>
-                      <Select
+                      <Selector
+                        label="类型"
+                        isLabelHidden
                         value={editing.form.type}
-                        onValueChange={(v) => changeType(v as ServiceRecordType)}
-                        disabled={editing.form.type === 'backup'}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SERVICE_RECORD_TYPES.filter(
-                            (t) => t.value !== 'backup' || editing.form.type === 'backup',
-                          ).map((t) => (
-                            <SelectItem key={t.value} value={t.value}>
-                              {t.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        onChange={(v) => changeType(v as ServiceRecordType)}
+                        isDisabled={editing.form.type === 'backup'}
+                        options={SERVICE_RECORD_TYPES.filter(
+                          (t) => t.value !== 'backup' || editing.form.type === 'backup',
+                        ).map((t) => ({ value: t.value, label: t.label }))}
+                      />
                     </Field>
                     <Field label="服务日期" error={errors.serviceDate} htmlFor="svc-date">
                       <Input
@@ -518,38 +511,25 @@ export function AfterSalesBoard({
                   </Field>
                   <div className="grid gap-4 sm:grid-cols-3">
                     <Field label="状态">
-                      <Select
+                      <Selector
+                        label="状态"
+                        isLabelHidden
                         value={editing.form.status}
-                        onValueChange={(v) => patchForm({ status: v })}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SERVICE_RECORD_STATUSES.map((s) => (
-                            <SelectItem key={s.value} value={s.value}>
-                              {s.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        onChange={(v) => patchForm({ status: v })}
+                        options={SERVICE_RECORD_STATUSES.map((s) => ({
+                          value: s.value,
+                          label: s.label,
+                        }))}
+                      />
                     </Field>
                     <Field label="收费方式">
-                      <Select
+                      <Selector
+                        label="收费方式"
+                        isLabelHidden
                         value={editing.form.billing}
-                        onValueChange={(v) => patchForm({ billing: v })}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SERVICE_BILLING.map((b) => (
-                            <SelectItem key={b.value} value={b.value}>
-                              {b.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        onChange={(v) => patchForm({ billing: v })}
+                        options={SERVICE_BILLING.map((b) => ({ value: b.value, label: b.label }))}
+                      />
                     </Field>
                     {editing.form.billing === 'paid' ? (
                       <Field label="收费金额（元）" error={errors.fee} htmlFor="svc-fee">
