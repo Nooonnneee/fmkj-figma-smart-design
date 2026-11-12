@@ -163,3 +163,34 @@ button 2       switch 1       sonner 1      command 1     badge 1
 | 01:30 | `design-pilot/page.tsx` 整页跳过                            | 它是「旧组件 vs Astryx」对照页，转了就没意义                                            |
 | 02:00 | 禁止 agent 起 dev server 做像素比对（除 reports 的 KPI 卡） | 第二个 agent 在这上面烧了半小时没产出                                                   |
 | 02:30 | reports 保留 4 张不强推                                     | agent 步数用尽，但已转的 7 张验收全过。留着下轮比硬塞好                                 |
+| C1    | ✅ 合并 PR #135（T1 档 8 张 / 4 文件）                      | squash `019a219`；真机验 4 页                                                           |
+| C2    | ✅ 合并 PR #136（reports-client 11/11 张）                  | squash `6c2d336`；四 Tab 全验                                                           |
+
+### C2 的关键发现（下次别再踩）
+
+1. **`/settings/reports` 有平台运营权限门禁**（`isPlatformOperator`）。
+   用 `demo@fmkj.local` 打开只会看到「当前账号没有平台运营权限」，**页面是空的**。
+   本地验证要临时加 `PLATFORM_ADMIN_EMAILS="demo@fmkj.local"` 再重启 dev —— 验完撤掉。
+   （第一次验了个空页面还以为改坏了。）
+2. **插件详情页真实路由是 `/plugins/<id>`**，不是 `/capabilities/<id>`。
+   列表页链接来自 `plugin-list.tsx` 的 `href={/plugins/${p.id}}`。
+3. **登录页默认是扫码 Tab**，「邮箱密码登录」要先点；用 `getByText('邮箱密码登录')`
+   比 `button.astryx-tab` 稳（后者偶尔匹配不到）。
+4. **dev 服务反复被打断**（agent 改文件热重载 + 端口没人清）。重启姿势要带环境变量：
+   ```
+   DATABASE_URI="postgres://fmkj@127.0.0.1:55432/fmkj" PAYLOAD_SECRET=... \
+     PAYLOAD_CONFIG_PATH="src/payload.selfhost.config.ts" pnpm dev
+   ```
+   先 `for pid in $(lsof -ti :3000); do kill -9 $pid; done` 再起。
+
+### C3 剩余（7 个文件）
+
+```
+capabilities/plugin-list.tsx
+projects/project-form.tsx
+projects/[id]/after-sales/after-sales-board.tsx
+projects/[id]/quotes/[quoteId]/quote-editor.tsx
+membership/membership-client.tsx
+join/[id]/page.tsx
+design-pilot/page.tsx     ← 按三档策略 T3 永久保留（左右对照页），不动
+```
