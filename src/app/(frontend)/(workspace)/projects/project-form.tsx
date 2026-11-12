@@ -16,7 +16,7 @@ import { toast } from 'sonner'
 
 import { Button } from '@astryxdesign/core/Button'
 import { Field } from '@astryxdesign/core/Field'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card as AstryxCard } from '@astryxdesign/core/Card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -198,16 +198,20 @@ export function ProjectForm({
         </div>
       ) : null}
 
-      <Card className="gap-0 border-border shadow-2xs">
+      {/* 三槽 + 条件 header/footer，且无 gap：自己排布，不套 padding 统一的槽 */}
+      <AstryxCard
+        padding={0}
+        className="gap-0 border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+      >
         {isNew ? null : (
-          <CardHeader className="border-b border-border pb-4">
-            <CardTitle className="text-base font-semibold">项目基础档案</CardTitle>
+          <div className="flex flex-col gap-1.5 border-b border-border px-5 pt-5 pb-4">
+            <div className="font-heading text-base font-semibold tracking-tight">项目基础档案</div>
             <p className="text-xs text-muted-foreground">
               管理业主联系方式、房产地址、全屋智能主生态平台与预算范围
             </p>
-          </CardHeader>
+          </div>
         )}
-        <CardContent className="flex flex-col gap-6 pt-6">
+        <div className="flex flex-col gap-6 px-5 pt-6">
           {group(
             UserRound,
             '业主信息',
@@ -291,9 +295,9 @@ export function ProjectForm({
               />
             </div>,
           )}
-        </CardContent>
+        </div>
         {readOnly ? null : (
-          <CardFooter className="mt-6 justify-end gap-2 border-t">
+          <div className="mt-6 flex items-center justify-end gap-2 border-t px-5 pt-5">
             {isNew ? (
               <Button
                 type="button"
@@ -327,9 +331,9 @@ export function ProjectForm({
               endContent={<Save />}
               label={isNew ? '创建项目' : '保存'}
             />
-          </CardFooter>
+          </div>
         )}
-      </Card>
+      </AstryxCard>
     </form>
   )
 }

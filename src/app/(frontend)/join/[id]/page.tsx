@@ -6,7 +6,6 @@ import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
 import { Card as AstryxCard } from '@astryxdesign/core/Card'
 import { Layout, LayoutContent, LayoutHeader } from '@astryxdesign/core/Layout'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { appAuth } from '@/lib/app-auth'
 import { APP_NAME, pageTitle } from '@/lib/brand'
 import { getPayloadClient } from '@/lib/payload'
@@ -52,20 +51,26 @@ export default async function JoinProjectPage({
         <Link href="/" aria-label={`${APP_NAME} 首页`}>
           <BrandLockup />
         </Link>
-        <Card className="w-full max-w-md text-center">
-          <CardHeader className="items-center">
+        {/* 居中排版卡：header 是 items-center 单列（图标堆叠在上），content 居中按钮 */}
+        <AstryxCard
+          padding={0}
+          className="w-full max-w-md border-0 bg-card text-center text-sm text-card-foreground shadow-xs ring-1 ring-border"
+        >
+          <div className="flex flex-col items-center gap-1.5 px-5 pt-5 pb-1.5">
             <div className="flex size-11 items-center justify-center rounded-full bg-warning/15 text-warning">
               <AlertTriangle className="size-5" />
             </div>
-            <CardTitle className="mt-2 text-lg">协作链接已失效</CardTitle>
-            <CardDescription>
+            <div className="mt-2 font-heading text-lg font-semibold tracking-tight">
+              协作链接已失效
+            </div>
+            <div className="text-sm text-muted-foreground">
               该项目的协作链接可能已被项目管理员关闭或重置，请联系项目创建者获取最新链接。
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex justify-center">
+            </div>
+          </div>
+          <div className="flex justify-center px-5 pt-1.5 pb-5">
             <Button variant="secondary" size="sm" href="/projects" label="返回工作台" />
-          </CardContent>
-        </Card>
+          </div>
+        </AstryxCard>
       </main>
     )
   }
