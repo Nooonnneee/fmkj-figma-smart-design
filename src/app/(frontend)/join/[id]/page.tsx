@@ -4,6 +4,8 @@ import { AlertTriangle, Eye, PencilLine, Users } from 'lucide-react'
 import { BrandLockup } from '@/components/brand/brand-mark'
 import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
+import { Card as AstryxCard } from '@astryxdesign/core/Card'
+import { Layout, LayoutContent, LayoutHeader } from '@astryxdesign/core/Layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { appAuth } from '@/lib/app-auth'
 import { APP_NAME, pageTitle } from '@/lib/brand'
@@ -76,40 +78,54 @@ export default async function JoinProjectPage({
       <Link href="/" aria-label={`${APP_NAME} 首页`}>
         <BrandLockup />
       </Link>
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <Users className="size-4 text-primary" />
-              项目协作邀请
-            </span>
-            <Badge
-              variant={canEdit ? 'neutral' : 'neutral'}
-              className="gap-1"
-              icon={canEdit ? <PencilLine className="size-3" /> : <Eye className="size-3" />}
-              label={canEdit ? '可编辑权限' : '仅查看权限'}
-            />
-          </div>
-          <div className="space-y-1">
-            <CardTitle className="text-xl">{project.name}</CardTitle>
-            <CardDescription>
-              {owner?.name ? `${owner.name} 邀请你加入该项目协作` : '邀请你加入该项目协作'}（
-              {canEdit
-                ? '可共同编辑点位图、报价单与合同'
-                : '只读查看项目点位、报价、合同与导出资料'}
-              ）
-            </CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <JoinCard
-            projectId={String(project.id)}
-            token={token}
-            role={shareConfig.role}
-            currentUser={user ? { name: user.name, email: user.email } : null}
-          />
-        </CardContent>
-      </Card>
+      <AstryxCard
+        padding={0}
+        className="w-full max-w-md border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+      >
+        <Layout
+          height="auto"
+          header={
+            <LayoutHeader padding={5} paddingBlockEnd={0}>
+              <div className="grid auto-rows-min items-start gap-1.5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    <Users className="size-4 text-primary" />
+                    项目协作邀请
+                  </span>
+                  <Badge
+                    variant={canEdit ? 'neutral' : 'neutral'}
+                    className="gap-1"
+                    icon={canEdit ? <PencilLine className="size-3" /> : <Eye className="size-3" />}
+                    label={canEdit ? '可编辑权限' : '仅查看权限'}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="font-heading text-xl font-semibold tracking-tight">
+                    {project.name}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {owner?.name ? `${owner.name} 邀请你加入该项目协作` : '邀请你加入该项目协作'}（
+                    {canEdit
+                      ? '可共同编辑点位图、报价单与合同'
+                      : '只读查看项目点位、报价、合同与导出资料'}
+                    ）
+                  </div>
+                </div>
+              </div>
+            </LayoutHeader>
+          }
+          content={
+            <LayoutContent padding={5} isScrollable={false}>
+              <JoinCard
+                projectId={String(project.id)}
+                token={token}
+                role={shareConfig.role}
+                currentUser={user ? { name: user.name, email: user.email } : null}
+              />
+            </LayoutContent>
+          }
+        />
+      </AstryxCard>
     </main>
   )
 }
