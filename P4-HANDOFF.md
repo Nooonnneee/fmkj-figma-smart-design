@@ -254,6 +254,36 @@ quote-editor / membership-client / join）**全部零漂移转换，0 保留**�
 P5 要删掉 `input.tsx`，前置是逐个调用点重写（去 className 依赖、改受控 state、
 number/date 换 inputMode 或保留原生），那是独立工程，不是「迁移」。
 
+#### 剩余 15 个小档结论（2026-11-19 实测，别再重复评估）
+
+**A 档 = 0 处。** 详见 `docs/p5-small-adapters-assessment.md`。
+
+tooltip 4 / separator 3 / table 3 / button 2 / kbd 2 / progress 2 / radio-group 2 /
+scroll-area 2 / badge 1 / command 1 / dialog 1 / input-group 1 / sheet 1 / sonner 1 / switch 1
+—— 共 30 处引用，**无一处能只换 import**。
+
+与 Input / DropdownMenu / textarea / select 同构，成因仍是那一条：
+**适配层存在的意义就是承接官方组件不收的东西。**
+引用数越少越明显 —— 能直接换 import 的调用点在早几批就转完了，
+剩下的正好是官方表达不了的那批。
+
+本批新增两条**实测**证据（读代码判不出来，以后不用重测）：
+
+1. **Tailwind 类名确实会穿透官方组件** —— `data-vertical:h-5` 在官方 `Divider` 上
+   量到 20px（默认 16px），内层线同步。⚠️ 验证时要用**非默认值**，
+   `h-4` 恰好等于官方默认会假阳性。
+2. **`SidebarSeparator` 的 `w-auto` 在官方横向 Divider 上毫无作用** ——
+   和不传 `w-auto` 量到的结果完全一样（1×16），只有 `h-px w-full` 才撑开。
+   不过该组件**零渲染点**，属死代码 + 潜在样式 bug，不是现网问题。
+
+同时扫出的死代码（P5 清理时一并删）：
+`ai-panel.tsx`（全仓零引用）、`command.tsx` 的 `CommandDialog`（零食用，
+却拖着 `dialog` + `input-group` 两档）、`sidebar.tsx` 的 `SidebarSeparator`（零渲染）、
+`delivery-package.tsx:9` 的 `import { Badge }`（只 import 不渲染）。
+
+→ **说明低引用数有相当一部分是「引用方自己也是死的」，
+不是「调用点简单到能直接换」。** 别被引用数误导。
+
 #### 既存问题（不是本次造成的，但要知道）
 
 `src/payload.config.ts` 在 main 上就是垫片（`export { default } from './payload.selfhost.config'`），
