@@ -226,6 +226,36 @@ async function main() {
     results.push({ name: '旧URL兼容', path: '/plugins', problems })
   }
 
+  // ── SEO 元信息：OG 图必须是绝对地址，且不能指向本机 ──────────
+  // 2026-11-14 生产事故：metadataBase 没读 PUBLIC_URL，退回 http://localhost:3000，
+  // 分享到微信/微博的卡片图全部指向本机。页面本身不报错，只能从这里发现。
+  // SMOKE_BASE 是本机地址时（CI、SSH 隧道冒烟）这条不适用，跳过。
+  if (!only.length || only.some((o) => '首页'.includes(o) || o === '/')) {
+    const res = await ctx.request.get(`${BASE}/`, { timeout: 15000 }).catch(() => null)
+    const html = res ? await res.text() : ''
+    const og = (html.match(/<meta[^>]+property="og:image"[^>]*content="([^"]+)"/i) ||
+      html.match(/<meta[^>]+content="([^"]+)"[^>]*property="og:image"/i) ||
+      [])[1]
+    const baseIsLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/i.test(new URL(BASE).hostname)
+    const problems = []
+    if (!og) {
+      problems.push('首页没有 og:image')
+    } else if (!/^https?:\/\//i.test(og)) {
+      problems.push(`og:image 不是绝对地址：${og}`)
+    } else if (!baseIsLocal && /(^|\/\/)(localhost|127\.0\.0\.1)/i.test(og)) {
+      problems.push(`og:image 指向本机（metadataBase 没解析对）：${og}`)
+    }
+    if (problems.length) {
+      console.log(`  ❌ SEO 元信息       ${problems.length} 个问题`)
+      for (const p of problems) fail('SEO 元信息', '断言', p)
+    } else if (baseIsLocal) {
+      console.log(`  ✅ SEO 元信息       本机地址，跳过 OG 断言`)
+    } else {
+      console.log(`  ✅ SEO 元信息       og:image ${og}`)
+    }
+    results.push({ name: 'SEO 元信息', path: '/', problems })
+  }
+
   // ── 公开页 ────────────────────────────────────────────
   for (const p of picked(PUBLIC)) {
     await check(page, p, { gated: false, errs })

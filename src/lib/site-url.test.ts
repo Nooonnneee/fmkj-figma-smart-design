@@ -21,8 +21,8 @@ describe('siteUrl', () => {
     }
   })
 
-  // 这条是回归测试：自托管生产只有 PUBLIC_URL，漏读它会让 metadataBase
-  // 退回 localhost:3000，分享卡片的 OG 图全部指错。
+  // 自托管生产只设 PUBLIC_URL（next.config 再派生出 NEXT_PUBLIC_SITE_URL）。
+  // 这条盯住「只给 PUBLIC_URL 也必须认得」，防止将来把顺序改回去。
   it('自托管生产只设 PUBLIC_URL 时也认得', () => {
     process.env.PUBLIC_URL = 'https://fmkj.top'
     expect(siteUrl()).toBe('https://fmkj.top')
