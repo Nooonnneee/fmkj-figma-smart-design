@@ -1273,7 +1273,8 @@ export const coreToolHandlers: Record<string, AiToolHandler> = {
       userId: ctx.user.id,
       referenceImage: reference?.dataUrl ?? null,
     })
-    // 记账失败不让生图失败；重试一次并留下结构化记录（见 chargeAiCredits）。
+    // 基础设施故障不让生图失败（重试一次并留下结构化记录）；积分不足等业务拒绝会抛出，
+    // 由 runTool 转成工具错误让模型告诉用户（见 chargeAiCredits）。
     const balance = await chargeAiCredits(payload, {
       user: ctx.user.id,
       delta: -model.cost,

@@ -1,5 +1,5 @@
 import { getCompanyInfo } from '@/lib/cached-data'
-import { chargeAiCredits } from '@/lib/credit-charge'
+import { isBusinessRejection } from '@/lib/credit-charge'
 import { getPayloadClient } from '@/lib/payload'
 import { loadProjectDocs } from '@/lib/project-docs'
 import { recordAiErrorDiagnostic } from '@/lib/usage-diagnostics'
@@ -26,6 +26,7 @@ import {
   type StreamTurnResult,
   type ToolContext,
 } from './server'
+import { saveAssistantReplyAndCharge } from './reply-billing'
 import { isVisionCapableModel, type AiModelConfig } from './templates'
 import type { ToolImage } from './tools/context'
 import {
@@ -645,31 +646,18 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
           estimated: ledger.estimated > 0,
         }
         const savedModelId = isAutoMode ? `auto:${activeModel.id}` : activeModel.id
-        const reply = await payload.create({
-          collection: 'ai-messages',
-          data: {
-            conversation: conversationId,
-            owner: user.id,
-            role: 'assistant',
-            content,
-            model: savedModelId,
-            cost,
-            toolCalls: toolLog.length ? toolLog : undefined,
-          },
-          overrideAccess: true,
-          depth: 0,
+        // 先以 cost=0 落库，扣费成功后再定稿；402 等业务拒绝会直接抛出（消息保持 0 = 未计费）。
+        const billed = await saveAssistantReplyAndCharge(payload, {
+          conversationId: conversationId!,
+          ownerId: user.id,
+          content,
+          model: savedModelId,
+          toolCalls: toolLog.length ? toolLog : undefined,
+          cost,
+          currentBalance: fresh.aiCredits ?? 0,
+          reason: `AI 对话 · ${displayModelLabel(activeModel)} · ${ledger.summary()}`,
+          ledgerModel: activeModel.id,
         })
-        let balance: number | null = null
-        if (cost > 0) {
-          // 记账失败不让本次对话失败；重试一次并留下结构化记录（见 chargeAiCredits）。
-          balance = await chargeAiCredits(payload, {
-            user: user.id,
-            delta: -cost,
-            reason: `AI 对话 · ${displayModelLabel(activeModel)} · ${ledger.summary()}`,
-            model: activeModel.id,
-            message: reply.id,
-          })
-        } else balance = fresh.aiCredits ?? 0
         await payload
           .update({
             collection: 'ai-conversations',
@@ -684,28 +672,38 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
           .catch(() => null)
         send({
           type: 'done',
-          messageId: String(reply.id),
-          cost,
+          messageId: String(billed.messageId),
+          // 只报告真正扣掉的积分：基础设施故障未记账时为 0。
+          cost: billed.charged,
           usage,
-          balance,
+          balance: billed.balance,
           mutated: ctx.mutated,
           projectId: ctx.projectId,
           modelId: activeModel.id,
           modelName: displayModelLabel(activeModel),
         })
       } catch (error) {
-        const errMsg = error instanceof AiError ? error.message : 'AI 服务出错，请稍后重试'
-        recordAiErrorDiagnostic({
-          userId: String(user.id),
-          userName: user.name || user.email || '用户',
-          modelId: activeModel.id,
-          modelName: displayModelLabel(activeModel),
-          projectId: ctx.projectId,
-          promptPreview: visibleText.slice(0, 120),
-          errorMessage: errMsg,
-        })
-        send({ type: 'error', error: errMsg })
-        if (!(error instanceof AiError)) console.error('[ai] chat failed', error)
+        // 业务拒绝（402 积分不足等）是确定性的用户可见结果，原样告诉用户；不记成 AI 故障。
+        const rejected = isBusinessRejection(error)
+        const errMsg = rejected
+          ? (error as Error).message
+          : error instanceof AiError
+            ? error.message
+            : 'AI 服务出错，请稍后重试'
+        if (!rejected) {
+          recordAiErrorDiagnostic({
+            userId: String(user.id),
+            userName: user.name || user.email || '用户',
+            modelId: activeModel.id,
+            modelName: displayModelLabel(activeModel),
+            projectId: ctx.projectId,
+            promptPreview: visibleText.slice(0, 120),
+            errorMessage: errMsg,
+          })
+        }
+        // code 让客户端区分「业务拒绝」和普通 AI 故障：前者即使已经流式输出过内容也要提示用户。
+        send({ type: 'error', error: errMsg, ...(rejected ? { code: 'billing_rejected' } : {}) })
+        if (!(error instanceof AiError) && !rejected) console.error('[ai] chat failed', error)
       } finally {
         clearInterval(heartbeat)
         closed = true

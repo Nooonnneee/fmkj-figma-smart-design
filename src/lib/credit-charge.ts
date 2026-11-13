@@ -13,14 +13,26 @@ export type CreditChargeData = {
 }
 
 /**
+ * 4xx 是**确定性业务拒绝**（402 积分不足、400 参数非法……）：重试不会变好，
+ * 必须原样抛给调用方，让用户看到拒绝、让请求失败。
+ * 只有 5xx / 连接中断 / 超时 / 序列化冲突（40001）这类基础设施故障才值得重试。
+ */
+export function isBusinessRejection(error: unknown): error is Error & { status: number } {
+  const status = (error as { status?: unknown } | null | undefined)?.status
+  return typeof status === 'number' && status >= 400 && status < 500
+}
+
+/**
  * 写一条积分流水。
  *
- * 记账失败**不能**把用户的请求判为失败——AI 已经产出、用户也已经等到结果了；但也**不能静默**：
- * 失败要留下能追溯的结构化记录（哪个用户、多少钱、哪次调用、什么错），并**重试一次**。
- * 两次都失败时返回 `null`，调用方照常把结果交给用户。
+ * 两类失败必须分开处理：
+ * - **业务拒绝（4xx）**：积分不足 / 参数非法等确定性结果，直接抛出，不重试、不吞掉。
+ *   调用方应把拒绝告诉用户，本次请求不成功。
+ * - **基础设施故障（连接中断、超时、序列化冲突等）**：AI 已经产出、用户也已经等到结果，
+ *   记账失败不判请求失败；但要留下能追溯的结构化记录（哪个用户、多少钱、哪次调用、什么错），
+ *   并**重试一次**。两次都失败时返回 `null`（= 本次未记账）。
  *
- * 默认不落库：新增集合 / 改 schema 需要 owner 批准，所以这里只做结构化日志（`[ai-billing]` 前缀，
- * 单行 JSON，便于日志系统按 userId / delta 聚合），不在数据库里记账。
+ * 结构化日志用 `[ai-billing]` 前缀、单行 JSON，便于日志系统按 userId / delta 聚合。
  *
  * 重试的前提是 `payload.create` 抛错即事务回滚、流水不会半写；只有当「提交成功但响应丢失」时
  * 才可能重复记一笔，这种歧义窗口无法靠重试本身消除。
@@ -45,6 +57,9 @@ export async function chargeAiCredits(
       })
       return entry.balanceAfter ?? null
     } catch (error) {
+      // 确定性业务拒绝：只尝试一次，交给调用方。
+      if (isBusinessRejection(error)) throw error
+
       const detail = {
         userId: String(data.user),
         delta: data.delta,
@@ -56,7 +71,7 @@ export async function chargeAiCredits(
         error: error instanceof Error ? error.message : String(error),
       }
       if (attempt < 2) {
-        console.error('[ai-billing] 积分记账失败，重试一次', JSON.stringify(detail))
+        console.error('[ai-billing] 积分记账基础设施故障，重试一次', JSON.stringify(detail))
       } else {
         console.error(
           '[ai-billing] 积分记账两次均失败，本次未记账（用户请求照常返回）',

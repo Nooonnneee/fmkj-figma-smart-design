@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { appAuth } from '@/lib/app-auth'
-import { chargeAiCredits } from '@/lib/credit-charge'
+import { chargeAiCredits, isBusinessRejection } from '@/lib/credit-charge'
 import { getPayloadClient } from '@/lib/payload'
 import { getPluginFlags } from '@/plugins/state'
 
@@ -83,6 +83,10 @@ export async function POST(request: Request) {
     })
     return NextResponse.json({ ok: true, ...image, size, cost: model.cost, balance })
   } catch (error) {
+    // 积分不足等业务拒绝必须原样返回 4xx，不能伪装成服务端故障。
+    if (isBusinessRejection(error)) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: error.status })
+    }
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : '生图失败' },
       { status: 500 },
