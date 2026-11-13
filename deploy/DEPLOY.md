@@ -154,14 +154,35 @@ PAYLOAD_CONFIG_PATH=src/payload.selfhost.config.ts DATABASE_URI=<一个测试用
 
 ## 8. 备份
 
+用 `deploy/backup.sh`，不要手敲 pg_dump —— 它多做两件事：写盘后立刻
+`pg_restore --list` 校验（半截的 dump 恰恰能解压，看不出来），以及自动清理过期备份。
+
 ```bash
-# 数据库
-docker compose exec db pg_dump -U fmkj fmkj | gzip > backup-$(date +%F).sql.gz
-# 图片（使用磁盘存储时）
-docker run --rm -v fmkj_media:/m -v $PWD:/b alpine tar czf /b/media-$(date +%F).tgz -C /m .
+sudo install -m 755 deploy/backup.sh /opt/fmkj/bin/fmkj-backup.sh
+sudo /opt/fmkj/bin/fmkj-backup.sh --db-only   # 先手动跑一次确认
 ```
 
-建议每天定时执行，并把备份复制到服务器以外的地方。卷名前缀取决于项目目录名，可用 `docker volume ls` 确认。
+挂到 cron（`/etc/cron.d/fmkj-backup`）：
+
+```cron
+30 3 * * * root /opt/fmkj/bin/fmkj-backup.sh >> /var/log/fmkj-backup.log 2>&1
+```
+
+策略：数据库每天一份 custom 格式、保留 14 天；素材卷满 7 天才打包、保留最近 2 份；
+磁盘剩余不足 3G 时跳过素材。参数都能用环境变量覆盖（`KEEP_DB_DAYS` / `KEEP_MEDIA` /
+`BACKUPS` / `DB_CONTAINER`）。
+
+还原演练（**定期做一次，别等出事才第一次试**）：
+
+```bash
+docker exec fmkj-db-1 createdb -U fmkj restore_drill
+docker exec -i fmkj-db-1 pg_restore -U fmkj -d restore_drill --no-owner < /opt/fmkj/backups/db-<时间>.dump
+docker exec fmkj-db-1 psql -U fmkj -d restore_drill -tAc 'SELECT count(*) FROM projects;'
+docker exec fmkj-db-1 dropdb -U fmkj restore_drill
+```
+
+备份目前落在**同一台服务器**上：能防误删、防写坏，防不了整机故障。异地副本
+（对象存储 / 另一台机器）还需要单独配。
 
 ## 9. 桌面客户端（Windows / macOS）
 

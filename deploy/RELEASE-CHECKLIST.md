@@ -1,110 +1,72 @@
-# 上线清单（A 级任务）
+# 发布清单（现行）
 
-> 用途：把「替换线上」这件事拆成可勾选的步骤，避免上线当天漏项。
-> 标注 🔴 的是**必须 owner 提供信息**才能推进的，其余我都能自己完成。
-
----
-
-## 0. 前置信息（🔴 只有 owner 知道）
-
-| #   | 信息                                             | 为什么需要                 | 现状    |
-| --- | ------------------------------------------------ | -------------------------- | ------- |
-| 1   | 线上服务器地址（IP / 云厂商 / 域名）             | 没有它无法部署             | ❓ 未知 |
-| 2   | 线上现在跑的是哪一版（Figma Make？某台服务器？） | 决定是「新建」还是「替换」 | ❓ 未知 |
-| 3   | SSH 访问方式（密钥 / 密码 / 跳板机）             | 部署执行的前提             | ❓ 未知 |
-| 4   | 域名是否已备案                                   | 国内服务器 80/443 强制要求 | ❓ 未知 |
-| 5   | 数据要不要迁移（Figma 里的历史客户数据）         | 决定是空库上线还是带数据   | ❓ 未知 |
+> 2026-11-14 更新。主站 `fmkj.top` 已上线，日常发布走**影子部署**
+> （`deploy/shadow-release.sh`），不再 `docker compose down && up`。
+>
+> 这份清单只留三部分：**每次发布做什么**、**一次性事项的现状**、**出事怎么回滚**。
+> 旧的「首次上线」清单已完成，历史留在 git 里。
 
 ---
 
-## 1. 代码就绪（我可以自查）
+## 每次发布
 
-- [x] 全部迁移文件齐全（13 个，`src/migrations/`）
-- [x] 七道门禁全绿
-      （`oxfmt` / `eslint 0 warning` / `tsc` / `knowledge:check` / `vitest 100` / 生产构建 / e2e 冒烟 21 页）
-- [x] `/catalog` 构建期连库导致卡死的问题已修复（改为 `force-dynamic`）
-- [ ] **Docker 镜像能构建成功**（本机正在验证）
-- [ ] 镜像能启动并通过健康检查
-- [ ] 首次启动自动建表 / 迁移执行成功
+按顺序打勾，任何一步失败都**不要**继续（生产在前一步之前不受影响）。
 
-## 2. 构建产物（我可以验证）
+- [ ] 分支 + PR，CI 七道门禁全绿（`ci-selfhosted.yml`：oxfmt / eslint 0 warning /
+      tsc / knowledge:check / vitest / 生产构建 / e2e 冒烟）
+- [ ] 本机打包源码（服务器到 GitHub 只有几十 KB/s）：
+      `git archive --format=tar main | COPYFILE_DISABLE=1 gzip > /tmp/fmkj.tar.gz`
+- [ ] 上传并解压，确认**没有 AppleDouble**：`find . -name '._*' | wc -l` 为 0
+- [ ] 服务器上 `SRC_DIR=<解压目录> PAUSE=1 bash deploy/shadow-release.sh`
+      （自动做：备份数据库 → 构建镜像 → 迁移 → 起影子容器 → 验证网络与素材卷 → 停住）
+- [ ] 本机开隧道跑冒烟（宿主机没有 node/playwright）：
+      `ssh -f -N -L 19129:127.0.0.1:<新端口> ubuntu@124.222.225.26`
+      `SMOKE_BASE=http://127.0.0.1:19129 node e2e/smoke.mjs` → 16/16 通过
+- [ ] 切流量：`SKIP_SMOKE=1 bash deploy/shadow-release.sh --cut <新端口>`
+- [ ] 切完核对三件事：
+      Caddy 指向新端口、`payload_migrations` 有本次新迁移、`https://fmkj.top/login` 200
+- [ ] 确认**上一版容器还活着**（它是回滚目标，脚本按设计保留「当前 + 上一版」）
 
-```bash
-docker build -t fmkj-app:latest .
-docker compose up -d          # 需要先配好 .env
-docker compose logs -f app    # 看到 Migrated + Ready
-curl -I http://localhost:3000/login   # 期望 200
-```
+## 一次性事项
 
-- [ ] 镜像构建成功
-- [ ] 容器启动、schema 建好
-- [ ] 关键页面可访问（登录 / 首页 / 项目列表 / 报价 / 合同）
+| 项                    | 现状                                                        |
+| --------------------- | ----------------------------------------------------------- |
+| 服务器 / 域名 / HTTPS | `124.222.225.26`，`fmkj.top`，Caddy 反代 `127.0.0.1:130xx`  |
+| 数据库                | 自托管 PostgreSQL（容器 `fmkj-db-1`），迁移由部署脚本自动跑 |
+| 管理员 / 员工账号     | 已创建；重设密码用 `scripts/set-password.ts`                |
+| 产品库                | 已导入（728 条）                                            |
+| 素材卷                | `fmkj_media`（约 500MB），挂到影子的 `/data/media`          |
+| 备份                  | **每天 03:30 自动**，见下                                   |
 
-## 3. 环境变量（🔴 需要 owner 给域名等）
+## 备份
 
-复制 `deploy/selfhost.env.example` → `.env`，必填三项：
-
-```bash
-PUBLIC_URL=https://<你的域名>          # 🔴 构建时写入前端，改后要重新 build
-PAYLOAD_SECRET=$(openssl rand -hex 32) # 设定后不要再改（改了所有人要重新登录）
-POSTGRES_PASSWORD=$(openssl rand -hex 32)
-```
-
-可选（国内建议）：`NPM_REGISTRY` / `NODE_IMAGE` / `POSTGRES_IMAGE` / 对象存储 `S3_*`
-
-- [ ] `.env` 配好
-- [ ] `PAYLOAD_SECRET` 已生成并妥善保存
-
-## 4. 数据（🔴 要看是否迁移历史数据）
-
-若需要迁移 Figma 里的历史数据，见 `deploy/DEPLOY.md` 第 4 节：
-
-1. Figma 里导出 → `data.json` + `files/`（约 140 MB，**含客户姓名电话，不要进 Git**）
-2. scp 到服务器 `import/`
-3. 容器里执行 `data-import.ts`
-4. **导入完成后删掉 `import/` 目录**
-
-- [ ] 导出完成
-- [ ] 上传并导入
-- [ ] 清理 `import/`
-
-## 5. 上线后必做（我可以写脚本）
-
-- [ ] 创建管理员账号（`scripts/set-password.ts admins <邮箱>`）
-- [ ] 逐个重设员工密码（Figma 密码格式不兼容，无法迁移）
-- [ ] 配置公司信息（名称 / 电话 / 地址 / 二维码 / Logo）
-- [ ] 导入产品库（否则首页/产品目录会显示「0 款在售产品」——
-      这个空状态已在 PR #47/#50 改成不暴露 0 值，但仍建议尽早导入）
-- [ ] 跑一遍冒烟：`SMOKE_PROJECT_ID=<真实项目> pnpm smoke`
-- [ ] 备份策略：`media` 卷 + PostgreSQL 数据卷
-
-## 6. 回滚预案
+`deploy/backup.sh` 装在服务器 `/opt/fmkj/bin/fmkj-backup.sh`，由
+`/etc/cron.d/fmkj-backup` 每天 03:30 触发：
 
 ```bash
-# 镜像层面
-docker compose down
-docker tag fmkj-app:previous fmkj-app:latest
-docker compose up -d
-
-# 数据层面（迁移前必须做的备份）
-docker compose exec db pg_dump -U fmkj fmkj > backup-$(date +%F).sql
+# 数据库：每天一份 custom 格式，保留 14 天，写盘后立刻 pg_restore --list 校验
+# 素材：满 7 天才打包一次，保留最近 2 份，磁盘不足 3G 时跳过
 ```
 
-- [ ] 上线前已备份数据库
-- [ ] 旧镜像 tag 保留
-- [ ] 知道怎么回滚
+手动跑 / 只跑数据库 / 强制备份素材：
 
----
+```bash
+sudo /opt/fmkj/bin/fmkj-backup.sh --db-only
+sudo /opt/fmkj/bin/fmkj-backup.sh --media
+```
 
-## 附：我能自动化掉的部分
+**2026-11-14 做过真实恢复演练**：把最新 dump 灌进临时库 `restore_drill`，
+projects / users / products / quotes / media 行数与生产完全一致，随后删库。
 
-等你给信息后，这些不需要你操心：
+## 回滚
 
-1. **构建验证**：本机跑通 `docker build` + 起容器 + 冒烟
-2. **部署脚本**：写一个 `deploy/release.sh`，一键完成
-   「构建 → 传镜像 → 服务器上滚动重启 → 健康检查 → 失败自动回滚」
-3. **GitHub Actions 部署流水线**：main 合并后自动构建并推送到服务器
-   （需要服务器 SSH 凭证配到 GitHub Secrets）
-4. **上线后冒烟**：部署完自动跑 e2e/smoke.mjs，失败自动告警
+```bash
+# 代码层面：把 Caddy 指回上一版容器（脚本会先探活，目标端口没服务就拒绝）
+bash deploy/shadow-release.sh --rollback <上一版端口>
 
-**先给我第 0 节的 5 条信息，我就能把它们全部落地。**
+# 数据层面：部署脚本第 0 步已自动备份；更早的还原点用每日备份
+docker exec -i fmkj-db-1 pg_restore -U fmkj -d fmkj --clean --if-exists < db-<时间>.dump
+```
+
+⚠️ 不要再用旧的 `docker compose down / up` 回滚：这台服务器同时跑着另一个业务，
+而且 `fmkj-app:latest` 每次部署都会被覆盖，按 tag 回退并不存在。
