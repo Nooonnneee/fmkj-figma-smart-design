@@ -11,15 +11,15 @@ import { SearchSubmit } from '@/components/search-submit'
 import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
 import { Card } from '@astryxdesign/core/Card'
-import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
+  TableHeaderCell,
   TableRow,
-} from '@/components/ui/table'
+} from '@astryxdesign/core/Table'
+import { SearchField } from '@/components/search-field'
 import { relId } from '@/lib/access'
 import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
@@ -271,12 +271,12 @@ export default async function ProjectsPage({
           {archived ? <input type="hidden" name="view" value="archived" /> : null}
           <div className="relative flex-1 sm:w-72 sm:flex-none">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
+            <SearchField
               name="q"
               defaultValue={q}
               placeholder="搜索项目、客户、小区或电话"
-              aria-label="搜索项目"
-              className="h-9 border-border bg-background pl-9 text-xs shadow-2xs"
+              ariaLabel="搜索项目"
+              controlClassName="h-9 border-border bg-background pl-9 text-xs shadow-2xs"
             />
           </div>
           <SearchSubmit />
@@ -314,14 +314,24 @@ export default async function ProjectsPage({
           padding={0}
           className="overflow-hidden border-0 bg-card text-sm text-card-foreground shadow-2xs ring-1 ring-border"
         >
-          <Table>
+          {/*
+            官方 Table 的单元格自带 max-width:0（truncate 用），裸宽度类会被压成内边距宽，
+            所以每处固定列宽都补 max-w-none；行悬停交给官方 hasHover。
+          */}
+          <Table hasHover>
             <TableHeader>
-              <TableRow>
-                <TableHead className="pl-4 sm:pl-6">项目名称与客户</TableHead>
-                <TableHead className="hidden w-32 md:table-cell">生态平台</TableHead>
-                <TableHead className="w-24 text-right">点位</TableHead>
-                <TableHead className="hidden text-right sm:table-cell">方案报价 / 合同</TableHead>
-                <TableHead className="hidden pr-6 text-right md:table-cell">最近更新</TableHead>
+              <TableRow isHeaderRow>
+                <TableHeaderCell className="pl-4 sm:pl-6">项目名称与客户</TableHeaderCell>
+                <TableHeaderCell className="hidden w-32 max-w-none md:table-cell">
+                  生态平台
+                </TableHeaderCell>
+                <TableHeaderCell className="w-24 max-w-none text-right">点位</TableHeaderCell>
+                <TableHeaderCell className="hidden text-right sm:table-cell">
+                  方案报价 / 合同
+                </TableHeaderCell>
+                <TableHeaderCell className="hidden pr-6 text-right md:table-cell">
+                  最近更新
+                </TableHeaderCell>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -330,10 +340,7 @@ export default async function ProjectsPage({
                 const amount = amountOf(pid)
                 const display = projectDisplayName(p.name)
                 return (
-                  <TableRow
-                    key={pid}
-                    className="group relative transition-colors hover:bg-subtle/80"
-                  >
+                  <TableRow key={pid} className="group relative">
                     <TableCell className="max-w-0 py-3 pl-4 sm:pl-6">
                       <div className="flex min-w-0 items-center gap-2">
                         <Link
@@ -355,14 +362,14 @@ export default async function ProjectsPage({
                           '未填写客户与楼盘'}
                       </div>
                     </TableCell>
-                    <TableCell className="hidden w-32 md:table-cell">
+                    <TableCell className="hidden w-32 max-w-none md:table-cell">
                       {p.platform ? (
                         <Badge variant="neutral" className="rounded-md" label={p.platform} />
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="w-28 text-right tabular-nums">
+                    <TableCell className="w-28 max-w-none text-right tabular-nums">
                       {p.pointCount ? (
                         <span className="text-sm font-medium text-foreground tabular-nums">
                           {p.pointCount}
@@ -371,7 +378,7 @@ export default async function ProjectsPage({
                         <span className="text-xs text-muted-foreground">未布点</span>
                       )}
                     </TableCell>
-                    <TableCell className="hidden w-40 text-right sm:table-cell">
+                    <TableCell className="hidden w-40 max-w-none text-right sm:table-cell">
                       {amount ? (
                         <div>
                           <div className="text-sm font-semibold text-foreground tabular-nums">
@@ -383,7 +390,7 @@ export default async function ProjectsPage({
                         <span className="text-sm text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="hidden w-28 pr-6 text-right text-xs text-muted-foreground tabular-nums md:table-cell">
+                    <TableCell className="hidden w-28 max-w-none pr-6 text-right text-xs text-muted-foreground tabular-nums md:table-cell">
                       {fmtDate(p.updatedAt)}
                     </TableCell>
                   </TableRow>
