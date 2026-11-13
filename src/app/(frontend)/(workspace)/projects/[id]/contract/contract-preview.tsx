@@ -13,25 +13,21 @@ import {
   Trash2,
   Undo2,
 } from 'lucide-react'
-import { toast } from 'sonner'
 
 import { Button } from '@astryxdesign/core/Button'
 import { Selector } from '@astryxdesign/core/Selector'
 import { TextArea } from '@astryxdesign/core/TextArea'
 import { IconButton } from '@astryxdesign/core/IconButton'
 import { CheckboxInput } from '@astryxdesign/core/CheckboxInput'
+import { DateInput } from '@astryxdesign/core/DateInput'
+import type { ISODateString } from '@astryxdesign/core/Calendar'
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
 import { Layout, LayoutContent, LayoutFooter } from '@astryxdesign/core/Layout'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { DropdownMenu } from '@astryxdesign/core/DropdownMenu'
+import { Field, FieldLabel } from '@astryxdesign/core/Field'
+import { NumberInput } from '@astryxdesign/core/NumberInput'
 import { TextInput } from '@astryxdesign/core/TextInput'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Field } from '@astryxdesign/core/Field'
+import { useToast } from '@astryxdesign/core/Toast'
 import { Popover } from '@astryxdesign/core/Popover'
 import type { ContractEditSection } from '@/documents/contract-document'
 import {
@@ -66,6 +62,15 @@ const SECTION: Record<ContractEditSection, { title: string; description: string 
 }
 
 const toNum = (v: string) => (v.trim() === '' ? NaN : Number(v))
+
+/**
+ * 需要「边输边算」的金额 / 比例输入仍是原生 number 输入：
+ * 官方 `NumberInput` 只在失焦 / 回车时提交，会让合同金额的大写、分期金额
+ * 与比例合计停止实时联动。这里就地保留原生的逐击提交语义。
+ */
+const NATIVE_NUM_CLASS =
+  'h-8 w-full min-w-0 rounded-[var(--radius-element)] border border-input bg-background px-2.5 py-1 text-base text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] duration-150 placeholder:text-muted-foreground/75 hover:border-border-strong focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted/60 disabled:opacity-70 md:text-sm dark:bg-input/20'
+
 const toDraft = (v: ContractValues): Draft => ({
   ...v,
   payments: v.payments.map((p) => ({ ...p, key: crypto.randomUUID() })),
@@ -87,6 +92,7 @@ export function ContractSectionEdit({
   signed: boolean
 }) {
   const router = useRouter()
+  const showToast = useToast()
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<Draft>(() => toDraft(values))
   const [pending, startTransition] = useTransition()
@@ -124,54 +130,55 @@ export function ContractSectionEdit({
         terms: draft.terms,
         payments: draft.payments.map(({ key: _key, ...p }) => p),
       })
-      if (!result.ok) return void toast.error(result.error)
-      toast.success(receiptOnly ? '收款状态已更新' : `${meta.title}已更新`)
+      if (!result.ok) return void showToast({ body: result.error, type: 'error' })
+      showToast({ body: receiptOnly ? '收款状态已更新' : `${meta.title}已更新` })
       setOpen(false)
       router.refresh()
     })
 
+  // 官方 TextInput 没有 maxLength（也不收 className），长度上限改为受控截断，
+  // 尺寸 / 字体类挪到 controlClassName。
   const text = (
     id: 'number' | 'customerName' | 'customerPhone' | 'address',
     label: string,
-    props: React.ComponentProps<typeof Input> = {},
+    opts: {
+      maxLength?: number
+      controlClassName?: string
+      inputMode?: React.ComponentProps<typeof TextInput>['inputMode']
+      autoComplete?: string
+    } = {},
   ) => (
     <Field label={label} inputID={`contract-${id}`}>
-      <Input
+      <TextInput
+        label={label}
+        isLabelHidden
         id={`contract-${id}`}
-        className="h-9"
         value={draft[id] ?? ''}
-        onChange={(e) => set({ [id]: e.target.value })}
-        {...props}
+        onChange={(v) => set({ [id]: opts.maxLength ? v.slice(0, opts.maxLength) : v })}
+        inputMode={opts.inputMode}
+        autoComplete={opts.autoComplete}
+        controlClassName={cn('h-9', opts.controlClassName)}
       />
     </Field>
   )
   const int = (id: 'durationDays' | 'warrantyMonths', label: string, unit: string, max: number) => (
-    <Field label={label} inputID={`contract-${id}`}>
-      <div className="relative">
-        <Input
-          id={`contract-${id}`}
-          type="number"
-          min={0}
-          max={max}
-          inputMode="numeric"
-          value={draft[id] ?? ''}
-          className="pr-12 tabular-nums"
-          onChange={(e) => {
-            const n = toNum(e.target.value)
-            set({ [id]: Number.isFinite(n) ? Math.round(n) : null })
-          }}
-        />
-        <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-muted-foreground">
-          {unit}
-        </span>
-      </div>
-    </Field>
+    <NumberInput
+      label={label}
+      id={`contract-${id}`}
+      value={draft[id] ?? undefined}
+      onChange={(n) => set({ [id]: n })}
+      min={0}
+      max={max}
+      isIntegerOnly
+      units={unit}
+      width="100%"
+    />
   )
 
   const fields = () => {
     switch (section) {
       case 'number':
-        return text('number', '合同编号', { maxLength: 40, className: 'font-mono' })
+        return text('number', '合同编号', { maxLength: 40, controlClassName: 'font-mono' })
       case 'parties':
         return (
           <>
@@ -207,7 +214,7 @@ export function ContractSectionEdit({
             </Field>
             <div className="grid gap-2">
               <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="contract-amount">合同金额</Label>
+                <FieldLabel label="合同金额" inputID="contract-amount" />
                 {selectedQuote && Math.abs(selectedQuote.total - (draft.amount || 0)) > 0.001 ? (
                   <Button
                     type="button"
@@ -224,14 +231,15 @@ export function ContractSectionEdit({
                 <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground">
                   ¥
                 </span>
-                <Input
+                <input
                   id="contract-amount"
                   type="number"
                   min={0}
                   step="any"
                   inputMode="decimal"
+                  aria-label="合同金额"
                   value={Number.isFinite(draft.amount) ? draft.amount : ''}
-                  className="pl-7 text-base font-semibold tabular-nums"
+                  className={cn(NATIVE_NUM_CLASS, 'pl-7 text-base font-semibold tabular-nums')}
                   onChange={(e) => set({ amount: toNum(e.target.value) })}
                 />
               </div>
@@ -287,14 +295,14 @@ export function ContractSectionEdit({
                         onChange={(v) => setPayment(p.key, { name: v })}
                       />
                       <div className="relative w-20 shrink-0">
-                        <Input
+                        <input
                           aria-label={`第 ${i + 1} 期比例`}
                           type="number"
                           min={0}
                           max={100}
                           step="any"
                           value={Number.isFinite(p.percent) ? p.percent : ''}
-                          className="h-8 pr-6 text-right tabular-nums"
+                          className={cn(NATIVE_NUM_CLASS, 'h-8 pr-6 text-right tabular-nums')}
                           onChange={(e) => setPayment(p.key, { percent: toNum(e.target.value) })}
                         />
                         <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-xs text-muted-foreground">
@@ -368,7 +376,7 @@ export function ContractSectionEdit({
         return (
           <div className="grid gap-2">
             <div className="flex items-center justify-between gap-2">
-              <Label htmlFor="contract-terms">约定内容</Label>
+              <FieldLabel label="约定内容" inputID="contract-terms" />
               {draft.terms === DEFAULT_CONTRACT_TERMS ? null : (
                 <Button
                   type="button"
@@ -479,6 +487,7 @@ export function ContractActions({
   printHref: string
 }) {
   const router = useRouter()
+  const showToast = useToast()
   const [busy, setBusy] = useState<'sign' | 'unsign' | 'delete' | null>(null)
   const [signOpen, setSignOpen] = useState(false)
   const [signDate, setSignDate] = useState(() => shanghaiDate())
@@ -489,10 +498,10 @@ export function ContractActions({
     setBusy(status === 'signed' ? 'sign' : 'unsign')
     try {
       const result = await setContractStatus(id, status, status === 'signed' ? signDate : undefined)
-      if (!result.ok) return void toast.error(result.error)
-      toast.success(
-        status === 'signed' ? '已标记为签订，合同内容已锁定' : '已撤销签订，可以修改合同',
-      )
+      if (!result.ok) return void showToast({ body: result.error, type: 'error' })
+      showToast({
+        body: status === 'signed' ? '已标记为签订，合同内容已锁定' : '已撤销签订，可以修改合同',
+      })
       setSignOpen(false)
       router.refresh()
     } finally {
@@ -504,8 +513,8 @@ export function ContractActions({
     setBusy('delete')
     try {
       const result = await deleteContract(id)
-      if (!result.ok) return void toast.error(result.error)
-      toast.success('合同已删除')
+      if (!result.ok) return void showToast({ body: result.error, type: 'error' })
+      showToast({ body: '合同已删除' })
       setConfirmDelete(false)
       router.refresh()
     } finally {
@@ -554,15 +563,12 @@ export function ContractActions({
                     签订后合同与依据的报价都会锁定，仍可登记收款。
                   </p>
                 </div>
-                <Field label="签订日期" inputID="contract-sign-date">
-                  <Input
-                    id="contract-sign-date"
-                    type="date"
-                    value={signDate}
-                    max={shanghaiDate()}
-                    onChange={(e) => setSignDate(e.target.value)}
-                  />
-                </Field>
+                <DateInput
+                  label="签订日期"
+                  value={signDate as ISODateString}
+                  max={shanghaiDate() as ISODateString}
+                  onChange={(v) => setSignDate(v ?? '')}
+                />
                 <Button
                   type="submit"
                   size="sm"
@@ -580,25 +586,27 @@ export function ContractActions({
               label="标记为已签订"
             />
           </Popover>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <DropdownMenu
+            alignment="end"
+            renderTrigger={(props) => (
               <IconButton
+                {...props}
                 variant="ghost"
-
-                aria-label="更多合同操作"
                 isDisabled={busy !== null}
                 label="更多合同操作"
                 icon={<MoreHorizontal />}
                 size="sm"
               />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem variant="destructive" onSelect={() => setConfirmDelete(true)}>
-                <Trash2 />
-                删除合同
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            )}
+            items={[
+              {
+                label: '删除合同',
+                icon: <Trash2 />,
+                variant: 'destructive',
+                onClick: () => setConfirmDelete(true),
+              },
+            ]}
+          />
           <Dialog
             isOpen={confirmDelete}
             onOpenChange={(o) => busy !== 'delete' && setConfirmDelete(o)}

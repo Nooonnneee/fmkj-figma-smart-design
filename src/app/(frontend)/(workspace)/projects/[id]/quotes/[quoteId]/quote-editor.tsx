@@ -29,8 +29,6 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { toast } from 'sonner'
-
 import { DeviceSymbol } from '@/components/device-symbol'
 import { GuardedLink } from '@/components/guarded-link'
 import { PlanFigure } from '@/components/plan-figure'
@@ -41,35 +39,23 @@ import { Button } from '@astryxdesign/core/Button'
 import { IconButton } from '@astryxdesign/core/IconButton'
 import { Card as AstryxCard } from '@astryxdesign/core/Card'
 import { CheckboxInput } from '@astryxdesign/core/CheckboxInput'
+import { DropdownMenu } from '@astryxdesign/core/DropdownMenu'
 import { Field } from '@astryxdesign/core/Field'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { TextInput } from '@astryxdesign/core/TextInput'
-import { Input } from '@/components/ui/input'
 import { Popover } from '@astryxdesign/core/Popover'
 import { Selector } from '@astryxdesign/core/Selector'
-import { TextArea } from '@astryxdesign/core/TextArea'
 import {
   Table,
   TableBody,
   TableCell,
   TableFooter,
-  TableHead,
   TableHeader,
+  TableHeaderCell,
   TableRow,
-} from '@/components/ui/table'
+} from '@astryxdesign/core/Table'
+import { TextArea } from '@astryxdesign/core/TextArea'
+import { TextInput } from '@astryxdesign/core/TextInput'
+import { useToast } from '@astryxdesign/core/Toast'
+import { Tooltip } from '@astryxdesign/core/Tooltip'
 import { contractStatusLabel } from '@/lib/contracts'
 import { DEVICE_TYPE_ORDER, deviceTypeLabel } from '@/lib/device-types'
 import { registerLeaveGuard } from '@/lib/leave-guard'
@@ -135,6 +121,14 @@ const toNum = (v: string) => (v.trim() === '' ? 0 : Number(v))
 const INLINE_NUM =
   'border-transparent bg-transparent shadow-none hover:border-input hover:bg-background focus-visible:bg-background dark:bg-transparent dark:hover:bg-input/20'
 
+/**
+ * 报价里的单价 / 数量 / 费用 / 优惠都靠「边输边算」实时联动合计，
+ * 官方 `NumberInput` 只在失焦 / 回车时提交会切断这份联动 —— 这里就地保留
+ * 原生 number 输入（类名与旧适配层的原生回退分支一致），提交语义不变。
+ */
+const NATIVE_NUM_CLASS =
+  'h-8 w-full min-w-0 rounded-[var(--radius-element)] border border-input bg-background px-2.5 py-1 text-base text-foreground shadow-xs outline-none transition-[color,box-shadow,border-color] duration-150 placeholder:text-muted-foreground/75 hover:border-border-strong focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted/60 disabled:opacity-70 md:text-sm dark:bg-input/20'
+
 /** 受控数字输入框：输入时保持原始文本（方便输入小数点），失焦或外部变更时同步数值 */
 function EditableNumber({
   value,
@@ -155,7 +149,7 @@ function EditableNumber({
     if (!focused) setText(String(value))
   }, [value, focused])
   return (
-    <Input
+    <input
       type="number"
       min={0}
       step="any"
@@ -163,7 +157,7 @@ function EditableNumber({
       aria-label={label}
       value={focused ? text : String(value)}
       disabled={disabled}
-      className={cn('h-7 px-2 text-right tabular-nums', className)}
+      className={cn(NATIVE_NUM_CLASS, 'h-7 px-2 text-right tabular-nums', className)}
       onFocus={() => {
         setFocused(true)
         setText(String(value))
@@ -211,9 +205,11 @@ export function QuoteEditor({
   pendingPoints?: number
 }) {
   const router = useRouter()
+  const showToast = useToast()
   const [quote, setQuote] = useState(initial)
   const [dirty, setDirty] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [productQuery, setProductQuery] = useState('')
   const [swapKey, setSwapKey] = useState<string | null>(null)
   const [lineQuery, setLineQuery] = useState('')
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set())
@@ -286,6 +282,49 @@ export function QuoteEditor({
     [activeProducts],
   )
 
+  // 旧 cmdk 命令面板换成官方 DropdownMenu 的数据模式：搜索框进 header，产品按设备类型分组。
+  // 这里在渲染期就地推导（不用 useMemo，避免把每次渲染重建的 addProduct 塞进依赖数组）。
+  const productPickerItems = (() => {
+    const q = productQuery.trim().toLowerCase()
+    const matches = (p: ProductOption) =>
+      !q ||
+      `${p.name} ${p.sku} ${p.brand?.name ?? ''} ${deviceTypeLabel(p.deviceType)}`
+        .toLowerCase()
+        .includes(q)
+    const sections = pickerGroups
+      .map((g) => ({
+        type: 'section' as const,
+        id: g.type || 'none',
+        title: g.type ? deviceTypeLabel(g.type) : '未分类',
+        items: g.items.filter(matches).map((p) => ({
+          id: p.id,
+          label: p.name,
+          description: `${p.brand?.name ?? ''} · ${p.sku}`,
+          icon: (
+            <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
+              {p.image ? (
+                <Image
+                  src={p.image}
+                  alt=""
+                  width={32}
+                  height={32}
+                  className="size-full bg-white object-contain"
+                />
+              ) : (
+                <span className="size-5">
+                  <DeviceSymbol type={p.deviceType} />
+                </span>
+              )}
+            </span>
+          ),
+          endContent: <span className="text-xs tabular-nums">{yuan(p.price)}</span>,
+          onClick: () => addProduct(p),
+        })),
+      }))
+      .filter((s) => s.items.length)
+    return sections.length ? sections : [{ label: '没有匹配的产品', isDisabled: true }]
+  })()
+
   const swapLine = swapKey ? (quote.items.find((l) => l.key === swapKey) ?? null) : null
   const applySwap = (p: ProductOption, scope: SwapScope, setDefault: boolean) => {
     if (!swapLine) return
@@ -312,10 +351,12 @@ export function QuoteEditor({
           : l,
       ),
     })
-    toast.success(`已更换 ${targets.length} 行为「${p.name}」，记得保存`)
+    showToast({ body: `已更换 ${targets.length} 行为「${p.name}」，记得保存` })
     if (setDefault && project && p.deviceType) {
       void setQuoteProjectDefault(project.id, p.deviceType, p.id).then((r) =>
-        r.ok ? toast.success('已同时设为项目默认型号') : toast.error(r.error),
+        r.ok
+          ? showToast({ body: '已同时设为项目默认型号' })
+          : showToast({ body: r.error, type: 'error' }),
       )
     }
   }
@@ -377,9 +418,9 @@ export function QuoteEditor({
         return { ...l, price: Math.round(base * rate * 100) / 100 }
       }),
     })
-    toast.success(
-      `已对所选 ${activeSelectedKeys.size} 项设备应用 ${Math.round(rate * 100) / 10} 折`,
-    )
+    showToast({
+      body: `已对所选 ${activeSelectedKeys.size} 项设备应用 ${Math.round(rate * 100) / 10} 折`,
+    })
   }
 
   const restoreBatchOriginPrice = () => {
@@ -391,7 +432,7 @@ export function QuoteEditor({
         return origin !== undefined ? { ...l, price: origin } : l
       }),
     })
-    toast.success(`已恢复所选 ${activeSelectedKeys.size} 项设备的目录原价`)
+    showToast({ body: `已恢复所选 ${activeSelectedKeys.size} 项设备的目录原价` })
   }
 
   const deleteBatchSelected = () => {
@@ -399,7 +440,7 @@ export function QuoteEditor({
     const count = activeSelectedKeys.size
     update({ items: quote.items.filter((l) => !activeSelectedKeys.has(l.key)) })
     setSelectedKeys(new Set())
-    toast.success(`已删除所选 ${count} 项设备`)
+    showToast({ body: `已删除所选 ${count} 项设备` })
   }
 
   const roundDownTotal = (unit: 100 | 1000) => {
@@ -408,7 +449,7 @@ export function QuoteEditor({
     const target = Math.floor(gross / unit) * unit
     const nextDiscount = Math.max(0, Math.round((gross - target) * 100) / 100)
     update({ discount: nextDiscount })
-    toast.success(`已自动抹零至 ${yuan(target)}（优惠 ${yuan(nextDiscount)}）`)
+    showToast({ body: `已自动抹零至 ${yuan(target)}（优惠 ${yuan(nextDiscount)}）` })
   }
 
   // 内部成本：品牌拿货折扣 → 产品库成本价 → 默认折扣（见 src/lib/quote-costs.ts）；只在报价台显示，不打印
@@ -481,11 +522,11 @@ export function QuoteEditor({
       fees: quote.fees.map(({ key: _k, ...f }) => f),
     })
     if (!result.ok) {
-      toast.error(result.error)
+      showToast({ body: result.error, type: 'error' })
       return false
     }
     setDirty(false)
-    toast.success('报价已保存')
+    showToast({ body: '报价已保存' })
     router.refresh()
     return true
   }
@@ -513,8 +554,8 @@ export function QuoteEditor({
     setCreatingContract(true)
     try {
       const result = await createContract(project.id, quote.id)
-      if (!result.ok) return void toast.error(result.error)
-      toast.success('已生成合同，请核对内容')
+      if (!result.ok) return void showToast({ body: result.error, type: 'error' })
+      showToast({ body: '已生成合同，请核对内容' })
       router.push(`/projects/${project.id}/contract`)
     } finally {
       setCreatingContract(false)
@@ -541,12 +582,12 @@ export function QuoteEditor({
       try {
         const res = await syncQuoteFromPointMap(quote.id, targetScope)
         if (!res.ok) {
-          toast.error(res.error)
+          showToast({ body: res.error, type: 'error' })
           return
         }
-        toast.success(
-          `已从点位图同步（${POINT_SCOPES.find((s) => s.value === res.scope)?.fullLabel}）`,
-        )
+        showToast({
+          body: `已从点位图同步（${POINT_SCOPES.find((s) => s.value === res.scope)?.fullLabel}）`,
+        })
         router.refresh()
       } finally {
         setSyncing(false)
@@ -597,9 +638,12 @@ export function QuoteEditor({
             label="全部报价"
           />
           {projectQuotes.length > 1 ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+            <DropdownMenu
+              alignment="start"
+              menuWidth="16rem"
+              renderTrigger={(props) => (
                 <Button
+                  {...props}
                   type="button"
                   variant="secondary"
                   size="sm"
@@ -608,33 +652,32 @@ export function QuoteEditor({
                   icon={<ChevronDown />}
                   label={projectQuotes.length ? `切换报价（${projectQuotes.length}）` : '切换报价'}
                 />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-64">
-                {projectQuotes.map((q) => (
-                  <DropdownMenuItem
-                    key={q.id}
-                    onSelect={() => {
-                      if (q.id === quote.id) return
-                      const go = () => router.push(`/projects/${project.id}/quotes/${q.id}`)
-                      if (dirty && !readOnly) save(go)
-                      else go()
-                    }}
+              )}
+              items={projectQuotes.map((q) => ({
+                id: q.id,
+                label: (
+                  <span
+                    className={cn(
+                      'flex-1 truncate',
+                      q.id === quote.id && 'font-semibold text-primary',
+                    )}
                   >
-                    <span
-                      className={cn(
-                        'flex-1 truncate',
-                        q.id === quote.id && 'font-semibold text-primary',
-                      )}
-                    >
-                      {q.title}
-                    </span>
-                    <span className="ml-3 text-xs text-muted-foreground tabular-nums">
-                      {yuan(q.total)}
-                    </span>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                    {q.title}
+                  </span>
+                ),
+                endContent: (
+                  <span className="ml-3 text-xs text-muted-foreground tabular-nums">
+                    {yuan(q.total)}
+                  </span>
+                ),
+                onClick: () => {
+                  if (q.id === quote.id) return
+                  const go = () => router.push(`/projects/${project.id}/quotes/${q.id}`)
+                  if (dirty && !readOnly) save(go)
+                  else go()
+                },
+              }))}
+            />
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -804,31 +847,25 @@ export function QuoteEditor({
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+              <DropdownMenu
+                alignment="end"
+                renderTrigger={(props) => (
                   <Button
+                    {...props}
                     size="sm"
                     variant="secondary"
                     className="h-7 gap-1 bg-primary-foreground/15 px-2.5 text-xs font-medium text-primary-foreground hover:bg-primary-foreground/25"
                     icon={<Percent />}
                     label="批量折扣"
                   />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => applyBatchDiscount(0.95)}>
-                    按目录价 9.5 折计算
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => applyBatchDiscount(0.9)}>
-                    按目录价 9.0 折计算
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => applyBatchDiscount(0.85)}>
-                    按目录价 8.5 折计算
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => applyBatchDiscount(0.8)}>
-                    按目录价 8.0 折计算
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                )}
+                items={[
+                  { label: '按目录价 9.5 折计算', onClick: () => applyBatchDiscount(0.95) },
+                  { label: '按目录价 9.0 折计算', onClick: () => applyBatchDiscount(0.9) },
+                  { label: '按目录价 8.5 折计算', onClick: () => applyBatchDiscount(0.85) },
+                  { label: '按目录价 8.0 折计算', onClick: () => applyBatchDiscount(0.8) },
+                ]}
+              />
               <Button
                 size="sm"
                 variant="secondary"
@@ -970,9 +1007,11 @@ export function QuoteEditor({
                     icon={<Loader2 />}
                     label="从点位图同步"
                   />
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
+                  <DropdownMenu
+                    alignment="end"
+                    renderTrigger={(props) => (
                       <Button
+                        {...props}
                         variant="secondary"
                         size="sm"
                         isDisabled={syncing || saving}
@@ -980,82 +1019,53 @@ export function QuoteEditor({
                         label="选择同步范围"
                         icon={<ChevronDown />}
                       />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {POINT_SCOPES.map((s) => (
-                        <DropdownMenuItem
-                          key={s.value}
-                          onSelect={() => void syncFromPointMap(s.value)}
-                        >
-                          <span
-                            className={cn('flex-1', s.value === currentScope && 'font-semibold')}
-                          >
-                            按「{s.fullLabel}」同步
-                          </span>
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    )}
+                    items={POINT_SCOPES.map((s) => ({
+                      id: s.value,
+                      label: (
+                        <span className={cn('flex-1', s.value === currentScope && 'font-semibold')}>
+                          按「{s.fullLabel}」同步
+                        </span>
+                      ),
+                      onClick: () => void syncFromPointMap(s.value),
+                    }))}
+                  />
                 </div>
               ) : null}
-              <Popover
-                label="添加产品"
-                placement="below"
+              <DropdownMenu
                 alignment="end"
-                // 原 `PopoverContent className="w-96 p-0"`：`w-96` = 384 是浮层外框宽度，
-                // 官方只有 `width` 能设；`p-0` 对应 `padding={0}`，内边距交给 cmdk 自己。
-                width={384}
-                padding={0}
-                isOpen={pickerOpen}
-                onOpenChange={setPickerOpen}
-                content={
-                  <Command>
-                    <CommandInput placeholder="搜索产品名称、型号、品牌或设备类型" />
-                    <CommandList className="max-h-96">
-                      <CommandEmpty>没有匹配的产品</CommandEmpty>
-                      {pickerGroups.map((g) => (
-                        <CommandGroup
-                          key={g.type || 'none'}
-                          heading={g.type ? deviceTypeLabel(g.type) : '未分类'}
-                        >
-                          {g.items.map((p) => (
-                            <CommandItem
-                              key={p.id}
-                              value={`${p.name} ${p.sku} ${p.brand?.name ?? ''} ${deviceTypeLabel(p.deviceType)}`}
-                              onSelect={() => addProduct(p)}
-                            >
-                              <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
-                                {p.image ? (
-                                  <Image
-                                    src={p.image}
-                                    alt=""
-                                    width={32}
-                                    height={32}
-                                    className="size-full bg-white object-contain"
-                                  />
-                                ) : (
-                                  <span className="size-5">
-                                    <DeviceSymbol type={p.deviceType} />
-                                  </span>
-                                )}
-                              </span>
-                              <div className="min-w-0 flex-1">
-                                <div className="truncate">{p.name}</div>
-                                <div className="truncate text-xs text-muted-foreground">
-                                  {p.brand?.name} · {p.sku}
-                                </div>
-                              </div>
-                              <span className="text-xs tabular-nums">{yuan(p.price)}</span>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      ))}
-                    </CommandList>
-                  </Command>
+                placement="below"
+                // 原 `PopoverContent className="w-96 p-0"`：`w-96` = 384 是浮层外框宽度；
+                // 官方菜单对应 `menuWidth`，高度上限沿用原来的 max-h-96（384px）。
+                menuWidth={384}
+                menuMaxHeight={384}
+                isMenuOpen={pickerOpen}
+                onOpenChange={(o) => {
+                  setPickerOpen(o)
+                  if (!o) setProductQuery('')
+                }}
+                renderTrigger={(props) => (
+                  <Button
+                    {...props}
+                    variant="secondary"
+                    size="sm"
+                    icon={<Plus />}
+                    label="添加产品"
+                  />
+                )}
+                header={
+                  <TextInput
+                    label="搜索产品"
+                    isLabelHidden
+                    value={productQuery}
+                    onChange={(v) => setProductQuery(v)}
+                    placeholder="搜索产品名称、型号、品牌或设备类型"
+                    aria-label="搜索产品名称、型号、品牌或设备类型"
+                    controlClassName="h-8"
+                  />
                 }
-              >
-                <Button variant="secondary" size="sm" icon={<Plus />} label="添加产品" />
-              </Popover>
+                items={productPickerItems}
+              />
             </div>
           )}
         </div>
@@ -1363,11 +1373,11 @@ export function QuoteEditor({
 
               {/* 平板与桌面端（>= md）IBM Carbon 高密度数据表格 */}
               <div className="hidden md:block">
-                <Table>
+                <Table hasHover>
                   <TableHeader>
-                    <TableRow>
+                    <TableRow isHeaderRow>
                       {readOnly ? null : (
-                        <TableHead className="w-10 pl-5">
+                        <TableHeaderCell className="w-10 max-w-none pl-5">
                           <CheckboxInput
                             label={'全选当前列表中的设备'}
                             isLabelHidden
@@ -1375,21 +1385,25 @@ export function QuoteEditor({
                             onChange={(v) => toggleSelectAllFiltered(Boolean(v))}
                             aria-label="全选当前列表中的设备"
                           />
-                        </TableHead>
+                        </TableHeaderCell>
                       )}
-                      <TableHead
+                      <TableHeaderCell
                         className={cn(
-                          'text-xs font-semibold text-muted-foreground',
+                          'max-w-none text-xs font-semibold text-muted-foreground',
                           readOnly && 'pl-6',
                         )}
                       >
                         设备型号与规格
-                      </TableHead>
-                      {showCosts ? <TableHead className="text-right">内部成本</TableHead> : null}
-                      <TableHead className="text-right">零售单价</TableHead>
-                      <TableHead className="text-right">数量</TableHead>
-                      <TableHead className="text-right">小计金额</TableHead>
-                      {readOnly ? null : <TableHead className="w-10 pr-4" />}
+                      </TableHeaderCell>
+                      {showCosts ? (
+                        <TableHeaderCell className="max-w-none text-right">
+                          内部成本
+                        </TableHeaderCell>
+                      ) : null}
+                      <TableHeaderCell className="max-w-none text-right">零售单价</TableHeaderCell>
+                      <TableHeaderCell className="max-w-none text-right">数量</TableHeaderCell>
+                      <TableHeaderCell className="max-w-none text-right">小计金额</TableHeaderCell>
+                      {readOnly ? null : <TableHeaderCell className="w-10 max-w-none pr-4" />}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1404,7 +1418,7 @@ export function QuoteEditor({
                           )}
                         >
                           {readOnly ? null : (
-                            <TableCell className="pl-5">
+                            <TableCell className="max-w-none pl-5">
                               <CheckboxInput
                                 label={'选择'}
                                 isLabelHidden
@@ -1414,7 +1428,9 @@ export function QuoteEditor({
                               />
                             </TableCell>
                           )}
-                          <TableCell className={cn('whitespace-normal', readOnly && 'pl-6')}>
+                          <TableCell
+                            className={cn('max-w-none whitespace-normal', readOnly && 'pl-6')}
+                          >
                             <div className="flex items-center gap-3">
                               <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background">
                                 {l.image ? (
@@ -1458,7 +1474,7 @@ export function QuoteEditor({
                             </div>
                           </TableCell>
                           {showCosts ? <CostCell cost={unitCost(l)} /> : null}
-                          <TableCell className="text-right">
+                          <TableCell className="max-w-none text-right">
                             <div className="flex flex-col items-end gap-0.5">
                               {numInput(
                                 l.price,
@@ -1492,7 +1508,7 @@ export function QuoteEditor({
                               })()}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="max-w-none text-right">
                             {numInput(
                               l.quantity,
                               (n) => updateLine(l.key, { quantity: n }),
@@ -1500,11 +1516,11 @@ export function QuoteEditor({
                               cn('ml-auto w-20', INLINE_NUM),
                             )}
                           </TableCell>
-                          <TableCell className="text-right font-medium tabular-nums">
+                          <TableCell className="max-w-none text-right font-medium tabular-nums">
                             {yuan(l.price * l.quantity)}
                           </TableCell>
                           {readOnly ? null : (
-                            <TableCell className="pr-4">
+                            <TableCell className="max-w-none pr-4">
                               <IconButton
                                 variant="ghost"
 
@@ -1525,15 +1541,15 @@ export function QuoteEditor({
                   <TableFooter>
                     <TableRow>
                       <TableCell
-                        className="pl-6 font-medium"
+                        className="max-w-none pl-6 font-medium"
                         colSpan={(showCosts ? 4 : 3) + (readOnly ? 0 : 1)}
                       >
                         产品小计
                       </TableCell>
-                      <TableCell className="text-right font-bold text-foreground tabular-nums">
+                      <TableCell className="max-w-none text-right font-bold text-foreground tabular-nums">
                         {yuan(totals.productTotal)}
                       </TableCell>
-                      {readOnly ? null : <TableCell />}
+                      {readOnly ? null : <TableCell className="max-w-none" />}
                     </TableRow>
                   </TableFooter>
                 </Table>
@@ -1735,27 +1751,28 @@ const COST_SOURCE: Record<UnitCost['source'], string> = {
 
 /** 单价成本单元格：鼠标悬停显示成本依据 */
 function CostCell({ cost }: { cost: UnitCost | null }) {
+  // 官方的 TableCell 不收原生 title，成本依据改用官方 Tooltip 承载（默认 200ms 延迟）。
+  const detail = cost
+    ? `${COST_SOURCE[cost.source]}${cost.rate ? ` · ${rateLabel(cost.rate)}` : ''}`
+    : '未设置成本：在「设置 → 报价成本与毛利」里填写品牌折扣'
   return (
-    <TableCell
-      className="text-right text-sm text-muted-foreground tabular-nums"
-      title={
-        cost
-          ? `${COST_SOURCE[cost.source]}${cost.rate ? ` · ${rateLabel(cost.rate)}` : ''}`
-          : '未设置成本：在「设置 → 报价成本与毛利」里填写品牌折扣'
-      }
-    >
-      {cost ? (
+    <TableCell className="max-w-none text-right text-sm text-muted-foreground tabular-nums">
+      <Tooltip content={detail} placement="below">
         <span className="inline-flex items-center gap-1">
-          {cost.source !== 'catalog' ? (
-            <span className="rounded bg-muted px-1 text-[10px] leading-4">
-              {cost.rate ? rateLabel(cost.rate) : '估'}
-            </span>
-          ) : null}
-          {yuan(cost.cost)}
+          {cost ? (
+            <>
+              {cost.source !== 'catalog' ? (
+                <span className="rounded bg-muted px-1 text-[10px] leading-4">
+                  {cost.rate ? rateLabel(cost.rate) : '估'}
+                </span>
+              ) : null}
+              {yuan(cost.cost)}
+            </>
+          ) : (
+            '—'
+          )}
         </span>
-      ) : (
-        '—'
-      )}
+      </Tooltip>
     </TableCell>
   )
 }
