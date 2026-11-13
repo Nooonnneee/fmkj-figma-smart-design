@@ -1,16 +1,11 @@
 'use client'
 
-import { Card } from '@astryxdesign/core/Card'
-import { Layout, LayoutContent, LayoutHeader } from '@astryxdesign/core/Layout'
+import { useState } from 'react'
 
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Card } from '@astryxdesign/core/Card'
+import { FieldLabel } from '@astryxdesign/core/Field'
+import { Layout, LayoutContent, LayoutHeader } from '@astryxdesign/core/Layout'
+import { Selector } from '@astryxdesign/core/Selector'
 
 export type DocKindOption = {
   kind: string
@@ -48,6 +43,35 @@ export function DocumentTemplateSettings({
   styles: DocStyleOption[]
   defaults: Record<string, { style?: string; layout?: string }>
 }) {
+  // 官方 Selector 只有受控写法：每类文档各记一份当前风格 + 版式，提交仍靠 htmlName。
+  const [selection, setSelection] = useState<Record<string, { style: string; layout: string }>>(
+    () =>
+      Object.fromEntries(
+        kinds.map((k) => {
+          const d = defaults[k.kind] ?? {}
+          return [
+            k.kind,
+            {
+              style: styles.some((s) => s.id === d.style) ? d.style! : (styles[0]?.id ?? ''),
+              layout: k.layouts.some((l) => l.value === d.layout)
+                ? d.layout!
+                : (k.layouts[0]?.value ?? ''),
+            },
+          ]
+        }),
+      ),
+  )
+
+  const pick = (kind: string, key: 'style' | 'layout', value: string) =>
+    setSelection((s) => ({ ...s, [kind]: { ...s[kind]!, [key]: value } }))
+
+  const styleOptions = styles.map((s) => ({
+    value: s.id,
+    label: s.name,
+    icon: <Swatch colors={s.swatch} />,
+    description: s.enabled ? undefined : '（插件已关闭，暂用简约）',
+  }))
+
   return (
     <Card
       padding={0}
@@ -63,48 +87,31 @@ export function DocumentTemplateSettings({
         content={
           <LayoutContent padding={5} isScrollable={false}>
             <div className="grid gap-4">
-              {kinds.map((k) => {
-                const d = defaults[k.kind] ?? {}
-                const style = styles.some((s) => s.id === d.style) ? d.style! : styles[0]?.id
-                const layout = k.layouts.some((l) => l.value === d.layout)
-                  ? d.layout!
-                  : k.layouts[0]?.value
-                return (
-                  <div key={k.kind} className="grid items-center gap-2 sm:grid-cols-[7rem_1fr_1fr]">
-                    <Label className="text-sm">{k.label}</Label>
-                    <Select name={`doc-${k.kind}-style`} defaultValue={style}>
-                      <SelectTrigger className="w-full" aria-label={`${k.label}风格`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {styles.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            <Swatch colors={s.swatch} />
-                            {s.name}
-                            {s.enabled ? null : (
-                              <span className="text-xs text-muted-foreground">
-                                （插件已关闭，暂用简约）
-                              </span>
-                            )}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select name={`doc-${k.kind}-layout`} defaultValue={layout}>
-                      <SelectTrigger className="w-full" aria-label={`${k.label}版式`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {k.layouts.map((l) => (
-                          <SelectItem key={l.value} value={l.value}>
-                            {l.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )
-              })}
+              {kinds.map((k) => (
+                <div key={k.kind} className="grid items-center gap-2 sm:grid-cols-[7rem_1fr_1fr]">
+                  <FieldLabel isGroupLabel label={k.label} inputID={`doc-${k.kind}-style`} />
+                  <Selector
+                    label={k.label}
+                    isLabelHidden
+                    aria-label={`${k.label}风格`}
+                    value={selection[k.kind]!.style}
+                    onChange={(v) => pick(k.kind, 'style', v)}
+                    htmlName={`doc-${k.kind}-style`}
+                    width="100%"
+                    options={styleOptions}
+                  />
+                  <Selector
+                    label={k.label}
+                    isLabelHidden
+                    aria-label={`${k.label}版式`}
+                    value={selection[k.kind]!.layout}
+                    onChange={(v) => pick(k.kind, 'layout', v)}
+                    htmlName={`doc-${k.kind}-layout`}
+                    width="100%"
+                    options={k.layouts.map((l) => ({ value: l.value, label: l.label }))}
+                  />
+                </div>
+              ))}
             </div>
           </LayoutContent>
         }

@@ -3,18 +3,16 @@
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, ImageIcon, Loader2, Save, Upload, X } from 'lucide-react'
-import { toast } from 'sonner'
 
 import { Button } from '@astryxdesign/core/Button'
 import { IconButton } from '@astryxdesign/core/IconButton'
 import { Field } from '@astryxdesign/core/Field'
 import { Card } from '@astryxdesign/core/Card'
 import { Layout, LayoutContent, LayoutHeader } from '@astryxdesign/core/Layout'
-
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
+import { Switch } from '@astryxdesign/core/Switch'
 import { TextArea } from '@astryxdesign/core/TextArea'
+import { TextInput } from '@astryxdesign/core/TextInput'
+import { useToast } from '@astryxdesign/core/Toast'
 
 import {
   DocumentTemplateSettings,
@@ -36,6 +34,13 @@ type Values = {
   logoUrl: string | null
   qrCodeUrl: string | null
 }
+
+/** 官方 TextInput 没有 maxLength（受控，长度由这里截断；服务端仍会二次校验）。 */
+type TextKey = 'name' | 'slogan' | 'phone' | 'email' | 'address' | 'qrCaption'
+
+type TextFieldOptions = Partial<
+  Pick<React.ComponentProps<typeof TextInput>, 'type' | 'inputMode' | 'placeholder' | 'isRequired'>
+> & { max: number }
 
 function ImageField({
   name,
@@ -155,10 +160,21 @@ export function CompanyForm({
   }
 }) {
   const router = useRouter()
+  const showToast = useToast()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<{ message: string; field?: string } | null>(null)
   const [quoteNotes, setQuoteNotes] = useState(initial.quoteNotes)
   const [contractTerms, setContractTerms] = useState(initial.contractTerms)
+  // 官方 TextInput 只有受控写法，6 个单行文本字段统一用一份 state
+  const [values, setValues] = useState<Record<TextKey, string>>({
+    name: initial.name,
+    slogan: initial.slogan,
+    phone: initial.phone,
+    email: initial.email,
+    address: initial.address,
+    qrCaption: initial.qrCaption,
+  })
+  const [printProductImages, setPrintProductImages] = useState(initial.printProductImages)
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -176,7 +192,7 @@ export function CompanyForm({
       }
       if (!res.ok || !data.ok)
         return setError({ message: data.error ?? '保存失败，请稍后重试', field: data.field })
-      toast.success('设置已保存')
+      showToast({ body: '设置已保存' })
       router.refresh()
     } catch {
       setError({ message: '网络错误，请稍后重试' })
@@ -185,20 +201,16 @@ export function CompanyForm({
     }
   }
 
-  const field = (
-    name: Exclude<keyof Values, 'printProductImages'>,
-    label: string,
-    props: React.ComponentProps<typeof Input> = {},
-  ) => (
-    <Field label={label} inputID={name}>
-      <Input
-        id={name}
-        name={name}
-        defaultValue={initial[name] ?? ''}
-        aria-invalid={error?.field === name ? true : undefined}
-        {...props}
-      />
-    </Field>
+  const field = (name: TextKey, label: string, { max, ...props }: TextFieldOptions) => (
+    <TextInput
+      id={name}
+      label={label}
+      htmlName={name}
+      value={values[name]}
+      onChange={(v) => setValues((s) => ({ ...s, [name]: v.slice(0, max) }))}
+      status={error?.field === name ? { type: 'error' } : undefined}
+      {...props}
+    />
   )
 
   return (
@@ -232,11 +244,11 @@ export function CompanyForm({
             <LayoutContent padding={5} isScrollable={false}>
               <div className="grid gap-4 md:grid-cols-2">
                 {field('name', '名称', {
-                  required: true,
-                  maxLength: 60,
+                  max: 60,
+                  isRequired: true,
                   placeholder: '公司、工作室或个人名称',
                 })}
-                {field('slogan', '副标题', { maxLength: 80 })}
+                {field('slogan', '副标题', { max: 80 })}
                 <div className="md:col-span-2">
                   <ImageField
                     name="logo"
@@ -267,9 +279,9 @@ export function CompanyForm({
           content={
             <LayoutContent padding={5} isScrollable={false}>
               <div className="grid gap-4 md:grid-cols-2">
-                {field('phone', '联系电话', { inputMode: 'tel', maxLength: 30 })}
-                {field('email', '邮箱', { type: 'email', maxLength: 80 })}
-                <div className="md:col-span-2">{field('address', '地址', { maxLength: 200 })}</div>
+                {field('phone', '联系电话', { inputMode: 'tel', max: 30 })}
+                {field('email', '邮箱', { type: 'email', max: 80 })}
+                <div className="md:col-span-2">{field('address', '地址', { max: 200 })}</div>
                 <div className="md:col-span-2">
                   <ImageField
                     name="qrCode"
@@ -280,7 +292,7 @@ export function CompanyForm({
                   />
                 </div>
                 {field('qrCaption', '二维码说明', {
-                  maxLength: 40,
+                  max: 40,
                   placeholder: '扫码添加微信',
                 })}
               </div>
@@ -331,14 +343,16 @@ export function CompanyForm({
                     controlClassName="leading-relaxed"
                   />
                 </Field>
-                <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-                  <Label htmlFor="printProductImages">打印报价单时显示产品缩略图</Label>
-                  <Switch
-                    id="printProductImages"
-                    name="printProductImages"
-                    defaultChecked={initial.printProductImages}
-                  />
-                </div>
+                <Switch
+                  label="打印报价单时显示产品缩略图"
+                  value={printProductImages}
+                  onChange={setPrintProductImages}
+                  htmlName="printProductImages"
+                  labelPosition="start"
+                  labelSpacing="spread"
+                  width="100%"
+                  className="rounded-lg border p-3"
+                />
               </div>
             </LayoutContent>
           }

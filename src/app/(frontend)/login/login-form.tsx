@@ -19,10 +19,8 @@ import {
 } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
-import { Field } from '@astryxdesign/core/Field'
+import { Field, FieldLabel } from '@astryxdesign/core/Field'
 import { TextInput } from '@astryxdesign/core/TextInput'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Tab, TabList } from '@astryxdesign/core/TabList'
 
 const LOGIN_METHOD_KEY = 'fmkj-login-method'
@@ -348,7 +346,7 @@ export function LoginForm({
       </div>
       <div className="grid gap-2">
         <div className="flex items-center justify-between">
-          <Label htmlFor="password">密码</Label>
+          <FieldLabel label="密码" inputID="password" />
           {otpRequired ? (
             <Button
               type="button"
@@ -477,7 +475,7 @@ export function LoginForm({
       </div>
       {otpRequired ? (
         <div className="grid gap-2">
-          <Label htmlFor="reg-otp">邮箱验证码</Label>
+          <FieldLabel label="邮箱验证码" inputID="reg-otp" />
           <div className="flex gap-2">
             <div className="relative flex-1">
               <ShieldCheck className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />

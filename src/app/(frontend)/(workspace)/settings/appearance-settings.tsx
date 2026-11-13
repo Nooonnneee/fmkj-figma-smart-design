@@ -7,17 +7,11 @@ import { useTheme } from 'next-themes'
 import { useAstryxTheme } from '@/components/astryx-theme-provider'
 import { useAccent } from '@/components/theme-provider'
 import { Card } from '@astryxdesign/core/Card'
+import { Grid } from '@astryxdesign/core/Grid'
 import { Layout, LayoutContent, LayoutHeader } from '@astryxdesign/core/Layout'
-
-import { Label } from '@/components/ui/label'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { ACCENT_SWATCH, ACCENTS, DEFAULT_ACCENT, isAccent } from '@/lib/appearance'
-import {
-  ASTRYX_SWATCH,
-  ASTRYX_THEMES,
-  DEFAULT_ASTRYX_THEME,
-  isAstryxTheme,
-} from '@/lib/astryx-theme'
+import { SelectableCard } from '@astryxdesign/core/SelectableCard'
+import { ACCENT_SWATCH, ACCENTS, DEFAULT_ACCENT } from '@/lib/appearance'
+import { ASTRYX_SWATCH, ASTRYX_THEMES, DEFAULT_ASTRYX_THEME } from '@/lib/astryx-theme'
 import { cn } from '@/lib/utils'
 
 const MODES = [
@@ -25,10 +19,6 @@ const MODES = [
   { value: 'dark', label: '深色', icon: Moon },
   { value: 'system', label: '跟随系统', icon: Monitor },
 ] as const
-
-// 整块选项可点；Radix 单选项输出 data-state，据此高亮选中的那一块
-const tile =
-  'relative cursor-pointer rounded-[var(--radius-container)] border bg-card font-normal leading-normal transition-colors hover:bg-accent/50 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/30'
 
 /**
  * 主题风格的示意小窗：侧栏 + 内容 + 主按钮。
@@ -101,61 +91,56 @@ export function AppearanceSettings() {
                 <p id="appearance-mode" className="text-sm font-medium">
                   颜色模式
                 </p>
-                <RadioGroup
-                  aria-labelledby="appearance-mode"
-                  value={mounted ? (theme ?? 'system') : ''}
-                  onValueChange={setTheme}
-                  className="grid-cols-3 gap-2"
-                >
+                {/* 官方 SelectableCard 的选中态是整卡内描边，没有角落圆点；
+                    单选互斥由受控 state 保证（点已选项不改变选择）。 */}
+                <Grid columns={3} gap={2} role="group" aria-labelledby="appearance-mode">
                   {MODES.map(({ value, label, icon: Icon }) => (
-                    <Label
+                    <SelectableCard
                       key={value}
-                      htmlFor={`appearance-mode-${value}`}
-                      className={cn(tile, 'flex-col items-start gap-2 p-3')}
+                      label={label}
+                      isSelected={mounted && (theme ?? 'system') === value}
+                      onChange={() => setTheme(value)}
+                      padding={3}
+                      className="flex flex-col items-start gap-2"
                     >
                       <Icon className="size-4 text-muted-foreground" />
                       <span className="text-sm">{label}</span>
-                      <RadioGroupItem
-                        id={`appearance-mode-${value}`}
-                        value={value}
-                        className="absolute top-3 right-3"
-                      />
-                    </Label>
+                    </SelectableCard>
                   ))}
-                </RadioGroup>
+                </Grid>
               </div>
 
               <div className="flex flex-col gap-2">
                 <p id="appearance-accent" className="text-sm font-medium">
                   主题风格
                 </p>
-                <RadioGroup
+                <Grid
+                  columns={{ minWidth: 180, max: 3 }}
+                  gap={2}
+                  role="group"
                   aria-labelledby="appearance-accent"
-                  value={accent}
-                  onValueChange={(v) => isAccent(v) && setAccent(v)}
-                  className="gap-2 sm:grid-cols-3"
                 >
                   {ACCENTS.map((a) => (
-                    <Label
+                    <SelectableCard
                       key={a.id}
-                      htmlFor={`appearance-accent-${a.id}`}
-                      className={cn(tile, 'flex-col items-stretch gap-2.5 p-3')}
+                      label={a.label}
+                      isSelected={accent === a.id}
+                      onChange={() => setAccent(a.id)}
+                      padding={3}
+                      className="flex flex-col items-stretch gap-2.5"
                     >
                       <AccentPreview swatch={ACCENT_SWATCH[a.id]} pill={a.id === 'official'} />
-                      <span className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium">
-                          {a.label}
-                          {a.id === DEFAULT_ACCENT ? (
-                            <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                              默认
-                            </span>
-                          ) : null}
-                        </span>
-                        <RadioGroupItem id={`appearance-accent-${a.id}`} value={a.id} />
+                      <span className="text-sm font-medium">
+                        {a.label}
+                        {a.id === DEFAULT_ACCENT ? (
+                          <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                            默认
+                          </span>
+                        ) : null}
                       </span>
-                    </Label>
+                    </SelectableCard>
                   ))}
-                </RadioGroup>
+                </Grid>
               </div>
 
               {/* 组件主题（Astryx 官方 6 套）—— 与上面的「主题风格」是两套：
@@ -167,33 +152,33 @@ export function AppearanceSettings() {
                 <p className="text-xs text-muted-foreground">
                   按钮、输入框、弹窗等组件的样式；与上面的主题风格相互独立。
                 </p>
-                <RadioGroup
+                <Grid
+                  columns={{ minWidth: 180, max: 3 }}
+                  gap={2}
+                  role="group"
                   aria-labelledby="appearance-astryx"
-                  value={themeId}
-                  onValueChange={(v) => isAstryxTheme(v) && setThemeId(v)}
-                  className="gap-2 sm:grid-cols-3"
                 >
                   {ASTRYX_THEMES.map((t) => (
-                    <Label
+                    <SelectableCard
                       key={t.id}
-                      htmlFor={`appearance-astryx-${t.id}`}
-                      className={cn(tile, 'flex-col items-stretch gap-2.5 p-3')}
+                      label={t.label}
+                      isSelected={themeId === t.id}
+                      onChange={() => setThemeId(t.id)}
+                      padding={3}
+                      className="flex flex-col items-stretch gap-2.5"
                     >
                       <AstryxThemePreview swatch={ASTRYX_SWATCH[t.id]} />
-                      <span className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium">
-                          {t.label}
-                          {t.id === DEFAULT_ASTRYX_THEME ? (
-                            <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                              默认
-                            </span>
-                          ) : null}
-                        </span>
-                        <RadioGroupItem id={`appearance-astryx-${t.id}`} value={t.id} />
+                      <span className="text-sm font-medium">
+                        {t.label}
+                        {t.id === DEFAULT_ASTRYX_THEME ? (
+                          <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                            默认
+                          </span>
+                        ) : null}
                       </span>
-                    </Label>
+                    </SelectableCard>
                   ))}
-                </RadioGroup>
+                </Grid>
               </div>
             </div>
           </LayoutContent>

@@ -19,7 +19,6 @@ import {
   Search,
   Users,
 } from 'lucide-react'
-import { toast } from 'sonner'
 
 import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
@@ -27,6 +26,7 @@ import { Card as AstryxCard } from '@astryxdesign/core/Card'
 import { Layout, LayoutContent, LayoutHeader } from '@astryxdesign/core/Layout'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { Tab, TabList } from '@astryxdesign/core/TabList'
+import { useToast } from '@astryxdesign/core/Toast'
 import type { CustomerUsageReport } from '@/lib/usage-diagnostics'
 import { cn } from '@/lib/utils'
 
@@ -83,6 +83,7 @@ function methodLabel(m?: string) {
 
 export function UsageReportsClient({ report }: { report: CustomerUsageReport }) {
   const router = useRouter()
+  const showToast = useToast()
   const [refreshing, setRefreshing] = useState(false)
   const [copiedSummary, setCopiedSummary] = useState(false)
   const [activeTab, setActiveTab] = useState('customers')
@@ -152,7 +153,7 @@ export function UsageReportsClient({ report }: { report: CustomerUsageReport }) 
     a.download = `繁梦空间-客户使用报告-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
-    toast.success('已导出 CSV 客户使用报表')
+    showToast({ body: '已导出 CSV 客户使用报表' })
   }
 
   function copyMarkdownDigest() {
@@ -193,7 +194,7 @@ export function UsageReportsClient({ report }: { report: CustomerUsageReport }) 
     }
     void navigator.clipboard?.writeText(lines.join('\n'))
     setCopiedSummary(true)
-    toast.success('已复制 Markdown 运维巡检日报')
+    showToast({ body: '已复制 Markdown 运维巡检日报' })
     setTimeout(() => setCopiedSummary(false), 1500)
   }
 
@@ -1007,7 +1008,7 @@ export function UsageReportsClient({ report }: { report: CustomerUsageReport }) 
                                     onClick={() => {
                                       const text = `[排障日志] 时间: ${err.createdAt}\n客户: ${err.userName} (${err.userId})\n模型: ${err.modelName} (${err.modelId})\n项目ID: ${err.projectId ?? '无'}\n用户指令: ${err.promptPreview}\n报错信息: ${err.errorMessage}`
                                       void navigator.clipboard?.writeText(text)
-                                      toast.success('已复制该条排障上下文')
+                                      showToast({ body: '已复制该条排障上下文' })
                                     }}
                                     icon={<Copy />}
                                     label="复制排障信息"
