@@ -78,11 +78,14 @@ docker compose --profile tools run --rm -e NEW_PASSWORD='至少10位的密码' t
   run --input '{"scriptPath":"scripts/set-password.ts","scriptArgs":["users","staff@example.com"]}'
 ```
 
-目前没有配置邮件服务，"忘记密码"邮件不会发出，需要用上面的命令重设。
+邮件：用户侧的注册验证码 / 忘记密码走 `RESEND_API_KEY` + `SMTP_FROM`（或 `SMTP_HOST/USER/PASS`），
+配好即可用。**Payload 后台 `/admin` 的「忘记密码」仍然不会发信** —— 自托管配置里没有给 Payload
+装 email adapter，邮件只会打到容器日志。管理员忘记密码用上面的 `set-password.ts` 重设。
 
 ## 6. HTTPS（Nginx）
 
-应用只监听本机 `127.0.0.1:3000`。Nginx 示例：
+应用只监听本机 `127.0.0.1:3000`，前面需要一层反向代理。**主站 fmkj.top 实际用的是 Caddy**
+（和同机的另一个业务共用，见第 7 节的影子部署）。下面是 Nginx 的等价写法，供新装机器参考：
 
 ```nginx
 server {
