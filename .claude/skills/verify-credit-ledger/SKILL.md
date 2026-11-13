@@ -112,6 +112,21 @@ pass it along with the model.
 Raw TLC output (what `verify.sh` writes) is a variable dump; the same run through
 `/statechart` is what you show a person.
 
+### Opening the diagram
+
+Two committed files next to the model, both rendered from the same run:
+
+- `chart.svg` — 双击用浏览器打开；拖进微信 / 飞书 / Slack；GitHub 的文件页也会
+  直接渲染它。带主题色，明暗都能看。
+- `chart.mmd` — 纯文本 Mermaid。贴到 <https://mermaid.live>，或在 VS Code 装
+  Mermaid 插件预览，或放进 Markdown 的 ```mermaid 代码块（GitHub / Obsidian 会渲染）。
+
+要 PNG（贴进 PPT / 文档）：`qlmanage -t -s 7405 -o /tmp/out verification/credit-ledger/chart.svg`，
+产物在 `/tmp/out/chart.svg.png`。这个 PNG 别提交，1.6 MB。
+
+`chart.svg` 是 `chart.mmd` 用 pele 渲染的派生文件，模型或 `view.ts` 改了要重新生成再
+一起提交；`verify.sh` 不重新生成它。
+
 ## Known result at the sync commit
 
 **Both rules break on the code as it stands. This is the finding, not a modeling
