@@ -1,6 +1,6 @@
 ---
 name: verify-credit-ledger
-description: "Formally verify the AI credit ledger: a charge or grant must leave users.aiCredits equal to the opening balance plus every committed ai-credit-ledger row, and a charge must never spend more than the balance. Use when changing src/collections/AiCreditLedger.ts, or anything that creates rows in ai-credit-ledger (AI 对话计费、AI 生图、户型图风格化、兑换码、积分任务)."
+description: 'Formally verify the AI credit ledger: a charge or grant must leave users.aiCredits equal to the opening balance plus every committed ai-credit-ledger row, and a charge must never spend more than the balance. Use when changing src/collections/AiCreditLedger.ts, or anything that creates rows in ai-credit-ledger (AI 对话计费、AI 生图、户型图风格化、兑换码、积分任务).'
 ---
 
 # Verify the AI credit ledger
@@ -19,25 +19,25 @@ unit test naturally covers.
 
 ## The rules the model checks
 
-| Rule                   | In the reader's words                            | If it breaks                                                                                       |
-| ---------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| Rule                   | In the reader's words                            | If it breaks                                                                                        |
+| ---------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
 | `BalanceMatchesLedger` | 充值不会凭空消失，扣费也不会凭空多扣             | 两笔扣费都记了流水，余额只减了一次 → 用户白嫖 AI；两笔发放都记了流水，到账只加一次 → 用户充的钱少了 |
 | `NoOverdraft`          | 余额不够的那一笔必须被拒，流水合计不会被花成负数 | 用户以一份积分的价钱跑了两份 AI                                                                     |
 
 ## Coverage record
 
-| Covered by the model                                               | File                                                          | Symbol / line                                                |
-| ------------------------------------------------------------------ | ------------------------------------------------------------- | ------------------------------------------------------------ |
-| reads `users.aiCredits`, computes `balanceAfter`, 402 when negative | `src/collections/AiCreditLedger.ts`                           | `beforeChange`（第 34 行起，`balanceAfter` 在 50、守卫在 51） |
-| writes `users.aiCredits = doc.balanceAfter`                        | same                                                          | `afterChange`（第 57 行起，写入在 63）                        |
-| 扣费调用点                                                         | `src/plugins/ai-copilot/chat-handler.ts`                      | `ai-credit-ledger` create，第 665 行                          |
-| 扣费调用点                                                         | `src/app/api/ai/images/route.ts`                              | 第 80 行（前置检查在第 68 行）                                |
-| 扣费调用点                                                         | `src/app/api/ai/images/style/route.ts`                        | 第 79 行（前置检查在第 62 行）                                |
-| 扣费调用点                                                         | `src/plugins/ai-copilot/tools/core-handlers.ts`               | 第 1278 行                                                    |
-| 发放调用点（兑换码）                                               | `src/lib/services/membership-service.ts`                      | 第 104 行                                                     |
-| 发放调用点（任务奖励）                                             | `src/lib/credit-tasks.ts`                                     | 第 159 行                                                     |
-| 模型依赖的事实 1：hooks 与插入在同一个事务                         | `node_modules/payload/dist/collections/operations/create.js`  | 第 46 行 `initTransaction`                                    |
-| 模型依赖的事实 2：跑在默认隔离级别（READ COMMITTED）               | `src/payload.selfhost.config.ts`                              | 第 158 行 `postgresAdapter({...})`，没有 `transactionOptions` |
+| Covered by the model                                                | File                                                         | Symbol / line                                                 |
+| ------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------- |
+| reads `users.aiCredits`, computes `balanceAfter`, 402 when negative | `src/collections/AiCreditLedger.ts`                          | `beforeChange`（第 34 行起，`balanceAfter` 在 50、守卫在 51） |
+| writes `users.aiCredits = doc.balanceAfter`                         | same                                                         | `afterChange`（第 57 行起，写入在 63）                        |
+| 扣费调用点                                                          | `src/plugins/ai-copilot/chat-handler.ts`                     | `ai-credit-ledger` create，第 665 行                          |
+| 扣费调用点                                                          | `src/app/api/ai/images/route.ts`                             | 第 80 行（前置检查在第 68 行）                                |
+| 扣费调用点                                                          | `src/app/api/ai/images/style/route.ts`                       | 第 79 行（前置检查在第 62 行）                                |
+| 扣费调用点                                                          | `src/plugins/ai-copilot/tools/core-handlers.ts`              | 第 1278 行                                                    |
+| 发放调用点（兑换码）                                                | `src/lib/services/membership-service.ts`                     | 第 104 行                                                     |
+| 发放调用点（任务奖励）                                              | `src/lib/credit-tasks.ts`                                    | 第 159 行                                                     |
+| 模型依赖的事实 1：hooks 与插入在同一个事务                          | `node_modules/payload/dist/collections/operations/create.js` | 第 46 行 `initTransaction`                                    |
+| 模型依赖的事实 2：跑在默认隔离级别（READ COMMITTED）                | `src/payload.selfhost.config.ts`                             | 第 158 行 `postgresAdapter({...})`，没有 `transactionOptions` |
 
 **Sync commit:** `03c6b8a`（2026-11-13，main）
 
@@ -161,7 +161,7 @@ while the ledger records two.
 
 Grants are only partly protected today. `src/lib/credit-tasks.ts:82` wraps task
 rewards in an **in-process** mutex keyed `bind_wechat` or `${taskId}:${userId}`.
-So the same task for the same user in one process cannot race — but two *different*
+So the same task for the same user in one process cannot race — but two _different_
 tasks for the same user (different keys; `loadAndSyncUserCreditTasks` fires
 `bind_email` and `bind_wechat` at `credit-tasks.ts:239`), two server processes, and
 兑换码核销 (`membership-service.ts`, no lock at all) are all still exposed.
