@@ -9,8 +9,10 @@ import { smartSelectHandlers } from '@/plugins/smart-select/ai-handlers'
 import type { PluginFlags } from '@/plugins/state'
 import type { PluginId } from '@/plugins/types'
 
+import { adminToolHandlers } from './tools/admin-handlers'
 import { coreToolHandlers } from './tools/core-handlers'
 import { competitorQuoteHandlers } from './tools/competitor-quote'
+import { pointMapToolHandlers } from './tools/point-map-handlers'
 import type { AiTool, AiToolHandler, ToolContext } from './tools/context'
 
 export type {
@@ -36,6 +38,8 @@ const HANDLER_MAP: Record<string, AiToolHandler> = {
   ...roomInsightsHandlers,
   ...smartSelectHandlers,
   ...proposalHandlers,
+  ...pointMapToolHandlers,
+  ...adminToolHandlers,
 }
 
 /** 根据各插件声明的 AiToolSpec 自动构建完整工具列表 */

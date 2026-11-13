@@ -614,8 +614,8 @@ export const adminToolSpecs: AdminToolSpec[] = [
     description:
       '在产品库新增一款产品。当用户说「产品库里新增一款 Aqara 面板」「把这款新品加进产品库」时调用。只有 CMS 管理员可以写入产品库；必须提供产品名称、型号/SKU、设备类型、品牌（已有品牌名称或 ID）和售价。品牌不会自动新建，找不到时应提示用户先在后台品牌库创建。',
     cost: 1,
-    // 权限字典暂无 catalog:write；真正的写权限由 Products 集合的 cmsAdminOnly 强制。
-    permissions: ['defaults:write'],
+    // 工具能力声明；真正的写权限仍由 Products 集合的 cmsAdminOnly 强制。
+    permissions: ['catalog:write'],
     scope: 'workspace',
     mutates: true,
     parameters: {
@@ -657,7 +657,7 @@ export const adminToolSpecs: AdminToolSpec[] = [
     description:
       '修改产品库中已有产品的资料或售价。当用户说「Aqara 那款面板涨到 399」「把这个产品调到 299」「产品改名为…」时调用。先用 search_products 按品牌/型号/关键词找到 productId，再传入要改的字段；改价必须显式传 price（元），不会根据文字猜测。只有 CMS 管理员可以修改产品库。',
     cost: 0.5,
-    permissions: ['defaults:write'],
+    permissions: ['catalog:write'],
     scope: 'workspace',
     mutates: true,
     parameters: {
@@ -855,7 +855,7 @@ export const adminToolSpecs: AdminToolSpec[] = [
     description:
       '修改当前账号的公司抬头与默认展示内容。当用户说「公司名改成…」「口号换成…」「报价单上的电话改成…」「报价备注/合同条款加上…」「打印报价单不要显示产品图」时调用。只允许名称、口号、电话、邮箱、地址、报价备注、合同条款、是否打印产品图；不能通过 AI 修改插件开关、文档模板、Logo/二维码、成本设置或任何密钥。',
     cost: 0.5,
-    permissions: ['projects:write'],
+    permissions: ['settings:write'],
     scope: 'workspace',
     mutates: true,
     parameters: {

@@ -3,6 +3,9 @@ import { DEVICE_CATEGORIES } from '@/lib/device-types'
 import { PROJECT_PLATFORMS } from '@/lib/projects'
 import type { PluginAiSpec } from '@/plugins/ai-types'
 
+import { adminToolSpecs } from './tools/admin-ai'
+import { pointMapToolSpecs } from './tools/point-map-ai'
+
 /**
  * 核心工作台 AI 能力（随 ai-copilot 插件启用）：
  * 覆盖项目信息、点位图、产品库检索、报价单、合同与导出链接。
@@ -14,12 +17,14 @@ export const coreAiSpec: PluginAiSpec = {
     'point-map:read',
     'point-map:write',
     'catalog:read',
+    'catalog:write',
     'defaults:write',
     'quotes:read',
     'quotes:write',
     'contracts:read',
     'contracts:write',
     'documents:read',
+    'settings:write',
     'images:generate',
   ],
   guidance: [
@@ -28,6 +33,8 @@ export const coreAiSpec: PluginAiSpec = {
     '当用户要求生成图片、画效果图、方案配图、场景图时，必须调用 generate_image 工具；不要声称已生成图片但没有调用。用户上传了参考图时设置 useAttachedImage=true。生成后把视觉质检结论告诉用户，质检分低于 7 时主动提出重新生成。',
     '项目已有户型图纸、用户要求规划或补齐 AP、窗帘、传感器、摄像头、中控屏、音箱、网关、VRF 等智能设备时，调用 plan_points_with_vision（视觉模型看图按规范布点），不要调用 setup_rooms_and_points。',
     '当用户上传或粘贴别家的报价单 / 设备清单要求比价时：先逐行识别品名、品牌、型号、数量与单价（安装调试、布线辅材等服务项放入 fees），再调用 create_quote_from_competitor 生成对比报价单，最后按行总结匹配型号与差价，不要把外店的服务项当成设备。',
+    '用户要求移动、删除、新增单个点位，或修改房间名称/区域范围时：先调用 list_point_map 拿到真实 id，再调用 edit_point_map 直接改；不要回答「请你自己在点位图里拖动」。坐标是点位图场景坐标，用户说厘米等真实尺寸时按场景比例估算并说明依据，不确定就先确认。',
+    '用户要求删除项目/报价/合同、增改产品、登记售后维保、修改交付物或分享设置、修改公司抬头时，直接调用对应工具完成（delete_project / delete_quote / delete_contract / create_product / update_product / save_after_sales_record / update_project_archive_settings / update_company_settings）；工具拒绝时如实转述原因，不要改成让用户自己去操作。',
   ],
   knowledge: [
     {
@@ -639,5 +646,7 @@ export const coreAiSpec: PluginAiSpec = {
         required: ['prompt'],
       },
     },
+    ...pointMapToolSpecs,
+    ...adminToolSpecs,
   ],
 }
