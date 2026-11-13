@@ -64,7 +64,10 @@ export const pointMapToolSpecs: AiToolSpec[] = [
                 description:
                   '点位代号（画布上显示的名称/编号，如 K1、Z3）；不传则按设备类型自动生成',
               },
-              x: { type: 'number', description: '点位中心 x（场景坐标）；与 y 一起省略时落在 roomId/sheetId 中心' },
+              x: {
+                type: 'number',
+                description: '点位中心 x（场景坐标）；与 y 一起省略时落在 roomId/sheetId 中心',
+              },
               y: { type: 'number', description: '点位中心 y（场景坐标）' },
               sheetId: {
                 type: 'string',
@@ -72,7 +75,8 @@ export const pointMapToolSpecs: AiToolSpec[] = [
               },
               roomId: {
                 type: 'string',
-                description: '目标房间 id（list_point_map 的 areas[].id；可选，优先于 sheetId 定位）',
+                description:
+                  '目标房间 id（list_point_map 的 areas[].id；可选，优先于 sheetId 定位）',
               },
               productId: {
                 type: 'string',

@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  applyPointEdits,
-  MAX_POINT_EDITS,
-  summarizePointMap,
-} from '@/lib/point-map-edit'
+import { applyPointEdits, MAX_POINT_EDITS, summarizePointMap } from '@/lib/point-map-edit'
 import {
   analyzeScene,
   buildAreaElements,
@@ -235,15 +231,23 @@ describe('applyPointEdits · update', () => {
     expect(area.name).toBe('客厅改造')
     expect(area.sheetId).toBe('sh-1')
     expect(area.poly).toEqual(polygon)
-    expect(r.scene.elements.find((e) => e.customData?.kind === 'area-label')?.text).toBe(
-      '客厅改造',
-    )
+    expect(r.scene.elements.find((e) => e.customData?.kind === 'area-label')?.text).toBe('客厅改造')
   })
 
   it('polygon 传 null 恢复矩形范围', () => {
     const { scene, areaId } = baseScene()
     const withPoly = applyPointEdits(scene, {
-      update: [{ id: areaId, polygon: [[100, 100], [300, 100], [300, 200], [100, 200]] }],
+      update: [
+        {
+          id: areaId,
+          polygon: [
+            [100, 100],
+            [300, 100],
+            [300, 200],
+            [100, 200],
+          ],
+        },
+      ],
     })
     expect(areasOf(withPoly.scene).find((a) => a.id === areaId)!.poly).not.toBeNull()
 
@@ -254,7 +258,15 @@ describe('applyPointEdits · update', () => {
   it('无效多边形逐条跳过', () => {
     const { scene, areaId } = baseScene()
     const r = applyPointEdits(scene, {
-      update: [{ id: areaId, polygon: [[0, 0], [10, 10]] as [number, number][] }],
+      update: [
+        {
+          id: areaId,
+          polygon: [
+            [0, 0],
+            [10, 10],
+          ] as [number, number][],
+        },
+      ],
     })
     expect(r.changed).toBe(false)
     expect(r.results[0].status).toBe('skipped')
@@ -333,7 +345,14 @@ describe('summarizePointMap', () => {
       pointCount: 2,
     })
     const point = s.points.find((p) => p.id === pointId)!
-    expect(point).toMatchObject({ code: 'Z1', type: 'socket', x: 200, y: 200, sheetId, roomId: areaId })
+    expect(point).toMatchObject({
+      code: 'Z1',
+      type: 'socket',
+      x: 200,
+      y: 200,
+      sheetId,
+      roomId: areaId,
+    })
     expect(point.name).toContain('Z1')
     expect(s.truncated).toBe(false)
   })

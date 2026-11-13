@@ -51,7 +51,11 @@ async function loadProject(
 ): Promise<{ ok: true; data: LoadedProject } | { ok: false; error: string; summary: string }> {
   const projectId = projectIdOf(args, ctx)
   if (!projectId)
-    return { ok: false, error: '当前尚未关联项目，请先调用 list_projects 选择项目', summary: '未关联项目' }
+    return {
+      ok: false,
+      error: '当前尚未关联项目，请先调用 list_projects 选择项目',
+      summary: '未关联项目',
+    }
 
   const payload = await getPayloadClient()
   const project = await payload
@@ -71,8 +75,7 @@ async function loadProject(
     })
     .catch(() => null)
 
-  if (!project)
-    return { ok: false, error: '项目不存在或你无权访问', summary: '项目不可用' }
+  if (!project) return { ok: false, error: '项目不存在或你无权访问', summary: '项目不可用' }
   return { ok: true, data: { payload, project, projectId } }
 }
 
@@ -107,8 +110,7 @@ const summaryOf = (results: readonly PointMapEditResult[]) => {
 export const pointMapToolHandlers: Record<string, AiToolHandler> = {
   async list_point_map(args, ctx) {
     const loaded = await loadProject(args, ctx)
-    if (!loaded.ok)
-      return { result: { error: loaded.error }, summary: loaded.summary }
+    if (!loaded.ok) return { result: { error: loaded.error }, summary: loaded.summary }
     const { project, projectId } = loaded.data
 
     const summary = summarizePointMap(project.pointMap as never)
@@ -131,8 +133,7 @@ export const pointMapToolHandlers: Record<string, AiToolHandler> = {
 
   async edit_point_map(args, ctx) {
     const loaded = await loadProject(args, ctx)
-    if (!loaded.ok)
-      return { result: { error: loaded.error }, summary: loaded.summary }
+    if (!loaded.ok) return { result: { error: loaded.error }, summary: loaded.summary }
     const { payload, project, projectId } = loaded.data
 
     if (!canEditProject(project as never, ctx.user.id))
@@ -140,10 +141,7 @@ export const pointMapToolHandlers: Record<string, AiToolHandler> = {
     if (project.status === 'archived')
       return { result: { error: ARCHIVED_MESSAGE }, summary: '项目已归档' }
 
-    const applied = applyPointEdits(
-      project.pointMap as never,
-      args as unknown as PointMapEdits,
-    )
+    const applied = applyPointEdits(project.pointMap as never, args as unknown as PointMapEdits)
     if (!applied.changed) {
       return {
         result: {
@@ -159,11 +157,7 @@ export const pointMapToolHandlers: Record<string, AiToolHandler> = {
     }
 
     for (const file of Object.values(applied.scene.files)) {
-      if (
-        file &&
-        file.dataURL.startsWith('data:') &&
-        file.dataURL.length > MAX_INLINE
-      )
+      if (file && file.dataURL.startsWith('data:') && file.dataURL.length > MAX_INLINE)
         return {
           result: {
             error: '场景里有图片还没有上传到媒体库，请先在点位图里重新保存后再试',

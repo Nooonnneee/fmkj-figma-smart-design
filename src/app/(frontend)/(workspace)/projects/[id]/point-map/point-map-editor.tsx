@@ -1879,9 +1879,7 @@ export function PointMapEditor({
                         </span>
                       ),
                       onClick: () =>
-                        void openLinkedPage(
-                          `/print/projects/${projectId}/proposal?scope=${scope}`,
-                        ),
+                        void openLinkedPage(`/print/projects/${projectId}/proposal?scope=${scope}`),
                     },
                   ]
                 : []),

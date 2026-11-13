@@ -9,12 +9,7 @@
  * 保存（payload.update + files 置 null）由 `point-map-handlers.ts` 负责。
  */
 import { inferAreaType, isAreaType } from '@/lib/area-types'
-import {
-  categoryOfType,
-  DEVICE_CATEGORIES,
-  DEVICE_TYPES,
-  isDeviceType,
-} from '@/lib/device-types'
+import { categoryOfType, DEVICE_CATEGORIES, DEVICE_TYPES, isDeviceType } from '@/lib/device-types'
 import { markerFileId } from '@/lib/point-markers'
 import {
   analyzeScene,
@@ -109,8 +104,7 @@ export type ApplyPointEditsResult = {
 
 const kindOf = (el: SceneEl) =>
   typeof el.customData?.kind === 'string' ? (el.customData.kind as string) : null
-const str = (v: unknown, max: number) =>
-  typeof v === 'string' ? v.trim().slice(0, max) : ''
+const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '')
 const num = (v: unknown): number | null => {
   if (typeof v === 'number') return Number.isFinite(v) ? v : null
   if (typeof v === 'string' && v.trim() !== '') {
@@ -125,7 +119,10 @@ const num = (v: unknown): number | null => {
 const typeByName = new Map<string, string>()
 for (const t of DEVICE_TYPES) {
   typeByName.set(t.name, t.value)
-  typeByName.set(`${DEVICE_CATEGORIES.find((c) => c.slug === t.category)?.name ?? ''}${t.name}`, t.value)
+  typeByName.set(
+    `${DEVICE_CATEGORIES.find((c) => c.slug === t.category)?.name ?? ''}${t.name}`,
+    t.value,
+  )
 }
 
 /** 设备类型：字典值、中文名（插座/双开）都能识别；无法识别返回 null。 */
@@ -144,18 +141,12 @@ const pointCenter = (el: SceneEl) => ({
 })
 
 /** 与点位/房间同一 group 的配套元素（代号文字、区域名文字）。 */
-function pairedElements(
-  elements: readonly SceneEl[],
-  source: SceneEl,
-  kind: string,
-): SceneEl[] {
+function pairedElements(elements: readonly SceneEl[], source: SceneEl, kind: string): SceneEl[] {
   const groups = new Set(source.groupIds ?? [])
   if (groups.size) {
     return elements.filter(
       (e) =>
-        e.id !== source.id &&
-        kindOf(e) === kind &&
-        (e.groupIds ?? []).some((g) => groups.has(g)),
+        e.id !== source.id && kindOf(e) === kind && (e.groupIds ?? []).some((g) => groups.has(g)),
     )
   }
   // 老场景可能没有 group：点位按代号兜底，区域名不猜（避免误改同名房间）
@@ -178,8 +169,7 @@ function findPoint(elements: readonly SceneEl[], id: string): SceneEl | null {
   const groups = new Set(label.groupIds ?? [])
   if (!groups.size) return null
   return (
-    elements.find((e) => isPointElement(e) && (e.groupIds ?? []).some((g) => groups.has(g))) ??
-    null
+    elements.find((e) => isPointElement(e) && (e.groupIds ?? []).some((g) => groups.has(g))) ?? null
   )
 }
 
@@ -287,8 +277,7 @@ function applyUpdate(
         before,
         after: {
           code: typeof point.customData?.pointCode === 'string' ? point.customData.pointCode : '',
-          type:
-            typeof point.customData?.deviceType === 'string' ? point.customData.deviceType : '',
+          type: typeof point.customData?.deviceType === 'string' ? point.customData.deviceType : '',
           productId:
             typeof point.customData?.productId === 'string' ? point.customData.productId : null,
         },
@@ -638,8 +627,7 @@ export function applyPointEdits(
   const elements = sourceElements.map(cloneElement)
   const files: Record<string, SceneFile> = Object.fromEntries(
     Object.entries((scene?.files ?? {}) as Record<string, SceneFile | null>).filter(
-      (entry): entry is [string, SceneFile] =>
-        !!entry[1] && typeof entry[1].dataURL === 'string',
+      (entry): entry is [string, SceneFile] => !!entry[1] && typeof entry[1].dataURL === 'string',
     ),
   )
 
@@ -650,9 +638,7 @@ export function applyPointEdits(
   const total = updates.length + moves.length + removes.length + adds.length
 
   const compact = (els: SceneEl[]) => {
-    const used = new Set(
-      els.map((e) => e.fileId).filter((v): v is string => typeof v === 'string'),
-    )
+    const used = new Set(els.map((e) => e.fileId).filter((v): v is string => typeof v === 'string'))
     for (const key of Object.keys(files)) if (!used.has(key)) delete files[key]
     return compactScene(els, files, scene?.appState)
   }
