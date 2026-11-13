@@ -9,6 +9,7 @@ import { getBrands, getCatalog, getCompanyInfo } from '@/lib/cached-data'
 import { DEFAULT_CONTRACT_TERMS } from '@/lib/contracts'
 import { isPlatformOperator } from '@/lib/platform-operator'
 import { loadCostSettings } from '@/lib/services/cost-settings-service'
+import { PLUGIN_CATEGORIES, PLUGINS } from '@/plugins'
 import { getPluginFlags } from '@/plugins/state'
 
 import { AppearanceSettings } from './appearance-settings'
@@ -112,6 +113,14 @@ export default async function SettingsPage() {
             logoUrl: company.logo?.url ?? null,
             qrCodeUrl: company.qrCode?.url ?? null,
           }}
+          plugins={PLUGINS.map((p) => ({
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            categoryLabel: PLUGIN_CATEGORIES.find((c) => c.key === p.category)?.label ?? '其他',
+            status: p.status,
+            enabled: flags[p.id],
+          }))}
           documents={{
             kinds: DOC_KIND_LIST.map((kind) => ({
               kind,

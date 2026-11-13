@@ -9,6 +9,7 @@ import { IconButton } from '@astryxdesign/core/IconButton'
 import { Field } from '@astryxdesign/core/Field'
 import { Card } from '@astryxdesign/core/Card'
 import { Layout, LayoutContent, LayoutHeader } from '@astryxdesign/core/Layout'
+import { Stack } from '@astryxdesign/core/Stack'
 import { Switch } from '@astryxdesign/core/Switch'
 import { TextArea } from '@astryxdesign/core/TextArea'
 import { TextInput } from '@astryxdesign/core/TextInput'
@@ -148,11 +149,22 @@ function ImageField({
   )
 }
 
+export type PluginOption = {
+  id: string
+  name: string
+  description: string
+  categoryLabel: string
+  status: 'ready' | 'coming-soon'
+  enabled: boolean
+}
+
 export function CompanyForm({
   initial,
   documents,
+  plugins,
 }: {
   initial: Values
+  plugins: PluginOption[]
   documents: {
     kinds: DocKindOption[]
     styles: DocStyleOption[]
@@ -175,6 +187,10 @@ export function CompanyForm({
     qrCaption: initial.qrCaption,
   })
   const [printProductImages, setPrintProductImages] = useState(initial.printProductImages)
+  // 插件开关：默认全开（disabledPlugins 里没有即开启），未就绪的插件始终关闭且不提交
+  const [pluginEnabled, setPluginEnabled] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(plugins.map((p) => [p.id, p.enabled])),
+  )
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -363,6 +379,55 @@ export function CompanyForm({
         styles={documents.styles}
         defaults={documents.defaults}
       />
+      <Card
+        padding={0}
+        className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+      >
+        <Layout
+          height="auto"
+          header={
+            <LayoutHeader padding={5} paddingBlockEnd={0}>
+              <div className="grid gap-1.5">
+                <div className="font-heading text-base font-semibold tracking-tight">插件</div>
+                <div className="text-sm text-muted-foreground">
+                  关闭后侧边栏与页面入口会隐藏，随时可以重新打开；改动随底部「保存」生效
+                </div>
+              </div>
+            </LayoutHeader>
+          }
+          content={
+            <LayoutContent padding={5} isScrollable={false}>
+              {/* 告诉服务端本次提交带插件开关；未勾选的插件会被记为关闭 */}
+              <input type="hidden" name="plugins-present" value="1" />
+              <Stack gap={3}>
+                {plugins.map((plugin) => {
+                  const isReady = plugin.status === 'ready'
+                  return (
+                    <Switch
+                      key={plugin.id}
+                      label={plugin.name}
+                      description={`${plugin.categoryLabel} · ${plugin.description}${
+                        isReady ? '' : '（未就绪）'
+                      }`}
+                      value={pluginEnabled[plugin.id] ?? false}
+                      onChange={(checked) =>
+                        setPluginEnabled((s) => ({ ...s, [plugin.id]: checked }))
+                      }
+                      htmlName={`plugin-${plugin.id}`}
+                      isDisabled={!isReady}
+                      disabledMessage={isReady ? undefined : '功能尚未就绪，暂不可开启'}
+                      labelPosition="start"
+                      labelSpacing="spread"
+                      width="100%"
+                      className="rounded-lg border p-3"
+                    />
+                  )
+                })}
+              </Stack>
+            </LayoutContent>
+          }
+        />
+      </Card>
       {/*
         保存条：吸底时必须是**不透明**背景 + 上边框，否则滚动过程中下方卡片的
         标题会从半透明背景里透出来，看起来像「保存条压住了标题」。
