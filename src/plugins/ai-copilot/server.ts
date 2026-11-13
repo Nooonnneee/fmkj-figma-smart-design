@@ -185,6 +185,9 @@ function sceneScore(m: AiModelConfig, scene: RouteScene): number {
   const s = routeText(m)
   if (scene === 'vision') {
     if (!isVisionCapableModel(s)) return -1
+    // qwen4 与 vision.ts 的 visionScore 保持同一档位（高于 3.7-plus），
+    // 否则 Auto 路由会与 rankVisionModels 选出不同的「最强视觉模型」。
+    if (/qwen-?4/.test(s)) return 104
     if (/qwen-?3\.8(?!.*flash)/.test(s)) return 100
     if (/qwen-?3\.8.*flash/.test(s)) return 98
     if (/glm-?5\.3(?!.*flash)/.test(s)) return 96

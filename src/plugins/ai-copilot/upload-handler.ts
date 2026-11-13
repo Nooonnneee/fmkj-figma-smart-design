@@ -32,6 +32,7 @@ import {
   pickPreferredVisionModel,
   extractJson,
   getVisionModels,
+  isHeavyThinkingVisionModel,
   isReasoningOnlyModel,
   loadImageBuffer,
   rememberImageBuffer,
@@ -344,13 +345,16 @@ async function runVisionFusion(args: {
   // 两轮直读：第一轮只求全量点位，第二轮复核纠错并读图例/文字统计
   const picked = pickPreferredVisionModel(args.models)
   const modelsForCall = picked ? [picked] : args.models
+  // 思考型模型（如 qwen4-preview）的 reasoning 会吃满 6000 token，正文为空 → 给足输出预算
+  const heavyThinking = modelsForCall.some((m) => isHeavyThinkingVisionModel(m))
+  const scanTokens = heavyThinking ? 24_000 : 6000
   const fullImage = await encodeImageForVision(args.png, { maxSide: 2400, quality: 88 })
   const round1 = await callVision({
     images: [fullImage],
     system: FLOORPLAN_SYSTEM,
     prompt: pointScanPrompt(args.profile),
     models: modelsForCall,
-    maxTokens: 6000,
+    maxTokens: scanTokens,
     timeoutMs: 150_000,
     thinking: true,
     highResolution: true,
@@ -363,7 +367,7 @@ async function runVisionFusion(args: {
         system: FLOORPLAN_SYSTEM,
         prompt: refinePrompt(args.profile, firstPoints),
         models: modelsForCall,
-        maxTokens: 6000,
+        maxTokens: scanTokens,
         timeoutMs: 150_000,
         thinking: true,
         highResolution: true,
