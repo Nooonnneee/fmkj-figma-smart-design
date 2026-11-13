@@ -213,26 +213,17 @@ export const adminToolHandlers: Record<string, AiToolHandler> = {
 
     const byProject = { project: { equals: projectId } }
     try {
-      // 顺序与网页 deleteProject 一致：先删合同（未签），再删报价，最后删项目。
-      await payload.delete({
-        collection: 'contracts',
-        where: byProject,
-        user: ctx.user,
-        overrideAccess: false,
-      })
-      await payload.delete({
-        collection: 'quotes',
-        where: byProject,
-        user: ctx.user,
-        overrideAccess: false,
-      })
-      // 对话保留，只解除项目关联。成员身份只能清理自己的会话（集合 access 限制）。
+      // owner 校验在前，级联清理与 web action（projects/actions.ts::deleteProject）保持一致：
+      // 合同/报价/对话清理使用 overrideAccess:true，最后删除项目仍按当前成员权限执行。
+      // 这样既能把其他协作成员的 AI 对话解除关联，也能删除已归档项目（集合 beforeDelete 会按归档拦截成员）。
+      await payload.delete({ collection: 'contracts', where: byProject, overrideAccess: true })
+      await payload.delete({ collection: 'quotes', where: byProject, overrideAccess: true })
+      // 对话保留，只解除项目关联。
       await payload.update({
         collection: 'ai-conversations',
         where: byProject,
         data: { project: null } as never,
-        user: ctx.user,
-        overrideAccess: false,
+        overrideAccess: true,
       })
       await payload.delete({
         collection: 'projects',
