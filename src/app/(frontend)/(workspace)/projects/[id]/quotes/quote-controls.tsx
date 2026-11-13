@@ -3,17 +3,11 @@
 import { useEffect, useState, useTransition } from 'react'
 import { useFormStatus } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { FilePlus2, Loader2, Trash2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { FilePlus2, Trash2 } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Selector } from '@astryxdesign/core/Selector'
+import { useToast } from '@astryxdesign/core/Toast'
 import { POINT_SCOPES } from '@/lib/point-scopes'
 
 import { createQuoteFromProject, deleteQuote } from './actions'
@@ -24,8 +18,8 @@ function SubmitButton({ children }: { children: string }) {
     <Button
       type="submit"
       isDisabled={pending}
-      icon={<Loader2 />}
-      endContent={<FilePlus2 />}
+      isLoading={pending}
+      icon={<FilePlus2 />}
       label={children}
     />
   )
@@ -38,23 +32,24 @@ export function GenerateQuoteForm({
   projectId: string
   hasPoints: boolean
 }) {
+  // 官方的 Selector 是受控组件；它的 hidden input 变更不会冒泡成 React form 的
+  // onChange，所以这里自己存一份 range，值仍通过 htmlName="scope" 交给 Server Action。
+  const [scope, setScope] = useState('all')
   return (
     <form action={createQuoteFromProject} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="projectId" value={projectId} />
       {hasPoints ? (
         <>
-          <Select name="scope" defaultValue="all">
-            <SelectTrigger className="w-36" aria-label="统计范围">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {POINT_SCOPES.map((s) => (
-                <SelectItem key={s.value} value={s.value}>
-                  {s.fullLabel}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Selector
+            label="统计范围"
+            isLabelHidden
+            htmlName="scope"
+            value={scope}
+            onChange={(v) => setScope(v)}
+            width="100%"
+            containerClassName="w-36"
+            options={POINT_SCOPES.map((s) => ({ value: s.value, label: s.fullLabel }))}
+          />
           <SubmitButton>从点位图生成报价</SubmitButton>
         </>
       ) : (
@@ -67,6 +62,7 @@ export function GenerateQuoteForm({
 /** 删除报价：点一次变成「确认删除」，3 秒内再点才删除，不弹窗。 */
 export function DeleteQuoteButton({ quoteId, title }: { quoteId: string; title: string }) {
   const router = useRouter()
+  const showToast = useToast()
   const [armed, setArmed] = useState(false)
   const [pending, startTransition] = useTransition()
 
@@ -89,16 +85,16 @@ export function DeleteQuoteButton({ quoteId, title }: { quoteId: string; title: 
         startTransition(async () => {
           const result = await deleteQuote(quoteId)
           if (!result.ok) {
-            toast.error(result.error)
+            showToast({ body: result.error, type: 'error' })
             setArmed(false)
             return
           }
-          toast.success(`已删除「${title}」`)
+          showToast({ body: `已删除「${title}」` })
           router.refresh()
         })
       }}
-      icon={<Loader2 />}
-      endContent={<Trash2 />}
+      isLoading={pending}
+      icon={<Trash2 />}
     />
   )
 }

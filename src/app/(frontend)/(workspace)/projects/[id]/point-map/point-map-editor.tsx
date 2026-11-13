@@ -26,42 +26,37 @@ import {
   Minus,
   PencilLine,
   Plus,
+  Presentation,
   ReceiptText,
   Redo2,
   RotateCcw,
   RotateCw,
   Ruler,
+  ScanSearch,
   Sparkles,
   Trash2,
   Undo2,
   X,
 } from 'lucide-react'
-import { toast } from 'sonner'
 
 import { BetaDocLink } from '@/components/beta-doc-link'
 import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
+import { DropdownMenu } from '@astryxdesign/core/DropdownMenu'
+import type { DropdownMenuOption } from '@astryxdesign/core/DropdownMenu'
 import { IconButton } from '@astryxdesign/core/IconButton'
+import { Kbd } from '@astryxdesign/core/Kbd'
 import { Layout, LayoutContent, LayoutFooter } from '@astryxdesign/core/Layout'
 import type { StyleTransferHandoff } from '@/lib/style-templates'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { TextInput } from '@astryxdesign/core/TextInput'
-import { Input } from '@/components/ui/input'
 import { ScrollableArea } from '@astryxdesign/core/ScrollableArea'
 import { Selector } from '@astryxdesign/core/Selector'
 import { useSidebar } from '@/components/ui/sidebar'
 import { Switch } from '@astryxdesign/core/Switch'
-import { Kbd } from '@/components/ui/kbd'
 import { Tab, TabList } from '@astryxdesign/core/TabList'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useToast } from '@astryxdesign/core/Toast'
+import { Tooltip } from '@astryxdesign/core/Tooltip'
 import { BoardCanvas, type CanvasContext } from '@/board/canvas/board-canvas'
 import { download, exportSheetPng } from '@/board/canvas/export'
 import { useViewSettings } from '@/board/canvas/use-view-settings'
@@ -117,6 +112,8 @@ import {
 } from '@/lib/point-scopes'
 import { compactScene, inlineFileIds, type SceneFile, type StoredScene } from '@/lib/point-scene'
 import { cn } from '@/lib/utils'
+import type { SelectionTier } from '@/plugins/smart-select/auto-select'
+import { SmartSelect } from '@/plugins/smart-select/smart-select-panel'
 
 import { createQuoteFromProject, syncQuoteFromPointMap } from '../quotes/actions'
 
@@ -158,21 +155,48 @@ function ToolbarIconButton({
   isDisabled?: boolean
 }) {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <IconButton
-          variant="ghost"
-          aria-pressed={pressed}
-          className={cn('text-muted-foreground', pressed && 'bg-muted text-foreground', className)}
-          onClick={props.onClick}
-          isDisabled={props.isDisabled}
-          label={label}
-          icon={children as never}
-          size="md"
-        />
-      </TooltipTrigger>
-      <TooltipContent side="bottom">{label}</TooltipContent>
+    <Tooltip content={label} placement="below">
+      <IconButton
+        variant="ghost"
+        aria-pressed={pressed}
+        className={cn('text-muted-foreground', pressed && 'bg-muted text-foreground', className)}
+        onClick={props.onClick}
+        isDisabled={props.isDisabled}
+        label={label}
+        icon={children as never}
+        size="md"
+      />
     </Tooltip>
+  )
+}
+
+/**
+ * 选中设备的旋转角度输入框。官方 TextInput 没有 `defaultValue`（必须受控），
+ * 所以用本地 state 承接输入，失焦（或回车）时把合法数值提交出去。
+ * 调用点用 `key` 在切换对象 / 角度变化时重挂载，保证显示值跟着选中对象走。
+ */
+function AngleInput({ value, onCommit }: { value: number; onCommit: (deg: number) => void }) {
+  const [draft, setDraft] = useState(String(value))
+  return (
+    <TextInput
+      label="旋转角度"
+      isLabelHidden
+      value={draft}
+      onChange={setDraft}
+      inputMode="numeric"
+      controlClassName="h-7 w-14 border-border bg-background text-xs tabular-nums"
+      onBlur={() => {
+        const v = Number(draft)
+        if (Number.isFinite(v)) onCommit(v)
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return
+          const target = e.currentTarget as HTMLInputElement
+          target.blur()
+        }
+      }}
+    />
   )
 }
 const pack = smartHomePack
@@ -225,6 +249,7 @@ function isTyping() {
 export function PointMapEditor({
   projectId,
   projectName,
+  platform,
   initialScene,
   serverUpdatedAt = null,
   warnings,
@@ -257,11 +282,14 @@ export function PointMapEditor({
   aiCopilot?: boolean
 }) {
   const dwgEnabled = plugins.dwg
+  // 上传按钮右侧的下拉菜单：DWG 导入或 AI 识图任一启用就显示
+  const uploadMenuEnabled = dwgEnabled || plugins.aiImport
   const router = useRouter()
   const { resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
   const sidebar = useSidebar()
+  const showToast = useToast()
   const board = useBoardHistory(() => decodeScene(initialScene))
   const { doc, commit } = board
   const [files, setFiles] = useState<Record<string, BoardFile>>(() => ({ ...initialScene.files }))
@@ -281,7 +309,9 @@ export function PointMapEditor({
   const editorRootRef = useRef<HTMLDivElement>(null)
   const [ctxMenu, setCtxMenu] = useState<CanvasContextMenuTarget | null>(null)
   const [cropFile, setCropFile] = useState<File | null>(null)
-  const [defaults] = useState<ProjectDefaults>(initialDefaults)
+  const [defaults, setDefaults] = useState<ProjectDefaults>(initialDefaults)
+  /** 智能选型请求进行中 */
+  const [selecting, setSelecting] = useState(false)
   const [query, setQuery] = useState('')
   const [savedVersion, setSavedVersion] = useState<number | null>(needsSave ? -1 : 0)
   const [saving, setSaving] = useState(false)
@@ -660,15 +690,18 @@ export function PointMapEditor({
         /* 忽略 */
       }
       setDraft(null)
-      toast.success('点位图已保存')
+      showToast({ body: '点位图已保存' })
       return true
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '保存失败，请稍后重试')
+      showToast({
+        body: error instanceof Error ? error.message : '保存失败，请稍后重试',
+        type: 'error',
+      })
       return false
     } finally {
       setSaving(false)
     }
-  }, [saving, readOnly, board, currentScene, uploadImage, projectId])
+  }, [saving, readOnly, board, currentScene, uploadImage, projectId, showToast])
 
   const saveRef = useRef(save)
   saveRef.current = save
@@ -680,6 +713,55 @@ export function PointMapEditor({
         window.confirm('点位图保存失败，仍要离开吗？未保存的修改会丢失。'),
     )
   }, [dirty, readOnly])
+
+  /** 接上智能选型插件的真实接口：先保存点位图，再按档次补全或重选默认型号 */
+  const autoSelect = useCallback(
+    async (tier: SelectionTier, overwrite: boolean) => {
+      if (dirty && !(await save())) return
+      setSelecting(true)
+      try {
+        const res = await fetch(`/projects/${projectId}/point-map/auto-defaults`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tier, overwrite, scope }),
+        })
+        const data = (await res.json().catch(() => ({}))) as {
+          ok?: boolean
+          error?: string
+          defaults?: ProjectDefaults
+          changed?: unknown[]
+          missing?: string[]
+        }
+        if (!res.ok || !data.ok || !data.defaults)
+          throw new Error(data.error ?? '选型失败，请稍后重试')
+        setDefaults(data.defaults)
+        const n = data.changed?.length ?? 0
+        const missing = data.missing?.length
+          ? `；${data.missing.map((t) => deviceTypeLabel(t)).join('、')} 产品库里没有在售产品`
+          : ''
+        showToast({
+          body: n ? `已为 ${n} 类设备设置默认型号${missing}` : `所有设备类型都已选型${missing}`,
+        })
+      } catch (error) {
+        showToast({
+          body: error instanceof Error ? error.message : '选型失败，请稍后重试',
+          type: 'error',
+        })
+      } finally {
+        setSelecting(false)
+      }
+    },
+    [dirty, save, projectId, scope, showToast],
+  )
+
+  /** 跳转前先保存，避免把未保存的点位图带走 */
+  const openLinkedPage = useCallback(
+    async (href: string) => {
+      if (dirty && !readOnly && !(await save())) return
+      router.push(href)
+    },
+    [dirty, readOnly, save, router],
+  )
 
   /* ---------------- 点位 ---------------- */
 
@@ -694,9 +776,9 @@ export function PointMapEditor({
   const updatePointType = useCallback(
     (pointId: string, newType: string) => {
       commit((d) => changePointType(d, pointId, newType))
-      toast.success(`已切换为「${deviceTypeLabel(newType)}」`)
+      showToast({ body: `已切换为「${deviceTypeLabel(newType)}」` })
     },
-    [commit],
+    [commit, showToast],
   )
 
   const duplicate = useCallback(
@@ -743,22 +825,25 @@ export function PointMapEditor({
     })
     setAutoGenOpen(false)
     if (!res.addedPoints) {
-      toast.error('当前还没有可生成点位的图纸，请先添加户型图')
+      showToast({ body: '当前还没有可生成点位的图纸，请先添加户型图', type: 'error' })
       return
     }
     commit(res.doc)
     setSelection(new Set())
-    toast.success(
-      `已智能生成 ${res.addedPoints} 个点位${res.removedPoints ? `（已覆盖原有 ${res.removedPoints} 个点位）` : ''}${res.addedAreas ? `，并自动划分 ${res.addedAreas} 个房间区域` : ''}`,
-      {
-        description: '可随时点击工具栏「撤销」按钮或按 Ctrl/⌘ + Z 恢复原有点位',
-        action: {
-          label: '撤销',
-          onClick: () => board.undo(),
-        },
-      },
-    )
-  }, [readOnly, autoGenScope, activeSheetId, autoGenIncludeLighting, board, commit])
+    showToast({
+      body: (
+        <span>
+          {`已智能生成 ${res.addedPoints} 个点位${res.removedPoints ? `（已覆盖原有 ${res.removedPoints} 个点位）` : ''}${res.addedAreas ? `，并自动划分 ${res.addedAreas} 个房间区域` : ''}`}
+          <span className="mt-0.5 block text-xs opacity-80">
+            可随时点击工具栏「撤销」按钮或按 Ctrl/⌘ + Z 恢复原有点位
+          </span>
+        </span>
+      ),
+      endContent: (
+        <Button size="sm" variant="secondary" label="撤销" onClick={() => board.undo()} />
+      ),
+    })
+  }, [readOnly, autoGenScope, activeSheetId, autoGenIncludeLighting, board, commit, showToast])
 
   /* ---------------- 图纸 ---------------- */
 
@@ -774,11 +859,11 @@ export function PointMapEditor({
       commit(r.doc)
       setCropFile(null)
       setTimeout(() => fitSheet(r.obj.sheetId), 80)
-      toast.success(`已添加图纸「${name}」`)
+      showToast({ body: `已添加图纸「${name}」` })
       // 图纸已经存进媒体库，立即保存，避免离开页面后丢失
       setTimeout(() => void saveRef.current(), 200)
     },
-    [uploadImage, board, commit, fitSheet],
+    [uploadImage, board, commit, fitSheet, showToast],
   )
 
   const renameSheet = useCallback(
@@ -797,17 +882,20 @@ export function PointMapEditor({
       if (!s) return
       commit((d) => removeSheet(d, s))
       setSelection(new Set())
-      toast.success(`已删除图纸「${s.name}」，可按 Ctrl/⌘ + Z 撤销`)
+      showToast({ body: `已删除图纸「${s.name}」，可按 Ctrl/⌘ + Z 撤销` })
     },
-    [board, commit],
+    [board, commit, showToast],
   )
 
   const importDwg = useCallback(
     async (file: File) => {
       if (converting) return
-      if (!/\.dwg$/i.test(file.name)) return toast.error('请选择 .dwg 文件')
+      if (!/\.dwg$/i.test(file.name)) return showToast({ body: '请选择 .dwg 文件', type: 'error' })
       setConverting(true)
-      const pending = toast.loading('正在转换 DWG，可能需要几十秒…')
+      const dismissLoading = showToast({
+        body: '正在转换 DWG，可能需要几十秒…',
+        isAutoHide: false,
+      })
       try {
         const body = new FormData()
         body.append('file', file)
@@ -828,13 +916,16 @@ export function PointMapEditor({
           }),
         )
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : '转换失败，请稍后重试')
+        showToast({
+          body: error instanceof Error ? error.message : '转换失败，请稍后重试',
+          type: 'error',
+        })
       } finally {
-        toast.dismiss(pending)
+        dismissLoading()
         setConverting(false)
       }
     },
-    [converting, projectId],
+    [converting, projectId, showToast],
   )
   const cancelCrop = useCallback(() => setCropFile(null), [])
 
@@ -843,20 +934,20 @@ export function PointMapEditor({
     if (readOnly) return
     setArmed(null)
     setTool('calibrate')
-    toast.info('在图纸上沿一段已知长度（如门洞、墙段尺寸）拖一条线，松开后输入真实长度')
-  }, [readOnly])
+    showToast({ body: '在图纸上沿一段已知长度（如门洞、墙段尺寸）拖一条线，松开后输入真实长度' })
+  }, [readOnly, showToast])
 
   const applyCalibration = useCallback(() => {
     if (!calib) return
     const m = Number(calib.value.replace(/[^\d.]/g, ''))
-    if (!(m > 0)) return toast.error('请输入大于 0 的长度（米）')
+    if (!(m > 0)) return showToast({ body: '请输入大于 0 的长度（米）', type: 'error' })
     const mmPerUnit = (m * 1000) / calib.units
     commit((d) => updateSheet(d, calib.sheetId, { mmPerUnit }))
     setCalib(null)
     setTool('select')
     if (!view.grid) setView({ grid: true })
-    toast.success(`已标定：1 米 ≈ ${Math.round(1000 / mmPerUnit)} 个单位，网格按 25cm 显示`)
-  }, [calib, commit, view.grid, setView])
+    showToast({ body: `已标定：1 米 ≈ ${Math.round(1000 / mmPerUnit)} 个单位，网格按 25cm 显示` })
+  }, [calib, commit, view.grid, setView, showToast])
 
   /* ---------------- 区域 ---------------- */
 
@@ -869,9 +960,9 @@ export function PointMapEditor({
       )
       commit(r.doc)
       setSelection(new Set([r.obj.id]))
-      toast.success('已添加区域：拖动顶点调整形状，拖动边的中点可以加顶点')
+      showToast({ body: '已添加区域：拖动顶点调整形状，拖动边的中点可以加顶点' })
     },
-    [board, commit],
+    [board, commit, showToast],
   )
   const addArea = useCallback(
     (areaType: string) => {
@@ -950,7 +1041,7 @@ export function PointMapEditor({
       setSyncingQuote(true)
       try {
         const res = await syncQuoteFromPointMap(qid, scope)
-        if (!res.ok) return toast.error(res.error)
+        if (!res.ok) return showToast({ body: res.error, type: 'error' })
         router.push(
           `/projects/${projectId}/quotes/${qid}${res.pending ? `?pending=${res.pending}` : ''}`,
         )
@@ -958,15 +1049,15 @@ export function PointMapEditor({
         setSyncingQuote(false)
       }
     },
-    [syncingQuote, saving, dirty, save, activeQuote, readOnly, router, projectId, scope],
+    [syncingQuote, saving, dirty, save, activeQuote, readOnly, router, projectId, scope, showToast],
   )
 
   /* ---------------- 导入导出 ---------------- */
 
   const exportPng = useCallback(async () => {
     const sheet = activeSheet
-    if (!sheet) return toast.error('还没有图纸')
-    const pending = toast.loading('正在生成图片…')
+    if (!sheet) return showToast({ body: '还没有图纸', type: 'error' })
+    const dismissLoading = showToast({ body: '正在生成图片…', isAutoHide: false })
     try {
       const { blob, scale } = await exportSheetPng({
         doc: board.current.current.doc,
@@ -978,17 +1069,17 @@ export function PointMapEditor({
         project: projectName,
       })
       download(blob, `${projectName}-${sheet.name}-点位图.png`)
-      toast.success(
-        scale
+      showToast({
+        body: scale
           ? `已导出（${pack.paper} · 1:${scale}，打印选「实际大小」）`
           : '已导出（图纸未标定，按纸张铺满）',
-      )
+      })
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '导出失败')
+      showToast({ body: error instanceof Error ? error.message : '导出失败', type: 'error' })
     } finally {
-      toast.dismiss(pending)
+      dismissLoading()
     }
-  }, [activeSheet, board, view, hidden, projectName])
+  }, [activeSheet, board, view, hidden, projectName, showToast])
 
   const exportJson = useCallback(() => {
     download(
@@ -1007,12 +1098,12 @@ export function PointMapEditor({
         commit(r.doc)
         setSelection(new Set())
         setTimeout(() => fitSheet(sheetsOf(r.doc)[0]?.sheetId ?? null), 60)
-        toast.success('已导入，可按 Ctrl/⌘ + Z 撤销；确认无误后保存')
+        showToast({ body: '已导入，可按 Ctrl/⌘ + Z 撤销；确认无误后保存' })
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : '导入失败')
+        showToast({ body: error instanceof Error ? error.message : '导入失败', type: 'error' })
       }
     },
-    [commit, fitSheet],
+    [commit, fitSheet, showToast],
   )
 
   /* ---------------- 画布事件 ---------------- */
@@ -1135,7 +1226,7 @@ export function PointMapEditor({
       }
       if (mod && key === 'c') {
         clipboard.current = doc.objects.filter((o) => selection.has(o.id) && o.kind !== 'sheet')
-        return toast.success(`已复制 ${clipboard.current.length} 个对象`)
+        return showToast({ body: `已复制 ${clipboard.current.length} 个对象` })
       }
       if (key === 'r' && !mod && !e.shiftKey) return rotate(sel, 90)
       const nudge = { arrowleft: [-1, 0], arrowright: [1, 0], arrowup: [0, -1], arrowdown: [0, 1] }[
@@ -1204,6 +1295,7 @@ export function PointMapEditor({
     duplicate,
     rotate,
     commit,
+    showToast,
   ])
 
   /* ---------------- 派生数据 ---------------- */
@@ -1334,101 +1426,138 @@ export function PointMapEditor({
           {/* 楼层切换：切换 / 总览 / 当前图纸的重命名、清除标定、删除都在这一个菜单里；添加图纸用中间的「上传户型图」 */}
           {snap.sheets.length ? (
             <>
-              <DropdownMenu>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        className="h-8 max-w-44 shrink-0 gap-1.5 px-2 text-xs font-medium data-[state=open]:bg-muted"
-                        label={activeSheet?.name ?? '全部楼层'}
-                        icon={<Layers />}
-                        endContent={<ChevronDown />}
-                      />
-                    </DropdownMenuTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">楼层图纸</TooltipContent>
-                </Tooltip>
-                <DropdownMenuContent align="start" className="w-64">
-                  <DropdownMenuLabel className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-                    楼层图纸
-                    <span className="font-normal tabular-nums">{snap.sheets.length} 张</span>
-                  </DropdownMenuLabel>
-                  {snap.sheets.map((s, idx) => {
-                    const obj = sheetObjs.find((o) => o.sheetId === s.id)
-                    const active = s.id === activeSheetId
-                    return (
-                      <DropdownMenuItem
-                        key={s.id}
-                        onSelect={() => fitSheet(s.id)}
-                        className="gap-2"
-                      >
-                        <span
-                          className={cn(
-                            'inline-flex h-5 min-w-7 shrink-0 items-center justify-center rounded px-1 text-[10px] font-semibold tabular-nums',
-                            active
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-muted text-muted-foreground',
-                          )}
-                        >
-                          {idx + 1}F
-                        </span>
-                        <span className={cn('min-w-0 flex-1 truncate', active && 'font-semibold')}>
-                          {s.name}
-                        </span>
-                        {s.missing ? (
-                          <AlertTriangle className="size-3.5 text-warning" aria-label="图片丢失" />
-                        ) : null}
-                        {obj?.mmPerUnit ? (
-                          <Ruler className="size-3 text-muted-foreground" aria-label="已标定比例" />
-                        ) : null}
-                        <span className="text-xs text-muted-foreground tabular-nums">
-                          {scopedPoints.filter((p) => p.sheetId === s.id).length}
-                        </span>
-                      </DropdownMenuItem>
-                    )
-                  })}
-                  {snap.sheets.length > 1 ? (
-                    <DropdownMenuItem onSelect={() => fitSheet(null)}>
-                      <Maximize2 />
-                      查看全部楼层总览
-                    </DropdownMenuItem>
-                  ) : null}
-                  {readOnly || !activeSheet ? null : (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuLabel className="truncate text-xs font-normal text-muted-foreground">
-                        当前图纸「{activeSheet.name}」
-                      </DropdownMenuLabel>
-                      <DropdownMenuItem
-                        onSelect={() =>
-                          setRenaming({ id: activeSheet.sheetId, name: activeSheet.name })
+              <DropdownMenu
+                placement="below"
+                alignment="start"
+                menuWidth="14.4rem"
+                renderTrigger={(triggerProps) => (
+                  <Tooltip content="楼层图纸" placement="below">
+                    <Button
+                      {...triggerProps}
+                      variant="ghost"
+                      className="h-8 max-w-44 shrink-0 gap-1.5 px-2 text-xs font-medium aria-expanded:bg-muted"
+                      label={activeSheet?.name ?? '全部楼层'}
+                      icon={<Layers />}
+                      endContent={<ChevronDown />}
+                    />
+                  </Tooltip>
+                )}
+                items={(() => {
+                  const items: DropdownMenuOption[] = [
+                    {
+                      type: 'section',
+                      id: 'floors',
+                      title: `楼层图纸 · ${snap.sheets.length} 张`,
+                      items: snap.sheets.map((s, idx) => {
+                        const obj = sheetObjs.find((o) => o.sheetId === s.id)
+                        const active = s.id === activeSheetId
+                        return {
+                          id: s.id,
+                          label: (
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span
+                                className={cn(
+                                  'inline-flex h-5 min-w-7 shrink-0 items-center justify-center rounded px-1 text-[10px] font-semibold tabular-nums',
+                                  active
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-muted text-muted-foreground',
+                                )}
+                              >
+                                {idx + 1}F
+                              </span>
+                              <span className={cn('min-w-0 truncate', active && 'font-semibold')}>
+                                {s.name}
+                              </span>
+                            </span>
+                          ),
+                          endContent: (
+                            <span className="flex items-center gap-1">
+                              {s.missing ? (
+                                <AlertTriangle
+                                  className="size-3.5 text-warning"
+                                  aria-label="图片丢失"
+                                />
+                              ) : null}
+                              {obj?.mmPerUnit ? (
+                                <Ruler
+                                  className="size-3 text-muted-foreground"
+                                  aria-label="已标定比例"
+                                />
+                              ) : null}
+                              <span className="text-xs text-muted-foreground tabular-nums">
+                                {scopedPoints.filter((p) => p.sheetId === s.id).length}
+                              </span>
+                            </span>
+                          ),
+                          onClick: () => fitSheet(s.id),
                         }
-                      >
-                        <PencilLine />
-                        重命名
-                      </DropdownMenuItem>
-                      {activeSheet.mmPerUnit ? (
-                        <DropdownMenuItem
-                          onSelect={() =>
-                            commit((d) => updateSheet(d, activeSheet.sheetId, { mmPerUnit: null }))
-                          }
-                        >
-                          <Eraser />
-                          清除比例标定
-                        </DropdownMenuItem>
-                      ) : null}
-                      <DropdownMenuItem
-                        variant="destructive"
-                        onSelect={() => setConfirmDelete(activeSheet.sheetId)}
-                      >
-                        <Trash2 />
-                        删除图纸
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                      }),
+                    },
+                  ]
+                  if (snap.sheets.length > 1) {
+                    items.push({
+                      id: 'all',
+                      label: (
+                        <span className="flex items-center gap-2">
+                          <Maximize2 className="size-4" />
+                          查看全部楼层总览
+                        </span>
+                      ),
+                      onClick: () => fitSheet(null),
+                    })
+                  }
+                  if (!readOnly && activeSheet) {
+                    items.push({ type: 'divider' })
+                    items.push({
+                      type: 'section',
+                      id: 'current',
+                      title: `当前图纸「${activeSheet.name}」`,
+                      items: [
+                        {
+                          id: 'rename',
+                          label: (
+                            <span className="flex items-center gap-2">
+                              <PencilLine className="size-4" />
+                              重命名
+                            </span>
+                          ),
+                          onClick: () =>
+                            setRenaming({ id: activeSheet.sheetId, name: activeSheet.name }),
+                        },
+                        ...(activeSheet.mmPerUnit
+                          ? [
+                              {
+                                id: 'clear-calib',
+                                label: (
+                                  <span className="flex items-center gap-2">
+                                    <Eraser className="size-4" />
+                                    清除比例标定
+                                  </span>
+                                ),
+                                onClick: () =>
+                                  commit((d) =>
+                                    updateSheet(d, activeSheet.sheetId, { mmPerUnit: null }),
+                                  ),
+                              },
+                            ]
+                          : []),
+                        {
+                          id: 'delete',
+                          variant: 'destructive',
+                          label: (
+                            <span className="flex items-center gap-2">
+                              <Trash2 className="size-4" />
+                              删除图纸
+                            </span>
+                          ),
+                          onClick: () => setConfirmDelete(activeSheet.sheetId),
+                        },
+                      ],
+                    })
+                  }
+                  return items
+                })()}
+              />
               <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-border" />
             </>
           ) : null}
@@ -1440,31 +1569,34 @@ export function PointMapEditor({
             {BOARD_TOOLS.filter((t) => !t.edit || !readOnly).map((t) => {
               const active = tool === t.id && !armed
               return (
-                <Tooltip key={t.id}>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      aria-pressed={active}
-                      aria-label={t.label}
-                      onClick={() => {
-                        setArmed(null)
-                        if (t.id === 'calibrate') startCalibrate()
-                        else setTool(t.id)
-                      }}
-                      className={cn(
-                        'inline-flex size-7 items-center justify-center rounded-md transition-[color,background-color,box-shadow] duration-150 ease-out-quart focus-visible:ring-3 focus-visible:ring-ring/35 focus-visible:outline-none',
-                        active
-                          ? 'bg-background text-foreground shadow-xs dark:bg-accent'
-                          : 'text-muted-foreground hover:text-foreground',
-                      )}
-                    >
-                      <t.icon className="size-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    {t.label}
-                    <Kbd>{t.key}</Kbd>
-                  </TooltipContent>
+                <Tooltip
+                  key={t.id}
+                  placement="below"
+                  content={
+                    <span className="inline-flex items-center gap-1.5">
+                      {t.label}
+                      <Kbd keys={t.key} />
+                    </span>
+                  }
+                >
+                  <button
+                    type="button"
+                    aria-pressed={active}
+                    aria-label={t.label}
+                    onClick={() => {
+                      setArmed(null)
+                      if (t.id === 'calibrate') startCalibrate()
+                      else setTool(t.id)
+                    }}
+                    className={cn(
+                      'inline-flex size-7 items-center justify-center rounded-md transition-[color,background-color,box-shadow] duration-150 ease-out-quart focus-visible:ring-3 focus-visible:ring-ring/35 focus-visible:outline-none',
+                      active
+                        ? 'bg-background text-foreground shadow-xs dark:bg-accent'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    <t.icon className="size-4" />
+                  </button>
                 </Tooltip>
               )
             })}
@@ -1500,52 +1632,84 @@ export function PointMapEditor({
           <div className="flex shrink-0 items-center gap-1.5">
             <div className="flex items-center">
               {/* 还没有图纸时它是主操作，带文字；有图纸后退为图标（新增楼层），只让当前步骤带文字 */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={primaryAction === 'upload' ? 'primary' : 'secondary'}
-                    size={snap.sheets.length ? 'sm' : 'md'}
-                    isDisabled={!!cropFile}
-                    onClick={() => fileInput.current?.click()}
-                    label={snap.sheets.length ? '上传户型图' : '上传户型图'}
-                    className={cn(dwgEnabled && 'rounded-r-none')}
-                    icon={<ImagePlus />}
-                  />
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  {snap.sheets.length
+              <Tooltip
+                placement="below"
+                content={
+                  snap.sheets.length
                     ? '上传户型图，新增一个楼层'
-                    : '上传 PNG / JPG 户型图，自动裁切'}
-                </TooltipContent>
+                    : '上传 PNG / JPG 户型图，自动裁切'
+                }
+              >
+                <Button
+                  variant={primaryAction === 'upload' ? 'primary' : 'secondary'}
+                  size={snap.sheets.length ? 'sm' : 'md'}
+                  isDisabled={!!cropFile}
+                  onClick={() => fileInput.current?.click()}
+                  label={snap.sheets.length ? '上传户型图' : '上传户型图'}
+                  className={cn(uploadMenuEnabled && 'rounded-r-none')}
+                  icon={<ImagePlus />}
+                />
               </Tooltip>
-              {dwgEnabled ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+              {uploadMenuEnabled ? (
+                <DropdownMenu
+                  placement="below"
+                  alignment="center"
+                  renderTrigger={(triggerProps) => (
                     <IconButton
+                      {...triggerProps}
                       variant={primaryAction === 'upload' ? 'primary' : 'secondary'}
-
                       isDisabled={converting || !!cropFile}
-                      aria-label="更多图纸导入方式"
+                      isLoading={converting}
+                      label="更多图纸导入方式"
                       className={cn(
                         'w-7 rounded-l-none',
                         primaryAction === 'upload' ? 'border-l-primary-foreground/20' : '-ml-px',
                       )}
-                      label="更多图纸导入方式"
-                      icon={<Loader2 />}
+                      icon={<ChevronDown />}
                       size="md"
                     />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="center">
-                    <DropdownMenuItem onSelect={() => fileInput.current?.click()}>
-                      <ImagePlus />
-                      上传图片户型图（PNG / JPG）
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => dwgInput.current?.click()}>
-                      <FileUp />
-                      导入 CAD 图纸（.dwg）
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  )}
+                  items={[
+                    {
+                      id: 'image',
+                      label: (
+                        <span className="flex items-center gap-2">
+                          <ImagePlus className="size-4" />
+                          上传图片户型图（PNG / JPG）
+                        </span>
+                      ),
+                      onClick: () => fileInput.current?.click(),
+                    },
+                    ...(dwgEnabled
+                      ? [
+                          {
+                            id: 'dwg',
+                            label: (
+                              <span className="flex items-center gap-2">
+                                <FileUp className="size-4" />
+                                导入 CAD 图纸（.dwg）
+                              </span>
+                            ),
+                            onClick: () => dwgInput.current?.click(),
+                          },
+                        ]
+                      : []),
+                    ...(plugins.aiImport
+                      ? [
+                          {
+                            id: 'ai-import',
+                            label: (
+                              <span className="flex items-center gap-2">
+                                <ScanSearch className="size-4" />
+                                AI 识别图纸（打开 AI 对话）
+                              </span>
+                            ),
+                            onClick: () => void openLinkedPage('/ai?plugin=ai-import'),
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
               ) : null}
             </div>
 
@@ -1667,40 +1831,74 @@ export function PointMapEditor({
           >
             {isFullscreen ? <Minimize2 /> : <Maximize2 />}
           </ToolbarIconButton>
-          <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <IconButton
-                    variant="ghost"
-
-                    className="text-muted-foreground data-[state=open]:bg-muted data-[state=open]:text-foreground"
-                    aria-label="导出 / 导入"
-                    label="导出 / 导入"
-                    icon={<Download />}
-                    size="sm"
-                  />
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">导出 / 导入</TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent align="end" className="w-60">
-              <DropdownMenuItem onSelect={() => void exportPng()}>
-                <ImageDown />
-                导出当前图纸 PNG（{pack.paper}，含图例）
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={exportJson}>
-                <FileJson />
-                导出画板 JSON
-              </DropdownMenuItem>
-              {readOnly ? null : (
-                <DropdownMenuItem onSelect={() => jsonInput.current?.click()}>
-                  <FileUp />
-                  导入画板 JSON
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <DropdownMenu
+            placement="below"
+            alignment="end"
+            menuWidth="13.5rem"
+            renderTrigger={(triggerProps) => (
+              <Tooltip content="导出 / 导入" placement="below">
+                <IconButton
+                  {...triggerProps}
+                  variant="ghost"
+                  className="text-muted-foreground aria-expanded:bg-muted aria-expanded:text-foreground"
+                  label="导出 / 导入"
+                  icon={<Download />}
+                  size="sm"
+                />
+              </Tooltip>
+            )}
+            items={[
+              {
+                id: 'png',
+                label: (
+                  <span className="flex items-center gap-2">
+                    <ImageDown className="size-4" />
+                    导出当前图纸 PNG（{pack.paper}，含图例）
+                  </span>
+                ),
+                onClick: () => void exportPng(),
+              },
+              {
+                id: 'json',
+                label: (
+                  <span className="flex items-center gap-2">
+                    <FileJson className="size-4" />
+                    导出画板 JSON
+                  </span>
+                ),
+                onClick: exportJson,
+              },
+              ...(plugins.proposal
+                ? [
+                    {
+                      id: 'proposal',
+                      label: (
+                        <span className="flex items-center gap-2">
+                          <Presentation className="size-4" />
+                          生成方案演示（业主版）
+                        </span>
+                      ),
+                      onClick: () =>
+                        void openLinkedPage(`/print/projects/${projectId}/proposal?scope=${scope}`),
+                    },
+                  ]
+                : []),
+              ...(readOnly
+                ? []
+                : [
+                    {
+                      id: 'import',
+                      label: (
+                        <span className="flex items-center gap-2">
+                          <FileUp className="size-4" />
+                          导入画板 JSON
+                        </span>
+                      ),
+                      onClick: () => jsonInput.current?.click(),
+                    },
+                  ]),
+            ]}
+          />
           {/* 强弱电布线：和「导出 / 导入」同属图纸输出，是给施工队交底的单据（Beta） */}
           <BetaDocLink label="强弱电布线" href={`/print/projects/${projectId}/wiring`} />
           <span aria-hidden className="mx-1 h-5 w-px bg-border" />
@@ -1726,54 +1924,61 @@ export function PointMapEditor({
                       ? `把${scope === 'all' ? '全部' : `「${pointScopeLabel(scope)}」`}点位同步到「${activeQuote.title}」并打开`
                       : '按当前点位生成报价'
                   }
-                  icon={<Loader2 />}
-                  endContent={<FilePlus2 />}
-                  label="同步报价"
+                  isLoading={syncingQuote}
+                  icon={activeQuote ? <ArrowLeftRight /> : <FilePlus2 />}
+                  label={activeQuote ? '同步报价' : '生成报价'}
                 />
                 {quotes.length ? (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
+                  <DropdownMenu
+                    placement="below"
+                    alignment="end"
+                    menuWidth="16.2rem"
+                    renderTrigger={(triggerProps) => (
                       <IconButton
+                        {...triggerProps}
                         variant="secondary"
-
                         className="-ml-px w-7 rounded-l-none"
                         isDisabled={saving || syncingQuote}
-                        aria-label="选择要同步的报价，或新建报价"
                         label="选择要同步的报价，或新建报价"
                         icon={<ChevronDown />}
                         size="sm"
                       />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-72">
-                      {quotes.map((q) => (
-                        <DropdownMenuItem
-                          key={q.id}
-                          disabled={!scopedPoints.length}
-                          onSelect={() => void switchToQuote(q.id)}
-                        >
+                    )}
+                    items={[
+                      ...quotes.map((q) => ({
+                        id: q.id,
+                        isDisabled: !scopedPoints.length,
+                        label: (
                           <span
                             className={cn(
-                              'min-w-0 flex-1 truncate',
+                              'min-w-0 truncate',
                               q.id === activeQuote?.id && 'font-semibold',
                             )}
                           >
                             同步到「{q.title}」
                           </span>
-                          <span className="ml-3 text-xs text-muted-foreground tabular-nums">
+                        ),
+                        endContent: (
+                          <span className="text-xs text-muted-foreground tabular-nums">
                             {yuan(q.total)}
                           </span>
-                        </DropdownMenuItem>
-                      ))}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        disabled={!scopedPoints.length}
-                        onSelect={() => void createNewQuote()}
-                      >
-                        <FilePlus2 />
-                        新建一份报价（{pointScopeLabel(scope)}）
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                        ),
+                        onClick: () => void switchToQuote(q.id),
+                      })),
+                      { type: 'divider' as const },
+                      {
+                        id: 'new',
+                        isDisabled: !scopedPoints.length,
+                        label: (
+                          <span className="flex items-center gap-2">
+                            <FilePlus2 className="size-4" />
+                            新建一份报价（{pointScopeLabel(scope)}）
+                          </span>
+                        ),
+                        onClick: () => void createNewQuote(),
+                      },
+                    ]}
+                  />
                 ) : null}
               </div>
               <Button
@@ -1882,7 +2087,7 @@ export function PointMapEditor({
                     setFiles((f) => ({ ...f, ...draft.scene.files }))
                     commit(r)
                     setDraft(null)
-                    toast.success('已恢复本地草稿，确认无误后保存')
+                    showToast({ body: '已恢复本地草稿，确认无误后保存' })
                   }}
                   label="恢复"
                 />
@@ -2031,21 +2236,13 @@ export function PointMapEditor({
                       icon={<RotateCw />}
                       size="sm"
                     />
-                    <Input
+                    <AngleInput
                       key={`${selectedSymbol.id}-${selectedSymbol.angle}`}
-                      defaultValue={toDeg(selectedSymbol.angle)}
-                      inputMode="numeric"
-                      aria-label="旋转角度"
-                      className="h-7 w-14 border-border bg-background text-xs tabular-nums"
-                      onBlur={(e) => {
-                        const v = Number(e.target.value)
-                        if (Number.isFinite(v))
-                          commit((d) =>
-                            rotateSymbols(d, [selectedSymbol.id], { absolute: fromDeg(v) }),
-                          )
-                      }}
-                      onKeyDown={(e) =>
-                        e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()
+                      value={toDeg(selectedSymbol.angle)}
+                      onCommit={(v) =>
+                        commit((d) =>
+                          rotateSymbols(d, [selectedSymbol.id], { absolute: fromDeg(v) }),
+                        )
                       }
                     />
                     <span className="text-xs text-muted-foreground">°</span>
@@ -2206,6 +2403,14 @@ export function PointMapEditor({
               >
                 <ScrollableArea label="图纸检查与设备统计" axis="block" className="min-h-0 flex-1">
                   <div className="space-y-2 p-3.5">
+                    {readOnly || !plugins.smartSelect ? null : (
+                      <SmartSelect
+                        platform={platform}
+                        busy={selecting}
+                        disabled={!scopedPoints.length || saving}
+                        onRun={(tier, overwrite) => void autoSelect(tier, overwrite)}
+                      />
+                    )}
                     {issues.length ? (
                       <section className="mb-3 space-y-1">
                         <h2 className="text-xs font-semibold text-fg-secondary">图纸检查</h2>
@@ -2430,7 +2635,7 @@ export function PointMapEditor({
                         size="sm"
                         variant={autoGenScope === 'all' ? 'primary' : 'secondary'}
                         onClick={() => setAutoGenScope('all')}
-                        label="全部图纸（ 张）"
+                        label={`全部图纸（${snap.sheets.length} 张）`}
                       />
                     </div>
                   </div>

@@ -2,32 +2,18 @@
 
 import { useActionState, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  AlertCircle,
-  Home,
-  Loader2,
-  NotebookPen,
-  Plus,
-  Save,
-  Settings2,
-  UserRound,
-} from 'lucide-react'
-import { toast } from 'sonner'
+import { AlertCircle, Home, NotebookPen, Plus, Save, Settings2, UserRound } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
 import { Field } from '@astryxdesign/core/Field'
 import { Card as AstryxCard } from '@astryxdesign/core/Card'
-import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
-import { registerLeaveGuard } from '@/lib/leave-guard'
+import { NumberInput } from '@astryxdesign/core/NumberInput'
+import { Selector } from '@astryxdesign/core/Selector'
+import { TextArea } from '@astryxdesign/core/TextArea'
+import { TextInput } from '@astryxdesign/core/TextInput'
+import { useToast } from '@astryxdesign/core/Toast'
 import { autoProjectName, PROJECT_PLATFORMS } from '@/lib/projects'
+import { registerLeaveGuard } from '@/lib/leave-guard'
 import { cn } from '@/lib/utils'
 
 import { saveProject, type ProjectFormState } from './actions'
@@ -46,6 +32,18 @@ export type ProjectFormValues = {
 }
 
 type Option = { value: string; label: string }
+
+/** 官方 TextInput / Selector 都是受控写法：单行文本与下拉各收进一份 state。 */
+type TextKey = 'customerName' | 'customerPhone' | 'community' | 'address' | 'name'
+type SelectKey = 'platform' | 'owner'
+
+/** 官方 TextInput 没有 maxLength（受控，长度由这里截断；服务端仍会二次校验）。 */
+type TextFieldOptions = Partial<
+  Pick<
+    React.ComponentProps<typeof TextInput>,
+    'placeholder' | 'inputMode' | 'autoComplete' | 'hasAutoFocus'
+  >
+> & { maxLength?: number }
 
 /**
  * 项目信息表单（新建和编辑共用）。所有字段都可以留空：
@@ -68,23 +66,37 @@ export function ProjectForm({
   onCancel?: () => void
 }) {
   const router = useRouter()
+  const showToast = useToast()
   const [state, action, pending] = useActionState<ProjectFormState, FormData>(saveProject, null)
   const [dirty, setDirty] = useState(false)
-  const [nameSource, setNameSource] = useState({
+  // 官方输入组件只有受控写法：字段统一进一份 state，提交仍靠 htmlName / FormData
+  const [fields, setFields] = useState<Record<string, string>>({
     customerName: initial.customerName ?? '',
+    customerPhone: initial.customerPhone ?? '',
     community: initial.community ?? '',
     address: initial.address ?? '',
+    name: initial.name ?? '',
+    platform: initial.platform || PROJECT_PLATFORMS[0],
+    owner: initial.owner ?? '__none',
   })
+  const [budget, setBudget] = useState<number | null>(initial.budget ?? null)
+  const [notes, setNotes] = useState(initial.notes ?? '')
   const errors = state && !state.ok ? (state.fieldErrors ?? {}) : {}
   const isNew = !initial.id
-  const suggestedName = autoProjectName(nameSource)
+  const setField = (key: TextKey | SelectKey, value: string) =>
+    setFields((f) => ({ ...f, [key]: value }))
+  const suggestedName = autoProjectName({
+    customerName: fields.customerName,
+    community: fields.community,
+    address: fields.address,
+  })
 
   useEffect(() => {
     if (!state?.ok) return
     setDirty(false)
     if (isNew) router.push(`/projects/${state.id}`)
     else {
-      toast.success('项目信息已保存')
+      showToast({ body: '项目信息已保存' })
       router.refresh()
       onSaved?.()
     }
@@ -105,57 +117,38 @@ export function ProjectForm({
     }
   }, [dirty, readOnly, isNew])
 
-  const text = (
-    name: keyof ProjectFormValues,
-    label: string,
-    props: React.ComponentProps<typeof Input> = {},
-  ) => (
-    <Field label={label} inputID={name}>
-      <Input
-        id={name}
-        name={name}
-        defaultValue={(initial[name] as string | number | null | undefined) ?? ''}
-        aria-invalid={errors[name] ? true : undefined}
-        disabled={readOnly}
-        {...props}
-        onChange={(e) => {
-          if (name === 'customerName' || name === 'community' || name === 'address')
-            setNameSource((s) => ({ ...s, [name]: e.target.value }))
-          props.onChange?.(e)
-        }}
-      />
-      {errors[name] ? <p className="text-xs text-destructive-strong">{errors[name]}</p> : null}
-    </Field>
+  const text = (name: TextKey, label: string, { maxLength, ...props }: TextFieldOptions = {}) => (
+    <TextInput
+      id={name}
+      label={label}
+      htmlName={name}
+      value={fields[name]}
+      onChange={(v) => setField(name, maxLength ? v.slice(0, maxLength) : v)}
+      isDisabled={readOnly}
+      status={errors[name] ? { type: 'error', message: errors[name] } : undefined}
+      {...props}
+    />
   )
 
   const select = (
-    name: keyof ProjectFormValues,
+    name: SelectKey,
     label: string,
     options: readonly Option[],
-    fallback: string,
     allowNone = false,
   ) => (
-    <Field label={label} inputID={name}>
-      <Select
-        name={name}
-        defaultValue={(initial[name] as string | null | undefined) || fallback}
-        disabled={readOnly}
-        onValueChange={() => setDirty(true)}
-      >
-        <SelectTrigger id={name} className="w-full" aria-invalid={errors[name] ? true : undefined}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {allowNone ? <SelectItem value="__none">未指定</SelectItem> : null}
-          {options.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {errors[name] ? <p className="text-xs text-destructive-strong">{errors[name]}</p> : null}
-    </Field>
+    <Selector
+      label={label}
+      value={fields[name]}
+      onChange={(v) => {
+        setField(name, v)
+        setDirty(true)
+      }}
+      htmlName={name}
+      isDisabled={readOnly}
+      width="100%"
+      status={errors[name] ? { type: 'error', message: errors[name] } : undefined}
+      options={allowNone ? [{ value: '__none', label: '未指定' }, ...options] : [...options]}
+    />
   )
 
   const group = (
@@ -218,7 +211,7 @@ export function ProjectForm({
             <>
               {text('customerName', '客户姓名', {
                 placeholder: '例如：王女士',
-                autoFocus: isNew,
+                hasAutoFocus: isNew,
                 autoComplete: 'off',
               })}
               {text('customerPhone', '客户电话', { inputMode: 'tel', autoComplete: 'off' })}
@@ -243,36 +236,34 @@ export function ProjectForm({
                 'platform',
                 '主平台',
                 PROJECT_PLATFORMS.map((p) => ({ value: p, label: p })),
-                initial.platform || PROJECT_PLATFORMS[0],
               )}
-              {text('budget', '预算（元）', {
-                type: 'number',
-                min: 0,
-                step: 1000,
-                inputMode: 'numeric',
-                placeholder: '可不填',
-              })}
-              {owners && !isNew ? select('owner', '负责人', owners, '__none', true) : null}
+              <NumberInput
+                id="budget"
+                label="预算（元）"
+                htmlName="budget"
+                value={budget}
+                onChange={setBudget}
+                min={0}
+                step={1000}
+                placeholder="可不填"
+                isDisabled={readOnly}
+                status={errors.budget ? { type: 'error', message: errors.budget } : undefined}
+              />
+              {owners && !isNew ? select('owner', '负责人', owners, true) : null}
               <div
                 className={cn('grid content-start gap-2', owners && !isNew ? '' : 'sm:col-span-2')}
               >
-                <Field
+                <TextInput
+                  id="name"
                   label="项目名称"
-                  inputID="name"
                   description="留空自动生成"
-                  descriptionID="name-hint"
-                >
-                  <Input
-                    id="name"
-                    name="name"
-                    defaultValue={initial.name ?? ''}
-                    placeholder={suggestedName}
-                    maxLength={120}
-                    aria-invalid={errors.name ? true : undefined}
-                    aria-describedby="name-hint"
-                    disabled={readOnly}
-                  />
-                </Field>
+                  htmlName="name"
+                  value={fields.name}
+                  onChange={(v) => setField('name', v.slice(0, 120))}
+                  placeholder={suggestedName}
+                  isDisabled={readOnly}
+                  status={errors.name ? { type: 'error', message: errors.name } : undefined}
+                />
               </div>
             </>,
           )}
@@ -282,13 +273,16 @@ export function ProjectForm({
             '记录家庭常住成员、装修阶段、特殊联动场景或网路条件。',
             <div className="grid gap-2 sm:col-span-2">
               <Field label="备注" inputID="notes" isLabelHidden>
-                <Textarea
+                <TextArea
                   id="notes"
-                  name="notes"
+                  label="备注"
+                  isLabelHidden
+                  value={notes}
+                  onChange={setNotes}
+                  htmlName="notes"
                   rows={3}
                   maxLength={2000}
-                  defaultValue={initial.notes ?? ''}
-                  disabled={readOnly}
+                  isDisabled={readOnly}
                   placeholder="户型、装修进度、客户偏好等"
                 />
               </Field>
@@ -326,8 +320,8 @@ export function ProjectForm({
             <Button
               type="submit"
               isDisabled={pending || (!isNew && !dirty)}
-              icon={<Loader2 />}
-              endContent={<Save />}
+              isLoading={pending}
+              icon={isNew ? <Plus /> : <Save />}
               label={isNew ? '创建项目' : '保存'}
             />
           </div>

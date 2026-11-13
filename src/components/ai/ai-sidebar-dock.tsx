@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   AlertCircle,
@@ -15,8 +14,17 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react'
-import { toast } from 'sonner'
 
+import { Button } from '@astryxdesign/core/Button'
+import {
+  DropdownMenu,
+  DropdownMenuDivider,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+} from '@astryxdesign/core/DropdownMenu'
+import { IconButton } from '@astryxdesign/core/IconButton'
+import { useToast } from '@astryxdesign/core/Toast'
+import { ClickableCard } from '@astryxdesign/core/ClickableCard'
 import {
   AiMessageBubble,
   AiPromptComposer,
@@ -27,14 +35,6 @@ import {
   type AiProjectContext,
   type AiToolCall,
 } from '@/components/ai/ai-elements'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { AI_MODELS, DEFAULT_AI_TEMPLATES, fillPromptTemplate } from '@/plugins/ai-copilot/templates'
 
@@ -134,6 +134,7 @@ export function AiSidebarDock({
   const availableModels = customModels?.length ? customModels : AI_MODELS
   const pathname = usePathname()
   const router = useRouter()
+  const showToast = useToast()
   const [projectList, setProjectList] = useState<AiProjectContext[]>(initialProjects)
 
   useEffect(() => {
@@ -202,7 +203,7 @@ export function AiSidebarDock({
       if (!res.ok || !data.messages) throw new Error(data.error)
       setMessages(data.messages.map((m) => toChat(m, availableModels)))
     } catch {
-      toast.error('读取会话失败')
+      showToast({ body: '读取会话失败', type: 'error' })
     } finally {
       setLoadingHistory(false)
     }
@@ -210,7 +211,10 @@ export function AiSidebarDock({
 
   async function deleteConversation(id: string) {
     const res = await fetch(`/ai/conversations/${id}`, { method: 'DELETE' }).catch(() => null)
-    if (!res?.ok) return toast.error('删除失败')
+    if (!res?.ok) {
+      showToast({ body: '删除失败', type: 'error' })
+      return
+    }
     setConversations((prev) => prev.filter((c) => c.id !== id))
     if (id === activeId) startNew()
   }
@@ -271,9 +275,10 @@ export function AiSidebarDock({
       const isText = file.type.startsWith('text/') || /\.(csv|txt|md|tsv)$/i.test(lower)
 
       if (!isImage && !isJson && !isText) {
-        toast.error(
-          `暂不支持「${file.name}」，请拖入 PNG/JPG 户型图、CAD .dxf 文件、JSON 点位文件或 CSV/TXT 清单`,
-        )
+        showToast({
+          body: `暂不支持「${file.name}」，请拖入 PNG/JPG 户型图、CAD .dxf 文件、JSON 点位文件或 CSV/TXT 清单`,
+          type: 'error',
+        })
         continue
       }
 
@@ -335,7 +340,7 @@ export function AiSidebarDock({
             void pollRecognition(id, data.mediaId)
         } catch (err) {
           const msg = (err as Error).message || '上传失败'
-          toast.error(`${file.name}：${msg}`)
+          showToast({ body: `${file.name}：${msg}`, type: 'error' })
           setAttachments((prev) => prev.filter((a) => a.id !== id))
         }
         continue
@@ -346,7 +351,7 @@ export function AiSidebarDock({
         const rawText = await file.text()
         const trimmed = rawText.trim()
         if (!trimmed) {
-          toast.error(`${file.name} 内容为空`)
+          showToast({ body: `${file.name} 内容为空`, type: 'error' })
           continue
         }
         let summary = `${Math.max(1, Math.round(file.size / 1024))} KB`
@@ -390,7 +395,7 @@ export function AiSidebarDock({
           },
         ])
       } catch {
-        toast.error(`读取文件 ${file.name} 失败`)
+        showToast({ body: `读取文件 ${file.name} 失败`, type: 'error' })
       }
     }
   }
@@ -409,8 +414,14 @@ export function AiSidebarDock({
     const readyAtts = attachments.filter((a) => a.status === 'ready')
     const text = raw.trim()
     if ((!text && readyAtts.length === 0) || streaming) return
-    if (!configured) return toast.error('还没有配置 AI 密钥')
-    if (credits < 1) return toast.error('积分已用完，请在「会员与积分」页兑换或联系管理员发放')
+    if (!configured) {
+      showToast({ body: '还没有配置 AI 密钥', type: 'error' })
+      return
+    }
+    if (credits < 1) {
+      showToast({ body: '积分已用完，请在「会员与积分」页兑换或联系管理员发放', type: 'error' })
+      return
+    }
 
     // 如果用户只拖入了附件没有输入文字，自动补一句默认说明
     const planImages = readyAtts.filter(
@@ -595,13 +606,21 @@ export function AiSidebarDock({
               }
             }
           } else if (ev.type === 'error') {
-            throw new Error(String(ev.error))
+            const err = new Error(String(ev.error)) as Error & { code?: string }
+            err.code = typeof ev.code === 'string' ? ev.code : undefined
+            throw err
           }
         }
       }
     } catch (error) {
       if ((error as Error).name === 'AbortError') dropReply()
-      else
+      else if ((error as Error & { code?: string }).code === 'billing_rejected') {
+        // 业务拒绝（如并发扣费时积分不足）：回复内容已经流式发出，但本次没扣费，必须明确告诉用户。
+        showToast({
+          body: (error as Error).message || '积分不足，本次回复未计费',
+          type: 'error',
+        })
+      } else
         patchReply((m) =>
           m.content
             ? m
@@ -661,78 +680,85 @@ export function AiSidebarDock({
       ) : null}
 
       <div className="flex h-11 items-center justify-between gap-1 px-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
+        <DropdownMenu
+          menuWidth="16rem"
+          renderTrigger={(props) => (
+            <Button
+              {...props}
               type="button"
-              className="inline-flex max-w-52 items-center gap-1 rounded-md px-2 py-1 text-sm font-medium hover:bg-sidebar-accent"
+              variant="ghost"
+              size="sm"
+              label={`对话：${activeTitle}`}
+              className="max-w-52 justify-start font-medium"
             >
               <span className="truncate">{activeTitle}</span>
               <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-64">
-            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-              最近对话
-            </DropdownMenuLabel>
-            {conversations.length === 0 ? (
-              <div className="px-2 py-1.5 text-xs text-muted-foreground">还没有对话</div>
-            ) : null}
+            </Button>
+          )}
+        >
+          <DropdownMenuGroup title="最近对话">
+            {conversations.length === 0 ? <DropdownMenuItem label="还没有对话" isDisabled /> : null}
             {conversations.map((c) => (
               <DropdownMenuItem
                 key={c.id}
-                onSelect={() => void openConversation(c.id)}
-                className="group flex items-center justify-between"
-              >
-                <span className={cn('truncate', c.id === activeId && 'font-medium')}>
-                  {c.title}
-                </span>
-                <button
-                  type="button"
-                  aria-label="删除"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    void deleteConversation(c.id)
-                  }}
-                  className="text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground"
-                >
-                  <Trash2 className="size-3.5" />
-                </button>
-              </DropdownMenuItem>
+                label={
+                  <span className={cn('truncate', c.id === activeId && 'font-medium')}>
+                    {c.title}
+                  </span>
+                }
+                onClick={() => void openConversation(c.id)}
+              />
             ))}
-          </DropdownMenuContent>
+          </DropdownMenuGroup>
         </DropdownMenu>
         <div className="flex items-center">
-          <button
+          <IconButton
             type="button"
-            aria-label="新对话"
+            variant="ghost"
+            size="sm"
+            label="新对话"
             onClick={startNew}
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
-          >
-            <SquarePen className="size-4" />
-          </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
+            icon={<SquarePen />}
+          />
+          <DropdownMenu
+            alignment="end"
+            menuWidth="12rem"
+            renderTrigger={(props) => (
+              <IconButton
+                {...props}
                 type="button"
-                aria-label="更多"
-                className="rounded-md p-1.5 text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
-              >
-                <MoreHorizontal className="size-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground tabular-nums">
-                剩余 {credits} 积分
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/ai">
-                  <Maximize2 className="size-4" />
-                  全屏打开
-                </Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
+                variant="ghost"
+                size="sm"
+                label="更多"
+                icon={<MoreHorizontal />}
+              />
+            )}
+          >
+            <DropdownMenuGroup title={<span className="tabular-nums">剩余 {credits} 积分</span>}>
+              {/* 本仓没有挂 LinkProvider，href 会整页跳转；
+                  用 preventDefault + router.push 保持原来的客户端导航。 */}
+              <DropdownMenuItem
+                label="全屏打开"
+                icon={<Maximize2 className="size-4" />}
+                href="/ai"
+                onClick={(e) => {
+                  e.preventDefault()
+                  router.push('/ai')
+                }}
+              />
+            </DropdownMenuGroup>
+            <DropdownMenuDivider />
+            {/* 官方的菜单行是唯一可交互目标（不允许在行内再嵌按钮），
+                所以删除从「每行悬浮按钮」改为在这里删除当前打开的对话。 */}
+            <DropdownMenuItem
+              label="删除当前对话"
+              icon={<Trash2 className="size-4" />}
+              variant="destructive"
+              isDisabled={!activeId}
+              onClick={() => {
+                if (activeId) void deleteConversation(activeId)
+              }}
+            />
           </DropdownMenu>
         </div>
       </div>
@@ -766,11 +792,13 @@ export function AiSidebarDock({
             </div>
             <div className="grid gap-2">
               {DEFAULT_AI_TEMPLATES.slice(0, 3).map((t) => (
-                <button
+                <ClickableCard
                   key={t.id}
-                  type="button"
+                  label={t.name}
                   onClick={() => pickTemplate(t.id)}
-                  className="group flex items-center gap-3 rounded-[var(--radius-container)] bg-card px-3.5 py-3 text-left shadow-xs ring-1 ring-border transition-[box-shadow,background-color] duration-150 ease-out-quart hover:bg-subtle hover:ring-border-strong focus-visible:ring-3 focus-visible:ring-ring/35 focus-visible:outline-none"
+                  padding={3}
+                  elevation="low"
+                  className="group flex items-center gap-3 text-left"
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-medium text-foreground">{t.name}</span>
@@ -781,7 +809,7 @@ export function AiSidebarDock({
                     ) : null}
                   </span>
                   <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-out-quart group-hover:translate-x-0.5 group-hover:text-foreground" />
-                </button>
+                </ClickableCard>
               ))}
             </div>
           </div>
@@ -834,39 +862,42 @@ export function AiSidebarDock({
         ) && !streaming ? (
           <div className="mb-2 flex flex-wrap items-center gap-1.5 px-1">
             <span className="text-[11px] text-muted-foreground">一键导入：</span>
-            <button
+            <Button
               type="button"
+              variant="primary"
+              size="sm"
+              label="仅导入开关"
+              className="rounded-full text-xs"
               onClick={() =>
                 void send(
                   '请将上传的户型图添加到当前项目点位图，仅导入识别到的开关点位（importMode=switches）',
                 )
               }
-              className="rounded-full border border-primary/30 bg-primary/8 px-2.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/15"
-            >
-              仅导入开关
-            </button>
-            <button
+            />
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
+              label="导入全部（开关+灯具）"
+              className="rounded-full text-xs text-muted-foreground"
               onClick={() =>
                 void send(
                   '请将上传的户型图添加到当前项目点位图，导入识别到的全部开关与灯具点位（importMode=all）',
                 )
               }
-              className="rounded-full border bg-background px-2.5 py-0.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground"
-            >
-              导入全部（开关+灯具）
-            </button>
-            <button
+            />
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
+              label="仅添加干净底图"
+              className="rounded-full text-xs text-muted-foreground"
               onClick={() =>
                 void send(
                   '请只将上传的户型图作为干净底图添加到点位图，不自动生成任何点位（importMode=none）',
                 )
               }
-              className="rounded-full border bg-background px-2.5 py-0.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground"
-            >
-              仅添加干净底图
-            </button>
+            />
           </div>
         ) : null}
         <AiPromptComposer

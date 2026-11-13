@@ -2,19 +2,18 @@
 
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, ImageIcon, Loader2, Save, Upload, X } from 'lucide-react'
-import { toast } from 'sonner'
+import { AlertCircle, ImageIcon, Save, Upload, X } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
 import { IconButton } from '@astryxdesign/core/IconButton'
 import { Field } from '@astryxdesign/core/Field'
 import { Card } from '@astryxdesign/core/Card'
 import { Layout, LayoutContent, LayoutHeader } from '@astryxdesign/core/Layout'
-
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
+import { Stack } from '@astryxdesign/core/Stack'
+import { Switch } from '@astryxdesign/core/Switch'
+import { TextArea } from '@astryxdesign/core/TextArea'
+import { TextInput } from '@astryxdesign/core/TextInput'
+import { useToast } from '@astryxdesign/core/Toast'
 
 import {
   DocumentTemplateSettings,
@@ -36,6 +35,13 @@ type Values = {
   logoUrl: string | null
   qrCodeUrl: string | null
 }
+
+/** 官方 TextInput 没有 maxLength（受控，长度由这里截断；服务端仍会二次校验）。 */
+type TextKey = 'name' | 'slogan' | 'phone' | 'email' | 'address' | 'qrCaption'
+
+type TextFieldOptions = Partial<
+  Pick<React.ComponentProps<typeof TextInput>, 'type' | 'inputMode' | 'placeholder' | 'isRequired'>
+> & { max: number }
 
 function ImageField({
   name,
@@ -143,11 +149,22 @@ function ImageField({
   )
 }
 
+export type PluginOption = {
+  id: string
+  name: string
+  description: string
+  categoryLabel: string
+  status: 'ready' | 'coming-soon'
+  enabled: boolean
+}
+
 export function CompanyForm({
   initial,
   documents,
+  plugins,
 }: {
   initial: Values
+  plugins: PluginOption[]
   documents: {
     kinds: DocKindOption[]
     styles: DocStyleOption[]
@@ -155,8 +172,25 @@ export function CompanyForm({
   }
 }) {
   const router = useRouter()
+  const showToast = useToast()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<{ message: string; field?: string } | null>(null)
+  const [quoteNotes, setQuoteNotes] = useState(initial.quoteNotes)
+  const [contractTerms, setContractTerms] = useState(initial.contractTerms)
+  // 官方 TextInput 只有受控写法，6 个单行文本字段统一用一份 state
+  const [values, setValues] = useState<Record<TextKey, string>>({
+    name: initial.name,
+    slogan: initial.slogan,
+    phone: initial.phone,
+    email: initial.email,
+    address: initial.address,
+    qrCaption: initial.qrCaption,
+  })
+  const [printProductImages, setPrintProductImages] = useState(initial.printProductImages)
+  // 插件开关：默认全开（disabledPlugins 里没有即开启），未就绪的插件始终关闭且不提交
+  const [pluginEnabled, setPluginEnabled] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(plugins.map((p) => [p.id, p.enabled])),
+  )
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -174,7 +208,7 @@ export function CompanyForm({
       }
       if (!res.ok || !data.ok)
         return setError({ message: data.error ?? '保存失败，请稍后重试', field: data.field })
-      toast.success('设置已保存')
+      showToast({ body: '设置已保存' })
       router.refresh()
     } catch {
       setError({ message: '网络错误，请稍后重试' })
@@ -183,20 +217,16 @@ export function CompanyForm({
     }
   }
 
-  const field = (
-    name: Exclude<keyof Values, 'printProductImages'>,
-    label: string,
-    props: React.ComponentProps<typeof Input> = {},
-  ) => (
-    <Field label={label} inputID={name}>
-      <Input
-        id={name}
-        name={name}
-        defaultValue={initial[name] ?? ''}
-        aria-invalid={error?.field === name ? true : undefined}
-        {...props}
-      />
-    </Field>
+  const field = (name: TextKey, label: string, { max, ...props }: TextFieldOptions) => (
+    <TextInput
+      id={name}
+      label={label}
+      htmlName={name}
+      value={values[name]}
+      onChange={(v) => setValues((s) => ({ ...s, [name]: v.slice(0, max) }))}
+      status={error?.field === name ? { type: 'error' } : undefined}
+      {...props}
+    />
   )
 
   return (
@@ -230,11 +260,11 @@ export function CompanyForm({
             <LayoutContent padding={5} isScrollable={false}>
               <div className="grid gap-4 md:grid-cols-2">
                 {field('name', '名称', {
-                  required: true,
-                  maxLength: 60,
+                  max: 60,
+                  isRequired: true,
                   placeholder: '公司、工作室或个人名称',
                 })}
-                {field('slogan', '副标题', { maxLength: 80 })}
+                {field('slogan', '副标题', { max: 80 })}
                 <div className="md:col-span-2">
                   <ImageField
                     name="logo"
@@ -265,9 +295,9 @@ export function CompanyForm({
           content={
             <LayoutContent padding={5} isScrollable={false}>
               <div className="grid gap-4 md:grid-cols-2">
-                {field('phone', '联系电话', { inputMode: 'tel', maxLength: 30 })}
-                {field('email', '邮箱', { type: 'email', maxLength: 80 })}
-                <div className="md:col-span-2">{field('address', '地址', { maxLength: 200 })}</div>
+                {field('phone', '联系电话', { inputMode: 'tel', max: 30 })}
+                {field('email', '邮箱', { type: 'email', max: 80 })}
+                <div className="md:col-span-2">{field('address', '地址', { max: 200 })}</div>
                 <div className="md:col-span-2">
                   <ImageField
                     name="qrCode"
@@ -278,7 +308,7 @@ export function CompanyForm({
                   />
                 </div>
                 {field('qrCaption', '二维码说明', {
-                  maxLength: 40,
+                  max: 40,
                   placeholder: '扫码添加微信',
                 })}
               </div>
@@ -304,33 +334,41 @@ export function CompanyForm({
             <LayoutContent padding={5} isScrollable={false}>
               <div className="grid gap-5">
                 <Field label="报价备注" inputID="quoteNotes">
-                  <Textarea
+                  <TextArea
                     id="quoteNotes"
-                    name="quoteNotes"
+                    label="报价备注"
+                    isLabelHidden
+                    value={quoteNotes}
+                    onChange={setQuoteNotes}
+                    htmlName="quoteNotes"
                     rows={3}
                     maxLength={2000}
-                    defaultValue={initial.quoteNotes}
                     placeholder="例如：报价有效期 30 天；设备质保一年，含一年免费上门维护"
                   />
                 </Field>
                 <Field label="合同条款" inputID="contractTerms">
-                  <Textarea
+                  <TextArea
                     id="contractTerms"
-                    name="contractTerms"
+                    label="合同条款"
+                    isLabelHidden
+                    value={contractTerms}
+                    onChange={setContractTerms}
+                    htmlName="contractTerms"
                     rows={7}
                     maxLength={5000}
-                    defaultValue={initial.contractTerms}
-                    className="leading-relaxed"
+                    controlClassName="leading-relaxed"
                   />
                 </Field>
-                <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-                  <Label htmlFor="printProductImages">打印报价单时显示产品缩略图</Label>
-                  <Switch
-                    id="printProductImages"
-                    name="printProductImages"
-                    defaultChecked={initial.printProductImages}
-                  />
-                </div>
+                <Switch
+                  label="打印报价单时显示产品缩略图"
+                  value={printProductImages}
+                  onChange={setPrintProductImages}
+                  htmlName="printProductImages"
+                  labelPosition="start"
+                  labelSpacing="spread"
+                  width="100%"
+                  className="rounded-lg border p-3"
+                />
               </div>
             </LayoutContent>
           }
@@ -341,6 +379,55 @@ export function CompanyForm({
         styles={documents.styles}
         defaults={documents.defaults}
       />
+      <Card
+        padding={0}
+        className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+      >
+        <Layout
+          height="auto"
+          header={
+            <LayoutHeader padding={5} paddingBlockEnd={0}>
+              <div className="grid gap-1.5">
+                <div className="font-heading text-base font-semibold tracking-tight">插件</div>
+                <div className="text-sm text-muted-foreground">
+                  关闭后侧边栏与页面入口会隐藏，随时可以重新打开；改动随底部「保存」生效
+                </div>
+              </div>
+            </LayoutHeader>
+          }
+          content={
+            <LayoutContent padding={5} isScrollable={false}>
+              {/* 告诉服务端本次提交带插件开关；未勾选的插件会被记为关闭 */}
+              <input type="hidden" name="plugins-present" value="1" />
+              <Stack gap={3}>
+                {plugins.map((plugin) => {
+                  const isReady = plugin.status === 'ready'
+                  return (
+                    <Switch
+                      key={plugin.id}
+                      label={plugin.name}
+                      description={`${plugin.categoryLabel} · ${plugin.description}${
+                        isReady ? '' : '（未就绪）'
+                      }`}
+                      value={pluginEnabled[plugin.id] ?? false}
+                      onChange={(checked) =>
+                        setPluginEnabled((s) => ({ ...s, [plugin.id]: checked }))
+                      }
+                      htmlName={`plugin-${plugin.id}`}
+                      isDisabled={!isReady}
+                      disabledMessage={isReady ? undefined : '功能尚未就绪，暂不可开启'}
+                      labelPosition="start"
+                      labelSpacing="spread"
+                      width="100%"
+                      className="rounded-lg border p-3"
+                    />
+                  )
+                })}
+              </Stack>
+            </LayoutContent>
+          }
+        />
+      </Card>
       {/*
         保存条：吸底时必须是**不透明**背景 + 上边框，否则滚动过程中下方卡片的
         标题会从半透明背景里透出来，看起来像「保存条压住了标题」。
@@ -356,7 +443,7 @@ export function CompanyForm({
         改为普通文档流 + 上边框，保存按钮始终跟着表单末尾走。
       */}
       <div className="flex justify-end border-t border-border pt-4">
-        <Button type="submit" isDisabled={saving} icon={<Loader2 />} label="保存" />
+        <Button type="submit" isLoading={saving} icon={<Save />} label="保存" />
       </div>
     </form>
   )

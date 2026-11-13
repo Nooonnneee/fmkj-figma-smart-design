@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { appAuth } from '@/lib/app-auth'
+import { chargeAiCredits, isBusinessRejection } from '@/lib/credit-charge'
 import { getPayloadClient } from '@/lib/payload'
 import { getPluginFlags } from '@/plugins/state'
 
@@ -74,24 +75,18 @@ export async function POST(request: Request) {
 
   try {
     const image = await generateImage({ prompt, model: model.id as never, size, userId: user.id })
-    let balance: number | null = null
-    try {
-      const entry = await payload.create({
-        collection: 'ai-credit-ledger',
-        data: {
-          user: user.id,
-          delta: -model.cost,
-          reason: `AI 生图 · ${model.name} · ${prompt.slice(0, 40)}`,
-        },
-        overrideAccess: true,
-        depth: 0,
-      })
-      balance = entry.balanceAfter ?? null
-    } catch (error) {
-      console.error('[ai-image] credit deduction failed', error)
-    }
+    // 记账失败不让生图失败；重试一次并留下结构化记录（见 chargeAiCredits）。
+    const balance = await chargeAiCredits(payload, {
+      user: user.id,
+      delta: -model.cost,
+      reason: `AI 生图 · ${model.name} · ${prompt.slice(0, 40)}`,
+    })
     return NextResponse.json({ ok: true, ...image, size, cost: model.cost, balance })
   } catch (error) {
+    // 积分不足等业务拒绝必须原样返回 4xx，不能伪装成服务端故障。
+    if (isBusinessRejection(error)) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: error.status })
+    }
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : '生图失败' },
       { status: 500 },

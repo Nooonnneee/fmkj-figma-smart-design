@@ -2,12 +2,12 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { ArrowRight } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
 import { Field } from '@astryxdesign/core/Field'
 import { TextInput } from '@astryxdesign/core/TextInput'
+import { useToast } from '@astryxdesign/core/Toast'
 import type { CollaboratorRole } from '@/lib/project-access'
 
 export function JoinCard({
@@ -22,6 +22,7 @@ export function JoinCard({
   currentUser: { name: string; email: string } | null
 }) {
   const router = useRouter()
+  const showToast = useToast()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -42,7 +43,9 @@ export function JoinCard({
         setError(data.error ?? '加入失败，请稍后重试')
         return
       }
-      toast.success(role === 'edit' ? '已加入项目协作（可编辑）' : '已加入项目协作（仅查看）')
+      showToast({
+        body: role === 'edit' ? '已加入项目协作（可编辑）' : '已加入项目协作（仅查看）',
+      })
       router.push(`/projects/${projectId}`)
       router.refresh()
     } catch {
@@ -65,8 +68,9 @@ export function JoinCard({
         <Button
           className="w-full"
           isDisabled={busy}
+          isLoading={busy}
           onClick={() => void submit('current')}
-          icon={<Loader2 />}
+          endContent={<ArrowRight />}
           label="接受邀请并进入项目"
         />
       </div>
@@ -111,7 +115,8 @@ export function JoinCard({
           type="submit"
           className="w-full"
           isDisabled={busy}
-          icon={<Loader2 />}
+          isLoading={busy}
+          endContent={<ArrowRight />}
           label="登录并加入项目"
         />
         <p className="text-center text-xs text-muted-foreground">

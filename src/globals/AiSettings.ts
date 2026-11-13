@@ -23,7 +23,7 @@ export const aiModelsField = {
   },
   admin: {
     description:
-      '仅超级管理员在 /admin 后台配置，对全局所有网页与小程序用户生效。留空时默认使用内置 DeepSeek 模型。使用 NewAPI 聚合网关时请在环境变量配置 NEWAPI_BASE_URL 与 NEWAPI_API_KEY。',
+      '仅超级管理员在 /admin 后台配置，对全局所有网页与小程序用户生效。留空时使用内置模型（DeepSeek / 通义千问，密钥分别来自 DEEPSEEK_API_KEY、DASHSCOPE_API_KEY）。使用 NewAPI 聚合网关时请在环境变量配置 NEWAPI_BASE_URL 与 NEWAPI_API_KEY。',
   },
   fields: [
     {

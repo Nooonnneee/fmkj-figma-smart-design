@@ -3,11 +3,11 @@
 import { useState, useTransition } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { CopyPlus, Loader2, MessageSquareQuote } from 'lucide-react'
-import { toast } from 'sonner'
+import { CopyPlus, MessageSquareQuote } from 'lucide-react'
 
 import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
+import { useToast } from '@astryxdesign/core/Toast'
 import { feedbackDecisionLabel, type DeferredItem } from '@/lib/client-feedback'
 import { yuan } from '@/lib/quotes'
 
@@ -42,6 +42,7 @@ export function ClientFeedbackList({
   canCreateQuote: boolean
 }) {
   const router = useRouter()
+  const showToast = useToast()
   const [busy, setBusy] = useState<string | null>(null)
   const [, startTransition] = useTransition()
   const pending = items.filter((f) => f.status === 'new').length
@@ -51,7 +52,7 @@ export function ClientFeedbackList({
     startTransition(async () => {
       const res = await setFeedbackStatusAction(f.id, f.status === 'new' ? 'handled' : 'new')
       setBusy(null)
-      if (!res.ok) return void toast.error(res.error)
+      if (!res.ok) return void showToast({ body: res.error, type: 'error' })
       router.refresh()
     })
   }
@@ -60,8 +61,8 @@ export function ClientFeedbackList({
     startTransition(async () => {
       const res = await createQuoteFromFeedbackAction(f.id)
       setBusy(null)
-      if (!res.ok) return void toast.error(res.error)
-      toast.success('已按业主意向生成调整版报价（原报价未改动）')
+      if (!res.ok) return void showToast({ body: res.error, type: 'error' })
+      showToast({ body: '已按业主意向生成调整版报价（原报价未改动）' })
       router.push(`/projects/${projectId}/quotes/${res.quoteId}`)
     })
   }
@@ -144,8 +145,9 @@ export function ClientFeedbackList({
                       size="sm"
                       variant="secondary"
                       isDisabled={busy === `q:${f.id}`}
+                      isLoading={busy === `q:${f.id}`}
                       onClick={() => adjust(f)}
-                      icon={<Loader2 />}
+                      icon={<CopyPlus />}
                       label={busy === `q:${f.id}` ? '生成调整版中…' : '按意向生成调整版'}
                     />
                   ) : null}
@@ -153,8 +155,8 @@ export function ClientFeedbackList({
                     size="sm"
                     variant={f.status === 'new' ? 'primary' : 'ghost'}
                     isDisabled={busy === f.id}
+                    isLoading={busy === f.id}
                     onClick={() => toggle(f)}
-                    icon={<Loader2 />}
                     label={f.status === 'new' ? '标记已处理' : '设为待处理'}
                   />
                 </div>

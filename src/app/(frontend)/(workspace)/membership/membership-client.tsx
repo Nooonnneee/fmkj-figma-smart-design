@@ -3,23 +3,23 @@
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { BookOpen, Check, Coins, Gift, History, Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { BookOpen, Check, Coins, Gift, History } from 'lucide-react'
 
 import { PageHeader } from '@/components/page-header'
 import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
 import { Card as AstryxCard } from '@astryxdesign/core/Card'
 import { Layout, LayoutContent, LayoutHeader } from '@astryxdesign/core/Layout'
-import { TextInput } from '@astryxdesign/core/TextInput'
 import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
+  TableHeaderCell,
   TableRow,
-} from '@/components/ui/table'
+} from '@astryxdesign/core/Table'
+import { TextInput } from '@astryxdesign/core/TextInput'
+import { useToast } from '@astryxdesign/core/Toast'
 import type { CreditTaskId, UserCreditTaskStatus } from '@/lib/credit-tasks'
 import { cn } from '@/lib/utils'
 
@@ -54,6 +54,7 @@ export function MembershipClient({
   }
 }) {
   const router = useRouter()
+  const showToast = useToast()
   const [code, setCode] = useState('')
   const [pending, startTransition] = useTransition()
   const [claimingTaskId, setClaimingTaskId] = useState<string | null>(null)
@@ -61,7 +62,7 @@ export function MembershipClient({
   function handleRedeem(e: React.FormEvent) {
     e.preventDefault()
     const trimmed = code.trim()
-    if (!trimmed) return void toast.error('请输入兑换码')
+    if (!trimmed) return void showToast({ body: '请输入兑换码', type: 'error' })
     startTransition(async () => {
       try {
         const res = await fetch('/membership/redeem', {
@@ -74,12 +75,13 @@ export function MembershipClient({
           message?: string
           error?: string
         } | null
-        if (!res.ok || !data?.ok) return void toast.error(data?.error || '兑换失败，请核对兑换码')
-        toast.success(data.message || '兑换成功')
+        if (!res.ok || !data?.ok)
+          return void showToast({ body: data?.error || '兑换失败，请核对兑换码', type: 'error' })
+        showToast({ body: data.message || '兑换成功' })
         setCode('')
         router.refresh()
       } catch {
-        toast.error('网络错误，请稍后重试')
+        showToast({ body: '网络错误，请稍后重试', type: 'error' })
       }
     })
   }
@@ -90,10 +92,10 @@ export function MembershipClient({
       try {
         const res = await claimTaskCredit(taskId)
         if (!res.ok) {
-          toast.error(res.error)
+          showToast({ body: res.error, type: 'error' })
           return
         }
-        toast.success(res.message)
+        showToast({ body: res.message })
         router.refresh()
       } finally {
         setClaimingTaskId(null)
@@ -164,7 +166,8 @@ export function MembershipClient({
               type="submit"
               isDisabled={pending}
               className="shrink-0"
-              icon={<Loader2 />}
+              isLoading={pending}
+              icon={<Gift />}
               label="兑换"
             />
           </form>
@@ -221,14 +224,19 @@ export function MembershipClient({
                   </div>
                   <div className="shrink-0">
                     {task.claimed ? (
-                      <Badge variant="neutral" className="gap-1" label={'已领取'} />
+                      <Badge
+                        variant="neutral"
+                        className="gap-1"
+                        label={'已领取'}
+                        icon={<Check />}
+                      />
                     ) : task.eligible ? (
                       <Button
                         size="sm"
                         className="h-8 text-xs"
                         isDisabled={isBusy}
+                        isLoading={isBusy}
                         onClick={() => handleClaimTask(task.id)}
-                        icon={<Loader2 />}
                         label={
                           task.id === 'follow_official_account'
                             ? '已关注 · 领 5 分'
@@ -285,16 +293,16 @@ export function MembershipClient({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="pl-6">说明</TableHead>
-                      <TableHead className="text-right">变动</TableHead>
-                      <TableHead className="text-right">结余</TableHead>
-                      <TableHead className="pr-6 text-right">时间</TableHead>
+                      <TableHeaderCell className="max-w-none pl-6">说明</TableHeaderCell>
+                      <TableHeaderCell className="max-w-none text-right">变动</TableHeaderCell>
+                      <TableHeaderCell className="max-w-none text-right">结余</TableHeaderCell>
+                      <TableHeaderCell className="max-w-none pr-6 text-right">时间</TableHeaderCell>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {initial.ledger.map((row) => (
                       <TableRow key={row.id}>
-                        <TableCell className="pl-6">
+                        <TableCell className="max-w-none pl-6">
                           <span className="font-medium">{row.reason}</span>
                           {row.model ? (
                             <span className="ml-2 text-xs text-muted-foreground">{row.model}</span>
@@ -302,16 +310,16 @@ export function MembershipClient({
                         </TableCell>
                         <TableCell
                           className={cn(
-                            'text-right font-medium tabular-nums',
+                            'max-w-none text-right font-medium tabular-nums',
                             row.delta > 0 ? 'text-success' : 'text-foreground',
                           )}
                         >
                           {row.delta > 0 ? `+${row.delta}` : row.delta}
                         </TableCell>
-                        <TableCell className="text-right text-muted-foreground tabular-nums">
+                        <TableCell className="max-w-none text-right text-muted-foreground tabular-nums">
                           {row.balanceAfter}
                         </TableCell>
-                        <TableCell className="pr-6 text-right text-xs text-muted-foreground tabular-nums">
+                        <TableCell className="max-w-none pr-6 text-right text-xs text-muted-foreground tabular-nums">
                           {fmtDateTime(row.createdAt)}
                         </TableCell>
                       </TableRow>

@@ -2,10 +2,10 @@
 
 import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { BadgeCheck, Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { BadgeCheck } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
+import { useToast } from '@astryxdesign/core/Toast'
 
 import { setDeliverables } from '../archive/actions'
 
@@ -18,6 +18,7 @@ export function SetFinalQuoteButton({
   quoteId: string
 }) {
   const router = useRouter()
+  const showToast = useToast()
   const [pending, start] = useTransition()
   return (
     <Button
@@ -28,12 +29,13 @@ export function SetFinalQuoteButton({
       onClick={() =>
         start(async () => {
           const res = await setDeliverables(projectId, { finalQuote: quoteId })
-          if (!res.ok) return void toast.error(res.error)
-          toast.success('已设为定稿报价，交付资料包和方案默认使用这一份')
+          if (!res.ok) return void showToast({ body: res.error, type: 'error' })
+          showToast({ body: '已设为定稿报价，交付资料包和方案默认使用这一份' })
           router.refresh()
         })
       }
-      icon={<Loader2 />}
+      isLoading={pending}
+      icon={<BadgeCheck />}
       label="设为定稿"
     />
   )

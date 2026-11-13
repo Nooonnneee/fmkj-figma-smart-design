@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Crop, Loader2, Maximize, ScanSearch } from 'lucide-react'
-import { toast } from 'sonner'
 
 import { Button } from '@astryxdesign/core/Button'
 import { Field } from '@astryxdesign/core/Field'
 import { TextInput } from '@astryxdesign/core/TextInput'
+import { useToast } from '@astryxdesign/core/Toast'
 import { clampRect, detectPlanBounds, fitIntoSheet, type Rect } from '@/lib/floor-plan-crop'
 import { SHEET } from '@/lib/sheet-spec'
 import { cn } from '@/lib/utils'
@@ -71,6 +71,7 @@ export function SheetCropper({
   onCancel: () => void
   onConfirm: (png: Blob, name: string) => Promise<void>
 }) {
+  const showToast = useToast()
   const [bitmap, setBitmap] = useState<ImageBitmap | null>(null)
   const [url, setUrl] = useState<string | null>(null)
   const [auto, setAuto] = useState<Rect | null>(null)
@@ -106,14 +107,14 @@ export function SheetCropper({
         setCrop(detected)
       })
       .catch(() => {
-        toast.error('图片读取失败，请换一张试试')
+        showToast({ body: '图片读取失败，请换一张试试', type: 'error' })
         onCancel()
       })
     return () => {
       alive = false
       URL.revokeObjectURL(objectUrl)
     }
-  }, [file, onCancel])
+  }, [file, onCancel, showToast])
 
   // 图片按舞台大小等比显示
   useEffect(() => {
@@ -170,7 +171,7 @@ export function SheetCropper({
 
   const confirm = async () => {
     if (!bitmap || !crop || busy) return
-    if (!name.trim()) return toast.error('请填写图纸名称')
+    if (!name.trim()) return showToast({ body: '请填写图纸名称', type: 'error' })
     setBusy(true)
     try {
       const canvas = document.createElement('canvas')
@@ -179,7 +180,10 @@ export function SheetCropper({
       if (!png) throw new Error('图纸生成失败，请重试')
       await onConfirm(png, name.trim())
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '图纸生成失败，请重试')
+      showToast({
+        body: error instanceof Error ? error.message : '图纸生成失败，请重试',
+        type: 'error',
+      })
       setBusy(false)
     }
   }
@@ -331,8 +335,8 @@ export function SheetCropper({
           <Button
             className="flex-1"
             isDisabled={!crop || busy}
+            isLoading={busy}
             onClick={() => void confirm()}
-            icon={<Loader2 />}
             label="确认并添加"
           />
         </div>

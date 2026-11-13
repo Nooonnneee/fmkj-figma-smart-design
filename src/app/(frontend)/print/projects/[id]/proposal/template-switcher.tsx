@@ -2,7 +2,7 @@
 
 import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronDown, Loader2 } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
 import type { PickerTemplate } from '@/plugins/proposal/picker-data'
@@ -41,10 +41,19 @@ export function ProposalTemplateSwitcher({
           variant="secondary"
           size="sm"
           className="h-8 shrink-0 gap-1.5 px-2.5 text-xs sm:gap-2 sm:px-3"
-          label="方案模板"
-          icon={<Loader2 />}
+          label={`方案模板：${current?.label ?? '未选择'}，点击更换`}
+          isLoading={pending}
+          icon={
+            current ? (
+              <span className="hidden sm:inline-flex">
+                <Swatches colors={current.swatches} />
+              </span>
+            ) : undefined
+          }
           endContent={<ChevronDown />}
-        />
+        >
+          <span className="max-w-20 truncate sm:max-w-32">{current?.label ?? '选择模板'}</span>
+        </Button>
       }
     />
   )

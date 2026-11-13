@@ -20,15 +20,12 @@ import {
   Wifi,
 } from 'lucide-react'
 
-import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { Button } from '@astryxdesign/core/Button'
+import { DropdownMenu } from '@astryxdesign/core/DropdownMenu'
+import type { DropdownMenuOption } from '@astryxdesign/core/DropdownMenu'
+import { IconButton } from '@astryxdesign/core/IconButton'
 import { Popover } from '@astryxdesign/core/Popover'
+import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl'
 import { Tooltip } from '@astryxdesign/core/Tooltip'
 import type { SystemPack } from '@/board/core/pack'
 import { SYMBOL_SIZES } from '@/board/core/symbols'
@@ -233,31 +230,29 @@ export function BoardLayersPanel({
         />
         <div className="flex items-center gap-1.5 pt-0.5">
           <Button
-            variant="outline"
-            size="xs"
+            variant="secondary"
+            size="sm"
             aria-pressed={view.grid}
             onClick={() => onView({ grid: !view.grid })}
             className={cn(
               'h-7 flex-1 text-xs font-normal',
               view.grid && 'border-primary/40 bg-primary/8 font-medium text-primary',
             )}
-          >
-            <Grid3x3 className="size-3.5" />
-            网格
-          </Button>
+            icon={<Grid3x3 className="size-3.5" />}
+            label="网格"
+          />
           <Button
-            variant="outline"
-            size="xs"
+            variant="secondary"
+            size="sm"
             aria-pressed={view.rulers}
             onClick={() => onView({ rulers: !view.rulers })}
             className={cn(
               'h-7 flex-1 text-xs font-normal',
               view.rulers && 'border-primary/40 bg-primary/8 font-medium text-primary',
             )}
-          >
-            <Ruler className="size-3.5" />
-            标尺
-          </Button>
+            icon={<Ruler className="size-3.5" />}
+            label="标尺"
+          />
         </div>
       </section>
     </div>
@@ -307,26 +302,29 @@ export function BoardViewPopover({
       }
     >
       <Tooltip content={label} placement="below">
-        <Button
+        <IconButton
           variant="ghost"
-          size="icon"
           // 官方浮层把开合状态写在触发器的 `aria-expanded` 上（不是 radix 的 `data-state`）。
           className="relative text-muted-foreground aria-expanded:bg-muted aria-expanded:text-foreground"
-          aria-label={label}
-        >
-          <SlidersHorizontal />
-          {hiddenCount ? (
-            <span
-              aria-hidden
-              className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-warning"
-            />
-          ) : highlighted || overlayOn ? (
-            <span
-              aria-hidden
-              className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-primary"
-            />
-          ) : null}
-        </Button>
+          label={label}
+          size="md"
+          icon={
+            <span className="relative">
+              <SlidersHorizontal />
+              {hiddenCount ? (
+                <span
+                  aria-hidden
+                  className="absolute -top-1 -right-1 size-1.5 rounded-full bg-warning"
+                />
+              ) : highlighted || overlayOn ? (
+                <span
+                  aria-hidden
+                  className="absolute -top-1 -right-1 size-1.5 rounded-full bg-primary"
+                />
+              ) : null}
+            </span>
+          }
+        />
       </Tooltip>
     </Popover>
   )
@@ -358,6 +356,43 @@ export function BoardToolbar(props: {
   const overlayOn = overlays.filter((o) => view.overlays?.[o.id]).length
   const showAll = () =>
     onView({ labels: true, layers: { sheet: true, area: true, shape: true, symbol: true } })
+  const exportItems: DropdownMenuOption[] = [
+    {
+      id: 'png',
+      label: (
+        <span className="flex items-center gap-2">
+          <ImageDown className="size-4" />
+          导出当前图纸 PNG（{props.pack.paper}，含图例）
+        </span>
+      ),
+      onClick: props.onExportPng,
+    },
+    {
+      id: 'json',
+      label: (
+        <span className="flex items-center gap-2">
+          <FileJson className="size-4" />
+          导出画板 JSON
+        </span>
+      ),
+      onClick: props.onExportJson,
+    },
+    ...(readOnly
+      ? []
+      : [
+          {
+            id: 'import',
+            label: (
+              <span className="flex items-center gap-2">
+                <FileUp className="size-4" />
+                导入画板 JSON（替换当前内容）
+              </span>
+            ),
+            onClick: props.onImportJson,
+          },
+        ]),
+    { type: 'divider' as const },
+  ]
   return (
     <div
       className={cn(
@@ -367,70 +402,65 @@ export function BoardToolbar(props: {
       onPointerDown={(e) => e.stopPropagation()}
     >
       {TOOLS.filter((t) => !t.edit || !readOnly).map((t) => (
-        <Button
+        <IconButton
           key={t.id}
           variant={tool === t.id ? 'secondary' : 'ghost'}
-          size="icon"
+          size="md"
           className={btn}
           aria-pressed={tool === t.id}
-          aria-label={t.label}
-          title={`${t.label}（${t.key}）`}
+          label={t.label}
+          tooltip={`${t.label}（${t.key}）`}
+          icon={<t.icon className="size-4" />}
           onClick={() => props.onTool(t.id)}
-        >
-          <t.icon className="size-4" />
-        </Button>
+        />
       ))}
       {readOnly ? null : (
         <>
           <span className="mx-0.5 h-5 w-px bg-border" />
           {props.onAutoGenerate ? (
-            <Button
+            <IconButton
               variant="ghost"
-              size="icon"
+              size="md"
               className={cn(btn, 'text-primary hover:text-primary')}
-              aria-label="智能生成点位"
-              title="智能生成点位（覆盖当前点位，可随时撤销）"
+              label="智能生成点位"
+              tooltip="智能生成点位（覆盖当前点位，可随时撤销）"
+              icon={<Sparkles className="size-4" />}
               onClick={props.onAutoGenerate}
-            >
-              <Sparkles className="size-4" />
-            </Button>
+            />
           ) : null}
-          <Button
+          <IconButton
             variant="ghost"
-            size="icon"
+            size="md"
             className={btn}
-            disabled={!props.canUndo}
-            aria-label="撤销"
-            title="撤销（Ctrl/⌘ + Z）"
+            isDisabled={!props.canUndo}
+            label="撤销"
+            tooltip="撤销（Ctrl/⌘ + Z）"
+            icon={<Undo2 className="size-4" />}
             onClick={props.onUndo}
-          >
-            <Undo2 className="size-4" />
-          </Button>
-          <Button
+          />
+          <IconButton
             variant="ghost"
-            size="icon"
+            size="md"
             className={btn}
-            disabled={!props.canRedo}
-            aria-label="重做"
-            title="重做（Ctrl/⌘ + Shift + Z）"
+            isDisabled={!props.canRedo}
+            label="重做"
+            tooltip="重做（Ctrl/⌘ + Shift + Z）"
+            icon={<Redo2 className="size-4" />}
             onClick={props.onRedo}
-          >
-            <Redo2 className="size-4" />
-          </Button>
+          />
         </>
       )}
       <span className="mx-0.5 h-5 w-px bg-border" />
-      <Button
+      <IconButton
         variant={view.grid ? 'secondary' : 'ghost'}
-        size="icon"
+        size="md"
         className={btn}
         aria-pressed={view.grid}
-        aria-label="网格"
-        title="网格 25cm（G）"
+        label="网格"
+        tooltip="网格 25cm（G）"
+        icon={<Grid3x3 className="size-4" />}
         onClick={() => onView({ grid: !view.grid })}
-      >
-        <Grid3x3 className="size-4" />
-      </Button>
+      />
       <Popover
         label={hiddenCount ? `显示与隐藏（${hiddenCount} 项已隐藏）` : '显示与隐藏'}
         placement="below"
@@ -444,9 +474,7 @@ export function BoardToolbar(props: {
             <div className="flex items-center justify-between px-3 pt-3 pb-1.5">
               <p className="text-sm font-medium">显示与隐藏</p>
               {hiddenCount ? (
-                <Button variant="ghost" size="xs" onClick={showAll}>
-                  全部显示
-                </Button>
+                <Button variant="ghost" size="sm" label="全部显示" onClick={showAll} />
               ) : null}
             </div>
             {/* 每个图层一行：眼睛图标就是开关，隐藏的行变灰 */}
@@ -486,14 +514,14 @@ export function BoardToolbar(props: {
                     const Icon = OVERLAY_ICONS[o.id] ?? Sparkles
                     return (
                       <li key={o.id}>
-                        <Button
-                          variant="ghost"
+                        <button
+                          type="button"
                           role="switch"
                           aria-checked={on}
                           disabled={!view.layers.symbol}
                           onClick={() => onView({ overlays: { ...view.overlays, [o.id]: !on } })}
                           className={cn(
-                            'h-auto w-full justify-start gap-2.5 px-1.5 py-1.5 text-left font-normal disabled:opacity-40',
+                            'flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left text-sm transition-colors hover:bg-muted disabled:opacity-40',
                             !on && 'text-muted-foreground',
                           )}
                         >
@@ -516,7 +544,7 @@ export function BoardToolbar(props: {
                               )}
                             />
                           </span>
-                        </Button>
+                        </button>
                       </li>
                     )
                   })}
@@ -558,69 +586,64 @@ export function BoardToolbar(props: {
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">标尺（Shift + R）</span>
                 <Button
-                  variant={view.rulers ? 'secondary' : 'outline'}
-                  size="xs"
+                  variant="secondary"
+                  size="sm"
                   aria-pressed={view.rulers}
                   onClick={() => onView({ rulers: !view.rulers })}
-                >
-                  {view.rulers ? '已显示' : '已隐藏'}
-                </Button>
+                  label={view.rulers ? '已显示' : '已隐藏'}
+                />
               </div>
             </div>
           </div>
         }
       >
-        <Button
+        <IconButton
           variant={hiddenCount ? 'secondary' : 'ghost'}
-          size="icon"
+          size="md"
           className={cn(btn, 'relative')}
-          aria-label={hiddenCount ? `显示与隐藏（${hiddenCount} 项已隐藏）` : '显示与隐藏'}
-          title={
+          label={hiddenCount ? `显示与隐藏（${hiddenCount} 项已隐藏）` : '显示与隐藏'}
+          tooltip={
             hiddenCount
               ? `有 ${hiddenCount} 项已隐藏`
               : '显示与隐藏：图层、代号、底图浓度、符号样式'
           }
-        >
-          {hiddenCount ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-          {hiddenCount ? (
-            <span aria-hidden className="absolute top-1 right-1 size-1.5 rounded-full bg-warning" />
-          ) : null}
-          {!hiddenCount && overlayOn ? (
-            <span aria-hidden className="absolute top-1 right-1 size-1.5 rounded-full bg-primary" />
-          ) : null}
-        </Button>
+          icon={
+            <span className="relative">
+              {hiddenCount ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              {hiddenCount ? (
+                <span
+                  aria-hidden
+                  className="absolute -top-1 -right-1 size-1.5 rounded-full bg-warning"
+                />
+              ) : overlayOn ? (
+                <span
+                  aria-hidden
+                  className="absolute -top-1 -right-1 size-1.5 rounded-full bg-primary"
+                />
+              ) : null}
+            </span>
+          }
+        />
       </Popover>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
+      <DropdownMenu
+        placement="below"
+        alignment="start"
+        menuWidth="12.6rem"
+        items={exportItems}
+        footer={<p className="px-2 py-1 text-xs text-muted-foreground">{props.pack.export.note}</p>}
+        renderTrigger={(triggerProps) => (
           <Button
+            {...triggerProps}
             variant="ghost"
-            size="icon"
+            isIconOnly
+            size="md"
             className={btn}
-            aria-label="导入导出"
-            title="导出图片 / 画板 JSON"
-          >
-            <Download className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-56">
-          <DropdownMenuItem onSelect={props.onExportPng}>
-            <ImageDown className="size-4" />
-            导出当前图纸 PNG（{props.pack.paper}，含图例）
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={props.onExportJson}>
-            <FileJson className="size-4" />
-            导出画板 JSON
-          </DropdownMenuItem>
-          {readOnly ? null : (
-            <DropdownMenuItem onSelect={props.onImportJson}>
-              <FileUp className="size-4" />
-              导入画板 JSON（替换当前内容）
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuSeparator />
-          <p className="px-2 py-1 text-xs text-muted-foreground">{props.pack.export.note}</p>
-        </DropdownMenuContent>
-      </DropdownMenu>
+            label="导入导出"
+            tooltip="导出图片 / 画板 JSON"
+            icon={<Download className="size-4" />}
+          />
+        )}
+      />
     </div>
   )
 }
@@ -682,25 +705,11 @@ function Segmented({
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="shrink-0 whitespace-nowrap text-muted-foreground">{label}</span>
-      <div className="flex shrink-0 rounded-lg bg-muted p-0.5" role="radiogroup" aria-label={label}>
+      <SegmentedControl label={label} value={value} onChange={onChange} size="sm" layout="hug">
         {options.map((o) => (
-          <button
-            key={o.value}
-            type="button"
-            role="radio"
-            aria-checked={value === o.value}
-            onClick={() => onChange(o.value)}
-            className={cn(
-              'h-6 shrink-0 rounded-md px-2 text-[11px] whitespace-nowrap transition-all',
-              value === o.value
-                ? 'bg-background font-semibold text-primary shadow-xs'
-                : 'font-normal text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {o.label}
-          </button>
+          <SegmentedControlItem key={o.value} value={o.value} label={o.label} />
         ))}
-      </div>
+      </SegmentedControl>
     </div>
   )
 }

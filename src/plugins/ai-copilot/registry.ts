@@ -9,8 +9,10 @@ import { smartSelectHandlers } from '@/plugins/smart-select/ai-handlers'
 import type { PluginFlags } from '@/plugins/state'
 import type { PluginId } from '@/plugins/types'
 
+import { adminToolHandlers } from './tools/admin-handlers'
 import { coreToolHandlers } from './tools/core-handlers'
 import { competitorQuoteHandlers } from './tools/competitor-quote'
+import { pointMapToolHandlers } from './tools/point-map-handlers'
 import type { AiTool, AiToolHandler, ToolContext } from './tools/context'
 
 export type {
@@ -32,9 +34,12 @@ export type LlmToolCall = {
 const HANDLER_MAP: Record<string, AiToolHandler> = {
   ...coreToolHandlers,
   ...competitorQuoteHandlers,
+  ...haMcpHandlers,
   ...roomInsightsHandlers,
   ...smartSelectHandlers,
   ...proposalHandlers,
+  ...pointMapToolHandlers,
+  ...adminToolHandlers,
 }
 
 /** 根据各插件声明的 AiToolSpec 自动构建完整工具列表 */
@@ -132,7 +137,11 @@ export async function runTool(tools: AiTool[], call: LlmToolCall, ctx: ToolConte
     }
   }
 
-  if (tool.spec.mutates && targetProjectId) {
+  // 项目级守卫只对「作用于某个项目」的工具生效（scope === 'project'）。
+  // workspace 级工具（create_project 新建项目、ha_call_service 控制现场设备）不修改任何已有项目：
+  // 若照旧拿 ctx.projectId 去查 canEditProject，用户当前停在「仅查看」或已归档项目时，
+  // 「新建一个项目」会被误判成越权。真正的项目写权限仍由下面的 canEditProject 守住。
+  if (tool.spec.mutates && tool.spec.scope === 'project' && targetProjectId) {
     const payload = await getPayloadClient()
     const proj = await payload
       .findByID({

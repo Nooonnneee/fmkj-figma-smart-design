@@ -2,10 +2,11 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { FileSignature, Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { FileSignature } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
+import { RadioList, RadioListItem } from '@astryxdesign/core/RadioList'
+import { useToast } from '@astryxdesign/core/Toast'
 import { quoteStatusLabel, yuan } from '@/lib/quotes'
 
 import { createContract, type ContractInput } from './actions'
@@ -29,6 +30,7 @@ export function CreateContractPanel({
   defaultQuoteId: string
 }) {
   const router = useRouter()
+  const showToast = useToast()
   const [quoteId, setQuoteId] = useState(defaultQuoteId)
   const [pending, startTransition] = useTransition()
   return (
@@ -39,40 +41,36 @@ export function CreateContractPanel({
           自动带入报价金额、客户资料与默认条款，生成后可修改。
         </p>
       </div>
-      <div role="radiogroup" aria-label="合同依据的报价" className="divide-y">
+      <RadioList
+        label="合同依据的报价"
+        isLabelHidden
+        width="100%"
+        value={quoteId}
+        onChange={(v) => setQuoteId(v)}
+      >
         {quotes.map((q) => (
-          <label
+          <RadioListItem
             key={q.id}
-            className="flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors hover:bg-muted/40 has-[:checked]:bg-muted/60"
-          >
-            <input
-              type="radio"
-              name="quote"
-              value={q.id}
-              checked={quoteId === q.id}
-              onChange={() => setQuoteId(q.id)}
-              className="size-4 accent-foreground"
-            />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">{q.title}</span>
-              <span className="text-xs text-muted-foreground">{quoteStatusLabel(q.status)}</span>
-            </span>
-            <span className="text-sm font-semibold tabular-nums">{yuan(q.total)}</span>
-          </label>
+            value={q.id}
+            label={q.title}
+            description={quoteStatusLabel(q.status)}
+            endContent={<span className="text-sm font-semibold tabular-nums">{yuan(q.total)}</span>}
+          />
         ))}
-      </div>
+      </RadioList>
       <div className="flex justify-end border-t px-5 py-4">
         <Button
           isDisabled={pending || !quoteId}
           onClick={() =>
             startTransition(async () => {
               const result = await createContract(projectId, quoteId)
-              if (!result.ok) return void toast.error(result.error)
-              toast.success('合同已生成，请核对内容')
+              if (!result.ok) return void showToast({ body: result.error, type: 'error' })
+              showToast({ body: '合同已生成，请核对内容' })
               router.refresh()
             })
           }
-          icon={<Loader2 />}
+          isLoading={pending}
+          icon={<FileSignature />}
           label="生成合同"
         />
       </div>

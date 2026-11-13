@@ -3,13 +3,13 @@
 import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Coins, Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { ArrowRight, Coins, Gift } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout'
 import { TextInput } from '@astryxdesign/core/TextInput'
+import { useToast } from '@astryxdesign/core/Toast'
 
 /** 兑换码充值弹窗：不再有会员等级卡片，只保留「输入兑换码充值 AI 积分」 */
 export function MembershipDialog({
@@ -22,6 +22,7 @@ export function MembershipDialog({
   credits: number
 }) {
   const router = useRouter()
+  const showToast = useToast()
   const inputRef = useRef<HTMLInputElement>(null)
   const [code, setCode] = useState('')
   const [pending, setPending] = useState(false)
@@ -30,7 +31,7 @@ export function MembershipDialog({
     e.preventDefault()
     const trimmed = code.trim().toUpperCase()
     if (!trimmed) {
-      toast.error('请输入兑换码')
+      showToast({ body: '请输入兑换码', type: 'error' })
       return
     }
     setPending(true)
@@ -46,14 +47,14 @@ export function MembershipDialog({
         error?: string
       }
       if (!res.ok || !data.ok) {
-        toast.error(data.error ?? '兑换失败，请检查兑换码')
+        showToast({ body: data.error ?? '兑换失败，请检查兑换码', type: 'error' })
         return
       }
-      toast.success(data.message ?? '兑换成功')
+      showToast({ body: data.message ?? '兑换成功' })
       setCode('')
       router.refresh()
     } catch {
-      toast.error('网络错误，请稍后重试')
+      showToast({ body: '网络错误，请稍后重试', type: 'error' })
     } finally {
       setPending(false)
     }
@@ -89,7 +90,6 @@ export function MembershipDialog({
                   value={code}
                   onChange={(v) => setCode(v.toUpperCase())}
                   placeholder="输入兑换码（如 FMKJ-XXXX-XXXX）"
-                  aria-label="兑换码"
                   isDisabled={pending}
                   controlClassName="font-mono tracking-wider uppercase"
                 />
@@ -97,7 +97,8 @@ export function MembershipDialog({
                   type="submit"
                   isDisabled={pending}
                   className="shrink-0"
-                  icon={<Loader2 />}
+                  isLoading={pending}
+                  icon={<Gift />}
                   label="立即兑换"
                 />
               </form>

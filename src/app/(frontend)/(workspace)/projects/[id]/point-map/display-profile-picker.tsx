@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Check, Loader2, Presentation } from 'lucide-react'
-import { toast } from 'sonner'
+import { Loader2, Presentation } from 'lucide-react'
 
-import { cn } from '@/lib/utils'
+import { SelectableCard } from '@astryxdesign/core/SelectableCard'
+import { useToast } from '@astryxdesign/core/Toast'
 import {
   DISPLAY_PROFILES,
   resolveDisplayProfile,
@@ -29,6 +29,7 @@ export function DisplayProfilePicker({
   projectId: string
   initial: unknown
 }) {
+  const showToast = useToast()
   const [current, setCurrent] = useState<DisplayProfileId>(resolveDisplayProfile(initial).id)
   const [pending, startSave] = useTransition()
 
@@ -40,12 +41,19 @@ export function DisplayProfilePicker({
       const res = await setDisplayProfile(projectId, id)
       if (!res.ok) {
         setCurrent(prev)
-        toast.error(res.error)
+        showToast({ body: res.error, type: 'error' })
         return
       }
       const p = resolveDisplayProfile(id)
-      toast.success(`已切换为「${p.label}」`, {
-        description: '方案模板与导出的 PDF 会按这个方案显示点位图',
+      showToast({
+        body: (
+          <span>
+            已切换为「{p.label}」
+            <span className="mt-0.5 block text-xs opacity-80">
+              方案模板与导出的 PDF 会按这个方案显示点位图
+            </span>
+          </span>
+        ),
       })
     })
   }
@@ -60,39 +68,24 @@ export function DisplayProfilePicker({
         {pending ? <Loader2 className="size-3 animate-spin text-muted-foreground" /> : null}
       </div>
 
-      <div role="radiogroup" aria-label="点位图显示方案" className="flex flex-col gap-1">
-        {DISPLAY_PROFILES.map((p) => {
-          const active = p.id === current
-          return (
-            <button
-              key={p.id}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              onClick={() => pick(p.id)}
-              className={cn(
-                'flex items-start gap-2 rounded-[var(--radius-inner)] px-2 py-1.5 text-left transition-colors',
-                active ? 'bg-accent text-accent-foreground' : 'hover:bg-muted',
-              )}
-            >
-              <span
-                aria-hidden
-                className={cn(
-                  'mt-0.5 flex size-3.5 shrink-0 items-center justify-center rounded-full border',
-                  active ? 'border-primary bg-primary text-primary-foreground' : 'border-input',
-                )}
-              >
-                {active ? <Check className="size-2.5" strokeWidth={3} /> : null}
+      <div role="group" aria-label="点位图显示方案" className="flex flex-col gap-1">
+        {DISPLAY_PROFILES.map((p) => (
+          <SelectableCard
+            key={p.id}
+            label={`${p.label}：${p.description}`}
+            isSelected={p.id === current}
+            onChange={() => pick(p.id)}
+            padding={2}
+            width="100%"
+          >
+            <span className="min-w-0">
+              <span className="block text-xs font-medium">{p.label}</span>
+              <span className="block text-[11px] leading-relaxed text-muted-foreground">
+                {p.description}
               </span>
-              <span className="min-w-0">
-                <span className="block text-xs font-medium">{p.label}</span>
-                <span className="block text-[11px] leading-relaxed text-muted-foreground">
-                  {p.description}
-                </span>
-              </span>
-            </button>
-          )
-        })}
+            </span>
+          </SelectableCard>
+        ))}
       </div>
 
       <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">

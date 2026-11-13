@@ -13,9 +13,10 @@ import { CheckboxInput } from '@astryxdesign/core/CheckboxInput'
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
 import { Layout, LayoutContent, LayoutFooter } from '@astryxdesign/core/Layout'
 import { TextInput } from '@astryxdesign/core/TextInput'
-import { Label } from '@/components/ui/label'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { ScrollableArea } from '@astryxdesign/core/ScrollableArea'
+import { RadioList, RadioListItem } from '@astryxdesign/core/RadioList'
+import { SelectableCard } from '@astryxdesign/core/SelectableCard'
+import { ToggleButton } from '@astryxdesign/core/ToggleButton'
 import { deviceTypeLabel } from '@/lib/device-types'
 import { yuan } from '@/lib/quotes'
 import { cn } from '@/lib/utils'
@@ -99,23 +100,21 @@ export function SwapProductDialog({
   }
 
   const filterChip = (
-    label: React.ReactNode,
-    active: boolean,
-    onClick: () => void,
     key: string,
+    ariaLabel: string,
+    content: React.ReactNode,
+    active: boolean,
+    onToggle: () => void,
   ) => (
-    <button
+    <ToggleButton
       key={key}
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        'flex h-7 items-center gap-1.5 rounded-md border bg-background px-2 text-xs transition-colors hover:bg-accent',
-        active && 'border-primary bg-primary/5 ring-1 ring-primary',
-      )}
+      size="sm"
+      label={ariaLabel}
+      isPressed={active}
+      onPressedChange={onToggle}
     >
-      {label}
-    </button>
+      {content}
+    </ToggleButton>
   )
 
   return (
@@ -161,36 +160,38 @@ export function SwapProductDialog({
               </div>
               {brands.length > 1 ? (
                 <div className="flex flex-wrap gap-1.5">
-                  {filterChip('全部品牌', !brand, () => setBrand(''), 'all')}
+                  {filterChip('all', '全部品牌', '全部品牌', !brand, () => setBrand(''))}
                   {brands.map((b) =>
                     filterChip(
+                      b.slug,
+                      b.name,
                       <>
                         <BrandLogo name={b.name} logo={b.logo} className="h-3.5" />
                         {b.name}
                       </>,
                       brand === b.slug,
                       () => setBrand(brand === b.slug ? '' : b.slug),
-                      b.slug,
                     ),
                   )}
                 </div>
               ) : null}
               {platforms.length > 1 ? (
                 <div className="flex flex-wrap gap-1.5">
-                  {filterChip('全部平台', !platform, () => setPlatform(''), 'all')}
+                  {filterChip('all', '全部平台', '全部平台', !platform, () => setPlatform(''))}
                   {platforms.map((pl) =>
-                    filterChip(
-                      pl,
-                      platform === pl,
-                      () => setPlatform(platform === pl ? '' : pl),
-                      pl,
+                    filterChip(pl, pl, pl, platform === pl, () =>
+                      setPlatform(platform === pl ? '' : pl),
                     ),
                   )}
                 </div>
               ) : null}
             </div>
 
-            <ScrollArea className="-mx-2 min-h-0 flex-1 basis-80">
+            <ScrollableArea
+              label="可选产品"
+              axis="block"
+              className="relative -mx-2 min-h-0 flex-1 basis-80"
+            >
               <div className="space-y-4 px-2">
                 {groups.map(({ brand: b, items }) => (
                   <section key={b?.slug ?? '_'}>
@@ -205,67 +206,69 @@ export function SwapProductDialog({
                         const active = picked === p.id
                         return (
                           <li key={p.id}>
-                            <button
-                              type="button"
-                              disabled={isCurrent}
-                              onClick={() => setPicked(p.id)}
-                              className={cn(
-                                'flex w-full items-center gap-3 rounded-lg border p-2 text-left transition-colors hover:bg-accent disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent',
-                                active && 'border-primary bg-primary/5 ring-1 ring-primary',
-                              )}
+                            <SelectableCard
+                              label={`${p.name}，${yuan(p.price)}`}
+                              isSelected={active}
+                              isDisabled={isCurrent}
+                              onChange={() => setPicked(p.id)}
+                              padding={2}
                             >
-                              <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
-                                {p.image ? (
-                                  <Image
-                                    src={p.image}
-                                    alt=""
-                                    width={48}
-                                    height={48}
-                                    className="size-full bg-white object-contain"
-                                  />
-                                ) : (
-                                  <ImageIcon className="size-5 text-muted-foreground/50" />
-                                )}
-                              </span>
-                              <span className="min-w-0 flex-1">
-                                <span className="block truncate text-sm font-medium">{p.name}</span>
-                                <span className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-                                  <span>{p.sku}</span>
-                                  {p.platforms.map((pl) => (
-                                    <Badge
-                                      key={pl}
-                                      variant="neutral"
-                                      className="h-4 px-1 text-xs"
-                                      label={pl}
+                              <span className="flex w-full items-center gap-3">
+                                <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+                                  {p.image ? (
+                                    <Image
+                                      src={p.image}
+                                      alt=""
+                                      width={48}
+                                      height={48}
+                                      className="size-full bg-white object-contain"
                                     />
-                                  ))}
+                                  ) : (
+                                    <ImageIcon className="size-5 text-muted-foreground/50" />
+                                  )}
                                 </span>
-                              </span>
-                              <span className="shrink-0 text-right">
-                                <span className="block text-sm font-semibold tabular-nums">
-                                  {yuan(p.price)}
-                                </span>
-                                {isCurrent ? (
-                                  <span className="text-xs text-muted-foreground">当前型号</span>
-                                ) : (
-                                  <span
-                                    className={cn(
-                                      'text-xs tabular-nums',
-                                      diff > 0
-                                        ? 'text-destructive-strong'
-                                        : diff < 0
-                                          ? 'text-success'
-                                          : 'text-muted-foreground',
-                                    )}
-                                  >
-                                    {diff === 0
-                                      ? '同价'
-                                      : `${diff > 0 ? '+' : '-'}${yuan(Math.abs(diff))}`}
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-sm font-medium">
+                                    {p.name}
                                   </span>
-                                )}
+                                  <span className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                                    <span>{p.sku}</span>
+                                    {p.platforms.map((pl) => (
+                                      <Badge
+                                        key={pl}
+                                        variant="neutral"
+                                        className="h-4 px-1 text-xs"
+                                        label={pl}
+                                      />
+                                    ))}
+                                  </span>
+                                </span>
+                                <span className="shrink-0 text-right">
+                                  <span className="block text-sm font-semibold tabular-nums">
+                                    {yuan(p.price)}
+                                  </span>
+                                  {isCurrent ? (
+                                    <span className="text-xs text-muted-foreground">当前型号</span>
+                                  ) : (
+                                    <span
+                                      className={cn(
+                                        'text-xs tabular-nums',
+                                        diff > 0
+                                          ? 'text-destructive-strong'
+                                          : diff < 0
+                                            ? 'text-success'
+                                            : 'text-muted-foreground',
+                                      )}
+                                    >
+                                      {diff === 0
+                                        ? '同价'
+                                        : `${diff > 0 ? '+' : '-'}${yuan(Math.abs(diff))}`}
+                                    </span>
+                                  )}
+                                </span>
+                                {active ? <Check className="size-4 shrink-0 text-primary" /> : null}
                               </span>
-                              {active ? <Check className="size-4 shrink-0 text-primary" /> : null}
-                            </button>
+                            </SelectableCard>
                           </li>
                         )
                       })}
@@ -280,35 +283,27 @@ export function SwapProductDialog({
                   />
                 ) : null}
               </div>
-            </ScrollArea>
+            </ScrollableArea>
 
             <div className="space-y-3 border-t pt-3">
               {sameTypeLines > 1 ? (
-                <RadioGroup
+                <RadioList
+                  label="更换范围"
+                  isLabelHidden
+                  orientation="horizontal"
                   value={scope}
-                  onValueChange={(v) => setScope(v as SwapScope)}
-                  className="flex flex-wrap gap-4"
+                  onChange={(v) => setScope(v as SwapScope)}
                 >
-                  <Label className="flex items-center gap-2 font-normal">
-                    <RadioGroupItem value="line" />
-                    只换这一行
-                  </Label>
-                  <Label className="flex items-center gap-2 font-normal">
-                    <RadioGroupItem value="type" />
-                    同类全部更换（{sameTypeLines} 行）
-                  </Label>
-                </RadioGroup>
+                  <RadioListItem value="line" label="只换这一行" />
+                  <RadioListItem value="type" label={`同类全部更换（${sameTypeLines} 行）`} />
+                </RadioList>
               ) : null}
               {canSetDefault ? (
-                <Label className="flex items-center gap-2 font-normal">
-                  <CheckboxInput
-                    label={'选择'}
-                    isLabelHidden
-                    value={setDefault}
-                    onChange={(v) => setSetDefault(v === true)}
-                  />
-                  同时设为项目默认型号（之后从点位图生成报价也用这个型号）
-                </Label>
+                <CheckboxInput
+                  label="同时设为项目默认型号（之后从点位图生成报价也用这个型号）"
+                  value={setDefault}
+                  onChange={(v) => setSetDefault(v === true)}
+                />
               ) : null}
               {manualPrice ? (
                 <p className="text-xs text-warning">

@@ -1,16 +1,25 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { CheckCircle2, Loader2, PenLine, Send } from 'lucide-react'
+import { CheckCircle2, PenLine, Send } from 'lucide-react'
 
 import { money, SectionHeader } from '@/components/landing/section'
 import { Badge } from '@astryxdesign/core/Badge'
-import { TextArea } from '@astryxdesign/core/TextArea'
 import { Button } from '@astryxdesign/core/Button'
 import { CheckboxInput } from '@astryxdesign/core/CheckboxInput'
-import { Field } from '@astryxdesign/core/Field'
+import { Field, FieldLabel } from '@astryxdesign/core/Field'
+import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl'
+import { SelectableCard } from '@astryxdesign/core/SelectableCard'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableHeaderCell,
+  TableRow,
+} from '@astryxdesign/core/Table'
+import { TextArea } from '@astryxdesign/core/TextArea'
 import { TextInput } from '@astryxdesign/core/TextInput'
-import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 
 import { submitIntent } from './actions'
@@ -164,7 +173,7 @@ export function ClientDecisionPanel({
         {quotes.length > 1 ? (
           <>
             <div
-              role="tablist"
+              role="group"
               aria-label="选择方案"
               className={cn(
                 'mt-10 grid gap-3',
@@ -173,123 +182,110 @@ export function ClientDecisionPanel({
               )}
             >
               {quotes.map((q) => {
-                const active = q.id === selected.id
                 const diff = q.total - cheapest
                 return (
-                  <button
+                  <SelectableCard
                     key={q.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => setSelectedId(q.id)}
-                    className={cn(
-                      'rounded-2xl border p-5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-                      active
-                        ? 'border-foreground bg-foreground text-background'
-                        : 'bg-card hover:border-foreground/40',
-                    )}
+                    label={`${q.title}，${money(q.total)}`}
+                    isSelected={q.id === selected.id}
+                    onChange={() => setSelectedId(q.id)}
+                    padding={4}
+                    width="100%"
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-sm font-medium">{q.title}</span>
-                      {q.isMain ? (
-                        <Badge variant={active ? 'neutral' : 'neutral'} label={'设计师推荐'} />
-                      ) : null}
-                    </div>
-                    <p className="mt-4 text-2xl font-semibold tracking-tight tabular-nums">
-                      {money(q.total)}
-                    </p>
-                    <p
-                      className={cn(
-                        'mt-1 text-xs',
-                        active ? 'text-background/70' : 'text-muted-foreground',
-                      )}
-                    >
-                      {q.lines.length} 项设备 ·{' '}
-                      {diff > 0 ? `比最低方案多 ${money(diff)}` : '价格最低'}
-                    </p>
-                  </button>
+                    <span className="block min-w-0 text-left">
+                      <span className="flex items-start justify-between gap-2">
+                        <span className="text-sm font-medium">{q.title}</span>
+                        {q.isMain ? <Badge variant="neutral" label="设计师推荐" /> : null}
+                      </span>
+                      <span className="mt-4 block text-2xl font-semibold tracking-tight tabular-nums">
+                        {money(q.total)}
+                      </span>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {q.lines.length} 项设备 ·{' '}
+                        {diff > 0 ? `比最低方案多 ${money(diff)}` : '价格最低'}
+                      </span>
+                    </span>
+                  </SelectableCard>
                 )
               })}
             </div>
 
             <div className="mt-6 overflow-x-auto rounded-2xl border bg-card">
-              <table className="w-full min-w-[34rem] border-collapse text-sm">
-                <caption className="sr-only">各方案按设备类别的数量与金额对比</caption>
-                <thead>
-                  <tr className="border-b text-left text-xs text-muted-foreground">
-                    <th scope="col" className="px-5 py-3 font-medium">
-                      设备类别
-                    </th>
-                    {quotes.map((q) => (
-                      <th
-                        key={q.id}
-                        scope="col"
-                        className={cn(
-                          'px-4 py-3 text-right font-medium',
-                          q.id === selected.id && 'bg-muted/60 text-foreground',
-                        )}
-                      >
-                        {q.title}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {categories.map((c) => {
-                    const differs =
-                      new Set(c.cells.map((x) => `${x.qty}:${Math.round(x.amount)}`)).size > 1
-                    return (
-                      <tr key={c.key} className="border-b last:border-b-0">
-                        <th scope="row" className="px-5 py-2.5 text-left font-normal">
-                          {c.name}
-                          {differs ? (
-                            <span className="ml-1.5 text-xs text-warning">有差异</span>
-                          ) : null}
-                        </th>
-                        {c.cells.map((cell, i) => (
-                          <td
-                            key={quotes[i].id}
-                            className={cn(
-                              'px-4 py-2.5 text-right tabular-nums',
-                              quotes[i].id === selected.id && 'bg-muted/60',
-                              !cell.qty && 'text-muted-foreground',
-                            )}
-                          >
-                            {cell.qty ? (
-                              <>
-                                <span className={cn(differs && 'font-medium')}>
-                                  {money(cell.amount)}
-                                </span>
-                                <span className="ml-1.5 text-xs text-muted-foreground">
-                                  ×{cell.qty}
-                                </span>
-                              </>
-                            ) : (
-                              '—'
-                            )}
-                          </td>
-                        ))}
-                      </tr>
-                    )
-                  })}
-                  <tr className="border-t bg-muted/30 font-medium">
-                    <th scope="row" className="px-5 py-3 text-left">
-                      合计（含服务费与优惠）
-                    </th>
-                    {quotes.map((q) => (
-                      <td
-                        key={q.id}
-                        className={cn(
-                          'px-4 py-3 text-right tabular-nums',
-                          q.id === selected.id && 'bg-muted/60',
-                        )}
-                      >
-                        {money(q.total)}
-                      </td>
-                    ))}
-                  </tr>
-                </tbody>
-              </table>
+              <div className="min-w-[34rem]">
+                <Table aria-label="各方案按设备类别的数量与金额对比">
+                  <TableHeader>
+                    <TableRow isHeaderRow>
+                      <TableHeaderCell className="px-5 py-3 text-left">设备类别</TableHeaderCell>
+                      {quotes.map((q) => (
+                        <TableHeaderCell
+                          key={q.id}
+                          className={cn(
+                            'px-4 py-3 text-right',
+                            q.id === selected.id && 'bg-muted/60 text-foreground',
+                          )}
+                        >
+                          {q.title}
+                        </TableHeaderCell>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {categories.map((c) => {
+                      const differs =
+                        new Set(c.cells.map((x) => `${x.qty}:${Math.round(x.amount)}`)).size > 1
+                      return (
+                        <TableRow key={c.key}>
+                          <TableCell scope="row" className="px-5 py-2.5 text-left font-normal">
+                            {c.name}
+                            {differs ? (
+                              <span className="ml-1.5 text-xs text-warning">有差异</span>
+                            ) : null}
+                          </TableCell>
+                          {c.cells.map((cell, i) => (
+                            <TableCell
+                              key={quotes[i].id}
+                              className={cn(
+                                'px-4 py-2.5 text-right tabular-nums',
+                                quotes[i].id === selected.id && 'bg-muted/60',
+                                !cell.qty && 'text-muted-foreground',
+                              )}
+                            >
+                              {cell.qty ? (
+                                <>
+                                  <span className={cn(differs && 'font-medium')}>
+                                    {money(cell.amount)}
+                                  </span>
+                                  <span className="ml-1.5 text-xs text-muted-foreground">
+                                    ×{cell.qty}
+                                  </span>
+                                </>
+                              ) : (
+                                '—'
+                              )}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      )
+                    })}
+                    <TableRow className="bg-muted/30 font-medium">
+                      <TableCell scope="row" className="px-5 py-3 text-left">
+                        合计（含服务费与优惠）
+                      </TableCell>
+                      {quotes.map((q) => (
+                        <TableCell
+                          key={q.id}
+                          className={cn(
+                            'px-4 py-3 text-right tabular-nums',
+                            q.id === selected.id && 'bg-muted/60',
+                          )}
+                        >
+                          {money(q.total)}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           </>
         ) : null}
@@ -413,29 +409,16 @@ export function ClientDecisionPanel({
 
               <fieldset className="mt-5" disabled={!canSubmit || pending}>
                 <legend className="sr-only">您的意向</legend>
-                <div className="grid grid-cols-2 gap-2">
-                  {(
-                    [
-                      ['confirm', '确认这套方案'],
-                      ['revise', '希望再调整'],
-                    ] as const
-                  ).map(([v, label]) => (
-                    <button
-                      key={v}
-                      type="button"
-                      aria-pressed={decision === v}
-                      onClick={() => setDecision(v)}
-                      className={cn(
-                        'h-10 rounded-xl border text-sm font-medium transition-colors',
-                        decision === v
-                          ? 'border-foreground bg-foreground text-background'
-                          : 'hover:border-foreground/40',
-                      )}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
+                <SegmentedControl
+                  label="您的意向"
+                  value={decision}
+                  onChange={(value) => setDecision(value as 'confirm' | 'revise')}
+                  layout="fill"
+                  isDisabled={!canSubmit || pending}
+                >
+                  <SegmentedControlItem value="confirm" label="确认这套方案" />
+                  <SegmentedControlItem value="revise" label="希望再调整" />
+                </SegmentedControl>
 
                 <div className="mt-4 grid gap-3">
                   <Field label="您的称呼" inputID="fb-name">
@@ -477,7 +460,7 @@ export function ClientDecisionPanel({
                       rows={3}
                       maxLength={1000}
                       value={message}
-                      onChange={(v) => setMessage(v)}
+                      onChange={(v) => setMessage(v.slice(0, 1000))}
                       placeholder={
                         decision === 'revise'
                           ? '例如：客厅想换成无主灯方案，主卧窗帘改双轨'
@@ -489,28 +472,22 @@ export function ClientDecisionPanel({
                     ) : null}
                   </Field>
                   <div className="grid gap-1.5">
-                    <Label className="flex items-center gap-1.5">
-                      <PenLine className="size-3.5" />
-                      手写签名{decision === 'revise' ? '（可选）' : ''}
-                    </Label>
+                    <FieldLabel
+                      label={`手写签名${decision === 'revise' ? '（可选）' : ''}`}
+                      inputID=""
+                      labelIcon={<PenLine className="size-3.5" />}
+                    />
                     <SignaturePad onChange={setSignature} invalid={Boolean(errors.signature)} />
                     {errors.signature ? (
                       <p className="text-xs text-destructive-strong">{errors.signature}</p>
                     ) : null}
                   </div>
-                  <label className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
-                    <CheckboxInput
-                      label={'选择'}
-                      isLabelHidden
-                      value={agree}
-                      onChange={(v) => setAgree(v === true)}
-                      className="mt-0.5"
-                      aria-invalid={Boolean(errors.agree)}
-                    />
-                    <span>
-                      我已查看方案内容。以上为购买意向，最终价格与配置以双方签订的合同为准。
-                    </span>
-                  </label>
+                  <CheckboxInput
+                    label="我已查看方案内容。以上为购买意向，最终价格与配置以双方签订的合同为准。"
+                    value={agree}
+                    onChange={(checked) => setAgree(checked)}
+                    aria-invalid={Boolean(errors.agree)}
+                  />
                   {errors.agree ? (
                     <p className="-mt-1 text-xs text-destructive-strong">{errors.agree}</p>
                   ) : null}
@@ -529,7 +506,7 @@ export function ClientDecisionPanel({
                 type="submit"
                 className="mt-4 w-full"
                 isDisabled={!canSubmit || pending}
-                icon={<Loader2 />}
+                isLoading={pending}
                 endContent={<Send />}
                 label={
                   canSubmit
