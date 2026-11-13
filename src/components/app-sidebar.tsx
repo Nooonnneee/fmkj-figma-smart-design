@@ -314,7 +314,7 @@ export function AppSidebar({
               <div className="flex flex-col gap-1">
                 {capabilityNav.map((group) => (
                   <div key={group.key}>
-                    <div className="px-3 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground/75 group-data-[collapsible=icon]:hidden">
+                    <div className="px-3 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground group-data-[collapsible=icon]:hidden">
                       {group.label}
                     </div>
                     <SidebarMenu className="gap-0.5">

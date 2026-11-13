@@ -11,6 +11,7 @@ import { IconButton } from '@astryxdesign/core/IconButton'
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout'
 import { Tab, TabList } from '@astryxdesign/core/TabList'
 import { brandLatin, DocCheckbox, DocRoot } from '@/documents/parts'
+import { docVars } from '@/documents/theme'
 import { DEFAULT_PAYMENTS, paymentAmounts } from '@/lib/contracts'
 import { categoryOfType, DEVICE_CATEGORIES, deviceTypeOf } from '@/lib/device-types'
 import type { CompanyInfo } from '@/lib/cached-data'
@@ -335,7 +336,11 @@ export function ProposalShowcase({
                   style={{ width: 84, height: 56 }}
                 >
                   <div
+                    data-doc-style={theme.style.id}
                     style={{
+                      // 缩略图也是文档纸面：没有 DocRoot 时必须补上 --doc-*，
+                      // 否则 text-doc-muted / text-doc-accent 解析为空，暗色下会继承成浅色。
+                      ...docVars(theme.style),
                       ...deckVars(theme),
                       width: SLIDE_W,
                       height: SLIDE_H,
@@ -343,7 +348,7 @@ export function ProposalShowcase({
                       transformOrigin: 'top left',
                       pointerEvents: 'none',
                     }}
-                    className="bg-doc-paper text-doc-ink"
+                    className="doc-body bg-doc-paper text-doc-ink"
                   >
                     <ShowcaseSlide
                       data={data}
