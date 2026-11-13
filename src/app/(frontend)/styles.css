@@ -621,6 +621,33 @@
     size: A4;
     margin: 14mm;
   }
+
+  /*
+   * 打印交付物时隐藏所有 Astryx 浮层（toast / tooltip / popover / dialog / 下拉菜单）。
+   *
+   * 本仓没有挂 <LayerProvider>，`useToast()` 会自建一个挂在 document.body 的
+   * fallback viewport（`data-astryx-toast-fallback`，见
+   * node_modules/@astryxdesign/core/src/Toast/useToast.tsx）；打印页的
+   * PrintToolbar 在导出/复制成功或失败时都会弹 toast。它是 fixed 定位的浮层，
+   * 浏览器打印时会被排进纸面 —— 打印是交付物，提示条不能印上去。
+   *
+   * 选择器覆盖：
+   * - `[data-astryx-toast-fallback]`：useToast 无 Provider 时自建的 body 级容器；
+   * - `[data-astryx-layer-root]`：Layer 给每个浮层根节点打的标记（useLayer 渲染的
+   *    fixed/context 层、Popover、Tooltip、DropdownMenu、Dialog 的 <dialog>、
+   *   ToastViewport 都会 spread 它，见 Layer/layerClickBoundary.ts）；
+   * - `[data-astryx-submenu-host]`：DropdownMenu 跟随菜单的子菜单宿主；
+   * - `[popover]`：Astryx 的浮层同时带原生 popover 属性（auto/manual），
+   *   兜底任何未走 layer root 的顶层气泡。
+   *
+   * 只作用于打印媒体，屏幕上的显示不受影响。
+   */
+  [data-astryx-toast-fallback],
+  [data-astryx-layer-root],
+  [data-astryx-submenu-host],
+  [popover] {
+    display: none !important;
+  }
 }
 
 /*
