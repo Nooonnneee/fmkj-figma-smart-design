@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # 重跑「积分流水」的形式化验证：对三份配置逐条检查 Ledger.tla 的两条规则。
 #
-# 预期结果：
-#   Current.cfg（今天的代码）   两条规则都违反
-#   Locked.cfg（建议的修复）    两条都成立
+# 预期结果（行锁修复已落地后）：
+#   Current.cfg（今天的代码，已加行锁）  两条规则都成立
+#   Locked.cfg（当初建议的修复）        两条都成立
 #   NoGuard.cfg（修复但去掉 402 守卫）  只有 NoOverdraft 违反
+#
+# 修复前 Current.cfg 是 Atomic = FALSE，两条规则都违反（丢失更新）；那段反例仍在
+# git 历史与本目录的旧 report 里，这里不再复现，只保住 NoGuard 那条「守卫真的会咬」的演示。
 #
 # 只依赖 java + tla2tools.jar，两个都在仓库外，不要提交二进制。
 # 想把反例读成中文路径，用 pstack 的 /statechart 读本目录的 report.md 或它另行生成的报告。
@@ -52,4 +55,4 @@ done
 
 echo
 echo "结果目录：$OUT"
-echo "违反次数：${BROKEN}（应为 3：Current 2 条 + NoGuard 1 条）"
+echo "违反次数：${BROKEN}（应为 1：只有 NoGuard 的 NoOverdraft）"
