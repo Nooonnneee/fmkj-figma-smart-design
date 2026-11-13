@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 
 import { Button } from '@astryxdesign/core/Button'
 import { CheckboxInput } from '@astryxdesign/core/CheckboxInput'
-import { Progress } from '@/components/ui/progress'
+import { ProgressBar } from '@astryxdesign/core/ProgressBar'
 import { Selector } from '@astryxdesign/core/Selector'
 import { COLLECT_MESSAGE, type CollectResult } from '@/lib/doc-collect'
 import {
@@ -231,7 +231,11 @@ export function DeliveryPackage({
               {progress.done}/{progress.total}
             </span>
           </div>
-          <Progress value={(progress.done / progress.total) * 100} />
+          <ProgressBar
+            label={progress.label}
+            isLabelHidden
+            value={(progress.done / progress.total) * 100}
+          />
           <p className="text-xs text-muted-foreground">方案页较多时需要几十秒，请保持页面打开。</p>
         </div>
       ) : null}

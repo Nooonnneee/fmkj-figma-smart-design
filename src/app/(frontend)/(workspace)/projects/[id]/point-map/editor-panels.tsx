@@ -22,7 +22,7 @@ import { IconButton } from '@astryxdesign/core/IconButton'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { ScrollableArea } from '@astryxdesign/core/ScrollableArea'
 import { Selector, SelectorOption } from '@astryxdesign/core/Selector'
-import { Progress } from '@/components/ui/progress'
+import { ProgressBar } from '@astryxdesign/core/ProgressBar'
 import { LEVEL_LABEL, type AreaAnalysis } from '@/lib/area-analysis'
 import { AREA_TYPES, areaTypeLabel } from '@/lib/area-types'
 import {
@@ -849,5 +849,12 @@ export function PointMapContextMenu({
 }
 
 export function CoverageBar({ value }: { value: number }) {
-  return <Progress value={value} className="h-1.5" />
+  return (
+    <ProgressBar
+      label="点位覆盖率"
+      isLabelHidden
+      value={value}
+      className="[&_.astryx-progress-bar-track]:h-1.5"
+    />
+  )
 }

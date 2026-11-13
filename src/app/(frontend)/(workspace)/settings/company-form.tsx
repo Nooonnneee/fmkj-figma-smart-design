@@ -14,7 +14,7 @@ import { Layout, LayoutContent, LayoutHeader } from '@astryxdesign/core/Layout'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
+import { TextArea } from '@astryxdesign/core/TextArea'
 
 import {
   DocumentTemplateSettings,
@@ -157,6 +157,8 @@ export function CompanyForm({
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<{ message: string; field?: string } | null>(null)
+  const [quoteNotes, setQuoteNotes] = useState(initial.quoteNotes)
+  const [contractTerms, setContractTerms] = useState(initial.contractTerms)
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -304,23 +306,29 @@ export function CompanyForm({
             <LayoutContent padding={5} isScrollable={false}>
               <div className="grid gap-5">
                 <Field label="报价备注" inputID="quoteNotes">
-                  <Textarea
+                  <TextArea
                     id="quoteNotes"
-                    name="quoteNotes"
+                    label="报价备注"
+                    isLabelHidden
+                    value={quoteNotes}
+                    onChange={setQuoteNotes}
+                    htmlName="quoteNotes"
                     rows={3}
                     maxLength={2000}
-                    defaultValue={initial.quoteNotes}
                     placeholder="例如：报价有效期 30 天；设备质保一年，含一年免费上门维护"
                   />
                 </Field>
                 <Field label="合同条款" inputID="contractTerms">
-                  <Textarea
+                  <TextArea
                     id="contractTerms"
-                    name="contractTerms"
+                    label="合同条款"
+                    isLabelHidden
+                    value={contractTerms}
+                    onChange={setContractTerms}
+                    htmlName="contractTerms"
                     rows={7}
                     maxLength={5000}
-                    defaultValue={initial.contractTerms}
-                    className="leading-relaxed"
+                    controlClassName="leading-relaxed"
                   />
                 </Field>
                 <div className="flex items-center justify-between gap-4 rounded-lg border p-3">

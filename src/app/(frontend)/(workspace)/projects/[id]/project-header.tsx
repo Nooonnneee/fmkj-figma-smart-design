@@ -6,7 +6,7 @@ import { Archive, ChevronRight } from 'lucide-react'
 import { GuardedLink } from '@/components/guarded-link'
 import { ThemeMenu } from '@/components/site-header'
 import { Badge } from '@astryxdesign/core/Badge'
-import { Separator } from '@/components/ui/separator'
+import { Divider } from '@astryxdesign/core/Divider'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import type { ProjectRole } from '@/lib/project-access'
 import { PROJECT_SECTIONS, sectionHref } from '@/lib/projects'
@@ -47,9 +47,10 @@ export function ProjectHeader({
       <div className="flex flex-wrap items-center md:h-12 md:flex-nowrap">
         <div className="flex h-12 min-w-0 flex-1 items-center gap-2 pl-3 md:flex-none md:pl-4">
           <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
-          <Separator
+          <Divider
             orientation="vertical"
-            className="data-vertical:h-5 data-vertical:self-center"
+            aria-hidden
+            className="shrink-0 data-vertical:h-5 data-vertical:self-center"
           />
           <GuardedLink
             href="/projects"

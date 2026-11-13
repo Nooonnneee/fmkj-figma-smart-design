@@ -13,9 +13,9 @@ import { CheckboxInput } from '@astryxdesign/core/CheckboxInput'
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
 import { Layout, LayoutContent, LayoutFooter } from '@astryxdesign/core/Layout'
 import { TextInput } from '@astryxdesign/core/TextInput'
+import { ScrollableArea } from '@astryxdesign/core/ScrollableArea'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { deviceTypeLabel } from '@/lib/device-types'
 import { yuan } from '@/lib/quotes'
 import { cn } from '@/lib/utils'
@@ -190,7 +190,11 @@ export function SwapProductDialog({
               ) : null}
             </div>
 
-            <ScrollArea className="-mx-2 min-h-0 flex-1 basis-80">
+            <ScrollableArea
+              label="可选产品"
+              axis="block"
+              className="relative -mx-2 min-h-0 flex-1 basis-80"
+            >
               <div className="space-y-4 px-2">
                 {groups.map(({ brand: b, items }) => (
                   <section key={b?.slug ?? '_'}>
@@ -280,7 +284,7 @@ export function SwapProductDialog({
                   />
                 ) : null}
               </div>
-            </ScrollArea>
+            </ScrollableArea>
 
             <div className="space-y-3 border-t pt-3">
               {sameTypeLines > 1 ? (

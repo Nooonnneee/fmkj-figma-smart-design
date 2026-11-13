@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
+import { TextArea } from '@astryxdesign/core/TextArea'
 import { registerLeaveGuard } from '@/lib/leave-guard'
 import { autoProjectName, PROJECT_PLATFORMS } from '@/lib/projects'
 import { cn } from '@/lib/utils'
@@ -75,6 +75,7 @@ export function ProjectForm({
     community: initial.community ?? '',
     address: initial.address ?? '',
   })
+  const [notes, setNotes] = useState(initial.notes ?? '')
   const errors = state && !state.ok ? (state.fieldErrors ?? {}) : {}
   const isNew = !initial.id
   const suggestedName = autoProjectName(nameSource)
@@ -282,13 +283,16 @@ export function ProjectForm({
             '记录家庭常住成员、装修阶段、特殊联动场景或网路条件。',
             <div className="grid gap-2 sm:col-span-2">
               <Field label="备注" inputID="notes" isLabelHidden>
-                <Textarea
+                <TextArea
                   id="notes"
-                  name="notes"
+                  label="备注"
+                  isLabelHidden
+                  value={notes}
+                  onChange={setNotes}
+                  htmlName="notes"
                   rows={3}
                   maxLength={2000}
-                  defaultValue={initial.notes ?? ''}
-                  disabled={readOnly}
+                  isDisabled={readOnly}
                   placeholder="户型、装修进度、客户偏好等"
                 />
               </Field>
