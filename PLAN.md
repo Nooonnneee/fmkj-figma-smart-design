@@ -128,6 +128,52 @@ UI 不再叫「插件」，改叫「能力中心」，分 AI 能力 / 模板 / �
 
 ---
 
+### 6. [x] Astryx P5 适配层清理 —— **已收口，决定保留适配层**（2026-11-13）
+
+**owner 决策：保留适配层，不再强推删除。**
+
+#### 做了什么
+
+| 批次      | 内容                                                                                 | PR                       |
+| --------- | ------------------------------------------------------------------------------------ | ------------------------ |
+| 删零引用  | toggle/tabs/skeleton/popover/input-otp/field/avatar/checkbox/badge/dialog            | #133 #139 #147           |
+| Card 全档 | 14 文件 31 个 `<Card>` 全部迁到官方 `Card` + `Layout`，零漂移                        | #134 #135 #136 #137 #138 |
+| Label     | project-form 转 2 处，其余 15 处按四条规则保留                                       | #141                     |
+| 死代码    | 清 4 处（`ai-panel` / `CommandDialog` / `SidebarSeparator` / Badge 死导入），-245 行 | #146 #148                |
+| 评估文档  | Input / DropdownMenu / textarea+select / 15 个小档                                   | #143 #144 #145           |
+
+**适配层文件数：30 → 20。**
+
+#### 为什么停下：五个档的 A 档都是 0
+
+| 组件         | 官方不收的                                                                   | 依赖度          |
+| ------------ | ---------------------------------------------------------------------------- | --------------- |
+| Input        | 原生 onChange 签名 / className / defaultValue / maxLength / number-date type | 18/18           |
+| DropdownMenu | asChild / 自由 children / 三段式 Sub / onSelect                              | 45/45           |
+| textarea     | defaultValue / className 静默丢弃                                            | 4/4             |
+| select       | 组合式 vs options 数组（结构差异）                                           | 3/3             |
+| 15 个小档    | tooltip/table/kbd/progress/sonner/switch…                                    | A=0 / B=5 / C=9 |
+
+**统一原因：适配层存在的意义，就是承接官方组件不收的东西。**
+
+#### 结论
+
+**P5 不是「删文件」任务，是「逐个调用点重写」工程。**
+能靠换 import 删掉的已经删完了。剩下的 20 个要改调用点代码（去 className 依赖、
+改受控 state、重写结构），工程量与收益不成比例。
+
+**→ 适配层保留。** 它的存在价值（承接官方不收的东西）大于删除价值。
+详细评估见 `docs/p5-*-assessment.md` 与 `P4-HANDOFF.md` §P5。
+
+#### 顺带纠正的四条错误文档
+
+1. Card「官方只有单 Card，需重写结构」→ 错，官方 `Card` + `Layout` 三槽可等价承接
+2. Card T3「必须保留」档 → 错，`padding={0}` + 内层 div 可绕开坍缩，**没有必须保留的卡型**
+3. Textarea「name 不会进 FormData」→ 错，官方 `htmlName` 会渲染 name
+4. 「P5 删 30 个文件」→ 错，实际能删 10 个
+
+---
+
 ## 等我问的问题（Alma 攒着，一次问清，不刷屏）
 
 - 核心基础操作是否也扣积分，还是只对插件 / AI 扣？（架构 §8.2）

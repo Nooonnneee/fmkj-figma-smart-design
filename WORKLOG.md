@@ -4,6 +4,48 @@
 
 ---
 
+## 2026-11-13 · Astryx P5 收口：适配层保留（13 个 PR）
+
+**owner 决策：保留适配层，不再强推删除。**
+
+### 产出
+
+| PR        | 内容                                            |
+| --------- | ----------------------------------------------- |
+| #132      | 受控 Select → 官方 Selector（4 处）             |
+| #133      | 删 6 个零引用适配层文件                         |
+| #134      | card ×4 + 纠正文档错判（像素 diff bbox = None） |
+| #135      | Card T1 档 8 张                                 |
+| #136      | reports-client 7/11 张（4 张 KPI 零漂移）       |
+| #137      | reports 后 4 张 + 修 3 处底距                   |
+| #138      | Card 剩余 6 文件 13 张（全部零漂移）            |
+| #139      | 删 avatar / checkbox                            |
+| #141      | project-form Label → Field（2 转 / 15 跳过）    |
+| #143      | DropdownMenu 档评估（A=0）                      |
+| #144      | textarea/select 评估 + 清 3 处死导入（A=0）     |
+| #145      | 15 个小档批量评估（A=0）+ 扫出 4 处死代码       |
+| #146 #148 | 清理 4 处死代码（-245 行）                      |
+| #147      | 删 badge / dialog                               |
+
+**适配层 30 → 20 个文件。Card 全档清零（只剩 design-pilot 对照页）。**
+
+### 为什么停在这里
+
+五个档的 A 档都是 0（Input / DropdownMenu / textarea / select / 15 个小档）。
+统一原因：**适配层存在的意义就是承接官方组件不收的东西。**
+再往下走要改调用点代码，工程量与收益不成比例。
+
+### 顺带纠正的四条错误文档
+
+1. Card「官方只有单 Card，需重写结构」→ 错，官方 `Card` + `Layout` 三槽可等价承接
+2. Card T3「必须保留」档 → 错，`padding={0}` + 内层 div 可绕开坍缩
+3. Textarea「name 不会进 FormData」→ 错，官方 `htmlName` 会渲染 name
+4. 「P5 删 30 个文件」→ 错，实际能删 10 个
+
+详细评估：`docs/p5-dropdown-menu-assessment.md`、`docs/p5-small-adapters-assessment.md`、`P4-HANDOFF.md` §P5
+
+---
+
 ## 2026-11-08 · Astryx 设计系统试点（PR #15）
 
 - 接入 Astryx（Meta 开源设计系统，Beta）：core + theme-neutral + stylex + cli，精确版本锁定
