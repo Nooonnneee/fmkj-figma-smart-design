@@ -33,12 +33,8 @@ import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
 import { IconButton } from '@astryxdesign/core/IconButton'
+import { DropdownMenu } from '@astryxdesign/core/DropdownMenu'
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import type { getManualSnapshot } from '@/lib/user-manual'
 import { cn } from '@/lib/utils'
@@ -404,13 +400,14 @@ export function DocsClient({ manual }: { manual: ManualData }) {
               as={Link}
               label="会员与积分"
             />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-xs" label="外观" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
-                <AppearanceMenuItems />
-              </DropdownMenuContent>
+            <DropdownMenu
+              alignment="end"
+              menuWidth={160}
+              renderTrigger={(props) => (
+                <Button {...props} variant="ghost" size="sm" className="text-xs" label="外观" />
+              )}
+            >
+              <AppearanceMenuItems />
             </DropdownMenu>
             <Button
               size="sm"
