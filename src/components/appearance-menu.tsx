@@ -33,12 +33,23 @@ function SelectionCheck({ selected }: { selected: boolean }) {
   return selected ? <Check aria-hidden className="size-4 text-foreground" /> : null
 }
 
-/** 主题风格色块：官方 item 的 `icon` 槽会把已渲染节点原样透传，尺寸由这里决定。 */
-function AccentSwatch({ className }: { className: string }) {
+/**
+ * 主题风格色块：官方 item 的 `icon` 槽会把已渲染节点原样透传，尺寸由这里决定。
+ *
+ * `pill` 用形状反映该主题真实的按钮形态——「官网」的按钮是全圆胶囊（见 `ACCENTS`
+ * 里「墨色胶囊」的描述），所以画成胶囊，其余仍是圆点。只靠颜色分不开这两套：
+ * 官网 `oklch(0.205 0.012 265)` 和经典 `oklch(0.205 0 0)` 明度相同、彩度只差 0.012，
+ * 都是近黑的 14px 圆点，肉眼看不出差别（视觉评审指出过这一点）。
+ */
+function AccentSwatch({ className, pill = false }: { className: string; pill?: boolean }) {
   return (
     <span
       aria-hidden
-      className={cn('size-3.5 rounded-full ring-1 ring-foreground/10', className)}
+      className={cn(
+        'h-3.5 shrink-0 rounded-full ring-1 ring-foreground/10',
+        pill ? 'w-6' : 'w-3.5',
+        className,
+      )}
     />
   )
 }
@@ -80,7 +91,7 @@ export function AppearanceMenuItems() {
           <DropdownMenuItem
             key={a.id}
             label={a.label}
-            icon={<AccentSwatch className={ACCENT_SWATCH[a.id]} />}
+            icon={<AccentSwatch className={ACCENT_SWATCH[a.id]} pill={a.id === 'official'} />}
             endContent={<SelectionCheck selected={accent === a.id} />}
             onClick={() => setAccent(a.id)}
           />
