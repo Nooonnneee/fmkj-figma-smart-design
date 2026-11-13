@@ -2,7 +2,7 @@ import { hashToken } from '@/lib/mp/auth'
 import { fail, mpRoute, ok, readJson, text } from '@/lib/mp/http'
 import { getPayloadClient } from '@/lib/payload'
 
-export function extractTicket(raw: string): string {
+function extractTicket(raw: string): string {
   const trimmed = raw.trim()
   if (!trimmed) return ''
   if (trimmed.startsWith('fmkj-login:')) return trimmed.slice('fmkj-login:'.length).trim()
