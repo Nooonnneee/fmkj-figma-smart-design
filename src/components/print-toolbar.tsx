@@ -12,22 +12,17 @@ import {
   FileDown,
   FolderDown,
   ImageDown,
-  Loader2,
   Lock,
   SlidersHorizontal,
 } from 'lucide-react'
-import { toast } from 'sonner'
 
 import { Button } from '@astryxdesign/core/Button'
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
+import { DropdownMenu } from '@astryxdesign/core/DropdownMenu'
+import type { DropdownMenuOption } from '@astryxdesign/core/DropdownMenu'
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Popover } from '@astryxdesign/core/Popover'
+import { useToast } from '@astryxdesign/core/Toast'
 import { COLLECT_MESSAGE, type CollectResult } from '@/lib/doc-collect'
 import {
   downloadBlob,
@@ -79,6 +74,7 @@ export function PrintToolbar({
   const [exportResult, setExportResult] = useState<ExportResultState | null>(null)
   const [copied, setCopied] = useState(false)
   const [inMiniProgram, setInMiniProgram] = useState(false)
+  const showToast = useToast()
   const searchParams = useSearchParams()
   const autoTriggered = useRef(false)
   const isMpView = searchParams.get('mp') === '1' || inMiniProgram
@@ -158,13 +154,13 @@ export function PrintToolbar({
         previewUrl,
         previewImages: bundle.previewDataUrls,
       })
-      toast.success(`已生成 PDF（共 ${bundle.pageCount} 页）`)
+      showToast({ body: `已生成 PDF（共 ${bundle.pageCount} 页）` })
     } catch {
-      toast.error('PDF 导出失败，请稍后重试')
+      showToast({ body: 'PDF 导出失败，请稍后重试', type: 'error' })
     } finally {
       setBusy(null)
     }
-  }, [exportName])
+  }, [exportName, showToast])
 
   useEffect(() => {
     const auto = searchParams.get('auto')
@@ -233,9 +229,11 @@ export function PrintToolbar({
         previewUrl: null,
         previewImages: urls,
       })
-      toast.success(urls.length > 1 ? `已生成 ${urls.length} 页高清图片` : '已生成高清图片')
+      showToast({
+        body: urls.length > 1 ? `已生成 ${urls.length} 页高清图片` : '已生成高清图片',
+      })
     } catch {
-      toast.error('导出失败，请稍后重试')
+      showToast({ body: '导出失败，请稍后重试', type: 'error' })
     } finally {
       setBusy(null)
     }
@@ -266,7 +264,7 @@ export function PrintToolbar({
         const writable = await handle.createWritable()
         await writable.write(exportResult.blob)
         await writable.close()
-        toast.success('已保存到您选择的文件夹')
+        showToast({ body: '已保存到您选择的文件夹' })
         return
       } catch (e) {
         if (e instanceof Error && e.name === 'AbortError') return
@@ -284,9 +282,9 @@ export function PrintToolbar({
     try {
       await navigator.clipboard.writeText(exportResult.downloadUrl)
       setCopied(true)
-      toast.success('已复制 PDF 下载链接，可粘贴到微信或手机浏览器打开保存')
+      showToast({ body: '已复制 PDF 下载链接，可粘贴到微信或手机浏览器打开保存' })
     } catch {
-      toast.error('复制失败，请手动长按链接复制')
+      showToast({ body: '复制失败，请手动长按链接复制', type: 'error' })
     }
   }
 
@@ -296,6 +294,21 @@ export function PrintToolbar({
     .map((g) => g.options.find((o) => o.value === g.value)?.label)
     .filter(Boolean)
     .slice(0, 2)
+
+  const exportItems: DropdownMenuOption[] = [
+    {
+      id: 'pdf',
+      label: '导出 PDF',
+      icon: <FileDown className="size-4" />,
+      onClick: () => void exportPdf(),
+    },
+    {
+      id: 'img',
+      label: '导出图片',
+      icon: <ImageDown className="size-4" />,
+      onClick: () => void exportImages(),
+    },
+  ]
 
   return (
     <div className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur-xs print:hidden">
@@ -388,36 +401,32 @@ export function PrintToolbar({
               size="sm"
               className="ml-auto h-8 shrink-0 gap-1.5 px-2.5 text-xs"
               isDisabled={busy !== null || Boolean(locked)}
+              isLoading={busy !== null}
               onClick={() => void exportPdf()}
-              icon={<Loader2 />}
-              endContent={<FileDown />}
+              icon={<FileDown />}
               label={busy ? '生成中…' : '导出 PDF'}
             />
           ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+            <DropdownMenu
+              alignment="end"
+              menuWidth="9rem"
+              placement="below"
+              items={exportItems}
+              renderTrigger={(triggerProps) => (
                 <Button
+                  {...triggerProps}
                   size="sm"
                   className="h-8"
                   isDisabled={busy !== null || Boolean(locked)}
-                  icon={<Loader2 />}
+                  isLoading={busy !== null}
+                  icon={<FileDown />}
                   endContent={<ChevronDown />}
                   label={
                     busy === 'pdf' ? '生成 PDF 中…' : busy === 'img' ? '生成图片中…' : '导出 PDF'
                   }
                 />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuItem onSelect={() => void exportPdf()}>
-                  <FileDown className="size-4" />
-                  导出 PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => void exportImages()}>
-                  <ImageDown className="size-4" />
-                  导出图片
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              )}
+            />
           )}
         </div>
       </div>

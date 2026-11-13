@@ -2,9 +2,9 @@
 
 import { useRouter } from 'next/navigation'
 import { LayoutTemplate } from 'lucide-react'
-import { toast } from 'sonner'
 
 import { Button } from '@astryxdesign/core/Button'
+import { useToast } from '@astryxdesign/core/Toast'
 import type { PickerTemplate } from '@/plugins/proposal/picker-data'
 import { Swatches, TemplatePicker } from '@/plugins/proposal/template-picker'
 
@@ -27,16 +27,17 @@ export function ArchiveTemplatePicker({
   editable: boolean
 }) {
   const router = useRouter()
+  const showToast = useToast()
   const current = templates.find((t) => t.value === value)
 
   async function select(v: string) {
     const t = templates.find((x) => x.value === v)
     const res = await setDeliverables(projectId, { proposalTemplate: v })
     if (!res.ok) {
-      toast.error(res.error)
+      showToast({ body: res.error, type: 'error' })
       return
     }
-    toast.success(`交付方案已换成「${t?.label ?? v}」`)
+    showToast({ body: `交付方案已换成「${t?.label ?? v}」` })
     router.refresh()
   }
 
@@ -57,10 +58,20 @@ export function ArchiveTemplatePicker({
           variant="secondary"
           size="sm"
           className="ml-7 h-8 gap-2 text-xs sm:ml-0"
-          label="交付方案模板：，点击"
-          icon={<Swatches colors={[]} />}
-          endContent={<LayoutTemplate />}
-        />
+          label={`交付方案模板：${current?.label ?? '未选择'}，点击${editable ? '更换' : '查看'}`}
+          icon={
+            current ? (
+              <Swatches colors={current.swatches} />
+            ) : (
+              <LayoutTemplate className="size-3.5" />
+            )
+          }
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="max-w-28 truncate">{current?.label ?? '选择模板'}</span>
+            <span className="text-muted-foreground">{editable ? '更换' : '查看'}</span>
+          </span>
+        </Button>
       }
     />
   )
