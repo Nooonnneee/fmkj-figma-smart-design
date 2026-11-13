@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { KeyRound, Loader2 } from 'lucide-react'
+import { KeyRound } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
 import { Field } from '@astryxdesign/core/Field'
@@ -71,7 +71,8 @@ export function UnlockForm({ token }: { token: string }) {
         <Button
           type="submit"
           isDisabled={pending || !password}
-          icon={<Loader2 />}
+          isLoading={pending}
+          icon={<KeyRound />}
           label="打开方案"
         />
       </form>

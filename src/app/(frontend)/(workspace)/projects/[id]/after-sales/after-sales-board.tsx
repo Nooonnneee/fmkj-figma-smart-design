@@ -12,7 +12,6 @@ import {
   DatabaseBackup,
   Ellipsis,
   Headphones,
-  Loader2,
   Pencil,
   Plus,
   Printer,
@@ -439,8 +438,9 @@ export function AfterSalesBoard({
                   size="sm"
                   className="w-full"
                   isDisabled={busyId === '__backup'}
+                  isLoading={busyId === '__backup'}
                   onClick={backup}
-                  icon={<Loader2 />}
+                  icon={<DatabaseBackup />}
                   label="立即备份当前配置"
                 />
               ) : null}
@@ -637,7 +637,7 @@ export function AfterSalesBoard({
                 onClick={() => setEditing(null)}
                 label="取消"
               />
-              <Button isDisabled={pending} onClick={submit} icon={<Loader2 />} label="保存" />
+              <Button isDisabled={pending} isLoading={pending} onClick={submit} label="保存" />
             </LayoutFooter>
           }
         />
@@ -848,8 +848,9 @@ function RecordItem({
               variant="ghost"
               aria-label={`更多操作：${r.title}`}
               isDisabled={busy}
+              isLoading={busy}
               label="更多操作"
-              icon={<Loader2 />}
+              icon={<Ellipsis />}
               size="sm"
             />
           )}

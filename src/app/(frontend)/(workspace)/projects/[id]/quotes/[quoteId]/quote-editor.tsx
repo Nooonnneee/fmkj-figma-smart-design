@@ -16,7 +16,6 @@ import {
   ImageIcon,
   Layers,
   ListFilter,
-  Loader2,
   Lock,
   MapPinned,
   Percent,
@@ -704,8 +703,9 @@ export function QuoteEditor({
               size="sm"
               className="h-8 bg-primary text-xs font-medium text-primary-foreground shadow-xs hover:bg-primary/90"
               isDisabled={saving}
+              isLoading={saving}
               onClick={() => save()}
-              icon={<Loader2 />}
+              icon={<Save />}
               label="保存报价"
             />
           )}
@@ -805,8 +805,10 @@ export function QuoteEditor({
           <Button
             size="sm"
             isDisabled={creatingContract || saving}
+            isLoading={creatingContract}
             onClick={() => void generateContract()}
-            icon={<Loader2 />}
+            icon={<FileSignature />}
+            endContent={<ArrowRight />}
             label="生成合同"
           />
         </div>
@@ -1004,7 +1006,8 @@ export function QuoteEditor({
                     isDisabled={syncing || saving}
                     className="rounded-r-none border-r-0"
                     onClick={() => void syncFromPointMap(currentScope)}
-                    icon={<Loader2 />}
+                    isLoading={syncing}
+                    icon={<RefreshCw />}
                     label="从点位图同步"
                   />
                   <DropdownMenu

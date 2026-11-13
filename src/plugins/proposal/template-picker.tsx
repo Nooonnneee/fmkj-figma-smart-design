@@ -314,9 +314,9 @@ export function TemplatePicker({
                           type="button"
                           size="sm"
                           isDisabled={!canChoose(activeT) || busy}
+                          isLoading={busy}
                           onClick={() => void choose(activeT.value)}
-                          icon={<Loader2 />}
-                          label="应用模板"
+                          label={chooseLabel(activeT)}
                         />
                       ) : null}
                     </div>
@@ -660,9 +660,9 @@ export function TemplatePicker({
                             type="button"
                             className="flex-1"
                             isDisabled={!canChoose(activeT) || busy}
+                            isLoading={busy}
                             onClick={() => void choose(activeT.value)}
-                            icon={<Loader2 />}
-                            label={'预览样张'}
+                            label={chooseLabel(activeT)}
                           />
                         ) : null}
                       </div>

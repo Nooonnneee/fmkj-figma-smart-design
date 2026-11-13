@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { CopyPlus, Loader2, MessageSquareQuote } from 'lucide-react'
+import { CopyPlus, MessageSquareQuote } from 'lucide-react'
 
 import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
@@ -145,8 +145,9 @@ export function ClientFeedbackList({
                       size="sm"
                       variant="secondary"
                       isDisabled={busy === `q:${f.id}`}
+                      isLoading={busy === `q:${f.id}`}
                       onClick={() => adjust(f)}
-                      icon={<Loader2 />}
+                      icon={<CopyPlus />}
                       label={busy === `q:${f.id}` ? '生成调整版中…' : '按意向生成调整版'}
                     />
                   ) : null}
@@ -154,8 +155,8 @@ export function ClientFeedbackList({
                     size="sm"
                     variant={f.status === 'new' ? 'primary' : 'ghost'}
                     isDisabled={busy === f.id}
+                    isLoading={busy === f.id}
                     onClick={() => toggle(f)}
-                    icon={<Loader2 />}
                     label={f.status === 'new' ? '标记已处理' : '设为待处理'}
                   />
                 </div>

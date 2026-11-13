@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Coins, Loader2 } from 'lucide-react'
+import { ArrowRight, Coins, Gift } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
@@ -97,7 +97,8 @@ export function MembershipDialog({
                   type="submit"
                   isDisabled={pending}
                   className="shrink-0"
-                  icon={<Loader2 />}
+                  isLoading={pending}
+                  icon={<Gift />}
                   label="立即兑换"
                 />
               </form>

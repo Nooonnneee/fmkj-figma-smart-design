@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Loader2 } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
 import { Field } from '@astryxdesign/core/Field'
@@ -68,8 +68,9 @@ export function JoinCard({
         <Button
           className="w-full"
           isDisabled={busy}
+          isLoading={busy}
           onClick={() => void submit('current')}
-          icon={<Loader2 />}
+          endContent={<ArrowRight />}
           label="接受邀请并进入项目"
         />
       </div>
@@ -114,7 +115,8 @@ export function JoinCard({
           type="submit"
           className="w-full"
           isDisabled={busy}
-          icon={<Loader2 />}
+          isLoading={busy}
+          endContent={<ArrowRight />}
           label="登录并加入项目"
         />
         <p className="text-center text-xs text-muted-foreground">

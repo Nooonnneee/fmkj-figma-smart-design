@@ -11,7 +11,6 @@ import { ACCENT_INIT_SCRIPT } from '@/lib/appearance'
 import { ASTRYX_THEME_INIT_SCRIPT } from '@/lib/astryx-theme'
 import { APP_DESCRIPTION, APP_NAME, APP_TAGLINE, COMPANY_NAME } from '@/lib/brand'
 import { siteSans } from '@/lib/fonts'
-import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { BodyCustomCode, renderHeadCustomCode } from '@/lib/make-custom-code'
 import { makeSiteSettings, sanitizeHtmlAttribute } from '@/lib/make-site-settings'
@@ -94,7 +93,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <AstryxThemeProvider>
             <ThemeProvider>
               <TooltipProvider>{children}</TooltipProvider>
-              <Toaster />
             </ThemeProvider>
           </AstryxThemeProvider>
         </div>

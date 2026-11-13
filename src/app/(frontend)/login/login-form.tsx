@@ -384,8 +384,8 @@ export function LoginForm({
         type="submit"
         className="h-10 w-full rounded-full bg-foreground text-background hover:bg-foreground/85"
         isDisabled={loading}
-        icon={<Loader2 />}
-        endContent={<LogIn />}
+        isLoading={loading}
+        icon={<LogIn />}
         label={loading ? '登录中' : '登录'}
       />
       {previewDemo ? (
@@ -499,8 +499,8 @@ export function LoginForm({
               variant="secondary"
               className="h-10 shrink-0 rounded-lg px-3.5 text-xs"
               isDisabled={sendingOtp || countdown > 0}
+              isLoading={sendingOtp}
               onClick={() => void handleSendOtp('register')}
-              icon={<Loader2 />}
               label={countdown > 0 ? `${countdown}s 后重发` : '获取验证码'}
             />
           </div>
@@ -568,8 +568,8 @@ export function LoginForm({
         type="submit"
         className="h-10 w-full rounded-full bg-foreground text-background hover:bg-foreground/85"
         isDisabled={loading}
-        icon={<Loader2 />}
-        endContent={<UserPlus />}
+        isLoading={loading}
+        icon={<UserPlus />}
         label={loading ? '正在创建工作台…' : '注册并进入工作台'}
       />
     </form>
@@ -636,8 +636,8 @@ export function LoginForm({
                   variant="secondary"
                   className="h-10 shrink-0 rounded-lg px-3.5 text-xs"
                   isDisabled={sendingOtp || countdown > 0}
+                  isLoading={sendingOtp}
                   onClick={() => void handleSendOtp('reset')}
-                  icon={<Loader2 />}
                   label={countdown > 0 ? `${countdown}s 后重发` : '获取验证码'}
                 />
               </div>
@@ -668,7 +668,7 @@ export function LoginForm({
             type="submit"
             className="h-10 w-full rounded-full bg-foreground text-background hover:bg-foreground/85"
             isDisabled={loading}
-            icon={<Loader2 />}
+            isLoading={loading}
             label={loading ? '正在重置密码…' : '重置密码并登录'}
           />
         </form>

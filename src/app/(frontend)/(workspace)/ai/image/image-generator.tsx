@@ -136,7 +136,8 @@ export function ImageGenerator({ models, configured }: { models: Model[]; config
           onClick={() => void generate()}
           isDisabled={!configured || busy || !prompt.trim()}
           className="h-11 w-full gap-2"
-          icon={<Loader2 />}
+          isLoading={busy}
+          icon={<Sparkles />}
           label={busy ? `生成中… ${elapsed}s` : `生成图片 · ${model?.cost ?? 5} 积分`}
         />
         <p className="text-[11px] leading-relaxed text-muted-foreground">
