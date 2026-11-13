@@ -30,10 +30,10 @@ unit test naturally covers.
 | ---------------------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
 | 加锁读余额（`SELECT ai_credits ... FOR UPDATE`），算 `balanceAfter`，负数时 402    | `src/collections/AiCreditLedger.ts`                          | `lockUserBalance`（第 24 行起，锁在第 30）＋ `beforeChange`（第 59 行起，`balanceAfter` 在 70、守卫在 71） |
 | writes `users.aiCredits = doc.balanceAfter`（在锁内、同一个事务）                  | same                                                         | `afterChange`（第 77 行起，写入在 83）                                                                     |
-| 扣费调用点                                                                         | `src/plugins/ai-copilot/chat-handler.ts`                     | `ai-credit-ledger` create，第 665 行                                                                       |
-| 扣费调用点                                                                         | `src/app/api/ai/images/route.ts`                             | 第 80 行（前置检查在第 68 行）                                                                             |
-| 扣费调用点                                                                         | `src/app/api/ai/images/style/route.ts`                       | 第 79 行（前置检查在第 62 行）                                                                             |
-| 扣费调用点                                                                         | `src/plugins/ai-copilot/tools/core-handlers.ts`              | 第 1278 行                                                                                                 |
+| 扣费调用点                                                                         | `src/plugins/ai-copilot/chat-handler.ts`                     | `chargeAiCredits`（写 `ai-credit-ledger`），第 665 行                                                      |
+| 扣费调用点                                                                         | `src/app/api/ai/images/route.ts`                             | 第 79 行（前置检查在第 69 行）                                                                             |
+| 扣费调用点                                                                         | `src/app/api/ai/images/style/route.ts`                       | 第 78 行（前置检查在第 63 行）                                                                             |
+| 扣费调用点                                                                         | `src/plugins/ai-copilot/tools/core-handlers.ts`              | 第 1277 行                                                                                                 |
 | 发放调用点（兑换码，同一事务内、兑换码行加锁）                                     | `src/lib/services/membership-service.ts`                     | 第 129 行 create（加锁在第 72 行）                                                                         |
 | 发放调用点（任务奖励）                                                             | `src/lib/credit-tasks.ts`                                    | 第 159 行                                                                                                  |
 | 模型依赖的事实 1：hooks 与插入在同一个事务                                         | `node_modules/payload/dist/collections/operations/create.js` | 第 46 行 `initTransaction`                                                                                 |
@@ -235,9 +235,13 @@ This verification does not pick the fix for you, and never edits product code.
   `Math.min(ledger.credits(), fresh.aiCredits)` against a read taken before the
   ledger create. The model charges a fixed delta; the clamp only makes the loss
   smaller, it does not remove it.
-- A 扣费 that throws is swallowed (`console.error('[ai] credit deduction failed')`
-  at `chat-handler.ts:681`, at `images/route.ts:91` and `images/style/route.ts:90`).
-  Usage that is never billed is a different property, not verified here.
+- A 扣费 that throws used to be swallowed (a bare `console.error`, and an **empty
+  catch** at `core-handlers.ts`). All four call sites now go through
+  `chargeAiCredits` (`src/lib/credit-charge.ts`): the request still succeeds but
+  the failure is retried once and logged as one structured `[ai-billing]` line
+  (userId / delta / reason / model / messageId / attempt / error). Nothing is
+  written to the database (a billing-failure collection would be a schema change),
+  so "usage that is never billed" is still a separate property, not verified here.
 - 兑换码核销 (`membership-service.ts`) now takes a `SELECT ... FOR UPDATE` on the
   code row inside one transaction, so two concurrent redemptions no longer both
   pass. That lock, like the ledger one, is **not modelled in `Ledger.tla`** and is

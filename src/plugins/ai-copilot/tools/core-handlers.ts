@@ -8,6 +8,7 @@ import {
   isContractStatus,
   paymentPercentTotal,
 } from '@/lib/contracts'
+import { chargeAiCredits } from '@/lib/credit-charge'
 import {
   CAMERA_PER_FLOOR,
   DESIGN_RULE_TEXT,
@@ -1272,22 +1273,12 @@ export const coreToolHandlers: Record<string, AiToolHandler> = {
       userId: ctx.user.id,
       referenceImage: reference?.dataUrl ?? null,
     })
-    let balance: number | null = null
-    try {
-      const entry = await payload.create({
-        collection: 'ai-credit-ledger',
-        data: {
-          user: ctx.user.id,
-          delta: -model.cost,
-          reason: `AI 生图 · ${model.name} · ${userPrompt.slice(0, 40)}`,
-        },
-        overrideAccess: true,
-        depth: 0,
-      })
-      balance = entry.balanceAfter ?? null
-    } catch {
-      // 图片已生成，扣费失败不影响返回
-    }
+    // 记账失败不让生图失败；重试一次并留下结构化记录（见 chargeAiCredits）。
+    const balance = await chargeAiCredits(payload, {
+      user: ctx.user.id,
+      delta: -model.cost,
+      reason: `AI 生图 · ${model.name} · ${userPrompt.slice(0, 40)}`,
+    })
 
     // 生成后由视觉模型质检：画面是否符合需求、有无畸形与乱码文字
     let qa: { score?: number; caption?: string; issues?: string[] } | null = null

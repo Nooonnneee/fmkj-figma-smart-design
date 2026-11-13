@@ -1,4 +1,5 @@
 import { getCompanyInfo } from '@/lib/cached-data'
+import { chargeAiCredits } from '@/lib/credit-charge'
 import { getPayloadClient } from '@/lib/payload'
 import { loadProjectDocs } from '@/lib/project-docs'
 import { recordAiErrorDiagnostic } from '@/lib/usage-diagnostics'
@@ -660,26 +661,14 @@ export async function handleAiChat(request: Request, user: User): Promise<Respon
         })
         let balance: number | null = null
         if (cost > 0) {
-          try {
-            const entry = await payload.create({
-              collection: 'ai-credit-ledger',
-              data: {
-                user: user.id,
-                delta: -cost,
-                reason: `AI 对话 · ${displayModelLabel(activeModel)} · ${ledger.summary()}`.slice(
-                  0,
-                  120,
-                ),
-                model: activeModel.id,
-                message: reply.id,
-              },
-              overrideAccess: true,
-              depth: 0,
-            })
-            balance = entry.balanceAfter ?? null
-          } catch (error) {
-            console.error('[ai] credit deduction failed', error)
-          }
+          // 记账失败不让本次对话失败；重试一次并留下结构化记录（见 chargeAiCredits）。
+          balance = await chargeAiCredits(payload, {
+            user: user.id,
+            delta: -cost,
+            reason: `AI 对话 · ${displayModelLabel(activeModel)} · ${ledger.summary()}`,
+            model: activeModel.id,
+            message: reply.id,
+          })
         } else balance = fresh.aiCredits ?? 0
         await payload
           .update({
