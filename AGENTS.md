@@ -133,6 +133,17 @@ for structured app data, not only editorial CMS content.
 
 ## Figma-Managed Payload Rules
 
+> **现状（2026-11，先读这一段）**：本仓库已实质迁到**自托管 Postgres**。
+> `src/payload.config.ts:1` 现在只有 `export { default } from './payload.selfhost.config'`；
+> `src/payload.selfhost.config.ts:152-158` 直接调用 `buildConfig()`，并用
+> `postgresAdapter()` 连接 `DATABASE_URI`。因此，下面「Figma 托管时代」的规则
+> （不要加 `db`、不要加 Postgres/SQLite adapter、不要写 migration、必须用
+> `buildFigmaConfig()`）**只适用于旧配置 / Figma Make 模板**，不是当前自托管配置的约束。
+>
+> 真正仍然有效的红线：不硬编码密钥或占位 secret，不提交 `.env`、客户数据或数据库导出，
+> 不直接推 main，不跳过 CI。下方「Secrets And Environment Variables」与文末
+> 「团队协作与自动化」章节继续有效。
+
 This is not a vanilla self-hosted Payload project. Figma Cloud provides the
 database, auth integration, file storage, deployment runtime, and platform
 secrets through `@payloadcms/figma`.
