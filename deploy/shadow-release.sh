@@ -169,11 +169,29 @@ done
 # 为什么必须在**真服务器**上跑：本地库没有素材，页面上「图片全 404」这类
 # 只在生产才出现的问题，本地冒烟永远测不出来（2026-11-09 就是这么漏过去的：
 # 影子容器挂了空素材卷，产品图全 404，但页面不报错、接口也返回 200）。
+#
+# 2026-11-14 修正：**这台宿主机没装 node/pnpm/playwright**，原来直接
+# `node e2e/smoke.mjs` 必然 command not found → 脚本在第 4.5 步中止，
+# 表现是「镜像构建完成了但流量没切」。
+# 现在宿主机没有 node+playwright 时**不会静默跳过**，而是明确 die 并给出
+# 本机隧道跑冒烟的命令；确认通过后再带 SKIP_SMOKE=1 重跑。
 log "4.5/7 冒烟验证影子容器（失败则中止，不切流量）"
-SMOKE_BASE="http://127.0.0.1:$NEW_PORT" \
-SMOKE_EMAIL="${SMOKE_EMAIL:-}" SMOKE_PASS="${SMOKE_PASS:-}" \
-  node e2e/smoke.mjs 2>&1 | tail -25 \
-  || die "冒烟未通过，已中止（生产未受影响）"
+# 注意：runner 镜像里只有 standalone 产物，没有 playwright，所以**不能**在
+# app 容器里跑冒烟。只有宿主机自己装了 node + playwright 才能本地跑。
+if [[ "${SKIP_SMOKE:-}" == "1" ]]; then
+  echo "  ⚠️  SKIP_SMOKE=1：跳过冒烟（调用方需自行验证）"
+elif [[ -f e2e/smoke.mjs ]] && command -v node >/dev/null 2>&1 \
+  && node -e 'require("playwright")' >/dev/null 2>&1; then
+  SMOKE_BASE="http://127.0.0.1:$NEW_PORT" SMOKE_OUT=/tmp/fmkj-smoke \
+  SMOKE_EMAIL="${SMOKE_EMAIL:-}" SMOKE_PASS="${SMOKE_PASS:-}" \
+    node e2e/smoke.mjs 2>&1 | tail -25 \
+    || die "冒烟未通过，已中止（生产未受影响）"
+else
+  die "宿主机没有 node + playwright，无法自动冒烟。请改在**本机**跑：
+      ssh -f -N -L 19128:127.0.0.1:$NEW_PORT ubuntu@<服务器>
+      SMOKE_BASE=http://127.0.0.1:19128 node e2e/smoke.mjs
+    确认通过后带上 SKIP_SMOKE=1 重跑本脚本（生产未受影响）"
+fi
 
 # ── 5. 切流量 ─────────────────────────────────────────
 log "5/7 切 Caddy 流量：$CUR_PORT → $NEW_PORT"

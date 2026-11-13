@@ -113,6 +113,36 @@ git pull
 docker compose build app && docker compose up -d app
 ```
 
+### 主站 fmkj.top 用影子部署（不停机、可回滚）
+
+`fmkj.top` 那台机器**同时跑着别的业务**（`fanmeng-gateway-*`），直接
+`docker compose up -d` 会重建容器、短暂中断两个业务。主站更新走影子部署：
+
+```bash
+bash deploy/shadow-release.sh              # 备份库 → 新目录 → 新镜像 → 新端口 → 验证 → 切 Caddy
+bash deploy/shadow-release.sh --rollback 13028   # 回滚到指定端口（先确认该端口有服务）
+```
+
+脚本第 4.5 步是切流量前的最后一道闸：**用真浏览器在影子上跑一遍冒烟**。
+
+⚠️ 那台宿主机没装 node / pnpm / playwright，**脚本自己跑不了冒烟**。它会直接停下并提示，
+不会静默跳过（2026-11-13 就因此在第 4.5 步中止过，表现为「镜像构建完了但流量没切」）。
+正确做法是**在本机**通过 SSH 隧道跑：
+
+```bash
+# 1. 把影子容器的端口（脚本会打印，如 13029）隧道到本机
+ssh -f -N -L 19128:127.0.0.1:13029 ubuntu@124.222.225.26
+
+# 2. 本机跑冒烟（本机有 playwright）
+SMOKE_BASE=http://127.0.0.1:19128 SMOKE_OUT=/tmp/fmkj-smoke node e2e/smoke.mjs
+
+# 3. 通过后带 SKIP_SMOKE=1 重跑脚本完成切流量（镜像已构建，会复用）
+SKIP_SMOKE=1 bash deploy/shadow-release.sh
+```
+
+想让自动冒烟真正跑起来，可以在服务器上装 node + playwright，或用带 playwright 的
+sidecar 镜像执行 —— 目前都没有做，所以每次发布都是「本机跑冒烟 → 服务器切流量」。
+
 如果在 Figma 里改了数据结构（集合、字段），推送前需要生成迁移文件：
 
 ```bash
