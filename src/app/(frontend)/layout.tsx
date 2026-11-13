@@ -11,6 +11,7 @@ import { ACCENT_INIT_SCRIPT } from '@/lib/appearance'
 import { ASTRYX_THEME_INIT_SCRIPT } from '@/lib/astryx-theme'
 import { APP_DESCRIPTION, APP_NAME, APP_TAGLINE, COMPANY_NAME } from '@/lib/brand'
 import { siteSans } from '@/lib/fonts'
+import { siteUrl } from '@/lib/site-url'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { BodyCustomCode, renderHeadCustomCode } from '@/lib/make-custom-code'
 import { makeSiteSettings, sanitizeHtmlAttribute } from '@/lib/make-site-settings'
@@ -31,9 +32,8 @@ const defaultSocialImage = {
 const googleAnalyticsId = sanitizeHtmlAttribute(makeSiteSettings.analytics?.googleAnalyticsId)
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL || process.env.FIGMA_PUBLIC_URL || 'http://localhost:3000',
-  ),
+  // 生产只设 PUBLIC_URL；直接写死 NEXT_PUBLIC_SITE_URL/FIGMA_PUBLIC_URL 会退回 localhost:3000
+  metadataBase: new URL(siteUrl('http://localhost:3000')),
   title,
   description,
   applicationName: APP_NAME,

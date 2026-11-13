@@ -17,6 +17,7 @@ import { DOC_KINDS } from '@/documents/registry'
 import { APP_NAME, COMPANY_NAME } from '@/lib/brand'
 import { getCompanyInfo } from '@/lib/cached-data'
 import { getLandingShowcase } from '@/lib/landing-showcase'
+import { siteUrl } from '@/lib/site-url'
 import { PLUGIN_DOC_STYLES } from '@/plugins/doc-styles/styles'
 
 export const metadata: Metadata = {
@@ -42,11 +43,7 @@ export default async function HomePage() {
   const hasDemo = Boolean(data?.sheets.length)
   const wechatQrUrl = company?.qrCode?.url ?? '/brand/wechat-contact-qr.jpg'
   const wechatQrCaption = company?.qrCaption ?? '扫码添加微信'
-  const siteUrl = (
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    process.env.FIGMA_PUBLIC_URL ||
-    'https://fmkj.top'
-  ).replace(/\/+$/, '')
+  const canonicalUrl = siteUrl()
   const jsonLd = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -54,15 +51,15 @@ export default async function HomePage() {
         '@type': 'Organization',
         name: COMPANY_NAME,
         alternateName: APP_NAME,
-        url: siteUrl,
-        logo: `${siteUrl}/brand/fmkj-app-icon-512.png`,
+        url: canonicalUrl,
+        logo: `${canonicalUrl}/brand/fmkj-app-icon-512.png`,
       },
       {
         '@type': 'SoftwareApplication',
         name: `${APP_NAME} · 全屋智能方案设计与报价工作台`,
         applicationCategory: 'DesignApplication',
         operatingSystem: 'Web, Windows, macOS, 微信小程序',
-        url: siteUrl,
+        url: canonicalUrl,
         description:
           '面向全屋智能设计师与集成商的点位图绘制、自动选型报价、8章横版方案演示（含AC+AP网络与中控拓扑图）、施工合同与交底清单一体工作台。',
         featureList: [

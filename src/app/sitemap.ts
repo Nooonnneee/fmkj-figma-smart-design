@@ -1,10 +1,5 @@
 import type { MetadataRoute } from 'next'
-
-const siteUrl = () =>
-  (process.env.NEXT_PUBLIC_SITE_URL || process.env.FIGMA_PUBLIC_URL || 'https://fmkj.top').replace(
-    /\/+$/,
-    '',
-  )
+import { siteUrl } from '@/lib/site-url'
 
 /** 站点地图：供百度、必应（Bing）、Google 与 AI 搜索引擎收录公开页面 */
 export default function sitemap(): MetadataRoute.Sitemap {
