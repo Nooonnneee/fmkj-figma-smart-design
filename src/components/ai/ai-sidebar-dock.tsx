@@ -616,7 +616,10 @@ export function AiSidebarDock({
       if ((error as Error).name === 'AbortError') dropReply()
       else if ((error as Error & { code?: string }).code === 'billing_rejected') {
         // 业务拒绝（如并发扣费时积分不足）：回复内容已经流式发出，但本次没扣费，必须明确告诉用户。
-        toast.error((error as Error).message || '积分不足，本次回复未计费')
+        showToast({
+          body: (error as Error).message || '积分不足，本次回复未计费',
+          type: 'error',
+        })
       } else
         patchReply((m) =>
           m.content
