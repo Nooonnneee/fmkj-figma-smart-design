@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   ArrowUp,
   Blocks,
@@ -21,18 +22,16 @@ import {
   X,
 } from 'lucide-react'
 
+import { Button } from '@astryxdesign/core/Button'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
-  DropdownMenuContent,
+  DropdownMenuDivider,
+  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+  DropdownMenuSubMenu,
+} from '@astryxdesign/core/DropdownMenu'
+import { IconButton } from '@astryxdesign/core/IconButton'
 import { cn } from '@/lib/utils'
 
 import { MarkdownText } from './markdown'
@@ -328,14 +327,15 @@ export function AiMessageBubble({
       {onQuickAction && isLast && followUpSuggestions(message).length ? (
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
           {followUpSuggestions(message).map((s) => (
-            <button
+            <Button
               key={s.label}
               type="button"
+              variant="secondary"
+              size="sm"
+              label={s.label}
+              className="rounded-full text-xs font-normal text-muted-foreground hover:text-foreground"
               onClick={() => onQuickAction(s.prompt)}
-              className="rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
-            >
-              {s.label}
-            </button>
+            />
           ))}
         </div>
       ) : null}
@@ -347,27 +347,27 @@ export function AiMessageBubble({
           </span>
         ) : null}
         <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-          <button
+          <IconButton
             type="button"
-            aria-label="复制"
+            variant="ghost"
+            size="sm"
+            label="复制"
             onClick={() => {
               void navigator.clipboard?.writeText(message.content)
               setCopied(true)
               setTimeout(() => setCopied(false), 1200)
             }}
-            className="rounded-md p-1 hover:bg-muted hover:text-foreground"
-          >
-            {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-          </button>
+            icon={copied ? <Check /> : <Copy />}
+          />
           {onRegenerate ? (
-            <button
+            <IconButton
               type="button"
-              aria-label="重新生成"
+              variant="ghost"
+              size="sm"
+              label="重新生成"
               onClick={onRegenerate}
-              className="rounded-md p-1 hover:bg-muted hover:text-foreground"
-            >
-              <RotateCcw className="size-3.5" />
-            </button>
+              icon={<RotateCcw />}
+            />
           ) : null}
         </div>
       </div>
@@ -422,6 +422,7 @@ export function AiPromptComposer({
   onAddFiles?: (files: FileList | File[]) => void
   onRemoveAttachment?: (id: string) => void
 }) {
+  const router = useRouter()
   const ref = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
@@ -564,82 +565,92 @@ export function AiPromptComposer({
       />
       <div className="flex items-center justify-between gap-2 px-2 pb-2">
         <div className="flex items-center gap-0.5">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
+          <DropdownMenu
+            placement="above"
+            menuWidth="14rem"
+            renderTrigger={(props) => (
+              <IconButton
+                {...props}
                 type="button"
-                aria-label="更多"
-                className="flex size-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                <Plus className="size-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" side="top" className="w-56">
-              <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
-                <Upload className="size-4" />
-                上传户型图 / 点位文件
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {templates?.length && onPickTemplate ? (
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>常用模板</DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="w-56">
-                    {templates.map((t) => (
-                      <DropdownMenuItem key={t.id} onSelect={() => onPickTemplate(t.id)}>
-                        {t.name}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-              ) : null}
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>关联项目</DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="w-56">
-                  <DropdownMenuItem onSelect={() => onSelectProject(null)}>不关联</DropdownMenuItem>
-                  {projects.map((p) => (
-                    <DropdownMenuItem key={p.id} onSelect={() => onSelectProject(p.id)}>
-                      <span className="truncate">{p.name}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>插件</DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="w-56">
-                  {usable.map((p) => (
-                    <DropdownMenuCheckboxItem
-                      key={p.id}
-                      checked={connectedPluginIds.includes(p.id)}
-                      onSelect={(e) => e.preventDefault()}
-                      onCheckedChange={() => onTogglePlugin(p.id)}
-                    >
-                      {p.name}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/capabilities">管理插件</Link>
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-            </DropdownMenuContent>
+                variant="ghost"
+                size="sm"
+                label="更多"
+                icon={<Plus />}
+              />
+            )}
+          >
+            <DropdownMenuItem
+              label="上传户型图 / 点位文件"
+              icon={<Upload className="size-4" />}
+              onClick={() => fileInputRef.current?.click()}
+            />
+            <DropdownMenuDivider />
+            {templates?.length && onPickTemplate ? (
+              <DropdownMenuSubMenu label="常用模板" menuWidth="14rem">
+                {templates.map((t) => (
+                  <DropdownMenuItem
+                    key={t.id}
+                    label={t.name}
+                    onClick={() => onPickTemplate(t.id)}
+                  />
+                ))}
+              </DropdownMenuSubMenu>
+            ) : null}
+            <DropdownMenuSubMenu label="关联项目" menuWidth="14rem">
+              <DropdownMenuItem label="不关联" onClick={() => onSelectProject(null)} />
+              {projects.map((p) => (
+                <DropdownMenuItem
+                  key={p.id}
+                  label={<span className="truncate">{p.name}</span>}
+                  onClick={() => onSelectProject(p.id)}
+                />
+              ))}
+            </DropdownMenuSubMenu>
+            <DropdownMenuSubMenu label="插件" menuWidth="14rem">
+              {usable.map((p) => (
+                <DropdownMenuCheckboxItem
+                  key={p.id}
+                  label={p.name}
+                  value={connectedPluginIds.includes(p.id)}
+                  onChange={() => onTogglePlugin(p.id)}
+                />
+              ))}
+              <DropdownMenuDivider />
+              {/* 本仓没有挂 LinkProvider，href 会整页跳转；
+                  这里用 preventDefault + router.push 保持原来的客户端导航，
+                  修饰键点击仍交给浏览器（官方在 href 行上会跳过 onClick）。 */}
+              <DropdownMenuItem
+                label="管理插件"
+                href="/capabilities"
+                onClick={(e) => {
+                  e.preventDefault()
+                  router.push('/capabilities')
+                }}
+              />
+            </DropdownMenuSubMenu>
           </DropdownMenu>
 
-          <button
+          <IconButton
             type="button"
-            aria-label="上传文件"
-            title="上传户型图（PNG/JPG）、点位 JSON 或 CSV/TXT 清单（支持直接拖入）"
+            variant="ghost"
+            size="sm"
+            label="上传文件"
+            tooltip="上传户型图（PNG/JPG）、点位 JSON 或 CSV/TXT 清单（支持直接拖入）"
             onClick={() => fileInputRef.current?.click()}
-            className="flex size-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <Paperclip className="size-3.5" />
-          </button>
+            icon={<Paperclip />}
+          />
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
+          <DropdownMenu
+            placement="above"
+            menuWidth="18rem"
+            renderTrigger={(props) => (
+              <Button
+                {...props}
                 type="button"
-                className="inline-flex h-7 items-center gap-1 rounded-full px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+                variant="ghost"
+                size="sm"
+                label={`选择 AI 模型：${selectedModel.name}`}
+                className="text-xs text-muted-foreground"
               >
                 {selectedModel.tierBadge ? (
                   <span
@@ -657,20 +668,15 @@ export function AiPromptComposer({
                 ) : null}
                 {selectedModel.name}
                 <ChevronDown className="size-3" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" side="top" className="w-72">
-              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                选择 AI 模型（Go / Plus / Pro 分档）
-              </DropdownMenuLabel>
+              </Button>
+            )}
+          >
+            <DropdownMenuGroup title="选择 AI 模型（Go / Plus / Pro 分档）">
               {models.map((m) => (
                 <DropdownMenuItem
                   key={m.id}
-                  onSelect={() => onSelectModel(m.id)}
-                  className="flex items-center justify-between gap-2"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 text-sm">
+                  label={
+                    <span className="flex items-center gap-1.5">
                       <span className="truncate font-medium">{m.name}</span>
                       <span
                         className={cn(
@@ -684,37 +690,38 @@ export function AiPromptComposer({
                       >
                         {m.tierBadge ?? 'Go'}
                       </span>
-                    </div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {m.tag} · 按量计费{m.cost !== 1 ? ` ×${m.cost}` : ''}
-                    </div>
-                  </div>
-                  {m.id === selectedModel.id ? <Check className="size-3.5 shrink-0" /> : null}
-                </DropdownMenuItem>
+                    </span>
+                  }
+                  description={`${m.tag} · 按量计费${m.cost !== 1 ? ` ×${m.cost}` : ''}`}
+                  endContent={
+                    m.id === selectedModel.id ? <Check className="size-3.5 shrink-0" /> : null
+                  }
+                  onClick={() => onSelectModel(m.id)}
+                />
               ))}
-            </DropdownMenuContent>
+            </DropdownMenuGroup>
           </DropdownMenu>
         </div>
 
         {streaming ? (
-          <button
+          <IconButton
             type="button"
-            aria-label="停止"
+            variant="primary"
+            size="sm"
+            label="停止"
             onClick={onStop}
-            className="flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground"
-          >
-            <Square className="size-3 fill-current" />
-          </button>
+            icon={<Square className="size-3 fill-current" />}
+          />
         ) : (
-          <button
+          <IconButton
             type="button"
-            aria-label="发送"
-            disabled={!canSend}
+            variant="primary"
+            size="sm"
+            label="发送"
+            isDisabled={!canSend}
             onClick={onSubmit}
-            className="flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity disabled:opacity-30"
-          >
-            <ArrowUp className="size-4" />
-          </button>
+            icon={<ArrowUp />}
+          />
         )}
       </div>
     </div>
