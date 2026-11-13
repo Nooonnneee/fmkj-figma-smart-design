@@ -8,21 +8,27 @@
 
 ## 一、一句话全貌
 
-浏览器 → **Next.js App Router**（route group：`(frontend)` 业务、`(payload)` 后台）→
+浏览器 → **Next.js 中间件**（`src/proxy.ts`，Next 16 里 `middleware.ts` 的改名）→
+**Next.js App Router**（route group：`(frontend)` 业务、`(payload)` 后台，外加顶层 `api/`）→
 **页面 / route handler** → **`src/lib/` 服务层** → **Payload Local API**（`getPayloadClient()`）
 → **Postgres**（`postgresAdapter`，`src/payload.selfhost.config.ts:158`）。
 
-插件、点位图引擎、数据集合、文档模板都是挂在上述主链上的外围层：插件挂页面/入口与 AI 工具，
-`src/board/` 是点位图渲染引擎，`src/collections/` 只在 Payload 配置层被引用。
+插件、点位图引擎、数据集合、全局配置、数据库迁移、文档模板都是挂在上述主链上的外围层：
+插件挂页面/入口与 AI 工具，`src/board/` 是点位图渲染引擎，`src/collections/` 与
+`src/globals/` 只在 Payload 配置层被引用，`src/migrations/` 描述数据库结构的演进。
+除 Postgres 外还有三个外部服务：S3 兼容对象存储、LLM 供应商、微信小程序接口。
 
 ```mermaid
 flowchart TB
   BROWSER["浏览器 / 小程序 / 桌面端"]
 
+  PROXY["src/proxy.ts<br/>中间件（Next 16 的 middleware）<br/>写 x-pathname · media HEAD 兜底"]
+
   subgraph APP["Next.js App Router（src/app/）"]
     direction TB
     FE["(frontend)<br/>业务页面 + route handler"]
     PY["(payload)<br/>/admin · /api/[...slug] · graphql"]
+    TOPAPI["api/<br/>ai/images · ai/images/style"]
   end
 
   subgraph PRESENT["表现层组件"]
@@ -35,16 +41,31 @@ flowchart TB
     PAYLOAD["payload.ts<br/>getPayloadClient()"]
   end
 
-  subgraph PERIPH["外围层"]
+  subgraph PERIPH["外围层（Payload 配置引用）"]
     PLUG["src/plugins/<br/>9 个插件 + AI 工具注册"]
     BOARD["src/board/<br/>点位图 canvas/core/packs"]
     COL["src/collections/<br/>21 个集合"]
+    GLOB["src/globals/<br/>3 个全局配置"]
   end
 
-  DB[("Postgres")]
+  subgraph CONFIG["Payload 配置层"]
+    SHARED["payload.shared.ts<br/>集合 / 全局 / 插件"]
+    SELF["payload.selfhost.config.ts<br/>postgresAdapter · s3Storage"]
+    MIG["src/migrations/<br/>14 个迁移模块"]
+  end
 
-  BROWSER --> FE
+  subgraph EXT["外部服务"]
+    DB[("Postgres")]
+    S3[("S3 兼容对象存储")]
+    LLM["LLM 供应商<br/>OpenAI 兼容 / 阿里云 MaaS"]
+    WX["微信小程序<br/>api.weixin.qq.com"]
+  end
+
+  BROWSER --> PROXY
+  PROXY -->|"工作台页面"| FE
+  PROXY -->|"media HEAD"| PY
   BROWSER --> PY
+  BROWSER --> TOPAPI
   FE -->|"175"| COMP
   FE -->|"511"| LIB
   FE -->|"92"| PLUG
@@ -58,24 +79,36 @@ flowchart TB
   LIB -->|"2"| BOARD
   LIB --> PAYLOAD
   COL -->|"46"| LIB
+  SHARED --> COL
+  SHARED --> GLOB
+  SHARED --> PLUG
+  SELF --> SHARED
+  SELF --> MIG
   PAYLOAD --> DB
   PY --> PAYLOAD
+  TOPAPI --> PAYLOAD
+  SELF --> S3
+  PLUG --> LLM
+  FE -->|"mp/v1/*"| WX
 ```
 
 边上的数字是实测 import 语句数（`grep -rn "from '@/<层>" src/<来源层> | wc -l`，见附录 B 命令）。
 
 ## 二、目录分层与依赖规则
 
-| 层           | 位置               | 职责                                           | 允许依赖                             | 实测依赖边                                   |
-| ------------ | ------------------ | ---------------------------------------------- | ------------------------------------ | -------------------------------------------- |
-| 路由/页面    | `src/app/`         | 页面、route handler、Server Action             | 组件、服务层、插件、documents、board | → lib 511 · → components 175 · → plugins 92  |
-| 组件         | `src/components/`  | 可复用 UI（含 Astryx 封装）                    | lib                                  | → lib 85 · → plugins 7                       |
-| 服务层       | `src/lib/`         | 业务逻辑、缓存、权限、Payload 客户端           | 插件、board、documents（存在反向边） | → plugins 11 · → board 2 · → components 2    |
-| 文档模板     | `src/documents/`   | 打印/文档的版式注册表                          | lib、plugins                         | → lib 8 · → plugins 2                        |
-| 插件         | `src/plugins/`     | 外围能力：AI 对话/识图、DWG、方案、售后等      | lib、components、documents           | → lib 110 · → components 13 · → documents 7  |
-| 点位图引擎   | `src/board/`       | 户型图 canvas、几何、符号包、历史栈            | lib、components                      | → lib 19 · → components 1                    |
-| 数据模型     | `src/collections/` | Payload 集合定义（字段、access、hooks）        | lib、plugins/proposal/framework      | → lib 46 · → plugins 1                       |
-| Payload 配置 | `src/payload*.ts`  | 组装 collections/globals/plugins、数据库与存储 | 全部（唯一的集合引用点）             | `payload.shared.ts` import collections 21 处 |
+| 层           | 位置               | 职责                                           | 允许依赖                             | 实测依赖边                                                                |
+| ------------ | ------------------ | ---------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------- |
+| 路由/页面    | `src/app/`         | 页面、route handler、Server Action             | 组件、服务层、插件、documents、board | → lib 511 · → components 175 · → plugins 92 · → documents 29 · → board 18 |
+| 中间件       | `src/proxy.ts`     | 写 `x-pathname`、media HEAD 兜底               | 无（只 import `next/server`）        | 无跨层 import                                                             |
+| 组件         | `src/components/`  | 可复用 UI（含 Astryx 封装）                    | lib、documents、board                | → lib 85 · → plugins 7 · → documents 6 · → board 2                        |
+| 服务层       | `src/lib/`         | 业务逻辑、缓存、权限、Payload 客户端           | 插件、board、documents（存在反向边） | → plugins 11 · → board 2 · → components 2 · → documents 1                 |
+| 文档模板     | `src/documents/`   | 打印/文档的版式注册表                          | lib、plugins                         | → lib 8 · → plugins 2                                                     |
+| 插件         | `src/plugins/`     | 外围能力：AI 对话/识图、DWG、方案、售后等      | lib、components、documents           | → lib 110 · → components 13 · → documents 7                               |
+| 点位图引擎   | `src/board/`       | 户型图 canvas、几何、符号包、历史栈            | lib、components                      | → lib 19 · → components 1                                                 |
+| 数据模型     | `src/collections/` | Payload 集合定义（字段、access、hooks）        | lib、plugins/proposal/framework      | → lib 46 · → plugins 1                                                    |
+| 全局配置     | `src/globals/`     | Payload globals：公司抬头、AI 设置、会员设置   | lib、plugins                         | → lib 7 · → plugins 3                                                     |
+| 数据库迁移   | `src/migrations/`  | 结构演进脚本（自托管配置专用）                 | 无（纯 DDL/SQL）                     | 无跨层 import                                                             |
+| Payload 配置 | `src/payload*.ts`  | 组装 collections/globals/plugins、数据库与存储 | 全部（唯一的集合引用点）             | `payload.shared.ts` import collections 21 处                              |
 
 **硬规则（已 grep 实测）**：没有任何页面或 route handler 直接 import `src/collections/`。
 
@@ -100,16 +133,52 @@ grep -rn "from './collections" src             # → 只有 src/payload.shared.t
   从 `@/plugins/proposal/framework` 取 `DECK_SECTIONS / ORCHESTRATION_RULES / PROPOSAL_FRAMEWORKS`。
   collections → plugins 1 处，属真实的层间倒挂。
 
+### 中间件 / 全局配置 / 数据库迁移
+
+这三层此前没进图，分别说明：
+
+- **中间件 `src/proxy.ts`**：Next 16 把 `middleware.ts` 改名为 `proxy.ts`，导出的函数也叫
+  `proxy`（`src/proxy.ts:32`），`config.matcher`（`src/proxy.ts:46`）列了 8 条路径
+  （7 个工作台页面前缀 + `/api/media/file/:path*`）。两个职责：给工作台页面写请求头
+  `x-pathname`（唯一消费者是 `src/lib/login-redirect.ts:11`，拼 `/login?from=`）；把
+  `/api/media/file/` 的 HEAD 请求转成内部 GET 再回传状态码/响应头（Payload 只注册了 GET，
+  否则 HEAD 一律 404，且被 `next.config.ts` 的强缓存固化）。**它不做鉴权**——
+  每个页面/接口/Server Action 各自校验登录与权限。
+- **全局配置 `src/globals/`**：3 个 Payload global，`src/payload.shared.ts:85` 注册 ——
+  `CompanySettings`（slug `company-settings`，抬头与默认条款）、`AiSettings`（slug `ai-settings`，
+  AI 模型/渠道，另挂 `ai-settings-endpoints`）、`MembershipSettings`（slug `membership-settings`，
+  会员分级已移除，只剩积分充值引导文案）。
+- **数据库迁移 `src/migrations/`**：`src/migrations/index.ts` 导出 `migrations` 数组，含 14 个
+  迁移模块（另有等名 `.json` 快照）。它**只在自托管配置里生效**：`migrationDir`（`selfhost:167`）、
+  `prodMigrations`（`selfhost:171`）在 `NODE_ENV === 'production'` 下自动执行；开发态走 `push`
+  （`selfhost:172`），所以结构变更必须落迁移文件，`push` 只给本地 `pnpm dev`。
+
+**外部服务不止 Postgres**：
+
+- **Postgres**：`postgresAdapter`（`src/payload.selfhost.config.ts:158`），UUID 主键、允许带 ID 导入。
+- **S3 兼容对象存储**：`s3Storage`（`src/payload.selfhost.config.ts:3` 引入、`174-190` 使用），
+  由 `S3_BUCKET` 是否设置决定（`selfhost:21`）；未配置 S3 时回退本地 `MEDIA_DIR`，并挂一个自实现的
+  `/file/:filename` 端点（`selfhost:40-147`，带 sharp WebP 缩略图与 ETag）。
+- **LLM 供应商**：聊天走 OpenAI 兼容渠道，每个渠道自带 `baseUrl` / `apiKeyEnv`（`AiSettings`），
+  另支持 `NEWAPI_API_KEY` / `ONEAPI_KEY`；AI 生图走阿里云百炼 MaaS 端点
+  （`src/plugins/ai-copilot/image-generation.ts:9`）。
+- **微信小程序**：`src/app/(frontend)/mp/v1/*` 的 33 个 route 由小程序调用，登录换 openid 打的是
+  `https://api.weixin.qq.com/sns/jscode2session`（`src/lib/mp/auth.ts:191`）。
+
 ## 三、真实路由全貌
 
 从 `src/app/` 目录树直接提取。`(frontend)` 下 46 个 `page.tsx`、58 个 `route.ts`。
 
 ```mermaid
 flowchart TB
+  PROXY["src/proxy.ts（中间件）<br/>matcher：projects/products/capabilities/<br/>membership/settings/ai/quotes + api/media/file"]
   ROOT["src/app/"]
+
+  PROXY --> ROOT
 
   ROOT --> FE["(frontend)<br/>业务"]
   ROOT --> PY["(payload)<br/>后台/API"]
+  ROOT --> TOPAPI["api/<br/>ai/images · ai/images/style"]
   ROOT --> META["manifest.ts · robots.ts<br/>sitemap.ts · global-not-found.tsx"]
 
   FE --> PUBLIC["公开页（不登录）"]
@@ -131,6 +200,13 @@ flowchart TB
 
 要点（从目录实测）：
 
+- **中间件 `src/proxy.ts`** 挂在所有路由最前面（Next 16 起 `middleware.ts` 改名 `proxy.ts`，
+  导出函数也叫 `proxy`）：它只做两件事——给工作台页面写请求头 `x-pathname`（供
+  `src/lib/login-redirect.ts:11` 拼 `/login?from=` 回跳）、把 `/api/media/file/` 的 HEAD 请求
+  转成内部 GET 兜底 404（`src/proxy.ts:32-44`）。它**不做鉴权**，权限仍由各页面/接口自校验。
+- 顶层 `src/app/api/` 只有两个 AI 生图 route（`ai/images`、`ai/images/style`），既不在
+  `(frontend)` 也不在 `(payload)`；它与 `(payload)/api/[...slug]` 的 catch-all 同属 `/api`
+  命名空间，命中时按更具体的静态路由优先。
 - `(frontend)/(workspace)` 是嵌套 route group：它的 `layout.tsx` 读公司设置与插件开关后再渲染侧边栏
   （`src/app/(frontend)/(workspace)/layout.tsx:35`）。
 - 项目主链路页面都在 `projects/[id]/`：`page.tsx`（信息）、`point-map`、`quotes`、`contract`、
@@ -138,6 +214,7 @@ flowchart TB
   route handler。
 - 未落到工作台的旧入口 `login/`、`download/`、`downloads/` 都在 `(frontend)` 下 `join`、`mp/web-login`。
 - Payload 后台与 REST/GraphQL 全部在 `(payload)`：`admin/[[...segments]]`、`api/[...slug]`。
+- route.ts 计数：全仓 64 个 —— `(frontend)` 58、`(payload)` 4、顶层 `api/` 2。
 
 ## 四、数据模型
 
@@ -167,24 +244,34 @@ erDiagram
 
   PRODUCTS }o--|| BRANDS : "79"
   PRODUCTS }o--o{ CATEGORIES : "86"
-  BRANDS }o--|| MEDIA : "24"
-  PRODUCTS }o--|| MEDIA : "98"
-  PROPOSAL_TEMPLATES }o--|| MEDIA : "201"
-  SCENES }o--|| MEDIA : "125"
-  USERS }o--|| MEDIA : "108,109"
-  AI_CREDIT_LEDGER }o--|| AI_MESSAGES : "96"
+  BRANDS }o--o| MEDIA : "24"
+  PRODUCTS }o--o| MEDIA : "98"
+  PROPOSAL_TEMPLATES }o--o| MEDIA : "201"
+  SCENES }o--o| MEDIA : "125"
+  QUOTES }o--o| MEDIA : "142"
+  USERS }o--o| MEDIA : "logo(108)"
+  USERS }o--o| MEDIA : "qrCode(109)"
+  AI_CREDIT_LEDGER }o--o| AI_MESSAGES : "96"
   AI_MESSAGES }o--|| AI_CONVERSATIONS : "32"
   MEDIA }o--o{ FOLDERS : "39"
   MEDIA }o--o{ TAGS : "40"
 ```
 
-标注数字为关系字段所在行号（`文件` 见下表）。归属分组：**核心链路**（users/projects/quotes/contracts/service-records/client-feedback/products/brands/categories/media/folders/tags）、**账号**（users/admins/wechat-accounts/mp-sessions/redemption-codes）、**AI**（ai-conversations/ai-messages/ai-credit-ledger）。
+标注数字为关系字段所在行号（`文件` 见下表）。**`o|` 表示「零或一」**：这些 upload/relationship 字段块里都没有
+`required: true`，留空是允许的；只有 `PRODUCTS }o--|| BRANDS(79)` 是必填（`src/collections/Products.ts:80`
+确有 `required: true`）。`USERS` 的 `logo`(108) 与 `qrCode`(109) 是**两个各自可选**的 upload 字段，
+所以拆成两条而不是一条「每个 user 恰好一个 media」。
+全仓 31 处 `relationTo`，上图逐条对应；`Quotes.ts:142`（报价行项 `image` → `media`）是原先漏掉的那条。
+
+归属分组：**核心链路**（users/projects/quotes/contracts/service-records/client-feedback/products/brands/categories/media/folders/tags）、
+**账号**（users/admins/wechat-accounts/mp-sessions/redemption-codes）、**AI**（ai-conversations/ai-messages/ai-credit-ledger）、
+**内容与模板**（scenes/proposal-templates）。
 
 | 集合（slug）          | 定义文件                                  | 关键关系                                                           |
 | --------------------- | ----------------------------------------- | ------------------------------------------------------------------ |
 | `users`               | `src/collections/Users.ts:21`             | 项目 owner/协作者、各 AI 集合、媒体 logo/qrCode                    |
 | `projects`            | `src/collections/Projects.ts:74`          | owner→users(195)、quotes(260)、collaborators→users(305)            |
-| `quotes`              | `src/collections/Quotes.ts:44`            | projects(114)、products(135)                                       |
+| `quotes`              | `src/collections/Quotes.ts:44`            | projects(114)、products(135)、media(142，行项图片)                 |
 | `contracts`           | `src/collections/Contracts.ts:65`         | projects(204)、quotes(213)                                         |
 | `service-records`     | `src/collections/ServiceRecords.ts:30`    | projects(113)                                                      |
 | `client-feedback`     | `src/collections/ClientFeedback.ts:53`    | projects(209)、quotes(218)、users(307)                             |
@@ -205,6 +292,11 @@ erDiagram
 `src/plugins/types.ts:55` 的 `PLUGIN_STAGES`，分 5 段；分类定义在 `src/plugins/types.ts:69`
 的 `PLUGIN_CATEGORIES`（AI 能力 / 模板 / 工具）。插件的 Payload 层扩展在构建时由
 `src/payload.shared.ts:97`（`...PLUGINS.flatMap((p) => (p.payload ? [p.payload] : []))`）注册。
+
+> 注意区分两个「Payload 插件」概念：`payload.shared.ts:95` 还单独注册了官方
+> `mcpPlugin({})`（`@payloadcms/plugin-mcp`），它**不在**这 9 个应用插件里，也不走
+> `RAW_PLUGINS`。别把它与 `ha-mcp`（第 131 行注册的应用插件，经 MCP 协议连客户现场的
+> Home Assistant）混为一谈。
 
 ```mermaid
 flowchart TB
@@ -273,17 +365,18 @@ flowchart TB
   LEDGER --> HOOK["afterChange 钩子<br/>AiCreditLedger.ts:57"]
   HOOK --> BAL["回写 users.aiCredits<br/>AiCreditLedger.ts:60"]
 
-  GRANT["发放积分<br/>membership-service.ts:100<br/>credit-tasks.ts"] --> LEDGER
+  GRANT["发放积分<br/>src/lib/services/membership-service.ts:103<br/>credit-tasks.ts"] --> LEDGER
 ```
 
-计费点实测（新增一条 `ai-credit-ledger` 流水）：
+计费点实测（新增一条 `ai-credit-ledger` 流水）。本列「余额校验」指**判断余额是否够用的那一行**
+（`if (... aiCredits ...) < 成本`），不是上面读余额的 `select: { aiCredits: true }`：
 
-| 入口              | 余额校验                          | 扣费写流水                        |
+| 入口              | 余额校验（判断行）                | 扣费写流水                        |
 | ----------------- | --------------------------------- | --------------------------------- |
-| AI 对话           | `chat-handler.ts:209`             | `chat-handler.ts:665`             |
-| AI 工具（跨插件） | `core-handlers.ts:1230`           | `core-handlers.ts:1278`           |
-| AI 生图           | `api/ai/images/route.ts:66`       | `api/ai/images/route.ts:80`       |
-| 户型图风格化      | `api/ai/images/style/route.ts:60` | `api/ai/images/style/route.ts:79` |
+| AI 对话           | `chat-handler.ts:211`             | `chat-handler.ts:665`             |
+| AI 工具（跨插件） | `core-handlers.ts:1232`           | `core-handlers.ts:1278`           |
+| AI 生图           | `api/ai/images/route.ts:68`       | `api/ai/images/route.ts:80`       |
+| 户型图风格化      | `api/ai/images/style/route.ts:62` | `api/ai/images/style/route.ts:79` |
 
 **余额的唯一真源是 `users.aiCredits`**，只能通过新增流水改变：`AiCreditLedger.ts:34` 的
 `beforeChange` 计算 `balanceAfter = user.aiCredits + delta` 并对负数余额抛 402；
@@ -299,7 +392,7 @@ flowchart TB
 | 1   | `PROJECT-ARCHITECTURE.md:286-298` 列插件清单为 11 项（方案演示、文档风格包、DWG 导入、房间智能分析、智能选型、现场勘测表、强弱电布线表、采购与备货单、场景与账号移交、售后维保记录、仪表盘） | `src/plugins/index.ts:27-143` 实际 9 个：ai-copilot、doc-styles、proposal、room-insights、smart-select、ai-import、dwg-import、after-sales、ha-mcp                       | 文档里的「现场勘测表 / 强弱电布线表 / 采购与备货单 / 场景与账号移交 / 仪表盘」都不是插件（`grep "'survey'\|'wiring'\|'procurement'\|'dashboard'" src/plugins` → 0）；文档漏掉 ai-copilot、ai-import、ha-mcp。按文档找插件会找不到 |
 | 2   | `PROJECT-ARCHITECTURE.md:300-308` 说 AI 对话、AI 识别导入、户型图风格化、AI 生图、AI 智能布点「从插件移到 AI 模块」                                                                          | 代码里 AI 对话 = 插件 `ai-copilot`、AI 识别导入 = 插件 `ai-import`，`category: 'ai'`（`index.ts:30,91`）                                                                 | AI 能力仍是插件形态，不是独立于插件体系的模块；文档的「三类并行」表述与实现不符                                                                                                                                                   |
 | 3   | `PROJECT-ARCHITECTURE.md:506-516` §4.6.2「没有用户启停 / 不做开启关闭插件」                                                                                                                  | 数据层与接口层都有开关：`Users.ts:133` `disabledPlugins`、`settings/company/route.ts:92-95`、`plugins/state.ts:18`；但**没有 UI 生成 `plugins-present` / `plugin-<id>`** | 半成品：后端开关是死代码，用户界面确实不能开关。要么补 UI，要么删掉 route/字段                                                                                                                                                    |
-| 4   | `PROJECT-ARCHITECTURE.md:619-626` §6 工具中心写作 `/plugins/tools`                                                                                                                           | 真实路由是 `src/app/(frontend)/(workspace)/capabilities/tools/page.tsx` → `/capabilities/tools`                                                                          | 文档 URL 过时；`next.config.ts:29-30` 有 `/plugins → /capabilities` 的 301，老链接仍可用，但要两次跳转                                                                                                                            |
+| 4   | `PROJECT-ARCHITECTURE.md:619-626` §6 工具中心写作 `/plugins/tools`                                                                                                                           | 真实路由是 `src/app/(frontend)/(workspace)/capabilities/tools/page.tsx` → `/capabilities/tools`                                                                          | 文档 URL 过时；`next.config.ts:29-30` 用 `permanent: true` 配了 `/plugins → /capabilities` 的 **308**（Next.js 对 `permanent: true` 发 308，不是 301），老链接仍可用，但要两次跳转                                                |
 | 5   | `PROJECT-ARCHITECTURE.md:664-671` §7.2 模板中心写作 `/plugins/templates`                                                                                                                     | 真实路由 `capabilities/templates/page.tsx` → `/capabilities/templates`                                                                                                   | 同上                                                                                                                                                                                                                              |
 | 6   | `PROJECT-ARCHITECTURE.md:136` 「会员等级字段仍在：`membershipTier` / `membershipExpiresAt`」                                                                                                 | `grep -rn 'membershipTier' src` → 0；`membershipExpiresAt` → 0（`src/lib/membership-policy.ts` 仍在但已无字段）                                                          | 文档滞留；会员分级已在代码里彻底移除，只剩积分                                                                                                                                                                                    |
 | 7   | `PROJECT-ARCHITECTURE.md:322` 「`ProjectToolbox` 组件存在…死代码」、`:363` 「`ProjectToolbox` 死代码在实施时删除」                                                                           | `grep -rn 'ProjectToolbox' src` → 0，已删除                                                                                                                              | 已成历史，文档未更新                                                                                                                                                                                                              |
@@ -321,14 +414,18 @@ flowchart TB
 | `src/plugins/types.ts`                                                   | 一、五（阶段、分类）   |
 | `src/plugins/state.ts`                                                   | 五（运行时开关）       |
 | `src/collections/*.ts`                                                   | 四                     |
+| `src/globals/*.ts`                                                       | 一、二（全局配置）     |
+| `src/migrations/`                                                        | 一、二（结构演进）     |
+| `src/proxy.ts`                                                           | 一、三（中间件）       |
 | `next.config.ts`（redirects）                                            | 附录 A（老路径）       |
 | `src/plugins/ai-copilot/billing.ts`、`src/collections/AiCreditLedger.ts` | 六                     |
 
-复跑本节所有数字的命令：
+复跑本节所有数字的命令。**注意依赖计数用不带尾斜杠的 `from '@/<层>`**，与正文 figcaption 口径一致
+（带斜杠的 `from '@/<层>/` 会漏掉 index 精确导入，例如 `from '@/plugins'`）：
 
 ```bash
 # 分层依赖计数（下例：app -> lib）
-grep -rn "from '@/lib/" src/app | wc -l
+grep -rn "from '@/lib" src/app | wc -l
 # 硬规则：无人直接 import collections
 grep -rn "from '@/collections" src/app src/lib | wc -l
 # 插件阶段是否为空
@@ -336,6 +433,11 @@ grep -rn "stage: 'build'" src/plugins | wc -l
 # 会员等级字段是否已移除
 grep -rn 'membershipTier' src | wc -l
 ```
+
+**为什么不能带尾斜杠**：`from '@/plugins/'` 只匹配子路径导入，会漏掉 `from '@/plugins'` 这种
+index 精确导入。全仓有 **10 处** `from '@/plugins'` 精确导入（`src/app` 8 处、`src/lib`
+与 `src/documents` 各 1 处），所以 `grep "from '@/plugins/" src/app | wc -l` → 84，
+而正确的 `grep "from '@/plugins" src/app | wc -l` → 92（正文用的就是 92）。
 
 ## 备注
 
