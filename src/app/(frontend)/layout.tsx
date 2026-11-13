@@ -32,7 +32,7 @@ const defaultSocialImage = {
 const googleAnalyticsId = sanitizeHtmlAttribute(makeSiteSettings.analytics?.googleAnalyticsId)
 
 export const metadata: Metadata = {
-  // 生产只设 PUBLIC_URL；直接写死 NEXT_PUBLIC_SITE_URL/FIGMA_PUBLIC_URL 会退回 localhost:3000
+  // 统一走 siteUrl()：生产只设 PUBLIC_URL，由 next.config 派生 NEXT_PUBLIC_SITE_URL
   metadataBase: new URL(siteUrl('http://localhost:3000')),
   title,
   description,
