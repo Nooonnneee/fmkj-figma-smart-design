@@ -51,6 +51,15 @@ if [[ "${1:-}" == "--cut" ]]; then
   [[ "$TARGET_PORT" == "$CUR_PORT" ]] && { echo "已经在 $TARGET_PORT，无需切换"; exit 0; }
   NEW_PORT=$TARGET_PORT
   CUT_ONLY=1
+  # --cut 是**另一次进程**，$STAMP 是新的，算出来的 $APP_CONTAINER 根本不存在。
+  # 而第 5.5 步的清理循环靠「跳过 $APP_CONTAINER」保护正在服务的容器 ——
+  # 名字对不上就等于没有保护：影子起好超过 5 分钟再切，脚本会**把自己刚切的
+  # 线上容器删掉**（2026-11-14 实测：那次只差 3 分钟就踩中）。
+  # 所以这里按端口反查真正在服务的容器名。
+  APP_CONTAINER=$(sudo docker ps --format '{{.Names}} {{.Ports}}' \
+    | awk -v p="127.0.0.1:$TARGET_PORT->" 'index($0,p){print $1; exit}')
+  [[ -n "$APP_CONTAINER" ]] || die "找不到监听 $TARGET_PORT 的容器，拒绝切流量"
+  echo "  目标容器：$APP_CONTAINER"
 fi
 
 # ── 回滚 ──────────────────────────────────────────────
@@ -272,9 +281,23 @@ sleep 6
 #
 # 只清 project 名以 fmkj-shadow- 开头、且不是本次 $PROJECT 的容器；
 # 手工创建的 `fmkj-shadow-app`（无 compose 标签）和 `fmkj-db-1` 一律不碰。
-log "5.5/7 清理上一版影子容器"
+#
+# 保留策略：**当前 + 上一版**。$CUR_PORT 那个容器就是上一版生产，脚本最后打印的
+# 回滚命令指向它 —— 之前把它一起清了，等于「回滚命令」是一句空话
+# （2026-11-14 实测：切完 13028 就没了，只剩 4 天前的 13001）。
+log "5.5/7 清理更早的影子容器（保留当前与上一版）"
 for c in $(sudo docker ps -a --format '{{.Names}}' | grep -E '^fmkj-shadow-[0-9]{8}-[0-9]{4}-app-1$' || true); do
   [[ "$c" == "$APP_CONTAINER" ]] && continue
+  # 双保险：任何正在监听新端口的容器都是「刚切过去的线上容器」，一律不动。
+  # 名字保护已经够了，但名字是推出来的，端口是事实。
+  if sudo docker port "$c" 2>/dev/null | grep -q ":$NEW_PORT\$"; then
+    echo "  保留：$c（正在服务 $NEW_PORT）"
+    continue
+  fi
+  if sudo docker port "$c" 2>/dev/null | grep -q ":$CUR_PORT\$"; then
+    echo "  保留：$c（上一版，回滚目标 $CUR_PORT）"
+    continue
+  fi
   # 只清 5 分钟以前的（避免误清并发的另一次部署）
   started=$(sudo docker inspect "$c" --format '{{.State.StartedAt}}' 2>/dev/null || true)
   if [[ -n "$started" ]]; then
@@ -293,5 +316,9 @@ for p in /login / /projects; do
     "$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "https://fmkj.top$p")"
 done
 
-echo "  本次容器：$APP_CONTAINER（compose project: $PROJECT）"
+if [[ "$CUT_ONLY" == "1" ]]; then
+  echo "  当前容器：$APP_CONTAINER"
+else
+  echo "  本次容器：$APP_CONTAINER（compose project: $PROJECT）"
+fi
 log "完成。回滚命令：bash deploy/shadow-release.sh --rollback $CUR_PORT"
