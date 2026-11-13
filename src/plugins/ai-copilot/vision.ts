@@ -32,6 +32,7 @@ const modelText = (m: AiModelConfig) => `${m.id} ${m.apiModel} ${m.name}`.toLowe
 export function visionScore(m: AiModelConfig): number {
   const s = modelText(m)
   if (!isVisionCapableModel(s)) return -1
+  if (/qwen-?4/.test(s)) return 320
   if (/qwen-?3\.7-plus/.test(s)) return 300
   if (/qwen-?3\.8(?!.*flash)/.test(s)) return 100
   if (/qwen-?3\.8.*flash/.test(s)) return 98
@@ -47,6 +48,9 @@ export function visionScore(m: AiModelConfig): number {
 
 export const isReasoningOnlyModel = (m: AiModelConfig) =>
   Boolean(m.reasoning) || /reasoner|deepseek-r1|\br1\b|qwq|qvq|thinking/.test(modelText(m))
+
+/** 思考链很长的视觉模型：识图时需要更大的 max_tokens，否则 reasoning 吃满、正文为空。 */
+export const isHeavyThinkingVisionModel = (m: AiModelConfig) => /qwen-?4|qvq|qwq/.test(modelText(m))
 
 /**
  * 可用的视觉模型（已启用、可识图、已配置密钥），按能力从高到低。
@@ -65,7 +69,14 @@ export function rankVisionModels(
   return [...accessible, ...sorted.filter((m) => !accessible.includes(m))]
 }
 
-/** 两轮识别优先用 qwen3.8-flash：召回高、速度快；没有时退回排序第一个。 */
+/**
+ * 两轮识别优先用 qwen3.8-flash：召回高、速度快；没有时退回排序第一个。
+ *
+ * ⚠️ 这里是**产品选择**，不是漏写的评分逻辑：2026-11-13 实测（qwen4-pointmap-test/README.md）
+ * qwen4-max-preview 虽然 visionScore 更高（320），但 devices 档召回低于 flash
+ * （33 点 vs 42 点，开关 13/17 vs 16/26）且单次 200s+。owner 2026-11-14 决定保持 flash 优先。
+ * qwen4 仍参与其它看图任务（对话看图、质检）；要让它接管两轮识图，需显式改这里或在后台停用 flash。
+ */
 export function pickPreferredVisionModel(
   models: AiModelConfig[],
   pattern = /qwen-?3\.8.*flash/i,
@@ -146,7 +157,12 @@ export async function callVision(opts: {
     if (!isReasoningOnlyModel(model)) {
       body.temperature = opts.temperature ?? 0.1
       // Qwen 3.x 等混合推理模型在百炼/兼容网关默认开启思考链，结构化识图显式关闭可提速 2~4 倍
-      if (!opts.thinking && (model.channelId === 'dashscope' || /qwen-?3/.test(mText))) {
+      if (
+        !opts.thinking &&
+        (model.channelId === 'dashscope' ||
+          model.channelId === 'dashscope-token-plan' ||
+          /qwen-?[3-9]/.test(mText))
+      ) {
         body.enable_thinking = false
       }
     }

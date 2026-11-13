@@ -164,7 +164,7 @@ export function inferModelTier(
  * 涵盖千问 Qwen-3.6/3.7/3.8、智谱 GLM-5.3 / GLM-5.3-Flash，以及 Qwen-VL / QVQ / GLM-4V / 豆包 Vision 等。
  */
 export const VISION_MODEL_RE =
-  /vl|vision|glm-4v|qvq|omni|doubao.*vision|qwen-?3\.[5-9]|glm-?5\.[0-9]|gpt-4o|claude-3|gemini/i
+  /vl|vision|glm-4v|qvq|omni|doubao.*vision|qwen-?3\.[5-9]|qwen-?4|glm-?5\.[0-9]|gpt-4o|claude-3|gemini/i
 
 export function isVisionCapableModel(apiModelOrId: string | undefined | null): boolean {
   if (!apiModelOrId) return false
@@ -274,6 +274,22 @@ export const DEFAULT_AI_MODELS: AiModelConfig[] = [
     cost: 2,
     description: '百炼 Token Plan 旗舰文本/多模态模型，适合复杂方案、图纸理解与多步工具调用',
     apiModel: 'qwen3.8-max',
+    baseUrl: AI_PROVIDER_CHANNELS['dashscope-token-plan'].baseUrl,
+    apiKeyEnv: AI_PROVIDER_CHANNELS['dashscope-token-plan'].apiKeyEnv,
+    minTier: 'free',
+    tierBadge: 'Go',
+    enabled: true,
+    isDefault: false,
+  },
+  {
+    id: 'qwen4-max-preview',
+    name: '通义千问 Qwen4-Max（预览版）',
+    provider: AI_PROVIDER_CHANNELS['dashscope-token-plan'].label,
+    channelId: 'dashscope-token-plan',
+    tag: '预览 · 复杂方案与工具',
+    cost: 2,
+    description: '百炼 Token Plan 最新预览模型，用于复杂方案、图纸理解与多步工具调用',
+    apiModel: 'qwen4-max-preview',
     baseUrl: AI_PROVIDER_CHANNELS['dashscope-token-plan'].baseUrl,
     apiKeyEnv: AI_PROVIDER_CHANNELS['dashscope-token-plan'].apiKeyEnv,
     minTier: 'free',
