@@ -1,12 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, Copy, ExternalLink, FileDown, FolderDown, Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { Check, Copy, ExternalLink, FileDown, FolderDown } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout'
+import { useToast } from '@astryxdesign/core/Toast'
 import { downloadBlob, exportPagesAsPdfBundle } from '@/lib/export-pdf'
 
 type ExportState = {
@@ -23,6 +23,7 @@ export function ShareExportButton({ projectName }: { projectName: string }) {
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<ExportState | null>(null)
   const [copied, setCopied] = useState(false)
+  const showToast = useToast()
 
   const handleExport = async () => {
     if (busy) return
@@ -37,7 +38,7 @@ export function ShareExportButton({ projectName }: { projectName: string }) {
             ),
           ]
       if (!pages.length) {
-        toast.error('未找到可导出的方案或报价页面')
+        showToast({ body: '未找到可导出的方案或报价页面', type: 'error' })
         return
       }
       const baseName = `${projectName}-方案与报价`
@@ -75,9 +76,9 @@ export function ShareExportButton({ projectName }: { projectName: string }) {
         previewUrl,
         previewImages: bundle.previewDataUrls,
       })
-      toast.success(`已生成 PDF（共 ${bundle.pageCount} 页）`)
+      showToast({ body: `已生成 PDF（共 ${bundle.pageCount} 页）` })
     } catch {
-      toast.error('导出失败，请稍后重试')
+      showToast({ body: '导出失败，请稍后重试', type: 'error' })
     } finally {
       setBusy(false)
     }
@@ -104,7 +105,7 @@ export function ShareExportButton({ projectName }: { projectName: string }) {
         const writable = await handle.createWritable()
         await writable.write(result.blob)
         await writable.close()
-        toast.success('已保存到您选择的文件夹')
+        showToast({ body: '已保存到您选择的文件夹' })
         return
       } catch (e) {
         if (e instanceof Error && e.name === 'AbortError') return
@@ -122,9 +123,9 @@ export function ShareExportButton({ projectName }: { projectName: string }) {
     try {
       await navigator.clipboard.writeText(result.downloadUrl)
       setCopied(true)
-      toast.success('已复制 PDF 下载链接，可在手机浏览器或微信中打开保存')
+      showToast({ body: '已复制 PDF 下载链接，可在手机浏览器或微信中打开保存' })
     } catch {
-      toast.error('复制失败，请手动复制')
+      showToast({ body: '复制失败，请手动复制', type: 'error' })
     }
   }
 
@@ -136,9 +137,9 @@ export function ShareExportButton({ projectName }: { projectName: string }) {
         variant="primary"
         className="h-8 gap-1.5 text-xs"
         isDisabled={busy}
+        isLoading={busy}
         onClick={() => void handleExport()}
-        icon={<Loader2 />}
-        endContent={<FileDown />}
+        icon={<FileDown />}
         label={busy ? '生成 PDF 中…' : '下载方案与报价 PDF'}
       />
 

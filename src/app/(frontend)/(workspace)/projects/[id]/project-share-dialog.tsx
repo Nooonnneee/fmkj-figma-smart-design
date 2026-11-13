@@ -11,23 +11,21 @@ import {
   LogOut,
   PencilLine,
   RefreshCw,
-  Shield,
   Trash2,
   Users,
 } from 'lucide-react'
-import { toast } from 'sonner'
 
 import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
 import { IconButton } from '@astryxdesign/core/IconButton'
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout'
-import { TextInput } from '@astryxdesign/core/TextInput'
-import { Label } from '@/components/ui/label'
+import { SelectableCard } from '@astryxdesign/core/SelectableCard'
 import { Selector } from '@astryxdesign/core/Selector'
 import { Switch } from '@astryxdesign/core/Switch'
+import { TextInput } from '@astryxdesign/core/TextInput'
+import { useToast } from '@astryxdesign/core/Toast'
 import type { CollaboratorRole, ProjectRole, ShareConfig } from '@/lib/project-access'
-import { cn } from '@/lib/utils'
 
 type CollaboratorView = {
   userId: string
@@ -56,6 +54,7 @@ export function ProjectShareDialog({
   initialCollaboratorCount?: number
 }) {
   const router = useRouter()
+  const showToast = useToast()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -101,13 +100,15 @@ export function ProjectShareDialog({
         error?: string
       } | null
       if (!res.ok || !data?.ok || !data.shareConfig) {
-        toast.error(data?.error ?? '修改失败')
+        showToast({ body: data?.error ?? '修改失败', type: 'error' })
         return
       }
       setState((prev) => (prev ? { ...prev, shareConfig: data.shareConfig! } : prev))
-      if (patch.resetToken) toast.success('已重置协作链接，旧链接已失效')
+      if (patch.resetToken) showToast({ body: '已重置协作链接，旧链接已失效' })
       else if (patch.role)
-        toast.success(`协作链接权限已设为「${patch.role === 'edit' ? '可编辑' : '仅查看'}」`)
+        showToast({
+          body: `协作链接权限已设为「${patch.role === 'edit' ? '可编辑' : '仅查看'}」`,
+        })
     } finally {
       setBusy(false)
     }
@@ -131,11 +132,11 @@ export function ProjectShareDialog({
         error?: string
       } | null
       if (!res.ok || !data?.ok || !data.collaborators) {
-        toast.error(data?.error ?? '操作失败')
+        showToast({ body: data?.error ?? '操作失败', type: 'error' })
         return
       }
       setState((prev) => (prev ? { ...prev, collaborators: data.collaborators! } : prev))
-      toast.success(patch.remove ? '已移除协作者' : '已更新协作者权限')
+      showToast({ body: patch.remove ? '已移除协作者' : '已更新协作者权限' })
       router.refresh()
     } finally {
       setBusy(false)
@@ -152,7 +153,7 @@ export function ProjectShareDialog({
         body: JSON.stringify({ action: 'leave' }),
       })
       if (res.ok) {
-        toast.success('已退出该项目协作')
+        showToast({ body: '已退出该项目协作' })
         setOpen(false)
         router.push('/projects')
         router.refresh()
@@ -167,10 +168,10 @@ export function ProjectShareDialog({
     try {
       await navigator.clipboard.writeText(shareUrl)
       setCopied(true)
-      toast.success('协作链接已复制，可直接发给微信好友或同事')
+      showToast({ body: '协作链接已复制，可直接发给微信好友或同事' })
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      toast.error('复制失败，请手动复制输入框中的链接')
+      showToast({ body: '复制失败，请手动复制输入框中的链接', type: 'error' })
     }
   }
 
@@ -215,71 +216,74 @@ export function ProjectShareDialog({
                   {/* 链接分享区（仅项目管理员可见） */}
                   {isOwner ? (
                     <div className="space-y-3 rounded-xl border bg-muted/30 p-3.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <Link2 className="size-4 text-primary" />
-                          <Label htmlFor="share-enabled" className="text-sm font-medium">
-                            开启链接邀请协作
-                          </Label>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Link2 className="size-4 shrink-0 text-primary" />
+                        <div className="min-w-0 flex-1">
+                          <Switch
+                            label="开启链接邀请协作"
+                            value={state.shareConfig.enabled}
+                            isDisabled={busy}
+                            onChange={(checked) => void updateConfig({ enabled: checked })}
+                            labelPosition="start"
+                            labelSpacing="spread"
+                            width="100%"
+                          />
                         </div>
-                        <Switch
-                          label={'开关'}
-                          isLabelHidden
-                          id="share-enabled"
-                          value={state.shareConfig.enabled}
-                          isDisabled={busy}
-                          onChange={(checked) => void updateConfig({ enabled: checked })}
-                        />
                       </div>
 
                       {state.shareConfig.enabled ? (
                         <>
-                          <div className="grid grid-cols-2 gap-2">
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => void updateConfig({ role: 'read' })}
-                              className={cn(
-                                'flex items-center gap-2 rounded-lg border bg-background p-2.5 text-left text-xs transition-colors',
-                                state.shareConfig.role === 'read' &&
-                                  'border-primary bg-primary/5 ring-1 ring-primary',
-                              )}
+                          <div
+                            role="group"
+                            aria-label="协作链接权限"
+                            className="grid grid-cols-2 gap-2"
+                          >
+                            <SelectableCard
+                              label="仅查看：查看点位、报价与导出"
+                              isSelected={state.shareConfig.role === 'read'}
+                              onChange={() => void updateConfig({ role: 'read' })}
+                              isDisabled={busy}
+                              padding={2}
+                              width="100%"
                             >
-                              <Eye className="size-4 shrink-0 text-muted-foreground" />
-                              <div>
-                                <div className="font-medium">仅查看</div>
-                                <div className="text-xs text-muted-foreground">
-                                  查看点位、报价与导出
-                                </div>
-                              </div>
-                            </button>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => void updateConfig({ role: 'edit' })}
-                              className={cn(
-                                'flex items-center gap-2 rounded-lg border bg-background p-2.5 text-left text-xs transition-colors',
-                                state.shareConfig.role === 'edit' &&
-                                  'border-primary bg-primary/5 ring-1 ring-primary',
-                              )}
+                              <span className="flex items-center gap-2 text-xs">
+                                <Eye className="size-4 shrink-0 text-muted-foreground" />
+                                <span>
+                                  <span className="block font-medium">仅查看</span>
+                                  <span className="block text-xs text-muted-foreground">
+                                    查看点位、报价与导出
+                                  </span>
+                                </span>
+                              </span>
+                            </SelectableCard>
+                            <SelectableCard
+                              label="可编辑：共同编辑点位、报价与合同"
+                              isSelected={state.shareConfig.role === 'edit'}
+                              onChange={() => void updateConfig({ role: 'edit' })}
+                              isDisabled={busy}
+                              padding={2}
+                              width="100%"
                             >
-                              <PencilLine className="size-4 shrink-0 text-muted-foreground" />
-                              <div>
-                                <div className="font-medium">可编辑</div>
-                                <div className="text-xs text-muted-foreground">
-                                  共同编辑点位、报价与合同
-                                </div>
-                              </div>
-                            </button>
+                              <span className="flex items-center gap-2 text-xs">
+                                <PencilLine className="size-4 shrink-0 text-muted-foreground" />
+                                <span>
+                                  <span className="block font-medium">可编辑</span>
+                                  <span className="block text-xs text-muted-foreground">
+                                    共同编辑点位、报价与合同
+                                  </span>
+                                </span>
+                              </span>
+                            </SelectableCard>
                           </div>
 
                           <div className="flex items-center gap-2">
                             <TextInput
-                              label={'表单字段'}
+                              label="协作链接"
                               isLabelHidden
                               isReadOnly
                               value={shareUrl}
                               controlClassName="h-8 bg-background font-mono text-xs"
+                              containerClassName="min-w-0 flex-1"
                             />
                             <Button
                               type="button"
@@ -293,7 +297,6 @@ export function ProjectShareDialog({
                             <IconButton
                               type="button"
                               variant="ghost"
-
                               tooltip="重置链接（旧链接立即失效）"
                               isDisabled={busy}
                               onClick={() => void updateConfig({ resetToken: true })}
@@ -368,8 +371,6 @@ export function ProjectShareDialog({
                               <IconButton
                                 type="button"
                                 variant="ghost"
-
-                                aria-label={`移除 ${c.name}`}
                                 isDisabled={busy}
                                 className="text-muted-foreground hover:text-destructive"
                                 onClick={() => void updateCollaborator(c.userId, { remove: true })}

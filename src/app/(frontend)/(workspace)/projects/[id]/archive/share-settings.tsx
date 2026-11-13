@@ -1,13 +1,15 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { CalendarClock, KeyRound, Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { KeyRound } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
+import { CheckboxInput } from '@astryxdesign/core/CheckboxInput'
+import { DateTimeInput } from '@astryxdesign/core/DateTimeInput'
+import type { ISODateTimeString } from '@astryxdesign/core/DateTimeInput'
 import { Field } from '@astryxdesign/core/Field'
 import { TextInput } from '@astryxdesign/core/TextInput'
-import { Input } from '@/components/ui/input'
+import { useToast } from '@astryxdesign/core/Toast'
 import type { ShareConfig } from '@/lib/project-access'
 
 import { setShareSettings } from './actions'
@@ -32,6 +34,7 @@ export function ShareSettings({ projectId, config }: { projectId: string; config
   const [password, setPassword] = useState('')
   const [clearPassword, setClearPassword] = useState(false)
   const [saving, startSave] = useTransition()
+  const showToast = useToast()
 
   const hasPassword = Boolean(config.passwordHash)
   const expired = Boolean(config.expiresAt) && Date.parse(config.expiresAt as string) < Date.now()
@@ -44,15 +47,22 @@ export function ShareSettings({ projectId, config }: { projectId: string; config
         password: clearPassword ? '' : password || undefined,
       })
       if (!res.ok) {
-        toast.error(res.error)
+        showToast({ body: res.error, type: 'error' })
         return
       }
       setPassword('')
       setClearPassword(false)
-      toast.success('分享设置已保存', {
-        description: res.config.expiresAt
-          ? `链接将于 ${new Date(res.config.expiresAt).toLocaleString('zh-CN')} 失效`
-          : '链接当前永久有效',
+      showToast({
+        body: (
+          <>
+            分享设置已保存。
+            <span className="block">
+              {res.config.expiresAt
+                ? `链接将于 ${new Date(res.config.expiresAt).toLocaleString('zh-CN')} 失效`
+                : '链接当前永久有效'}
+            </span>
+          </>
+        ),
       })
     })
   }
@@ -75,12 +85,14 @@ export function ShareSettings({ projectId, config }: { projectId: string; config
 
       <div className="flex flex-col gap-4 px-5 py-4">
         <Field label="有效期" inputID="share-expires">
-          <Input
+          <DateTimeInput
             id="share-expires"
-            type="datetime-local"
-            value={expiresAt}
-            onChange={(e) => setExpiresAt(e.target.value)}
-            className="w-full max-w-xs"
+            label="有效期"
+            isLabelHidden
+            value={(expiresAt || undefined) as ISODateTimeString | undefined}
+            onChange={(value) => setExpiresAt(value ?? '')}
+            width="100%"
+            containerClassName="max-w-xs"
           />
           <p className="text-xs text-muted-foreground">
             留空 = 永久有效。到期后业主打开链接会看到「链接已过期」，不影响你自己登录查看。
@@ -101,17 +113,14 @@ export function ShareSettings({ projectId, config }: { projectId: string; config
             autoComplete="new-password"
           />
           {hasPassword ? (
-            <label className="flex items-center gap-2 text-xs text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={clearPassword}
-                onChange={(e) => {
-                  setClearPassword(e.target.checked)
-                  if (e.target.checked) setPassword('')
-                }}
-              />
-              清除访问密码（业主可直接打开链接）
-            </label>
+            <CheckboxInput
+              label="清除访问密码（业主可直接打开链接）"
+              value={clearPassword}
+              onChange={(checked) => {
+                setClearPassword(checked)
+                if (checked) setPassword('')
+              }}
+            />
           ) : (
             <p className="text-xs text-muted-foreground">
               设置后，业主首次打开链接需要输入密码。密码只保存摘要，无法找回，只能重设。
@@ -124,8 +133,8 @@ export function ShareSettings({ projectId, config }: { projectId: string; config
             type="button"
             size="sm"
             isDisabled={saving}
+            isLoading={saving}
             onClick={save}
-            icon={<Loader2 />}
             label="保存设置"
           />
           <span className="text-xs text-muted-foreground">

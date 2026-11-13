@@ -3,13 +3,13 @@
 import { useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ExternalLink, FileArchive, FileStack, Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
+import { ExternalLink, FileArchive, FileStack } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
 import { CheckboxInput } from '@astryxdesign/core/CheckboxInput'
 import { ProgressBar } from '@astryxdesign/core/ProgressBar'
 import { Selector } from '@astryxdesign/core/Selector'
+import { useToast } from '@astryxdesign/core/Toast'
 import { COLLECT_MESSAGE, type CollectResult } from '@/lib/doc-collect'
 import {
   buildPdfFromJpegs,
@@ -109,6 +109,7 @@ export function DeliveryPackage({
   cover: { company: string; customer: string; address: string; date: string }
 }) {
   const router = useRouter()
+  const showToast = useToast()
   const [selected, setSelected] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(docs.map((d) => [d.key, d.defaultOn && Boolean(d.url)])),
   )
@@ -124,8 +125,8 @@ export function DeliveryPackage({
   const save = (patch: { finalQuote?: string | null }, ok: string) =>
     startSaving(async () => {
       const res = await setDeliverables(projectId, patch)
-      if (!res.ok) return void toast.error(res.error)
-      toast.success(ok)
+      if (!res.ok) return void showToast({ body: res.error, type: 'error' })
+      showToast({ body: ok })
       router.refresh()
     })
 
@@ -180,13 +181,14 @@ export function DeliveryPackage({
         )
         downloadBlob(zipFiles(entries), `${base}.zip`)
       }
-      toast.success(
-        mode === 'pdf'
-          ? `已生成交付资料包 PDF（${results.length} 份资料）`
-          : `已生成交付资料包 ZIP（${results.length} 份资料）`,
-      )
+      showToast({
+        body:
+          mode === 'pdf'
+            ? `已生成交付资料包 PDF（${results.length} 份资料）`
+            : `已生成交付资料包 ZIP（${results.length} 份资料）`,
+      })
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '生成失败，请稍后重试')
+      showToast({ body: e instanceof Error ? e.message : '生成失败，请稍后重试', type: 'error' })
     } finally {
       setProgress(null)
       setToc(null)
@@ -209,15 +211,17 @@ export function DeliveryPackage({
             variant="secondary"
             size="sm"
             isDisabled={busy || !chosen.length}
+            isLoading={busy}
             onClick={() => void build('zip')}
-            icon={<Loader2 />}
+            icon={<FileArchive />}
             label="下载 ZIP"
           />
           <Button
             size="sm"
             isDisabled={busy || !chosen.length}
+            isLoading={busy}
             onClick={() => void build('pdf')}
-            icon={<Loader2 />}
+            icon={<FileStack />}
             label="合并为一份 PDF"
           />
         </div>

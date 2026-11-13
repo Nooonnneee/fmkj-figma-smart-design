@@ -8,11 +8,9 @@ import {
   Copy,
   FileArchive,
   ImageDown,
-  Loader2,
   Share2,
   Sparkles,
 } from 'lucide-react'
-import { toast } from 'sonner'
 
 import { ScaledFrame } from '@/components/scaled-frame'
 import { SocialPoster, type SocialPosterTheme } from '@/components/social-poster'
@@ -22,6 +20,7 @@ import { IconButton } from '@astryxdesign/core/IconButton'
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout'
 import { Switch } from '@astryxdesign/core/Switch'
+import { useToast } from '@astryxdesign/core/Toast'
 import { downloadBlob } from '@/lib/export-pdf'
 import {
   buildSocialPosterPages,
@@ -64,6 +63,7 @@ export function SocialPosterDialog({ data }: { data: SocialPosterData }) {
   const [generated, setGenerated] = useState<Record<string, string>>({})
   const [copiedText, setCopiedText] = useState(false)
   const exportNodes = useRef<(HTMLDivElement | null)[]>([])
+  const showToast = useToast()
   const pages = useMemo(() => buildSocialPosterPages(data), [data])
   const active = Math.min(current, pages.length - 1)
   const socialCaption = socialPosterCaption(data, hideExactPrice)
@@ -77,10 +77,10 @@ export function SocialPosterDialog({ data }: { data: SocialPosterData }) {
     try {
       await navigator.clipboard.writeText(socialCaption)
       setCopiedText(true)
-      toast.success('已复制图组配套文案')
+      showToast({ body: '已复制图组配套文案' })
       setTimeout(() => setCopiedText(false), 2000)
     } catch {
-      toast.error('复制失败，请手动选中文案复制')
+      showToast({ body: '复制失败，请手动选中文案复制', type: 'error' })
     }
   }
 
@@ -107,9 +107,12 @@ export function SocialPosterDialog({ data }: { data: SocialPosterData }) {
         new Blob([pngBytes(url)], { type: 'image/png' }),
         `${socialPosterFilename(data.title)}-${String(active + 1).padStart(2, '0')}-${pages[active].label}.png`,
       )
-      toast.success('当前图片已生成，手机端也可长按下方图片保存')
+      showToast({ body: '当前图片已生成，手机端也可长按下方图片保存' })
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '生成图片失败，请稍后重试')
+      showToast({
+        body: error instanceof Error ? error.message : '生成图片失败，请稍后重试',
+        type: 'error',
+      })
     } finally {
       setBusy(false)
     }
@@ -137,10 +140,13 @@ export function SocialPosterDialog({ data }: { data: SocialPosterData }) {
         zipFiles(entries),
         `${socialPosterFilename(data.title)}-小红书图组-${pages.length}张.zip`,
       )
-      toast.success(`已打包 ${pages.length} 张独立图片与配套文案`)
+      showToast({ body: `已打包 ${pages.length} 张独立图片与配套文案` })
     } catch (error) {
       setGenerated((prev) => ({ ...prev, ...rendered }))
-      toast.error(error instanceof Error ? error.message : '图组生成失败，请稍后重试')
+      showToast({
+        body: error instanceof Error ? error.message : '图组生成失败，请稍后重试',
+        type: 'error',
+      })
     } finally {
       setBusy(false)
     }
@@ -195,8 +201,6 @@ export function SocialPosterDialog({ data }: { data: SocialPosterData }) {
                   <div className="flex items-center justify-between gap-2">
                     <IconButton
                       variant="secondary"
-
-                      aria-label="上一张"
                       isDisabled={busy || active === 0}
                       onClick={() => setCurrent(active - 1)}
                       label="上一张"
@@ -208,8 +212,6 @@ export function SocialPosterDialog({ data }: { data: SocialPosterData }) {
                     </span>
                     <IconButton
                       variant="secondary"
-
-                      aria-label="下一张"
                       isDisabled={busy || active === pages.length - 1}
                       onClick={() => setCurrent(active + 1)}
                       label="下一张"
@@ -217,7 +219,11 @@ export function SocialPosterDialog({ data }: { data: SocialPosterData }) {
                       size="sm"
                     />
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4" aria-label="图组内容">
+                  <div
+                    role="group"
+                    aria-label="图组内容"
+                    className="grid grid-cols-3 gap-1.5 sm:grid-cols-4"
+                  >
                     {pages.map((page, i) => (
                       <Button
                         key={page.key}
@@ -228,8 +234,15 @@ export function SocialPosterDialog({ data }: { data: SocialPosterData }) {
                         aria-pressed={i === active}
                         onClick={() => setCurrent(i)}
                         className="h-auto min-w-0 justify-start whitespace-normal py-1.5 text-left leading-snug"
-                        label={''}
-                      />
+                        label={`第 ${i + 1} 张：${page.label}`}
+                      >
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <span className="shrink-0 tabular-nums">
+                            {String(i + 1).padStart(2, '0')}
+                          </span>
+                          <span className="truncate">{page.label}</span>
+                        </span>
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -258,28 +271,26 @@ export function SocialPosterDialog({ data }: { data: SocialPosterData }) {
                     </div>
                   </div>
                   <div className="space-y-3 rounded-xl border bg-muted/20 p-3 text-xs">
-                    <label className="flex items-center justify-between gap-3">
-                      <span>隐藏具体金额，使用预算区间</span>
-                      <Switch
-                        label={'开关'}
-                        isLabelHidden
-                        value={hideExactPrice}
-                        isDisabled={busy}
-                        onChange={setHideExactPrice}
-                      />
-                    </label>
-                    <label className="flex items-center justify-between gap-3">
-                      <span>
-                        {data.miniAppCodeUrl ? '收尾页附带小程序码' : '收尾页附带服务方联系二维码'}
-                      </span>
-                      <Switch
-                        label={'开关'}
-                        isLabelHidden
-                        value={showQr}
-                        isDisabled={busy}
-                        onChange={setShowQr}
-                      />
-                    </label>
+                    <Switch
+                      label="隐藏具体金额，使用预算区间"
+                      value={hideExactPrice}
+                      isDisabled={busy}
+                      onChange={setHideExactPrice}
+                      labelPosition="start"
+                      labelSpacing="spread"
+                      width="100%"
+                    />
+                    <Switch
+                      label={
+                        data.miniAppCodeUrl ? '收尾页附带小程序码' : '收尾页附带服务方联系二维码'
+                      }
+                      value={showQr}
+                      isDisabled={busy}
+                      onChange={setShowQr}
+                      labelPosition="start"
+                      labelSpacing="spread"
+                      width="100%"
+                    />
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
@@ -288,9 +299,8 @@ export function SocialPosterDialog({ data }: { data: SocialPosterData }) {
                         variant="ghost"
                         size="sm"
                         onClick={() => void copyCaption()}
-                        icon={<Check />}
-                        endContent={<Copy />}
-                        label={'栖序雅致'}
+                        icon={copiedText ? <Check /> : <Copy />}
+                        label={copiedText ? '已复制' : '复制文案'}
                       />
                     </div>
                     <pre className="whitespace-pre-wrap break-words rounded-xl border bg-muted/20 p-3 font-sans text-xs leading-relaxed">
@@ -300,15 +310,17 @@ export function SocialPosterDialog({ data }: { data: SocialPosterData }) {
                   <div className="grid gap-2 sm:grid-cols-2">
                     <Button
                       isDisabled={busy}
+                      isLoading={busy}
                       onClick={() => void downloadCurrent()}
-                      icon={<Loader2 />}
+                      icon={<ImageDown />}
                       label="保存当前图片"
                     />
                     <Button
                       variant="secondary"
                       isDisabled={busy}
+                      isLoading={busy}
                       onClick={() => void downloadGroup()}
-                      icon={<Loader2 />}
+                      icon={<FileArchive />}
                       label="下载整组 ZIP"
                     />
                   </div>
