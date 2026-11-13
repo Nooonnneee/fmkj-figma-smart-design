@@ -691,6 +691,26 @@
   font-weight: 400;
 }
 
+/*
+ * 文档纸面在任何颜色模式下都是浅色纸张。
+ *
+ * Astryx 主题在 @layer reset 里直接给 h1–h6、p 写了
+ * `color: var(--color-text-primary)`；暗色模式下这个 token 是浅色，
+ * 落在白纸上就看不见了（合同预览、首页报价单样张都中招）。
+ * 在文档根节点把 Astryx 的文本 token 指回文档自己的墨色，作用域只在文档内部。
+ */
+[data-doc-style] {
+  --color-text-primary: var(--doc-ink);
+  --color-text-secondary: var(--doc-muted);
+}
+
+/* 表格深色表头：Astryx 给 p/h 的直设颜色会压过从表头继承的 text-doc-head-fg，
+   把表头文字令牌也切到表头前景色，否则深底上会是深色字。 */
+[data-doc-style] .bg-doc-head {
+  --color-text-primary: var(--doc-head-fg);
+  --color-text-secondary: var(--doc-head-fg);
+}
+
 /* 繁梦空间品牌色（标志、品牌规范页使用；与 public/brand 下的标识文件一致） */
 @theme {
   --color-brand-indigo: #8f72ff;

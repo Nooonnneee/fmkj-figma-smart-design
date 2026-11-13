@@ -262,7 +262,7 @@ export function MembershipClient({
                         label="去生成"
                       />
                     ) : (
-                      <Badge variant="neutral" className="text-muted-foreground" label={'待绑定'} />
+                      <Badge variant="neutral" label={'待绑定'} />
                     )}
                   </div>
                 </div>
