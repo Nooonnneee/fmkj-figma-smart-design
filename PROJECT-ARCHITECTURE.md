@@ -133,7 +133,7 @@ AI 模块 = 对话、识图、生图、风格化、工具调度、计费
 - 协作：协作者、分享链接（read/edit）、加入项目
 - 登录：邮箱密码、邮箱验证码注册、微信扫码、重置密码
 - 账号内有：个人抬头、文档默认模板、关闭的插件、成本设置
-- 会员等级字段仍在：`membershipTier` / `membershipExpiresAt`
+- 会员等级字段已彻底移除：`grep -rn 'membershipTier\|membershipExpiresAt' src` → 0，账号只剩积分
 - 积分字段：`aiCredits`，流水集合 `AiCreditLedger`
 - 已确认：现阶段只做个人账号；公司后续再规划
 - 已确认：取消会员分级后清空会员等级/到期时间，保留积分与积分流水
@@ -283,29 +283,29 @@ AI 模型与渠道设置当前已经在 Payload 后台的「AI 设置」里，�
 
 ### 3.2 当前插件清单
 
-| 插件           | 子类     | 主要能力                |
-| -------------- | -------- | ----------------------- |
-| 方案演示       | 模板     | 横版方案、PDF           |
-| 文档风格包     | 模板     | 报价 / 合同共用打印风格 |
-| DWG 导入       | 独立工具 | DWG/DXF → 户型底图      |
-| 房间智能分析   | 功能     | 配置完整度、场景建议    |
-| 智能选型       | 功能     | 一键选型                |
-| 现场勘测表     | 功能     | 勘测记录、打印          |
-| 强弱电布线表   | 功能     | 回路、线缆、交底        |
-| 采购与备货单   | 功能     | 采购、备货、核验        |
-| 场景与账号移交 | 功能     | 场景卡、账号交接        |
-| 售后维保记录   | 功能     | 质保、检修、台账        |
-| 仪表盘         | 功能     | 账号级数据概览          |
+注册表以代码为准：`src/plugins/index.ts:27-143` 的 `RAW_PLUGINS` 实际注册 9 个插件。
 
-以下能力从插件移到 AI 模块：
+| 插件 id       | 名称                   | 分类（category） | 主要能力                                                |
+| ------------- | ---------------------- | ---------------- | ------------------------------------------------------- |
+| `ai-copilot`  | AI 对话侧栏（高级）    | AI 能力（ai）    | 侧边栏常驻助手：识图、风格化、生图、智能布点、跨插件执行 |
+| `doc-styles`  | 文档风格包             | 模板（template） | 报价 / 合同 / 点位图 / 交底的扩展打印风格               |
+| `proposal`    | 方案演示               | 模板（template） | 横版方案、服务交付页、PDF                               |
+| `room-insights` | 房间智能分析         | 工具（tool）     | 配置完整度、缺失提醒、联动场景建议                      |
+| `smart-select` | 智能选型              | 工具（tool）     | 按生态平台与预算档位一键选型                            |
+| `ai-import`   | AI 识别导入            | AI 能力（ai）    | 识别图纸生成点位，导入 / 导出点位 JSON                  |
+| `dwg-import`  | DWG 导入               | 工具（tool）     | DWG / DXF → 户型底图                                    |
+| `after-sales` | 售后维保记录           | 工具（tool）     | 质保倒计时、维保记录、配置备份、售后维保卡              |
+| `ha-mcp`      | 智能家居现场对接（HA-MCP） | AI 能力（ai） | 通过 MCP 连接 Home Assistant，读取 / 控制现场设备       |
 
-```text
-AI 对话
-AI 识别导入
-户型图风格化
-AI 生图
-AI 智能布点
-```
+「现场勘测表 / 强弱电布线表 / 采购与备货单 / 场景与账号移交 / 仪表盘」不是插件：
+前四项已封存为 Beta 文档（见 §3.2.2、§3.2.3），仪表盘属于账号级页面，不在插件注册表里。
+
+`ha-mcp` 注册在 `src/plugins/index.ts:131`，阶段为 `global`、分类为 `ai`，用于智能家居现场
+对接（读设备、搜实体、按区域核对点位、现场开关调试）。
+
+AI 对话 = 插件 `ai-copilot`，AI 识别导入 = 插件 `ai-import`，两者都以 `category: 'ai'`
+注册（`src/plugins/index.ts:30,91`）。户型图风格化、AI 生图、智能布点同样是 `ai-copilot`
+内的能力，AI 能力仍是插件形态，不是独立于插件体系的模块。
 
 ### 3.2.2 项目内功能现状审计（2026-11-07）
 
@@ -319,8 +319,7 @@ AI 智能布点
 
 其他发现：
 
-- `ProjectToolbox` 组件存在，但没有被任何页面引用，目前是死代码
-- 项目里没有真正的「工具箱」页面
+- `ProjectToolbox` 组件已删除（`grep -rn 'ProjectToolbox' src` → 0），项目里没有真正的「工具箱」页面
 - 上述功能目前主要靠插件开关 + 归档交付包入口，不是项目页面
 
 已确认方案：
@@ -360,7 +359,7 @@ AI 智能布点
 - 不占能力中心 / 插件位
 - 点击仍可打开对应打印页
 - 不新增工具箱页面
-- `ProjectToolbox` 死代码在实施时删除
+- `ProjectToolbox` 已删除，不存在待删死代码
 
 ### 3.3 插件作用域和未来公司
 
@@ -503,9 +502,9 @@ AI 能力插件：AI 模块自己的用户能力
 └─ 工具
 ```
 
-### 4.6.2 没有用户启停
+### 4.6.2 用户开关
 
-普通用户不安装、不启停，直接点想用的能力：
+普通用户不安装插件，但可以关闭自己不需要的能力：
 
 ```text
 点击卡片
@@ -513,26 +512,36 @@ AI 能力插件：AI 模块自己的用户能力
 → 按积分使用
 ```
 
-不做「开启 / 关闭插件」。
+数据层 / 接口层与设置页都已支持用户开关：`src/app/(frontend)/(workspace)/settings/company-form.tsx:382-430`
+的「插件」卡片为每个 ready 插件渲染一行 Switch，携带 hidden `plugins-present=1` 与
+`htmlName="plugin-<id>"`，未就绪插件置灰；服务端
+`src/app/(frontend)/(workspace)/settings/company/route.ts:92-95` 收集未勾选项，写入用户
+`companyProfile.disabledPlugins`（`src/collections/Users.ts:133`），运行时由
+`src/plugins/state.ts:18` 的 `getPluginFlags()` 生效。关闭的插件不再出现在能力中心和项目入口。
 
 ### 4.6.3 分类
 
+代码里的分类只有三段（`src/plugins/types.ts:69` 的 `PLUGIN_CATEGORIES`）：
+
 ```text
-AI 能力
-  户型图风格化
-  智能布点
-  AI 生图
-  AI 识图
+AI 能力（category: 'ai'）
+  ai-copilot    AI 对话、识图、户型图风格化、AI 生图、智能布点
+  ai-import     AI 识别导入
+  ha-mcp        智能家居现场对接（HA-MCP）
 
-模板
-  方案模板
-  点位图显示方案
-  文档风格
+模板（category: 'template'）
+  proposal      方案模板
+  doc-styles    文档风格（报价 / 合同共用）
 
-工具
-  文件转换（DWG / DXF 转户型图）
-  其他独立工具
+工具（category: 'tool'）
+  room-insights 房间智能分析
+  smart-select  智能选型
+  dwg-import    DWG / DXF 转户型图
+  after-sales   售后维保
 ```
+
+注意分类是**插件归属**，不是能力点拆分：`doc-styles` 归在模板，而不是按「报价 / 合同」
+拆成多个能力点。
 
 ### 4.6.4 这三类里有插件性质的东西
 
@@ -546,7 +555,7 @@ AI 能力 / 模板 / 工具
 
 ### 4.6.5 超级管理员
 
-普通用户无启停；超级管理员是否保留「全局隐藏 / 维护开关」待确认。
+普通用户可按账号关闭插件（见 §4.6.2）；超级管理员是否保留「全局隐藏 / 维护开关」待确认。
 
 ---
 
@@ -619,11 +628,16 @@ AI 能力 / 模板 / 工具
 ## 6. 工具中心
 
 ```text
-/plugins/tools
-  户型图风格化（AI 模块）
-  DWG / DXF 转户型图
-  AI 识别导入（AI 模块）
+/capabilities/tools
+  户型图风格化（ai-copilot 插件）
+  DWG / DXF 转户型图（dwg-import 插件）
+  AI 识别导入（ai-import 插件）
 ```
+
+真实页面是 `src/app/(frontend)/(workspace)/capabilities/tools/page.tsx`。旧地址
+（`/plugins` 及其子路径）不再作为真实路由，`next.config.ts:29-30` 把 `/plugins` 和
+`/plugins/:path*` 以 `permanent: true` 配成 **308** 跳到 `/capabilities` 与
+`/capabilities/:path*`；老书签仍可用，但会多一次跳转。
 
 ### DWG / DXF
 
@@ -664,11 +678,14 @@ DXF 的具体转换方案暂缓，列为待办。
 ### 7.2 模板中心
 
 ```text
-/plugins/templates
+/capabilities/templates
   Tab：方案模板
   Tab：点位图显示
   Tab：文档风格（报价 + 合同共用）
 ```
+
+真实页面是 `src/app/(frontend)/(workspace)/capabilities/templates/page.tsx`；旧地址经
+`next.config.ts:29-30` 的 `/plugins/:path*` **308** 跳到 `/capabilities/templates`。
 
 ### 7.3 项目内模板面板
 
@@ -712,9 +729,9 @@ DXF 的具体转换方案暂缓，列为待办。
 
 ### 当前
 
-- 已有会员分级逻辑
-- 插件有 tier 字段
-- AI 对话/识别在插件清单里
+- 会员分级已在代码中移除，只剩积分
+- 插件无 tier 字段（`AppPlugin` 无等级属性）
+- AI 对话/识别在插件清单里（`ai-copilot` / `ai-import`，`category: 'ai'`）
 - 使用报告和积分账单分散
 - 模板分散，无模板中心
 - 点位图显示没有项目级配置
