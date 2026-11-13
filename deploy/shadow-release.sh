@@ -98,9 +98,21 @@ REL="$RELEASES/$STAMP"
 log "1/6 准备新版本目录 $REL"
 sudo mkdir -p "$REL"
 sudo chown "$(id -u):$(id -g)" "$REL"
-git clone --depth 1 --branch main \
-  git@github.com:lynnliuyu/fmkj-figma-smart-design.git "$REL/src"
-echo "  版本：$(git -C "$REL/src" log -1 --format='%h %ad' --date=short)"
+# 服务器到 GitHub 的链路实测只有几十 KB/s（2026-11-14 单次 --depth 1 clone 跑了
+# 十几分钟还没完）。所以支持两条路：
+#   · SRC_DIR=<已有源码目录> → 直接 rsync 复用，不联网
+#   · 否则 git clone（慢但自包含）
+if [[ -n "${SRC_DIR:-}" ]]; then
+  [[ -d "$SRC_DIR" ]] || die "SRC_DIR=$SRC_DIR 不存在"
+  echo "  复用源码：$SRC_DIR（跳过 git clone）"
+  rsync -a --exclude='.git' --exclude='node_modules' --exclude='.next' \
+    --exclude='.env' "$SRC_DIR"/ "$REL/src"/
+  echo "  版本：$(sha256sum "$REL/src/package.json" | cut -c1-12) (package.json)"
+else
+  git clone --depth 1 --branch main \
+    git@github.com:lynnliuyu/fmkj-figma-smart-design.git "$REL/src"
+  echo "  版本：$(git -C "$REL/src" log -1 --format='%h %ad' --date=short)"
+fi
 
 # 沿用生产 .env —— **绝不重新生成 PAYLOAD_SECRET**（改了所有人都要重新登录）
 sudo cp "$APP_DIR/.env" "$REL/src/.env"
