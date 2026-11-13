@@ -1,3 +1,4 @@
+import { relId } from '@/lib/access'
 import { inferAreaType, isAreaType } from '@/lib/area-types'
 import { getCatalog, getCompanyInfo } from '@/lib/cached-data'
 import {
@@ -39,7 +40,13 @@ import {
 } from '@/lib/point-scene'
 import { inPointScope } from '@/lib/point-scopes'
 import { DEFAULT_PLATFORM, isProjectPlatform } from '@/lib/projects'
-import { QUOTE_STATUSES, type QuoteStatus } from '@/lib/quotes'
+import {
+  applyQuoteItemEdits,
+  QUOTE_STATUSES,
+  type QuoteItemEdit,
+  type QuoteStatus,
+} from '@/lib/quotes'
+import { saveQuoteInput } from '@/lib/services/quote-service'
 import type { Project } from '@/payload-types'
 import {
   parsePointImport,
@@ -862,6 +869,16 @@ export const coreToolHandlers: Record<string, AiToolHandler> = {
           total: q.total,
           fees: q.fees ?? [],
           itemCount: (q.items ?? []).length,
+          // 行 id 供 AI 做局部改/删：create_or_update_quote 的 items[].id / removeItemIds
+          items: (q.items ?? []).map((r) => ({
+            id: r.id ?? null,
+            productId: relId(r.product) || null,
+            name: r.name,
+            sku: r.sku ?? null,
+            unit: r.unit ?? null,
+            price: r.price,
+            quantity: r.quantity,
+          })),
         })),
         contract: ctx.project.contract
           ? {
@@ -894,9 +911,107 @@ export const coreToolHandlers: Record<string, AiToolHandler> = {
           .filter((f) => f.name && f.amount > 0)
       : undefined
 
+    const quoteId = typeof args.quoteId === 'string' ? args.quoteId.trim() : ''
+    const hasItemEdit =
+      (Array.isArray(args.items) && args.items.length > 0) ||
+      (Array.isArray(args.removeItemIds) && args.removeItemIds.length > 0)
+    if (hasItemEdit && !quoteId)
+      return {
+        result: {
+          error:
+            '修改报价明细需要传 quoteId：先调用 get_project_details 查看该项目已有的报价单 id 与每行明细。',
+        },
+        summary: '缺少报价单 ID',
+      }
+
     // 修改已有报价单
-    if (typeof args.quoteId === 'string' && args.quoteId.trim()) {
-      const qid = args.quoteId.trim()
+    if (quoteId) {
+      const qid = quoteId
+      const itemEdits = Array.isArray(args.items) ? (args.items as QuoteItemEdit[]) : []
+      const removeItemIds = Array.isArray(args.removeItemIds)
+        ? (args.removeItemIds as unknown[])
+            .filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+            .map((v) => v.trim())
+        : []
+
+      // 改明细：先读现有行，把局部修改合并进去，再交给 saveQuoteInput 全量保存。
+      // 这样模型只需提交改动的行，不会因漏传其余行而误删。
+      if (itemEdits.length > 0 || removeItemIds.length > 0) {
+        const stored = await payload
+          .findByID({
+            collection: 'quotes',
+            id: qid,
+            depth: 0,
+            user: ctx.user,
+            overrideAccess: false,
+            select: {
+              title: true,
+              status: true,
+              discount: true,
+              notes: true,
+              fees: true,
+              items: true,
+            },
+          })
+          .catch(() => null)
+        if (!stored) return { result: { error: '报价不存在或已被删除' }, summary: '报价不存在' }
+        const storedRows = (stored.items ?? []).map((r) => ({
+          id: r.id ?? null,
+          product: relId(r.product),
+          deviceType: r.deviceType ?? null,
+          image: relId(r.image),
+          name: r.name ?? null,
+          sku: r.sku ?? null,
+          unit: r.unit ?? null,
+          price: r.price ?? null,
+          quantity: r.quantity ?? null,
+        }))
+        const merged = applyQuoteItemEdits(storedRows, itemEdits, removeItemIds)
+        if (!merged.ok) return { result: { error: merged.error }, summary: '明细修改未生效' }
+
+        const title =
+          typeof args.title === 'string' && args.title.trim()
+            ? args.title.trim().slice(0, 120)
+            : (stored.title ?? '')
+        const status = parseQuoteStatus(args.status) ?? stored.status ?? 'draft'
+        const discount =
+          typeof args.discount === 'number' && args.discount >= 0
+            ? Math.round(args.discount * 100) / 100
+            : (stored.discount ?? 0)
+        const notes =
+          typeof args.notes === 'string' ? args.notes.trim().slice(0, 2000) : (stored.notes ?? '')
+        const nextFees =
+          fees ?? (stored.fees ?? []).map((f) => ({ name: f.name ?? '', amount: f.amount ?? 0 }))
+
+        const saved = await saveQuoteInput(ctx.user, qid, {
+          title,
+          status,
+          discount,
+          notes,
+          fees: nextFees,
+          // 合并结果已含未改动的行；单价 / 数量 / 合计由 saveQuoteInput 与集合 hook 校验重算。
+          items: merged.items as never,
+        })
+        if (!saved.ok) return { result: { error: saved.error }, summary: '明细修改未生效' }
+
+        ctx.mutated = true
+        await refreshContextProject(ctx, ctx.projectId)
+        return {
+          result: {
+            quoteId: qid,
+            title,
+            status,
+            total: saved.total,
+            changedRows: itemEdits.filter((e) => e?.id).length,
+            addedRows: itemEdits.filter((e) => !e?.id).length,
+            removedRows: removeItemIds.length,
+          },
+          summary: `已更新报价明细（合计 ¥${saved.total}）`,
+          href: `/projects/${ctx.projectId}/quotes/${qid}`,
+          hrefLabel: '查看报价单',
+        }
+      }
+
       const patch: Record<string, unknown> = {}
       if (typeof args.title === 'string' && args.title.trim())
         patch.title = args.title.trim().slice(0, 60)

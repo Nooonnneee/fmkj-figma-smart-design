@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { quoteTotals, yuan, quoteStatusLabel, quoteStatusVariant } from './quotes'
+import {
+  applyQuoteItemEdits,
+  quoteTotals,
+  yuan,
+  quoteStatusLabel,
+  quoteStatusVariant,
+} from './quotes'
 
 describe('quoteTotals', () => {
   it('按行合计：单价 × 数量 + 费用，再减去优惠', () => {
@@ -93,5 +99,77 @@ describe('报价状态取值', () => {
     expect(quoteStatusLabel('sent')).toBe('已发送')
     expect(quoteStatusLabel('bogus')).toBe('草稿')
     expect(quoteStatusLabel(undefined)).toBe('草稿')
+  })
+})
+
+// 报价明细的「局部修改」合并：AI 只提交动过的行，其余行必须原样保留。
+describe('applyQuoteItemEdits', () => {
+  const row = (
+    id: string,
+    name: string,
+    price: number,
+    quantity: number,
+    product: string | null = null,
+  ) => ({ id, name, price, quantity, product, deviceType: 'switch-3' })
+
+  it('改一行的数量：其余行原样保留，合计按明细重算', () => {
+    const stored = [row('r1', '客厅灯', 100, 2), row('r2', '卧室灯', 50, 1)]
+    const r = applyQuoteItemEdits(stored, [{ id: 'r1', quantity: 3 }])
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    // 未提到的 r2 一字不改
+    expect(r.items).toEqual([row('r1', '客厅灯', 100, 3), row('r2', '卧室灯', 50, 1)])
+    // 合计由明细重算：100*3 + 50 = 350
+    expect(quoteTotals(r.items).total).toBe(350)
+  })
+
+  it('换型号：只覆盖传入字段，其余行不动', () => {
+    const stored = [row('r1', '旧灯', 100, 2, 'p1'), row('r2', '卧室灯', 50, 1, null)]
+    const r = applyQuoteItemEdits(stored, [{ id: 'r1', productId: 'p2', name: '新灯' }])
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.items[0]).toMatchObject({
+      id: 'r1',
+      product: 'p2',
+      name: '新灯',
+      price: 100,
+      quantity: 2,
+    })
+    expect(r.items[1]).toEqual(row('r2', '卧室灯', 50, 1, null))
+  })
+
+  it('删行只删指定 id，其余行保留', () => {
+    const stored = [row('r1', '客厅灯', 100, 2), row('r2', '卧室灯', 50, 1)]
+    const r = applyQuoteItemEdits(stored, [], ['r2'])
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.items.map((x) => x.id)).toEqual(['r1'])
+    expect(quoteTotals(r.items).total).toBe(200)
+  })
+
+  it('不带 id 的条目作为新行追加，未提及的行不受影响', () => {
+    const stored = [row('r1', '客厅灯', 100, 2)]
+    const r = applyQuoteItemEdits(stored, [{ name: '新灯', price: 10, quantity: 3 }])
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.items).toHaveLength(2)
+    expect(r.items[1]).toMatchObject({ name: '新灯', price: 10, quantity: 3 })
+    expect(r.items[0]).toEqual(row('r1', '客厅灯', 100, 2))
+    expect(quoteTotals(r.items).total).toBe(230)
+  })
+
+  it('空修改等于原样返回（不丢行）', () => {
+    const stored = [row('r1', 'a', 1, 1), row('r2', 'b', 2, 2)]
+    const r = applyQuoteItemEdits(stored, [])
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.items).toEqual(stored)
+  })
+
+  it('改不存在的 id 报错，不静默丢行', () => {
+    const r = applyQuoteItemEdits([row('r1', 'a', 1, 1)], [{ id: 'nope', quantity: 9 }])
+    expect(r.ok).toBe(false)
+    if (r.ok) return
+    expect(r.error).toContain('nope')
   })
 })

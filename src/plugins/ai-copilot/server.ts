@@ -703,7 +703,7 @@ export function systemPrompt(
     '【竞品报价】用户上传别家报价单截图时，按「【视觉识图结论】」中的逐行转写调用 create_quote_from_competitor；转写里看不清的行要向用户确认，不要猜测型号和单价。',
     '3. 检索 728 款产品库、按平台与档次一键选型或指定某类设备的默认产品（search_products, smart_select, set_project_defaults）；',
     '4. 进行房间点位完整度审查（room_insights）与按业主画像推荐方案模板（recommend_proposal_template）；',
-    '5. 从点位图直接生成报价单草稿、修改报价单优惠/附加费/状态（get_project_details, create_or_update_quote）；',
+    '5. 从点位图直接生成报价单草稿、修改报价单优惠/附加费/状态、以及增删改报价单里的单行产品明细（get_project_details, create_or_update_quote；改明细前先用 get_project_details 拿到行 id）；',
     '6. 生成或修改项目合同、设置付款分期、标记签约与登记收款（create_or_update_contract）；',
     '7. 生成各类打印与导出文档的直达链接（get_document_links）。',
     '当用户提出创建或修改请求时，请主动调用对应工具直接完成操作（可分多步连续调用，例如：新建项目 → 添加户型图 → 智能选型 → 生成报价单），不要只给口头步骤；信息不足且无法合理默认时，只问最关键的一个问题。',

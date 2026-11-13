@@ -366,7 +366,7 @@ export const coreAiSpec: PluginAiSpec = {
       name: 'get_project_details',
       title: '项目点位与报价明细',
       description:
-        '读取当前关联项目的详细点位清单、已汇总的产品金额、以及项目下所有报价单和合同信息。',
+        '读取当前关联项目的详细点位清单、已汇总的产品金额、以及项目下最近 5 份报价单（含每行产品明细与行 id）和合同信息。修改报价明细前先用本工具拿到每行的 id。',
       cost: 0.2,
       permissions: ['projects:read', 'point-map:read', 'quotes:read', 'contracts:read'],
       scope: 'project',
@@ -377,7 +377,7 @@ export const coreAiSpec: PluginAiSpec = {
       name: 'create_or_update_quote',
       title: '报价单生成与修改',
       description:
-        '为当前关联项目生成一份新的报价单（根据点位图和默认型号汇总），或修改已有的报价单（传入 quoteId 可修改标题、状态 draft/sent/accepted、优惠金额 discount、附加费用 fees 如安装调试费、备注 notes）。',
+        '为当前关联项目生成一份新的报价单（根据点位图和默认型号汇总），或修改已有的报价单（传入 quoteId）。可修改标题 title、状态 status（draft/sent/accepted）、优惠金额 discount、附加费用 fees（如安装调试费）、备注 notes，以及逐行修改产品明细 items / 删除明细行 removeItemIds。\n\n【改明细 = 局部修改，不是全量覆盖】items 里带 id 的条目只改你给出的字段（例如只传 quantity 就只改数量），未给出的字段原样保留；不带 id 的条目会新增一行（新增行必须给 name、price、quantity）。要删掉某行，把该行 id 放进 removeItemIds。没有提到的行不会被删除。\n【必须先读再改】修改明细前先调用 get_project_details，读取该报价单 items 里每行的 id、productId、name、price、quantity，用 id 定位要改或要删的行；不要凭记忆猜 id。\n【换型号】传 productId（可用 search_products 查询），且必须与原行设备类型一致；同时传新的 name（产品名），否则名称仍会是旧型号。金额与合计由服务端按明细自动重算，不要自己算。',
       cost: 1,
       permissions: ['quotes:write'],
       scope: 'project',
@@ -409,6 +409,38 @@ export const coreAiSpec: PluginAiSpec = {
             },
           },
           notes: { type: 'string', description: '报价单备注说明' },
+          items: {
+            type: 'array',
+            description:
+              '产品明细的局部修改：带 id 的条目修改已有行（只覆盖传入字段），不带 id 的条目新增一行。未传入的行保持原样。',
+            items: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'string',
+                  description: '已有明细行 ID（来自 get_project_details；新增行不要传）',
+                },
+                productId: {
+                  type: 'string',
+                  description:
+                    '产品 ID（来自 search_products；换型号时传，必须与原行设备类型一致）',
+                },
+                name: {
+                  type: 'string',
+                  description: '产品名称（新增行必填；换型号时传新产品名）',
+                },
+                sku: { type: 'string', description: '型号 / 规格' },
+                unit: { type: 'string', description: '单位（如 个、套）' },
+                price: { type: 'number', description: '单价（元；新增行必填）' },
+                quantity: { type: 'number', description: '数量（新增行必填）' },
+              },
+            },
+          },
+          removeItemIds: {
+            type: 'array',
+            items: { type: 'string' },
+            description: '要删除的明细行 ID 列表（来自 get_project_details）',
+          },
         },
       },
     },
