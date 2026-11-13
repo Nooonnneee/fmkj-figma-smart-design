@@ -360,7 +360,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           <EmptyState
             icon={<PackageSearch className="size-5" />}
             title="没有找到符合条件的产品"
-            description="换个关键词或筛选条件试试；新产品在后台（/admin）添加。"
+            description="换个关键词或筛选条件试试；成员与管理员均可新增、修改产品与售价。"
             action={<Button variant="secondary" size="sm" href="/products" label="清除筛选" />}
           />
         ) : (

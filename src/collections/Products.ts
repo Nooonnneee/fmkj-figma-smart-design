@@ -25,11 +25,12 @@ export const Products: CollectionConfig = {
     group: '产品库',
   },
   defaultSort: 'name',
-  // 产品库由后台（/admin）维护，所有成员都可以查看（包括成本）。
+  // 所有成员都可以查看（包括成本）；2026-11-13 owner 批准：新增/改价放开给所有成员，
+  // 删除产品仍只允许后台 CMS 管理员。
   access: {
     read: cmsAdminOrMember,
-    create: cmsAdminOnly,
-    update: cmsAdminOnly,
+    create: cmsAdminOrMember,
+    update: cmsAdminOrMember,
     delete: cmsAdminOnly,
   },
   hooks: {

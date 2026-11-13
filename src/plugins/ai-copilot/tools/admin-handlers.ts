@@ -25,9 +25,7 @@ import {
 import { saveShareSettings } from '@/lib/services/share-settings-service'
 
 import {
-  PRODUCT_WRITE_DENIED,
   contractDeleteBlock,
-  isCmsAdminUser,
   normalizeArchiveSettings,
   normalizeCompanySettings,
   normalizeCreateProduct,
@@ -313,9 +311,8 @@ export const adminToolHandlers: Record<string, AiToolHandler> = {
   },
 
   async create_product(args, ctx) {
-    // Products 集合的 create 权限是 cmsAdminOnly；提前返回可读原因，避免把 403 变成「工具失败」。
-    if (!isCmsAdminUser(ctx.user)) return failure(PRODUCT_WRITE_DENIED)
-
+    // 新增/改价已放开给所有 active 成员（2026-11-13 owner 批准），
+    // 真正的权限由 Products 集合 access + user + overrideAccess:false 裁决。
     const normalized = normalizeCreateProduct(args)
     if (!normalized.ok) return failure(normalized.error, normalized.fieldErrors)
 
@@ -368,13 +365,12 @@ export const adminToolHandlers: Record<string, AiToolHandler> = {
       }
     } catch (error) {
       console.error('[ai] create product failed', error)
-      return failure(readableError(error, '新增产品失败：产品库仅允许 CMS 管理员写入'))
+      return failure(readableError(error, '新增产品失败：请确认账号已启用且有产品库写入权限'))
     }
   },
 
   async update_product(args, ctx) {
-    if (!isCmsAdminUser(ctx.user)) return failure(PRODUCT_WRITE_DENIED)
-
+    // 与 create_product 相同：成员可改，权限交给集合 access 裁决。
     const normalized = normalizeUpdateProduct(args)
     if (!normalized.ok) return failure(normalized.error, normalized.fieldErrors)
 
@@ -430,7 +426,7 @@ export const adminToolHandlers: Record<string, AiToolHandler> = {
       }
     } catch (error) {
       console.error('[ai] update product failed', error)
-      return failure(readableError(error, '修改产品失败：产品库仅允许 CMS 管理员写入'))
+      return failure(readableError(error, '修改产品失败：请确认账号已启用且有产品库写入权限'))
     }
   },
 
