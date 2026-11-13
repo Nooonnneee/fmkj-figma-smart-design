@@ -4,10 +4,10 @@ import { useState, useTransition } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { CopyPlus, Loader2, MessageSquareQuote } from 'lucide-react'
-import { toast } from 'sonner'
 
 import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
+import { useToast } from '@astryxdesign/core/Toast'
 import { feedbackDecisionLabel, type DeferredItem } from '@/lib/client-feedback'
 import { yuan } from '@/lib/quotes'
 
@@ -42,6 +42,7 @@ export function ClientFeedbackList({
   canCreateQuote: boolean
 }) {
   const router = useRouter()
+  const showToast = useToast()
   const [busy, setBusy] = useState<string | null>(null)
   const [, startTransition] = useTransition()
   const pending = items.filter((f) => f.status === 'new').length
@@ -51,7 +52,7 @@ export function ClientFeedbackList({
     startTransition(async () => {
       const res = await setFeedbackStatusAction(f.id, f.status === 'new' ? 'handled' : 'new')
       setBusy(null)
-      if (!res.ok) return void toast.error(res.error)
+      if (!res.ok) return void showToast({ body: res.error, type: 'error' })
       router.refresh()
     })
   }
@@ -60,8 +61,8 @@ export function ClientFeedbackList({
     startTransition(async () => {
       const res = await createQuoteFromFeedbackAction(f.id)
       setBusy(null)
-      if (!res.ok) return void toast.error(res.error)
-      toast.success('已按业主意向生成调整版报价（原报价未改动）')
+      if (!res.ok) return void showToast({ body: res.error, type: 'error' })
+      showToast({ body: '已按业主意向生成调整版报价（原报价未改动）' })
       router.push(`/projects/${projectId}/quotes/${res.quoteId}`)
     })
   }
