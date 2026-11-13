@@ -26,11 +26,13 @@ import {
   Minus,
   PencilLine,
   Plus,
+  Presentation,
   ReceiptText,
   Redo2,
   RotateCcw,
   RotateCw,
   Ruler,
+  ScanSearch,
   Sparkles,
   Trash2,
   Undo2,
@@ -110,6 +112,8 @@ import {
 } from '@/lib/point-scopes'
 import { compactScene, inlineFileIds, type SceneFile, type StoredScene } from '@/lib/point-scene'
 import { cn } from '@/lib/utils'
+import type { SelectionTier } from '@/plugins/smart-select/auto-select'
+import { SmartSelect } from '@/plugins/smart-select/smart-select-panel'
 
 import { createQuoteFromProject, syncQuoteFromPointMap } from '../quotes/actions'
 
@@ -245,6 +249,7 @@ function isTyping() {
 export function PointMapEditor({
   projectId,
   projectName,
+  platform,
   initialScene,
   serverUpdatedAt = null,
   warnings,
@@ -277,6 +282,8 @@ export function PointMapEditor({
   aiCopilot?: boolean
 }) {
   const dwgEnabled = plugins.dwg
+  // 上传按钮右侧的下拉菜单：DWG 导入或 AI 识图任一启用就显示
+  const uploadMenuEnabled = dwgEnabled || plugins.aiImport
   const router = useRouter()
   const { resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -302,7 +309,9 @@ export function PointMapEditor({
   const editorRootRef = useRef<HTMLDivElement>(null)
   const [ctxMenu, setCtxMenu] = useState<CanvasContextMenuTarget | null>(null)
   const [cropFile, setCropFile] = useState<File | null>(null)
-  const [defaults] = useState<ProjectDefaults>(initialDefaults)
+  const [defaults, setDefaults] = useState<ProjectDefaults>(initialDefaults)
+  /** 智能选型请求进行中 */
+  const [selecting, setSelecting] = useState(false)
   const [query, setQuery] = useState('')
   const [savedVersion, setSavedVersion] = useState<number | null>(needsSave ? -1 : 0)
   const [saving, setSaving] = useState(false)
@@ -704,6 +713,55 @@ export function PointMapEditor({
         window.confirm('点位图保存失败，仍要离开吗？未保存的修改会丢失。'),
     )
   }, [dirty, readOnly])
+
+  /** 接上智能选型插件的真实接口：先保存点位图，再按档次补全或重选默认型号 */
+  const autoSelect = useCallback(
+    async (tier: SelectionTier, overwrite: boolean) => {
+      if (dirty && !(await save())) return
+      setSelecting(true)
+      try {
+        const res = await fetch(`/projects/${projectId}/point-map/auto-defaults`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tier, overwrite, scope }),
+        })
+        const data = (await res.json().catch(() => ({}))) as {
+          ok?: boolean
+          error?: string
+          defaults?: ProjectDefaults
+          changed?: unknown[]
+          missing?: string[]
+        }
+        if (!res.ok || !data.ok || !data.defaults)
+          throw new Error(data.error ?? '选型失败，请稍后重试')
+        setDefaults(data.defaults)
+        const n = data.changed?.length ?? 0
+        const missing = data.missing?.length
+          ? `；${data.missing.map((t) => deviceTypeLabel(t)).join('、')} 产品库里没有在售产品`
+          : ''
+        showToast({
+          body: n ? `已为 ${n} 类设备设置默认型号${missing}` : `所有设备类型都已选型${missing}`,
+        })
+      } catch (error) {
+        showToast({
+          body: error instanceof Error ? error.message : '选型失败，请稍后重试',
+          type: 'error',
+        })
+      } finally {
+        setSelecting(false)
+      }
+    },
+    [dirty, save, projectId, scope, showToast],
+  )
+
+  /** 跳转前先保存，避免把未保存的点位图带走 */
+  const openLinkedPage = useCallback(
+    async (href: string) => {
+      if (dirty && !readOnly && !(await save())) return
+      router.push(href)
+    },
+    [dirty, readOnly, save, router],
+  )
 
   /* ---------------- 点位 ---------------- */
 
@@ -1588,11 +1646,11 @@ export function PointMapEditor({
                   isDisabled={!!cropFile}
                   onClick={() => fileInput.current?.click()}
                   label={snap.sheets.length ? '上传户型图' : '上传户型图'}
-                  className={cn(dwgEnabled && 'rounded-r-none')}
+                  className={cn(uploadMenuEnabled && 'rounded-r-none')}
                   icon={<ImagePlus />}
                 />
               </Tooltip>
-              {dwgEnabled ? (
+              {uploadMenuEnabled ? (
                 <DropdownMenu
                   placement="below"
                   alignment="center"
@@ -1622,16 +1680,34 @@ export function PointMapEditor({
                       ),
                       onClick: () => fileInput.current?.click(),
                     },
-                    {
-                      id: 'dwg',
-                      label: (
-                        <span className="flex items-center gap-2">
-                          <FileUp className="size-4" />
-                          导入 CAD 图纸（.dwg）
-                        </span>
-                      ),
-                      onClick: () => dwgInput.current?.click(),
-                    },
+                    ...(dwgEnabled
+                      ? [
+                          {
+                            id: 'dwg',
+                            label: (
+                              <span className="flex items-center gap-2">
+                                <FileUp className="size-4" />
+                                导入 CAD 图纸（.dwg）
+                              </span>
+                            ),
+                            onClick: () => dwgInput.current?.click(),
+                          },
+                        ]
+                      : []),
+                    ...(plugins.aiImport
+                      ? [
+                          {
+                            id: 'ai-import',
+                            label: (
+                              <span className="flex items-center gap-2">
+                                <ScanSearch className="size-4" />
+                                AI 识别图纸（打开 AI 对话）
+                              </span>
+                            ),
+                            onClick: () => void openLinkedPage('/ai?plugin=ai-import'),
+                          },
+                        ]
+                      : []),
                   ]}
                 />
               ) : null}
@@ -1792,6 +1868,23 @@ export function PointMapEditor({
                 ),
                 onClick: exportJson,
               },
+              ...(plugins.proposal
+                ? [
+                    {
+                      id: 'proposal',
+                      label: (
+                        <span className="flex items-center gap-2">
+                          <Presentation className="size-4" />
+                          生成方案演示（业主版）
+                        </span>
+                      ),
+                      onClick: () =>
+                        void openLinkedPage(
+                          `/print/projects/${projectId}/proposal?scope=${scope}`,
+                        ),
+                    },
+                  ]
+                : []),
               ...(readOnly
                 ? []
                 : [
@@ -2312,6 +2405,14 @@ export function PointMapEditor({
               >
                 <ScrollableArea label="图纸检查与设备统计" axis="block" className="min-h-0 flex-1">
                   <div className="space-y-2 p-3.5">
+                    {readOnly || !plugins.smartSelect ? null : (
+                      <SmartSelect
+                        platform={platform}
+                        busy={selecting}
+                        disabled={!scopedPoints.length || saving}
+                        onRun={(tier, overwrite) => void autoSelect(tier, overwrite)}
+                      />
+                    )}
                     {issues.length ? (
                       <section className="mb-3 space-y-1">
                         <h2 className="text-xs font-semibold text-fg-secondary">图纸检查</h2>
