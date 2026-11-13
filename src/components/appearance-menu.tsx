@@ -1,7 +1,6 @@
 'use client'
 
-import { useId } from 'react'
-import { Monitor, Moon, Palette, Sun } from 'lucide-react'
+import { Check, Monitor, Moon, Palette, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
 
 import { useAstryxTheme } from '@/components/astryx-theme-provider'
@@ -10,11 +9,11 @@ import { IconButton } from '@astryxdesign/core/IconButton'
 import {
   DropdownMenu,
   DropdownMenuDivider,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
+  DropdownMenuGroup,
+  DropdownMenuItem,
 } from '@astryxdesign/core/DropdownMenu'
-import { ACCENT_SWATCH, ACCENTS, isAccent } from '@/lib/appearance'
-import { ASTRYX_SWATCH, ASTRYX_THEMES, isAstryxTheme } from '@/lib/astryx-theme'
+import { ACCENT_SWATCH, ACCENTS } from '@/lib/appearance'
+import { ASTRYX_SWATCH, ASTRYX_THEMES } from '@/lib/astryx-theme'
 import { cn } from '@/lib/utils'
 
 const MODES = [
@@ -24,19 +23,14 @@ const MODES = [
 ] as const
 
 /**
- * 组标题。
+ * 选中标记。
  *
- * 官方 `DropdownMenuRadioGroup` 自己就渲染 `role="group"` + `aria-label`，
- * 如果外面再套一层 `DropdownMenuGroup`（同样是 `role="group"`）就会变成
- * 嵌套的重复分组，屏幕阅读器会把同一组播报两遍。所以这里只渲染一段
- * 纯展示的标题文本，并用 `aria-labelledby` 指回它 —— 可访问名只有一份。
+ * 官方的 `DropdownMenuRadioItem` 自带单选指示器，且没有关掉它的 prop；
+ * 我们的色块本身已经在 `icon` 槽里，再叠一个圆点就变成「圆点 + 色块」两个图标。
+ * 所以改用官方 `DropdownMenuItem`，选中态放在 `endContent` 的勾选标记上。
  */
-function GroupHeading({ id, children }: { id: string; children: React.ReactNode }) {
-  return (
-    <div id={id} className="px-2 py-1 text-xs text-muted-foreground select-none">
-      {children}
-    </div>
-  )
+function SelectionCheck({ selected }: { selected: boolean }) {
+  return selected ? <Check aria-hidden className="size-4 text-foreground" /> : null
 }
 
 /** 主题风格色块：官方 item 的 `icon` 槽会把已渲染节点原样透传，尺寸由这里决定。 */
@@ -65,62 +59,45 @@ export function AppearanceMenuItems() {
   const { theme, setTheme } = useTheme()
   const { accent, setAccent } = useAccent()
   const { themeId, setThemeId } = useAstryxTheme()
-  const modeHeadingId = useId()
-  const accentHeadingId = useId()
-  const componentHeadingId = useId()
+  const mode = theme ?? 'system'
 
   return (
     <>
-      <GroupHeading id={modeHeadingId}>颜色模式</GroupHeading>
-      <DropdownMenuRadioGroup
-        label="颜色模式"
-        aria-labelledby={modeHeadingId}
-        value={theme ?? 'system'}
-        onChange={(v) => setTheme(v)}
-      >
+      <DropdownMenuGroup title="颜色模式">
         {MODES.map(({ value, label, icon: Icon }) => (
-          <DropdownMenuRadioItem
+          <DropdownMenuItem
             key={value}
-            value={value}
             label={label}
             icon={<Icon className="size-4" />}
+            endContent={<SelectionCheck selected={mode === value} />}
+            onClick={() => setTheme(value)}
           />
         ))}
-      </DropdownMenuRadioGroup>
+      </DropdownMenuGroup>
       <DropdownMenuDivider />
-      <GroupHeading id={accentHeadingId}>主题风格</GroupHeading>
-      <DropdownMenuRadioGroup
-        label="主题风格"
-        aria-labelledby={accentHeadingId}
-        value={accent}
-        onChange={(v) => isAccent(v) && setAccent(v)}
-      >
+      <DropdownMenuGroup title="主题风格">
         {ACCENTS.map((a) => (
-          <DropdownMenuRadioItem
+          <DropdownMenuItem
             key={a.id}
-            value={a.id}
             label={a.label}
             icon={<AccentSwatch className={ACCENT_SWATCH[a.id]} />}
+            endContent={<SelectionCheck selected={accent === a.id} />}
+            onClick={() => setAccent(a.id)}
           />
         ))}
-      </DropdownMenuRadioGroup>
+      </DropdownMenuGroup>
       <DropdownMenuDivider />
-      <GroupHeading id={componentHeadingId}>组件主题</GroupHeading>
-      <DropdownMenuRadioGroup
-        label="组件主题"
-        aria-labelledby={componentHeadingId}
-        value={themeId}
-        onChange={(v) => isAstryxTheme(v) && setThemeId(v)}
-      >
+      <DropdownMenuGroup title="组件主题">
         {ASTRYX_THEMES.map((t) => (
-          <DropdownMenuRadioItem
+          <DropdownMenuItem
             key={t.id}
-            value={t.id}
             label={t.label}
             icon={<ThemeSwatch color={ASTRYX_SWATCH[t.id]} />}
+            endContent={<SelectionCheck selected={themeId === t.id} />}
+            onClick={() => setThemeId(t.id)}
           />
         ))}
-      </DropdownMenuRadioGroup>
+      </DropdownMenuGroup>
     </>
   )
 }
