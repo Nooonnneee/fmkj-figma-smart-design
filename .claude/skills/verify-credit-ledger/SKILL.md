@@ -34,7 +34,7 @@ unit test naturally covers.
 | 扣费调用点                                                                         | `src/app/api/ai/images/route.ts`                             | 第 80 行（前置检查在第 68 行）                                                                             |
 | 扣费调用点                                                                         | `src/app/api/ai/images/style/route.ts`                       | 第 79 行（前置检查在第 62 行）                                                                             |
 | 扣费调用点                                                                         | `src/plugins/ai-copilot/tools/core-handlers.ts`              | 第 1278 行                                                                                                 |
-| 发放调用点（兑换码）                                                               | `src/lib/services/membership-service.ts`                     | 第 104 行                                                                                                  |
+| 发放调用点（兑换码，同一事务内、兑换码行加锁）                                     | `src/lib/services/membership-service.ts`                     | 第 129 行 create（加锁在第 72 行）                                                                         |
 | 发放调用点（任务奖励）                                                             | `src/lib/credit-tasks.ts`                                    | 第 159 行                                                                                                  |
 | 模型依赖的事实 1：hooks 与插入在同一个事务                                         | `node_modules/payload/dist/collections/operations/create.js` | 第 46 行 `initTransaction`                                                                                 |
 | 模型依赖的事实 2：跑在默认隔离级别（READ COMMITTED）                               | `src/payload.selfhost.config.ts`                             | 第 158 行 `postgresAdapter({...})`，没有 `transactionOptions`                                              |
@@ -169,12 +169,16 @@ The other direction is just as real: two overlapping **grants** both read the ol
 balance and both write the same `balanceAfter`, so the account receives one grant
 while the ledger records two.
 
-Grants are only partly protected today. `src/lib/credit-tasks.ts:82` wraps task
+Grants were only partly protected. `src/lib/credit-tasks.ts:82` wraps task
 rewards in an **in-process** mutex keyed `bind_wechat` or `${taskId}:${userId}`.
 So the same task for the same user in one process cannot race — but two _different_
 tasks for the same user (different keys; `loadAndSyncUserCreditTasks` fires
-`bind_email` and `bind_wechat` at `credit-tasks.ts:239`), two server processes, and
-兑换码核销 (`membership-service.ts`, no lock at all) are all still exposed.
+`bind_email` and `bind_wechat` at `credit-tasks.ts:239`) and two server processes
+are still exposed. 兑换码核销 (`membership-service.ts`) used to have the same
+read-modify-write shape on `usedCount` and on the per-user `redeemedBy` check with
+no lock at all; it now runs the whole redemption in one transaction behind a
+`SELECT ... FOR UPDATE` on the code row, so two concurrent redemptions cannot both
+pass. It is still not modelled in `Ledger.tla`.
 
 ### Why the model matches the code
 
@@ -234,10 +238,12 @@ This verification does not pick the fix for you, and never edits product code.
 - A 扣费 that throws is swallowed (`console.error('[ai] credit deduction failed')`
   at `chat-handler.ts:681`, at `images/route.ts:91` and `images/style/route.ts:90`).
   Usage that is never billed is a different property, not verified here.
-- 兑换码核销 (`membership-service.ts`) has the same read-modify-write shape on
-  `usedCount` and on the per-user `redeemedBy` check, with no lock at all. Two
-  concurrent redemptions can both pass it. Modelled nowhere yet; it is the
-  nearest second target.
+- 兑换码核销 (`membership-service.ts`) now takes a `SELECT ... FOR UPDATE` on the
+  code row inside one transaction, so two concurrent redemptions no longer both
+  pass. That lock, like the ledger one, is **not modelled in `Ledger.tla`** and is
+  only covered by `src/lib/services/membership-service.test.ts` (which mocks the
+  store, so it proves the shape — one transaction, lock first, no ledger row on
+  rejection — not real Postgres behaviour).
 - The `balanceAfter` / `balance` semantics for accounts whose opening balance was
   never backed by ledger rows. The model assumes the opening balance is the
   baseline.
