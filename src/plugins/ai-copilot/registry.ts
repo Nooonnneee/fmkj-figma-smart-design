@@ -32,6 +32,7 @@ export type LlmToolCall = {
 const HANDLER_MAP: Record<string, AiToolHandler> = {
   ...coreToolHandlers,
   ...competitorQuoteHandlers,
+  ...haMcpHandlers,
   ...roomInsightsHandlers,
   ...smartSelectHandlers,
   ...proposalHandlers,
