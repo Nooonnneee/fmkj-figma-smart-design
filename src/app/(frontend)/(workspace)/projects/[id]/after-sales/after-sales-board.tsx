@@ -24,14 +24,15 @@ import {
   Trash2,
   Wrench,
 } from 'lucide-react'
-import { toast } from 'sonner'
-
 import { Badge } from '@astryxdesign/core/Badge'
 import { Selector } from '@astryxdesign/core/Selector'
 import { Button } from '@astryxdesign/core/Button'
 import { IconButton } from '@astryxdesign/core/IconButton'
 import { Card as AstryxCard } from '@astryxdesign/core/Card'
+import { DateInput, type DateInputProps } from '@astryxdesign/core/DateInput'
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
+import { DropdownMenu } from '@astryxdesign/core/DropdownMenu'
+import { FieldLabel } from '@astryxdesign/core/Field'
 // 本文件已用 Layout 承接 Dialog 的三槽，卡片槽位改用别名，避免标识符冲突
 import {
   Layout,
@@ -41,17 +42,10 @@ import {
   LayoutFooter,
   LayoutHeader as CardHeader,
 } from '@astryxdesign/core/Layout'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { NumberInput } from '@astryxdesign/core/NumberInput'
 import { TextInput } from '@astryxdesign/core/TextInput'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { TextArea } from '@astryxdesign/core/TextArea'
+import { useToast } from '@astryxdesign/core/Toast'
 import {
   inWarranty,
   longDay,
@@ -119,6 +113,12 @@ type FormState = {
 
 const yuan = (n: number) => `¥${n.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`
 
+/**
+ * 官方 `DateInput` 的 `value` 是 `ISODateString`（`YYYY-MM-DD` 模板字面量类型），
+ * 而表单里存的是普通 `string`。这里只做类型收窄，空串按「未填」传 undefined。
+ */
+const isoDate = (s: string) => (s || undefined) as DateInputProps['value']
+
 export function AfterSalesBoard({
   projectId,
   data,
@@ -132,6 +132,7 @@ export function AfterSalesBoard({
 }) {
   const router = useRouter()
   const today = toShanghaiDay(new Date())!
+  const showToast = useToast()
   const [filter, setFilter] = useState<FilterKey>('all')
   const [editing, setEditing] = useState<{ id: string | null; form: FormState } | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -217,10 +218,10 @@ export function AfterSalesBoard({
       )
       if (!res.ok) {
         setErrors(res.fieldErrors ?? {})
-        toast.error(res.error)
+        showToast({ body: res.error, type: 'error' })
         return
       }
-      toast.success(id ? '维保记录已更新' : '已登记维保记录')
+      showToast({ body: id ? '维保记录已更新' : '已登记维保记录' })
       setEditing(null)
       router.refresh()
     })
@@ -230,8 +231,8 @@ export function AfterSalesBoard({
     startTransition(async () => {
       const res = await setServiceRecordStatusAction(projectId, r.id, 'done')
       setBusyId(null)
-      if (!res.ok) return void toast.error(res.error)
-      toast.success('已标记为完成')
+      if (!res.ok) return void showToast({ body: res.error, type: 'error' })
+      showToast({ body: '已标记为完成' })
       router.refresh()
     })
   }
@@ -241,8 +242,8 @@ export function AfterSalesBoard({
     startTransition(async () => {
       const res = await deleteServiceRecordAction(projectId, r.id)
       setBusyId(null)
-      if (!res.ok) return void toast.error(res.error)
-      toast.success('已删除')
+      if (!res.ok) return void showToast({ body: res.error, type: 'error' })
+      showToast({ body: '已删除' })
       router.refresh()
     })
   }
@@ -251,8 +252,8 @@ export function AfterSalesBoard({
     startTransition(async () => {
       const res = await createConfigBackupAction(projectId)
       setBusyId(null)
-      if (!res.ok) return void toast.error(res.error)
-      toast.success(`已备份 ${res.devices} 台设备的配置台账`)
+      if (!res.ok) return void showToast({ body: res.error, type: 'error' })
+      showToast({ body: `已备份 ${res.devices} 台设备的配置台账` })
       router.refresh()
     })
   }
@@ -514,11 +515,12 @@ export function AfterSalesBoard({
                       />
                     </Field>
                     <Field label="服务日期" error={errors.serviceDate} htmlFor="svc-date">
-                      <Input
+                      <DateInput
+                        label="服务日期"
+                        isLabelHidden
                         id="svc-date"
-                        type="date"
-                        value={editing.form.serviceDate}
-                        onChange={(e) => changeDate(e.target.value)}
+                        value={isoDate(editing.form.serviceDate)}
+                        onChange={(v) => changeDate(v ?? '')}
                       />
                     </Field>
                   </div>
@@ -556,14 +558,16 @@ export function AfterSalesBoard({
                     </Field>
                     {editing.form.billing === 'paid' ? (
                       <Field label="收费金额（元）" error={errors.fee} htmlFor="svc-fee">
-                        <Input
+                        <NumberInput
+                          label="收费金额（元）"
+                          isLabelHidden
                           id="svc-fee"
-                          type="number"
                           min={0}
-                          step="any"
-                          inputMode="decimal"
-                          value={editing.form.fee}
-                          onChange={(e) => patchForm({ fee: e.target.value })}
+                          hasClear
+                          value={editing.form.fee === '' ? null : Number(editing.form.fee)}
+                          onChange={(v: number | null) =>
+                            patchForm({ fee: v == null ? '' : String(v) })
+                          }
                         />
                       </Field>
                     ) : (
@@ -611,13 +615,14 @@ export function AfterSalesBoard({
                     />
                   </Field>
                   <Field label="下次回访（可选）" error={errors.nextVisitAt} htmlFor="svc-next">
-                    <Input
+                    <DateInput
+                      label="下次回访（可选）"
+                      isLabelHidden
                       id="svc-next"
-                      type="date"
-                      className="sm:w-48"
-                      value={editing.form.nextVisitAt}
-                      min={today}
-                      onChange={(e) => patchForm({ nextVisitAt: e.target.value })}
+                      controlClassName="sm:w-48"
+                      value={isoDate(editing.form.nextVisitAt)}
+                      min={isoDate(today)}
+                      onChange={(v) => patchForm({ nextVisitAt: v ?? '' })}
                     />
                   </Field>
                 </div>
@@ -835,36 +840,28 @@ function RecordItem({
         ) : null}
       </div>
       {canEdit ? (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+        <DropdownMenu
+          alignment="end"
+          renderTrigger={(props) => (
             <IconButton
+              {...props}
               variant="ghost"
-
               aria-label={`更多操作：${r.title}`}
               isDisabled={busy}
               label="更多操作"
               icon={<Loader2 />}
               size="sm"
             />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={onEdit}>
-              <Pencil className="size-4" />
-              编辑
-            </DropdownMenuItem>
-            {r.status !== 'done' ? (
-              <DropdownMenuItem onSelect={onDone}>
-                <CircleCheck className="size-4" />
-                标记为已完成
-              </DropdownMenuItem>
-            ) : null}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-              <Trash2 className="size-4" />
-              删除
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          )}
+          items={[
+            { label: '编辑', icon: Pencil, onClick: onEdit },
+            ...(r.status !== 'done'
+              ? [{ label: '标记为已完成', icon: CircleCheck, onClick: onDone }]
+              : []),
+            { type: 'divider' as const },
+            { label: '删除', icon: Trash2, onClick: onDelete, variant: 'destructive' as const },
+          ]}
+        />
       ) : null}
     </li>
   )
@@ -883,7 +880,7 @@ function Field({
 }) {
   return (
     <div className="grid gap-1.5">
-      <Label htmlFor={htmlFor}>{label}</Label>
+      <FieldLabel label={label} inputID={htmlFor ?? ''} />
       {children}
       {error ? <p className="text-xs text-destructive-strong">{error}</p> : null}
     </div>

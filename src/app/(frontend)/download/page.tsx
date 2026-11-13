@@ -15,7 +15,7 @@ import { DesktopHeroActions, DesktopPlatformCards } from '@/components/download/
 import { LandingFooter, LandingNav } from '@/components/landing/landing-chrome'
 import { SectionHeading } from '@/components/landing/section-heading'
 import { Button } from '@astryxdesign/core/Button'
-import { Kbd, KbdGroup } from '@/components/ui/kbd'
+import { Kbd } from '@astryxdesign/core/Kbd'
 import { APP_NAME, pageTitle } from '@/lib/brand'
 
 export const metadata: Metadata = {
@@ -24,11 +24,13 @@ export const metadata: Metadata = {
   alternates: { canonical: '/download' },
 }
 
+// 官方 Kbd 用 `mod` 表示平台修饰键（macOS 渲染成 ⌘、其它平台渲染成 Ctrl），
+// 自动跟随平台，不用自己按系统分支拼按键。
 const SHORTCUTS = [
-  { keys: ['Ctrl', '1'], label: '项目' },
-  { keys: ['Ctrl', '2'], label: '产品库' },
-  { keys: ['Ctrl', 'P'], label: '打印' },
-  { keys: ['Ctrl', 'N'], label: '新窗口' },
+  { keys: 'mod+1', label: '项目' },
+  { keys: 'mod+2', label: '产品库' },
+  { keys: 'mod+P', label: '打印' },
+  { keys: 'mod+N', label: '新窗口' },
 ]
 
 const FEATURES = [
@@ -183,11 +185,7 @@ export default function DownloadPage() {
                     <ul className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                       {SHORTCUTS.map((shortcut) => (
                         <li key={shortcut.label} className="flex items-center gap-2">
-                          <KbdGroup>
-                            {shortcut.keys.map((key) => (
-                              <Kbd key={key}>{key}</Kbd>
-                            ))}
-                          </KbdGroup>
+                          <Kbd keys={shortcut.keys} />
                           {shortcut.label}
                         </li>
                       ))}

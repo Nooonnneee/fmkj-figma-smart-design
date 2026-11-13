@@ -848,11 +848,30 @@ export function PointMapContextMenu({
   )
 }
 
+/**
+ * 点位覆盖率条：官方 `ProgressBar` 的轨道默认 8px，这里压到 6px。
+ *
+ * ⚠️ 这条覆盖能生效靠的是 **CSS 级联层序**，不是选择器权重。
+ * 官方的高度规则是 `astryx.css:1949` 的
+ * `.xdk7pt:not(#\#):not(#\#):not(#\#):not(#\#){height:8px}`，实际权重 **(4,1,0)**；
+ * 本行 Tailwind 任意变体 `[&_…]:h-1.5` 编译出的规则权重只有 **(0,2,0)**。
+ * 也就是说**按权重本行会输**（这正是「靠特定度压过去」那类说法错的地方）。
+ * 它真正生效的原因是 `src/app/(frontend)/layers.css` 声明了
+ * `@layer reset, theme, base, astryx-base, astryx-theme, components, utilities;`：
+ * 官方高度规则落在 `astryx-base` 层，Tailwind 工具类落在**最后的 `utilities` 层**，
+ * 层序决定胜负，与权重无关。
+ *
+ * 🚨 因此这行依赖「`utilities` 排在最后」这一前提，**层序一改就会静默失效**（不报错、只是高度回到 8px）。
+ *
+ * 当前全仓没有渲染点（只有这里一个定义）；保留是为了暂存覆盖率展示，`hasValueLabel`
+ * 保证日后一旦启用会显示数值，而不是只画一根没有数字的条。
+ */
 export function CoverageBar({ value }: { value: number }) {
   return (
     <ProgressBar
       label="点位覆盖率"
       isLabelHidden
+      hasValueLabel
       value={value}
       className="[&_.astryx-progress-bar-track]:h-1.5"
     />

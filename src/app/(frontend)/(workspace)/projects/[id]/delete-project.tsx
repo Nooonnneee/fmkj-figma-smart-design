@@ -3,11 +3,11 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Trash2 } from 'lucide-react'
-import { toast } from 'sonner'
 
 import { Button } from '@astryxdesign/core/Button'
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
 import { Layout, LayoutContent, LayoutFooter } from '@astryxdesign/core/Layout'
+import { useToast } from '@astryxdesign/core/Toast'
 
 import { deleteProject } from '../actions'
 
@@ -22,6 +22,7 @@ export function DeleteProject({
   quoteCount: number
 }) {
   const router = useRouter()
+  const showToast = useToast()
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
   const [pending, start] = useTransition()
@@ -32,7 +33,7 @@ export function DeleteProject({
       const res = await deleteProject(projectId)
       if (!res.ok) return setError(res.error)
       setOpen(false)
-      toast.success('项目已删除')
+      showToast({ body: '项目已删除' })
       router.push('/projects')
       router.refresh()
     })

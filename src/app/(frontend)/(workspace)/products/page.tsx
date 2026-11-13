@@ -21,7 +21,7 @@ import { PageHeader } from '@/components/page-header'
 import { SearchSubmit } from '@/components/search-submit'
 import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
-import { Input } from '@/components/ui/input'
+import { SearchField } from '@/components/search-field'
 import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
 import { getBrands, getCatalog } from '@/lib/cached-data'
@@ -251,12 +251,12 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             ))}
             <div className="relative w-full sm:w-72">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
+              <SearchField
                 name="q"
                 defaultValue={f.q}
                 placeholder="搜索名称、SKU、型号、品牌"
-                aria-label="搜索产品"
-                className="pl-9"
+                ariaLabel="搜索产品"
+                controlClassName="pl-9"
               />
             </div>
             <SearchSubmit variant="primary" />
