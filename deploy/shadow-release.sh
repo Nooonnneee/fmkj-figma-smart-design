@@ -94,6 +94,20 @@ fi
 # --cut 只切流量：跳过备份 / 构建 / 迁移 / 起容器，直接走到第 5 步
 if [[ "$CUT_ONLY" != "1" ]]; then
 
+# ── 预检：清掉没有容器挂着的影子网络 ──────────────────
+# 每个 release 会建一个 compose 网络（<project>_default），5.5 步只删容器，
+# 网络不会跟着消失。攒够 ~28 个就把 Docker 默认地址池吃光，第 3 步直接报：
+#   all predefined address pools have been fully subnetted
+# 2026-11-14 实测踩到：构建白跑了十分钟才发现。放在最前面，失败得快。
+log "预检：清理遗留的影子网络"
+for n in $(sudo docker network ls --format '{{.Name}}' \
+  | grep -E '^fmkj-shadow-[0-9]{8}-[0-9]{4}_default$' || true); do
+  attached=$(sudo docker network inspect "$n" --format '{{len .Containers}}' 2>/dev/null || echo 1)
+  if [[ "$attached" == "0" ]]; then
+    sudo docker network rm "$n" >/dev/null 2>&1 && echo "  已清理：$n"
+  fi
+done
+
 # ── 0. 备份数据库 ─────────────────────────────────────
 log "0/6 备份数据库"
 mkdir -p "$BACKUPS"
