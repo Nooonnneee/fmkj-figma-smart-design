@@ -28,8 +28,8 @@ unit test naturally covers.
 
 | Covered by the model                                                               | File                                                         | Symbol / line                                                                                              |
 | ---------------------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| 加锁读余额（`SELECT ai_credits ... FOR UPDATE`），算 `balanceAfter`，负数时 402    | `src/collections/AiCreditLedger.ts`                          | `lockUserBalance`（第 24 行起，锁在第 30）＋ `beforeChange`（第 59 行起，`balanceAfter` 在 70、守卫在 71） |
-| writes `users.aiCredits = doc.balanceAfter`（在锁内、同一个事务）                  | same                                                         | `afterChange`（第 77 行起，写入在 83）                                                                     |
+| 加锁读余额（`SELECT ai_credits ... FOR UPDATE`），算 `balanceAfter`，负数时 402    | `src/collections/AiCreditLedger.ts`                          | `lockUserBalance`（第 22 行起，锁在第 26）＋ `beforeChange`（第 55 行起，`balanceAfter` 在 66、守卫在 67） |
+| writes `users.aiCredits = doc.balanceAfter`（在锁内、同一个事务）                  | same                                                         | `afterChange`（第 73 行起，写入在 79）                                                                     |
 | 扣费调用点                                                                         | `src/plugins/ai-copilot/chat-handler.ts`                     | `chargeAiCredits`（写 `ai-credit-ledger`），第 665 行                                                      |
 | 扣费调用点                                                                         | `src/app/api/ai/images/route.ts`                             | 第 79 行（前置检查在第 69 行）                                                                             |
 | 扣费调用点                                                                         | `src/app/api/ai/images/style/route.ts`                       | 第 78 行（前置检查在第 63 行）                                                                             |
@@ -38,15 +38,16 @@ unit test naturally covers.
 | 发放调用点（任务奖励）                                                             | `src/lib/credit-tasks.ts`                                    | 第 159 行                                                                                                  |
 | 模型依赖的事实 1：hooks 与插入在同一个事务                                         | `node_modules/payload/dist/collections/operations/create.js` | 第 46 行 `initTransaction`                                                                                 |
 | 模型依赖的事实 2：跑在默认隔离级别（READ COMMITTED）                               | `src/payload.selfhost.config.ts`                             | 第 158 行 `postgresAdapter({...})`，没有 `transactionOptions`                                              |
-| 模型依赖的事实 3：`beforeChange` 在同一个事务里对 user 行加锁（对应 `Locked.cfg`） | `src/collections/AiCreditLedger.ts`                          | `lockUserBalance` 第 30 行 `FOR UPDATE`，走 `req.transactionID` 的事务                                     |
+| 模型依赖的事实 3：`beforeChange` 在同一个事务里对 user 行加锁（对应 `Locked.cfg`） | `src/collections/AiCreditLedger.ts`                          | `lockUserBalance` 第 26 行 `FOR UPDATE`，走 `req.transactionID` 的事务                                     |
 
-**Sync commit:** `03c6b8a`（2026-11-13，main）
+**Sync commit:** `681acf3`（2026-11-13，`fix/ai-billing-integrity`）
 
 Move this commit forward **only** after confirming the model still describes the
 code at the new commit — walk the table above and re-read each symbol. If a call
 site moved or a new one appeared, update the model and the table first.
-(The covered files are byte-identical at `d410008`, so the record still holds
-there; `03c6b8a` is the commit on `main` where it was read.)
+This is the commit where the row-lock fix (`f1dd4e8`), the membership fix
+(`9900545`), the `chargeAiCredits` call-site move (`dc93aae`) and the tool-registry
+changes were all last re-read against the table.
 
 ## Run it
 
@@ -231,7 +232,7 @@ This verification does not pick the fix for you, and never edits product code.
   standard READ COMMITTED / `FOR UPDATE` semantics, but it has **not** been
   exercised against a database here. Running this against the real Postgres on
   this machine is forbidden (it may be production).
-- `chat-handler.ts:639` clamps the charge with
+- `chat-handler.ts:640` clamps the charge with
   `Math.min(ledger.credits(), fresh.aiCredits)` against a read taken before the
   ledger create. The model charges a fixed delta; the clamp only makes the loss
   smaller, it does not remove it.
@@ -252,7 +253,9 @@ This verification does not pick the fix for you, and never edits product code.
   never backed by ledger rows. The model assumes the opening balance is the
   baseline.
 - Anything about AI pricing maths (`src/plugins/ai-copilot/billing.ts`) — that is
-  deterministic and covered by ordinary tests.
+  deterministic and is now covered by `src/plugins/ai-copilot/billing.test.ts`
+  (basic formula, minimum 1 credit, peak/off-peak and weekend rates, cache-hit
+  price, and the old-formula fallback when a model has no pricing).
 
 ## When the covered code changes
 
