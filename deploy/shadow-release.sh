@@ -6,7 +6,10 @@
 # 影子部署的做法是：新目录 → 新镜像 → 新端口 → 验证通过 → 改 Caddy 流量。
 #
 # 用法（在服务器上以 ubuntu 用户执行）：
-#   bash deploy/shadow-release.sh [--rollback]
+#   bash deploy/shadow-release.sh                      # 完整发布：构建 → 影子 → 冒烟 → 切流量
+#   PAUSE=1 bash deploy/shadow-release.sh              # 只做到「影子就绪」，不切流量
+#   bash deploy/shadow-release.sh --cut <端口>         # 只切流量（冒烟在本机跑完后用）
+#   bash deploy/shadow-release.sh --rollback <端口>    # 回滚到指定端口
 set -euo pipefail
 
 APP_DIR=/opt/fmkj/figma-smart-design        # 当前生产目录（旧版，保留用于回滚）
@@ -34,6 +37,21 @@ NEW_PORT=$(( CUR_PORT == 13099 ? 13000 : CUR_PORT + 1 ))
 
 log() { printf '\n\033[1m▶ %s\033[0m\n' "$*"; }
 die() { printf '\n\033[31m✗ %s\033[0m\n' "$*" >&2; exit 1; }
+
+# ── 只切流量：给 PAUSE=1 之后的第二次调用用 ──────────────────
+# 第一次跑（PAUSE=1）建好影子容器并停在「未切流量」，本机冒烟通过后再跑
+#   SKIP_SMOKE=1 bash deploy/shadow-release.sh --cut <NEW_PORT>
+# 此时不再构建、不再起容器，只改 Caddy 指向。
+CUT_ONLY=0
+if [[ "${1:-}" == "--cut" ]]; then
+  TARGET_PORT=${2:-}
+  [[ -n "$TARGET_PORT" ]] || die "--cut 需要一个端口，如 --cut 13029"
+  curl -s -o /dev/null --max-time 5 "http://127.0.0.1:$TARGET_PORT/login" \
+    || die "127.0.0.1:$TARGET_PORT 上没有服务在监听，拒绝切流量"
+  [[ "$TARGET_PORT" == "$CUR_PORT" ]] && { echo "已经在 $TARGET_PORT，无需切换"; exit 0; }
+  NEW_PORT=$TARGET_PORT
+  CUT_ONLY=1
+fi
 
 # ── 回滚 ──────────────────────────────────────────────
 if [[ "${1:-}" == "--rollback" ]]; then
@@ -63,6 +81,9 @@ if [[ "${1:-}" == "--rollback" ]]; then
   curl -s -o /dev/null -w '  https://fmkj.top/login → %{http_code}\n' https://fmkj.top/login
   exit 0
 fi
+
+# --cut 只切流量：跳过备份 / 构建 / 迁移 / 起容器，直接走到第 5 步
+if [[ "$CUT_ONLY" != "1" ]]; then
 
 # ── 0. 备份数据库 ─────────────────────────────────────
 log "0/6 备份数据库"
@@ -187,11 +208,30 @@ elif [[ -f e2e/smoke.mjs ]] && command -v node >/dev/null 2>&1 \
     node e2e/smoke.mjs 2>&1 | tail -25 \
     || die "冒烟未通过，已中止（生产未受影响）"
 else
+  # 停在「新容器已起、流量未切」状态，把后续命令直接打印出来。
+  # PAUSE=1 是**显式选择**：脚本不会假装冒烟跑过了。
+  if [[ "${PAUSE:-}" == "1" || "${1:-}" == "--cut" ]]; then
+    cat <<JSON
+  ⏸  PAUSE=1：影子容器已就绪，流量未切。
+     端口 $NEW_PORT（Caddy 仍指向 $CUR_PORT，生产未受影响）
+
+  在本机跑冒烟：
+      ssh -f -N -L 19128:127.0.0.1:$NEW_PORT $USER@\$(hostname -I | awk '{print \$1}')
+      SMOKE_BASE=http://127.0.0.1:19128 SMOKE_OUT=/tmp/fmkj-smoke node e2e/smoke.mjs
+
+  通过后切流量：
+      SKIP_SMOKE=1 bash deploy/shadow-release.sh --cut $NEW_PORT
+JSON
+    exit 0
+  fi
   die "宿主机没有 node + playwright，无法自动冒烟。请改在**本机**跑：
       ssh -f -N -L 19128:127.0.0.1:$NEW_PORT ubuntu@<服务器>
       SMOKE_BASE=http://127.0.0.1:19128 node e2e/smoke.mjs
-    确认通过后带上 SKIP_SMOKE=1 重跑本脚本（生产未受影响）"
+    或带 PAUSE=1 重跑本脚本，让它停在「新容器就绪、流量未切」，
+    确认通过后再用 SKIP_SMOKE=1 切流量（生产未受影响）"
 fi
+
+fi  # CUT_ONLY：以上是「构建 + 起影子 + 冒烟」阶段，--cut 时整段跳过
 
 # ── 5. 切流量 ─────────────────────────────────────────
 log "5/7 切 Caddy 流量：$CUR_PORT → $NEW_PORT"
