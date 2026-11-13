@@ -155,6 +155,27 @@ describe('参数归一化', () => {
     expect(priced.data.patch.price).toBe(399)
   })
 
+  it('成员输入能通过产品新增与改价的归一化', () => {
+    // 2026-11-13 owner 批准：产品库新增/改价放开给所有成员。
+    // handler 不再做 isCmsAdminUser 前置拒绝，成员输入直接进入归一化。
+    const created = normalizeCreateProduct({
+      name: '面板',
+      sku: 'X1',
+      deviceType: 'switch-3',
+      brand: 'Aqara',
+      price: 399,
+    })
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+    expect(created.data).toMatchObject({ name: '面板', sku: 'X1', price: 399 })
+
+    const updated = normalizeUpdateProduct({ productId: 'p1', price: 399 })
+    expect(updated.ok).toBe(true)
+    if (!updated.ok) return
+    expect(updated.data.productId).toBe('p1')
+    expect(updated.data.patch).toEqual({ price: 399 })
+  })
+
   it('修改产品：空补丁 / 负价格 / 非法状态要报错', () => {
     expect(normalizeUpdateProduct({ productId: 'p1' }).ok).toBe(false)
     const negative = normalizeUpdateProduct({ productId: 'p1', price: -5 })
@@ -300,21 +321,6 @@ describe('危险操作与权限拦截', () => {
     expect(contractDeleteBlock('signed')).toContain('撤销签订')
     expect(contractDeleteBlock('draft')).toBeNull()
     expect(contractDeleteBlock(undefined)).toBeNull()
-  })
-
-  it('成员调用产品写入工具会被拒绝，且不会碰数据库', async () => {
-    mocks.getPayloadClient.mockClear()
-    const created = await adminToolHandlers.create_product(
-      { name: '面板', sku: 'X1', deviceType: 'switch-3', brand: 'Aqara', price: 399 },
-      memberCtx,
-    )
-    expect(fail(created).result.error).toContain('CMS 管理员')
-    const updated = await adminToolHandlers.update_product(
-      { productId: 'p1', price: 399 },
-      memberCtx,
-    )
-    expect(fail(updated).result.error).toContain('CMS 管理员')
-    expect(mocks.getPayloadClient).not.toHaveBeenCalled()
   })
 
   it('公司设置的敏感字段在进库前被拒绝', async () => {

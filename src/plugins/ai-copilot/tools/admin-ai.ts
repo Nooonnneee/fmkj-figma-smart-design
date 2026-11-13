@@ -279,16 +279,6 @@ export function normalizeUpdateProduct(
   return { ok: true, data: { productId, patch, brandRef } }
 }
 
-/** 产品库写入只对 CMS 管理员开放（与 Products 集合的 cmsAdminOnly 一致）。 */
-export function isCmsAdminUser(user: unknown): boolean {
-  return Boolean(
-    user && typeof user === 'object' && (user as { collection?: unknown }).collection === 'admins',
-  )
-}
-
-export const PRODUCT_WRITE_DENIED =
-  '产品库只能由 CMS 管理员在后台维护，当前账号没有新增或修改产品的权限'
-
 /* ------------------------------ 公司设置 ------------------------------ */
 
 export type CompanySettingsPatch = {
@@ -612,9 +602,9 @@ export const adminToolSpecs: AdminToolSpec[] = [
     name: 'create_product',
     title: '新增产品',
     description:
-      '在产品库新增一款产品。当用户说「产品库里新增一款 Aqara 面板」「把这款新品加进产品库」时调用。只有 CMS 管理员可以写入产品库；必须提供产品名称、型号/SKU、设备类型、品牌（已有品牌名称或 ID）和售价。品牌不会自动新建，找不到时应提示用户先在后台品牌库创建。',
+      '在产品库新增一款产品。当用户说「产品库里新增一款 Aqara 面板」「把这款新品加进产品库」时调用。成员可以新增/修改产品与售价；删除产品仍只允许后台管理员。必须提供产品名称、型号/SKU、设备类型、品牌（已有品牌名称或 ID）和售价。品牌不会自动新建，找不到时应提示用户先在后台品牌库创建。',
     cost: 1,
-    // 工具能力声明；真正的写权限仍由 Products 集合的 cmsAdminOnly 强制。
+    // 工具能力声明；真正的写权限由 Products 集合的 cmsAdminOrMember 裁决。
     permissions: ['catalog:write'],
     scope: 'workspace',
     mutates: true,
@@ -655,7 +645,7 @@ export const adminToolSpecs: AdminToolSpec[] = [
     name: 'update_product',
     title: '修改产品与改价',
     description:
-      '修改产品库中已有产品的资料或售价。当用户说「Aqara 那款面板涨到 399」「把这个产品调到 299」「产品改名为…」时调用。先用 search_products 按品牌/型号/关键词找到 productId，再传入要改的字段；改价必须显式传 price（元），不会根据文字猜测。只有 CMS 管理员可以修改产品库。',
+      '修改产品库中已有产品的资料或售价。当用户说「Aqara 那款面板涨到 399」「把这个产品调到 299」「产品改名为…」时调用。先用 search_products 按品牌/型号/关键词找到 productId，再传入要改的字段；改价必须显式传 price（元），不会根据文字猜测。成员可以新增/修改产品与售价；删除产品仍只允许后台管理员。',
     cost: 0.5,
     permissions: ['catalog:write'],
     scope: 'workspace',
