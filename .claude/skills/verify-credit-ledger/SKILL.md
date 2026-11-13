@@ -26,26 +26,28 @@ unit test naturally covers.
 
 ## Coverage record
 
-| Covered by the model                                                | File                                                         | Symbol / line                                                 |
-| ------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------- |
-| reads `users.aiCredits`, computes `balanceAfter`, 402 when negative | `src/collections/AiCreditLedger.ts`                          | `beforeChange`（第 34 行起，`balanceAfter` 在 50、守卫在 51） |
-| writes `users.aiCredits = doc.balanceAfter`                         | same                                                         | `afterChange`（第 57 行起，写入在 63）                        |
-| 扣费调用点                                                          | `src/plugins/ai-copilot/chat-handler.ts`                     | `ai-credit-ledger` create，第 665 行                          |
-| 扣费调用点                                                          | `src/app/api/ai/images/route.ts`                             | 第 80 行（前置检查在第 68 行）                                |
-| 扣费调用点                                                          | `src/app/api/ai/images/style/route.ts`                       | 第 79 行（前置检查在第 62 行）                                |
-| 扣费调用点                                                          | `src/plugins/ai-copilot/tools/core-handlers.ts`              | 第 1278 行                                                    |
-| 发放调用点（兑换码）                                                | `src/lib/services/membership-service.ts`                     | 第 104 行                                                     |
-| 发放调用点（任务奖励）                                              | `src/lib/credit-tasks.ts`                                    | 第 159 行                                                     |
-| 模型依赖的事实 1：hooks 与插入在同一个事务                          | `node_modules/payload/dist/collections/operations/create.js` | 第 46 行 `initTransaction`                                    |
-| 模型依赖的事实 2：跑在默认隔离级别（READ COMMITTED）                | `src/payload.selfhost.config.ts`                             | 第 158 行 `postgresAdapter({...})`，没有 `transactionOptions` |
+| Covered by the model                                                               | File                                                         | Symbol / line                                                                                              |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| 加锁读余额（`SELECT ai_credits ... FOR UPDATE`），算 `balanceAfter`，负数时 402    | `src/collections/AiCreditLedger.ts`                          | `lockUserBalance`（第 22 行起，锁在第 26）＋ `beforeChange`（第 55 行起，`balanceAfter` 在 66、守卫在 67） |
+| writes `users.aiCredits = doc.balanceAfter`（在锁内、同一个事务）                  | same                                                         | `afterChange`（第 73 行起，写入在 79）                                                                     |
+| 扣费调用点                                                                         | `src/plugins/ai-copilot/chat-handler.ts`                     | `chargeAiCredits`（写 `ai-credit-ledger`），第 665 行                                                      |
+| 扣费调用点                                                                         | `src/app/api/ai/images/route.ts`                             | 第 79 行（前置检查在第 69 行）                                                                             |
+| 扣费调用点                                                                         | `src/app/api/ai/images/style/route.ts`                       | 第 78 行（前置检查在第 63 行）                                                                             |
+| 扣费调用点                                                                         | `src/plugins/ai-copilot/tools/core-handlers.ts`              | 第 1277 行                                                                                                 |
+| 发放调用点（兑换码，同一事务内、兑换码行加锁）                                     | `src/lib/services/membership-service.ts`                     | 第 129 行 create（加锁在第 72 行）                                                                         |
+| 发放调用点（任务奖励）                                                             | `src/lib/credit-tasks.ts`                                    | 第 159 行                                                                                                  |
+| 模型依赖的事实 1：hooks 与插入在同一个事务                                         | `node_modules/payload/dist/collections/operations/create.js` | 第 46 行 `initTransaction`                                                                                 |
+| 模型依赖的事实 2：跑在默认隔离级别（READ COMMITTED）                               | `src/payload.selfhost.config.ts`                             | 第 158 行 `postgresAdapter({...})`，没有 `transactionOptions`                                              |
+| 模型依赖的事实 3：`beforeChange` 在同一个事务里对 user 行加锁（对应 `Locked.cfg`） | `src/collections/AiCreditLedger.ts`                          | `lockUserBalance` 第 26 行 `FOR UPDATE`，走 `req.transactionID` 的事务                                     |
 
-**Sync commit:** `03c6b8a`（2026-11-13，main）
+**Sync commit:** `681acf3`（2026-11-13，`fix/ai-billing-integrity`）
 
 Move this commit forward **only** after confirming the model still describes the
 code at the new commit — walk the table above and re-read each symbol. If a call
 site moved or a new one appeared, update the model and the table first.
-(The covered files are byte-identical at `d410008`, so the record still holds
-there; `03c6b8a` is the commit on `main` where it was read.)
+This is the commit where the row-lock fix (`f1dd4e8`), the membership fix
+(`9900545`), the `chargeAiCredits` call-site move (`dc93aae`) and the tool-registry
+changes were all last re-read against the table.
 
 ## Run it
 
@@ -54,12 +56,12 @@ bash verification/credit-ledger/verify.sh
 ```
 
 It checks each rule against each of the three configs and prints a verdict per
-rule. Today it must print:
+rule. After the row-lock fix landed it must print:
 
 ```
 ▸ Current
-  BalanceMatchesLedger   ❌ 违反
-  NoOverdraft            ❌ 违反
+  BalanceMatchesLedger   ✅ 成立
+  NoOverdraft            ✅ 成立
 ▸ Locked
   BalanceMatchesLedger   ✅ 成立
   NoOverdraft            ✅ 成立
@@ -67,12 +69,15 @@ rule. Today it must print:
   BalanceMatchesLedger   ✅ 成立
   NoOverdraft            ❌ 违反
 
-违反次数：3（应为 3：Current 2 条 + NoGuard 1 条）
+违反次数：1（应为 1：只有 NoGuard 的 NoOverdraft）
 ```
 
-`NoGuard.cfg` is the proposed fix with the 402 check deleted. It exists to show
-that `NoOverdraft` is testing the check itself, not just the lost update: a rule
-that never fails proves nothing.
+`Current.cfg` and `Locked.cfg` now describe the same code (the fix landed), so
+both hold. `NoGuard.cfg` is that same fix with the 402 check deleted: it exists to
+show that `NoOverdraft` is testing the check itself, not just the lost update — a
+rule that never fails proves nothing. The lost-update counterexample is no longer
+reproduced by a config; it lives in git history and in the "Known result" section
+below.
 
 The real hooks are also replayed, without a database:
 
@@ -82,9 +87,10 @@ pnpm exec vitest run -c verification/credit-ledger/vitest.config.ts
 
 `verification/credit-ledger/replay.test.ts` drives the **real** `beforeChange` /
 `afterChange` from `AiCreditLedger.ts` through a two-phase in-memory store that
-mimics two overlapping transactions (reads see committed data only). Its first
-case is `it.fails` on the invariant, so it stays green while the bug is real and
-turns red the moment someone fixes the code — that is the signal to rewrite it.
+mimics two overlapping transactions (reads see committed data only) and models the
+row lock as a promise the second transaction waits on. Both cases now assert the
+fixed behaviour: two concurrent charges serialize, and the second is refused with 402. The store's lock is our own emulation, not Postgres's — see the first bullet
+under "What this does NOT cover".
 
 ### Toolchain notes for this machine
 
@@ -127,18 +133,23 @@ Two committed files next to the model, both rendered from the same run:
 `chart.svg` 是 `chart.mmd` 用 pele 渲染的派生文件，模型或 `view.ts` 改了要重新生成再
 一起提交；`verify.sh` 不重新生成它。
 
-## Known result at the sync commit
+## Known result
 
-**Both rules break on the code as it stands. This is the finding, not a modeling
-error.**
+**Before the row-lock fix, both rules broke on the code. That is the finding this
+model was built to make, not a modeling error.** The fix (`lockUserBalance` in
+`AiCreditLedger.ts`) is `Locked.cfg`; now that it has landed, `Current.cfg` sets
+`Atomic = TRUE` as well, so both rules hold for both.
 
-| Config                              | `Atomic` | `Guard` | Result                                                      |
-| ----------------------------------- | -------- | ------- | ----------------------------------------------------------- |
-| `Current.cfg` (today)               | FALSE    | TRUE    | `BalanceMatchesLedger` **breaks**, `NoOverdraft` **breaks** |
-| `Locked.cfg` (proposed)             | TRUE     | TRUE    | rules hold                                                  |
-| `NoGuard.cfg` (fix minus the check) | TRUE     | FALSE   | `NoOverdraft` **breaks**                                    |
+| Config                                         | `Atomic` | `Guard` | Result                                                      |
+| ---------------------------------------------- | -------- | ------- | ----------------------------------------------------------- |
+| `Current.cfg` / `Locked.cfg` (the fix, landed) | TRUE     | TRUE    | rules hold                                                  |
+| (the code before the fix, for reference)       | FALSE    | TRUE    | `BalanceMatchesLedger` **breaks**, `NoOverdraft` **breaks** |
+| `NoGuard.cfg` (fix minus the check)            | TRUE     | FALSE   | `NoOverdraft` **breaks**                                    |
 
 ### The counterexample, in the code's words
+
+（修复前的反例，保留作为「模型确实能抓到这个 bug」的证据。修复后 `Current.cfg`
+不再复现它。）
 
 ```
 1. 用户余额 5，两笔扣 5 分的 AI 请求同时到账
@@ -159,12 +170,16 @@ The other direction is just as real: two overlapping **grants** both read the ol
 balance and both write the same `balanceAfter`, so the account receives one grant
 while the ledger records two.
 
-Grants are only partly protected today. `src/lib/credit-tasks.ts:82` wraps task
+Grants were only partly protected. `src/lib/credit-tasks.ts:82` wraps task
 rewards in an **in-process** mutex keyed `bind_wechat` or `${taskId}:${userId}`.
 So the same task for the same user in one process cannot race — but two _different_
 tasks for the same user (different keys; `loadAndSyncUserCreditTasks` fires
-`bind_email` and `bind_wechat` at `credit-tasks.ts:239`), two server processes, and
-兑换码核销 (`membership-service.ts`, no lock at all) are all still exposed.
+`bind_email` and `bind_wechat` at `credit-tasks.ts:239`) and two server processes
+are still exposed. 兑换码核销 (`membership-service.ts`) used to have the same
+read-modify-write shape on `usedCount` and on the per-user `redeemedBy` check with
+no lock at all; it now runs the whole redemption in one transaction behind a
+`SELECT ... FOR UPDATE` on the code row, so two concurrent redemptions cannot both
+pass. It is still not modelled in `Ledger.tla`.
 
 ### Why the model matches the code
 
@@ -174,29 +189,34 @@ tasks for the same user (different keys; `loadAndSyncUserCreditTasks` fires
   indivisible step, as modelled.
 - That adapter is configured without `transactionOptions`
   (`src/payload.selfhost.config.ts:158`), so the isolation level is Postgres's
-  default **READ COMMITTED**: the read in `beforeChange` sees the last committed
-  value, not the value the other in-flight transaction is about to write.
-- Nothing locks the user row, so the `afterChange` write is a blind
-  `UPDATE users SET ai_credits = $1` (a literal, not `ai_credits + $1`) and the
-  later commit simply overwrites the earlier one. There is no `version` /
-  optimistic lock on `users` or `ai-credit-ledger`, and no unique constraint on
-  the ledger table.
+  default **READ COMMITTED**.
+- Before the fix nothing locked the user row: the `beforeChange` read saw the last
+  committed value, and the `afterChange` write was a blind
+  `UPDATE users SET ai_credits = $1` (a literal, not `ai_credits + $1`), so the
+  later commit overwrote the earlier one. There is no `version` / optimistic lock
+  on `users` or `ai-credit-ledger`, and no unique constraint on the ledger table.
+- The fix keeps that literal write but now holds the user row
+  (`lockUserBalance`, `SELECT ... FOR UPDATE`) from `beforeChange` until the
+  transaction commits, so the read-modify-write is serialized and the second
+  request re-reads the committed balance.
 - The deployed config is this one: `src/payload.config.ts` is
   `export { default } from './payload.selfhost.config'` and the Dockerfile forces
   `PAYLOAD_CONFIG_PATH=src/payload.selfhost.config.ts`. `AGENTS.md` / `CLAUDE.md`
   describe a Figma-managed platform database; for this question the code is ahead
   of those docs, and the Postgres reasoning above is the correct one.
 
-### The fix
+### The fix (landed)
 
-Hold the user row for the duration of the read-modify-write, or make the write
-atomic: 在 `beforeChange` 里先对这条 user 加行锁（`SELECT ... FOR UPDATE`，走
-`req` 同一个事务），或者把余额更新改成
+The row-lock form was chosen: 在 `beforeChange` 里先对这条 user 加行锁
+（`SELECT ... FOR UPDATE`，走 `req` 同一个事务），afterChange 照旧写回
+`doc.balanceAfter`。它等价于 `Locked.cfg`，也保住了 402 守卫。
+另一条等价路线是把余额更新改成
 `UPDATE users SET ai_credits = ai_credits + $delta WHERE id = $id AND ai_credits + $delta >= 0`
-并用 `RETURNING` 的余额回填 `balanceAfter`。两者都等价于 `Locked.cfg`。数据库
-隔离级别调成可串行化也能挡住，但要配重试，否则并发时会直接报错。
+并用 `RETURNING` 的余额回填 `balanceAfter`；数据库隔离级别调成可串行化也能挡住，
+但要配重试，否则并发时会直接报错。
 
 This verification does not pick the fix for you, and never edits product code.
+（行锁那次修复由 owner 批准，改动见 git 历史。）
 
 ## What this does NOT cover
 
@@ -205,26 +225,37 @@ This verification does not pick the fix for you, and never edits product code.
   create (narrow); in 生图 / 风格化 a **pre-check read happens before a
   multi-second generation**, so the two are easier to overlap than the
   millisecond-scale window suggests.
-- Row-lock blocking. `replay.test.ts` uses an in-memory store with no row locks,
-  so it lets both writes land before either commits. Real Postgres blocks the
-  second `UPDATE` on the first transaction's lock — the result is the same,
-  because the write is a literal.
-- `chat-handler.ts:639` clamps the charge with
+- **Real row-lock blocking.** `replay.test.ts` models the lock with a promise in
+  its in-memory store; it does not prove that real Postgres blocks the second
+  transaction on `SELECT ... FOR UPDATE`, re-reads the committed balance after
+  the first commits, and routes the second into the 402 branch. That behaviour is
+  standard READ COMMITTED / `FOR UPDATE` semantics, but it has **not** been
+  exercised against a database here. Running this against the real Postgres on
+  this machine is forbidden (it may be production).
+- `chat-handler.ts:640` clamps the charge with
   `Math.min(ledger.credits(), fresh.aiCredits)` against a read taken before the
   ledger create. The model charges a fixed delta; the clamp only makes the loss
   smaller, it does not remove it.
-- A 扣费 that throws is swallowed (`console.error('[ai] credit deduction failed')`
-  at `chat-handler.ts:681`, at `images/route.ts:91` and `images/style/route.ts:90`).
-  Usage that is never billed is a different property, not verified here.
-- 兑换码核销 (`membership-service.ts`) has the same read-modify-write shape on
-  `usedCount` and on the per-user `redeemedBy` check, with no lock at all. Two
-  concurrent redemptions can both pass it. Modelled nowhere yet; it is the
-  nearest second target.
+- A 扣费 that throws used to be swallowed (a bare `console.error`, and an **empty
+  catch** at `core-handlers.ts`). All four call sites now go through
+  `chargeAiCredits` (`src/lib/credit-charge.ts`): the request still succeeds but
+  the failure is retried once and logged as one structured `[ai-billing]` line
+  (userId / delta / reason / model / messageId / attempt / error). Nothing is
+  written to the database (a billing-failure collection would be a schema change),
+  so "usage that is never billed" is still a separate property, not verified here.
+- 兑换码核销 (`membership-service.ts`) now takes a `SELECT ... FOR UPDATE` on the
+  code row inside one transaction, so two concurrent redemptions no longer both
+  pass. That lock, like the ledger one, is **not modelled in `Ledger.tla`** and is
+  only covered by `src/lib/services/membership-service.test.ts` (which mocks the
+  store, so it proves the shape — one transaction, lock first, no ledger row on
+  rejection — not real Postgres behaviour).
 - The `balanceAfter` / `balance` semantics for accounts whose opening balance was
   never backed by ledger rows. The model assumes the opening balance is the
   baseline.
 - Anything about AI pricing maths (`src/plugins/ai-copilot/billing.ts`) — that is
-  deterministic and covered by ordinary tests.
+  deterministic and is now covered by `src/plugins/ai-copilot/billing.test.ts`
+  (basic formula, minimum 1 credit, peak/off-peak and weekend rates, cache-hit
+  price, and the old-formula fallback when a model has no pricing).
 
 ## When the covered code changes
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { appAuth } from '@/lib/app-auth'
+import { chargeAiCredits, isBusinessRejection } from '@/lib/credit-charge'
 import { getPayloadClient } from '@/lib/payload'
 import { STYLE_TEMPLATES } from '@/lib/style-templates'
 import { getPluginFlags } from '@/plugins/state'
@@ -73,25 +74,19 @@ export async function POST(request: Request) {
       note,
       userId: user.id,
     })
-    let balance: number | null = null
-    try {
-      const entry = await payload.create({
-        collection: 'ai-credit-ledger',
-        data: {
-          user: user.id,
-          delta: -STYLE_TRANSFER_COST,
-          reason: 'AI 户型图风格化 · 风格模板',
-        },
-        overrideAccess: true,
-        depth: 0,
-      })
-      balance = entry.balanceAfter ?? null
-    } catch (error) {
-      console.error('[ai-style] credit deduction failed', error)
-    }
+    // 记账失败不让风格化失败；重试一次并留下结构化记录（见 chargeAiCredits）。
+    const balance = await chargeAiCredits(payload, {
+      user: user.id,
+      delta: -STYLE_TRANSFER_COST,
+      reason: 'AI 户型图风格化 · 风格模板',
+    })
     return NextResponse.json({ ok: true, ...image, cost: STYLE_TRANSFER_COST, balance })
   } catch (error) {
-    const status = error instanceof StyleTransferError ? 400 : 500
+    const status = isBusinessRejection(error)
+      ? error.status
+      : error instanceof StyleTransferError
+        ? 400
+        : 500
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : '风格化失败' },
       { status },

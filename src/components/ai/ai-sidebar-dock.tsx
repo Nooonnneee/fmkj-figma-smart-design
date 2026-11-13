@@ -606,13 +606,18 @@ export function AiSidebarDock({
               }
             }
           } else if (ev.type === 'error') {
-            throw new Error(String(ev.error))
+            const err = new Error(String(ev.error)) as Error & { code?: string }
+            err.code = typeof ev.code === 'string' ? ev.code : undefined
+            throw err
           }
         }
       }
     } catch (error) {
       if ((error as Error).name === 'AbortError') dropReply()
-      else
+      else if ((error as Error & { code?: string }).code === 'billing_rejected') {
+        // 业务拒绝（如并发扣费时积分不足）：回复内容已经流式发出，但本次没扣费，必须明确告诉用户。
+        toast.error((error as Error).message || '积分不足，本次回复未计费')
+      } else
         patchReply((m) =>
           m.content
             ? m
