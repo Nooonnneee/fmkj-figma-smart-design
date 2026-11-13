@@ -2,7 +2,7 @@
 
 import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import { BadgeCheck } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
 import { useToast } from '@astryxdesign/core/Toast'
@@ -34,7 +34,8 @@ export function SetFinalQuoteButton({
           router.refresh()
         })
       }
-      icon={<Loader2 />}
+      isLoading={pending}
+      icon={<BadgeCheck />}
       label="设为定稿"
     />
   )

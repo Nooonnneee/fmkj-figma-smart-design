@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { FileSignature, Loader2 } from 'lucide-react'
+import { FileSignature } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
 import { RadioList, RadioListItem } from '@astryxdesign/core/RadioList'
@@ -69,7 +69,8 @@ export function CreateContractPanel({
               router.refresh()
             })
           }
-          icon={<Loader2 />}
+          isLoading={pending}
+          icon={<FileSignature />}
           label="生成合同"
         />
       </div>

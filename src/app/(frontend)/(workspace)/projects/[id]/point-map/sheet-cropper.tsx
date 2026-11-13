@@ -335,8 +335,8 @@ export function SheetCropper({
           <Button
             className="flex-1"
             isDisabled={!crop || busy}
+            isLoading={busy}
             onClick={() => void confirm()}
-            icon={<Loader2 />}
             label="确认并添加"
           />
         </div>

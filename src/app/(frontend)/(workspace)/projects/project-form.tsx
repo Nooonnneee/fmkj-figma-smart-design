@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, Home, Loader2, NotebookPen, Save, Settings2, UserRound } from 'lucide-react'
+import { AlertCircle, Home, NotebookPen, Plus, Save, Settings2, UserRound } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
 import { Field } from '@astryxdesign/core/Field'
@@ -320,8 +320,8 @@ export function ProjectForm({
             <Button
               type="submit"
               isDisabled={pending || (!isNew && !dirty)}
-              icon={<Loader2 />}
-              endContent={<Save />}
+              isLoading={pending}
+              icon={isNew ? <Plus /> : <Save />}
               label={isNew ? '创建项目' : '保存'}
             />
           </div>

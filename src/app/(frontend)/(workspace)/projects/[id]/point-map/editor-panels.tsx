@@ -389,7 +389,11 @@ export function SelectedArea({
           onChange={(v) => setName(v)}
           onBlur={commit}
           onKeyDown={(ev) => {
-            if (ev.key === 'Enter') (ev.currentTarget as HTMLInputElement).blur()
+            if (ev.key === 'Enter') {
+              if (ev.nativeEvent.isComposing || ev.nativeEvent.keyCode === 229) return
+              const target = ev.currentTarget as HTMLInputElement
+              target.blur()
+            }
           }}
           controlClassName="h-8 border-border bg-background text-xs"
         />

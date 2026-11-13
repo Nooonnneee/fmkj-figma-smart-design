@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, ImageIcon, Loader2, Save, Upload, X } from 'lucide-react'
+import { AlertCircle, ImageIcon, Save, Upload, X } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
 import { IconButton } from '@astryxdesign/core/IconButton'
@@ -378,7 +378,7 @@ export function CompanyForm({
         改为普通文档流 + 上边框，保存按钮始终跟着表单末尾走。
       */}
       <div className="flex justify-end border-t border-border pt-4">
-        <Button type="submit" isDisabled={saving} icon={<Loader2 />} label="保存" />
+        <Button type="submit" isLoading={saving} icon={<Save />} label="保存" />
       </div>
     </form>
   )

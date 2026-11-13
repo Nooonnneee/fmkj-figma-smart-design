@@ -4,7 +4,6 @@ import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   FileSignature,
-  Loader2,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -462,7 +461,7 @@ export function ContractSectionEdit({
                   type="submit"
                   form={formId}
                   isDisabled={pending}
-                  icon={<Loader2 />}
+                  isLoading={pending}
                   label="保存"
                 />
               </div>
@@ -536,8 +535,9 @@ export function ContractActions({
           variant="secondary"
           size="sm"
           isDisabled={busy !== null}
+          isLoading={busy === 'unsign'}
           onClick={() => void changeStatus('draft')}
-          icon={<Loader2 />}
+          icon={<Undo2 />}
           label="撤销签订"
         />
       ) : (
@@ -573,7 +573,7 @@ export function ContractActions({
                   type="submit"
                   size="sm"
                   isDisabled={busy !== null || !signDate}
-                  icon={<Loader2 />}
+                  isLoading={busy === 'sign'}
                   label="确认签订"
                 />
               </form>
@@ -633,8 +633,9 @@ export function ContractActions({
                     <Button
                       variant="destructive"
                       isDisabled={busy === 'delete'}
+                      isLoading={busy === 'delete'}
                       onClick={() => void remove()}
-                      icon={<Loader2 />}
+                      icon={<Trash2 />}
                       label="删除合同"
                     />
                   </div>

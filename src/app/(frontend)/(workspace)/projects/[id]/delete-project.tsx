@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, Trash2 } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog'
@@ -99,7 +99,8 @@ export function DeleteProject({
                     variant="destructive"
                     onClick={confirm}
                     isDisabled={pending}
-                    icon={<Loader2 />}
+                    isLoading={pending}
+                    icon={<Trash2 />}
                     label="确认删除"
                   />
                 </div>

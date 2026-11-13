@@ -278,7 +278,8 @@ export function StyleTransfer({
           onClick={() => void generate()}
           isDisabled={!configured || busy || !source || !styleId}
           className="h-11 w-full gap-2"
-          icon={<Loader2 />}
+          isLoading={busy}
+          icon={<Palette />}
           label={busy ? `风格化生成中… ${elapsed}s` : `生成风格化户型图 · ${cost} 积分`}
         />
         <p className="text-[11px] leading-relaxed text-muted-foreground">

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2, Sparkles } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
 import { cn } from '@/lib/utils'
@@ -56,8 +56,8 @@ export function SmartSelect({
         <Button
           size="sm"
           isDisabled={disabled || busy}
+          isLoading={busy}
           onClick={() => onRun(tier, false)}
-          icon={<Loader2 />}
           label="补全未选型"
         />
         <Button

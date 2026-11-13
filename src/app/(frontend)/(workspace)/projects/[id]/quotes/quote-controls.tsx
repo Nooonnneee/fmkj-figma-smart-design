@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from 'react'
 import { useFormStatus } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { FilePlus2, Loader2, Trash2 } from 'lucide-react'
+import { FilePlus2, Trash2 } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
 import { Selector } from '@astryxdesign/core/Selector'
@@ -18,8 +18,8 @@ function SubmitButton({ children }: { children: string }) {
     <Button
       type="submit"
       isDisabled={pending}
-      icon={<Loader2 />}
-      endContent={<FilePlus2 />}
+      isLoading={pending}
+      icon={<FilePlus2 />}
       label={children}
     />
   )
@@ -93,8 +93,8 @@ export function DeleteQuoteButton({ quoteId, title }: { quoteId: string; title: 
           router.refresh()
         })
       }}
-      icon={<Loader2 />}
-      endContent={<Trash2 />}
+      isLoading={pending}
+      icon={<Trash2 />}
     />
   )
 }

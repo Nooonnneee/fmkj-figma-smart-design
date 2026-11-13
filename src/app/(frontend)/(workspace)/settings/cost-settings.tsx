@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { Loader2, Search } from 'lucide-react'
+import { EyeOff, Save, Search } from 'lucide-react'
 
 import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
@@ -85,7 +85,7 @@ export function CostSettingsCard({
             <div className="grid gap-1.5">
               <div className="flex flex-wrap items-center gap-2 font-heading text-base font-semibold tracking-tight">
                 报价成本与毛利
-                <Badge variant="neutral" label={'仅自己可见'} />
+                <Badge variant="neutral" label={'仅自己可见'} icon={<EyeOff />} />
               </div>
               <div className="text-sm text-muted-foreground">
                 设置你的拿货折扣后，报价台会实时估算成本、毛利率和最低成交价。打印的报价单、合同和业主分享页都不会出现任何成本信息。
@@ -220,7 +220,8 @@ export function CostSettingsCard({
                 <Button
                   onClick={save}
                   isDisabled={pending}
-                  icon={<Loader2 />}
+                  isLoading={pending}
+                  icon={<Save />}
                   label="保存成本设置"
                 />
               </div>

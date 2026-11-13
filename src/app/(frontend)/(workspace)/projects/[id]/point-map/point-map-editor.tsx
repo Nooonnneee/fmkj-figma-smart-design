@@ -185,7 +185,13 @@ function AngleInput({ value, onCommit }: { value: number; onCommit: (deg: number
         const v = Number(draft)
         if (Number.isFinite(v)) onCommit(v)
       }}
-      onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return
+          const target = e.currentTarget as HTMLInputElement
+          target.blur()
+        }
+      }}
     />
   )
 }
@@ -1409,10 +1415,16 @@ export function PointMapEditor({
                           endContent: (
                             <span className="flex items-center gap-1">
                               {s.missing ? (
-                                <AlertTriangle className="size-3.5 text-warning" />
+                                <AlertTriangle
+                                  className="size-3.5 text-warning"
+                                  aria-label="图片丢失"
+                                />
                               ) : null}
                               {obj?.mmPerUnit ? (
-                                <Ruler className="size-3 text-muted-foreground" />
+                                <Ruler
+                                  className="size-3 text-muted-foreground"
+                                  aria-label="已标定比例"
+                                />
                               ) : null}
                               <span className="text-xs text-muted-foreground tabular-nums">
                                 {scopedPoints.filter((p) => p.sheetId === s.id).length}
@@ -1589,12 +1601,13 @@ export function PointMapEditor({
                       {...triggerProps}
                       variant={primaryAction === 'upload' ? 'primary' : 'secondary'}
                       isDisabled={converting || !!cropFile}
+                      isLoading={converting}
                       label="更多图纸导入方式"
                       className={cn(
                         'w-7 rounded-l-none',
                         primaryAction === 'upload' ? 'border-l-primary-foreground/20' : '-ml-px',
                       )}
-                      icon={<Loader2 />}
+                      icon={<ChevronDown />}
                       size="md"
                     />
                   )}
@@ -1820,9 +1833,9 @@ export function PointMapEditor({
                       ? `把${scope === 'all' ? '全部' : `「${pointScopeLabel(scope)}」`}点位同步到「${activeQuote.title}」并打开`
                       : '按当前点位生成报价'
                   }
-                  icon={<Loader2 />}
-                  endContent={<FilePlus2 />}
-                  label="同步报价"
+                  isLoading={syncingQuote}
+                  icon={activeQuote ? <ArrowLeftRight /> : <FilePlus2 />}
+                  label={activeQuote ? '同步报价' : '生成报价'}
                 />
                 {quotes.length ? (
                   <DropdownMenu
@@ -2523,7 +2536,7 @@ export function PointMapEditor({
                         size="sm"
                         variant={autoGenScope === 'all' ? 'primary' : 'secondary'}
                         onClick={() => setAutoGenScope('all')}
-                        label="全部图纸（ 张）"
+                        label={`全部图纸（${snap.sheets.length} 张）`}
                       />
                     </div>
                   </div>

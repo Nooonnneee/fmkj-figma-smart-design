@@ -91,7 +91,7 @@ export function ProjectHeader({
               label={role === 'edit' ? '协作 · 可编辑' : '协作 · 仅查看'}
             />
           ) : null}
-          {archived ? <Badge variant="neutral" label={'已归档'} /> : null}
+          {archived ? <Badge variant="neutral" label={'已归档'} icon={<Archive />} /> : null}
           <ProjectShareDialog
             projectId={projectId}
             projectName={name}

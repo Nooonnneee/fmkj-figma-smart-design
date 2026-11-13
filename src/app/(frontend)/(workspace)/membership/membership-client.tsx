@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { BookOpen, Coins, Gift, History, Loader2 } from 'lucide-react'
+import { BookOpen, Check, Coins, Gift, History } from 'lucide-react'
 
 import { PageHeader } from '@/components/page-header'
 import { Badge } from '@astryxdesign/core/Badge'
@@ -166,7 +166,8 @@ export function MembershipClient({
               type="submit"
               isDisabled={pending}
               className="shrink-0"
-              icon={<Loader2 />}
+              isLoading={pending}
+              icon={<Gift />}
               label="兑换"
             />
           </form>
@@ -223,14 +224,19 @@ export function MembershipClient({
                   </div>
                   <div className="shrink-0">
                     {task.claimed ? (
-                      <Badge variant="neutral" className="gap-1" label={'已领取'} />
+                      <Badge
+                        variant="neutral"
+                        className="gap-1"
+                        label={'已领取'}
+                        icon={<Check />}
+                      />
                     ) : task.eligible ? (
                       <Button
                         size="sm"
                         className="h-8 text-xs"
                         isDisabled={isBusy}
+                        isLoading={isBusy}
                         onClick={() => handleClaimTask(task.id)}
-                        icon={<Loader2 />}
                         label={
                           task.id === 'follow_official_account'
                             ? '已关注 · 领 5 分'
