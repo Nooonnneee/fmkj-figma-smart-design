@@ -185,7 +185,13 @@ function AngleInput({ value, onCommit }: { value: number; onCommit: (deg: number
         const v = Number(draft)
         if (Number.isFinite(v)) onCommit(v)
       }}
-      onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return
+          const target = e.currentTarget as HTMLInputElement
+          target.blur()
+        }
+      }}
     />
   )
 }
