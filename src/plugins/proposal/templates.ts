@@ -158,6 +158,28 @@ export function resolveProposalTemplate(
   return list.find((t) => t.value === key) ?? null
 }
 
+/** 分享页「方案演示」的开场预设：项目选定的模板对应的视觉主题与结构 */
+export type ShowcasePreset = {
+  theme: DeckThemeId
+  framework: 'full' | 'story' | 'budget'
+}
+
+/**
+ * 把项目里保存的模板标识（Projects.proposalTemplate）解析成「方案演示」的开场预设。
+ * 模板不存在、已停用、是施工交底版（不对业主展示）时返回 null，由调用方回退到默认的 qixu + full。
+ * 返回的只有主题与结构，不包含模板标识——分享页是业主可见页面，不能把 slug 渲染出去。
+ */
+export function showcasePreset(
+  v: unknown,
+  list: ProposalTemplateDef[] = BUILTIN_PROPOSAL_TEMPLATES,
+): ShowcasePreset | null {
+  const tpl = resolveProposalTemplate(v, list)
+  if (!tpl || tpl.kind !== 'owner') return null
+  if (tpl.framework !== 'full' && tpl.framework !== 'story' && tpl.framework !== 'budget')
+    return null
+  return { theme: tpl.theme, framework: tpl.framework }
+}
+
 /** 业主方案在前、施工交底在后（选择器、模板库、知识库都按这个顺序） */
 export const ownerTemplates = (list: ProposalTemplateDef[]) =>
   list.filter((t) => t.kind === 'owner')
