@@ -207,6 +207,10 @@ function RoomMini({
             width={width - 16}
             height={height - 16}
             crop={crop}
+            coverage={ctx.profile.coverage}
+            displayEffects={ctx.profile.displayEffects}
+            grid={ctx.profile.grid}
+            sheetOpacity={ctx.profile.sheetOpacity}
           />
         ) : (
           <p className="doc-body text-[12px] text-[#787771]">未框选房间范围</p>
