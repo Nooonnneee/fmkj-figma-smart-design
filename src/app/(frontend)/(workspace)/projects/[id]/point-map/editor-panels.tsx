@@ -176,6 +176,11 @@ export function PlacePanel({
                   {types.map((t) => {
                     const n = counts.get(t.value) ?? 0
                     const active = armed === t.value
+                    // ⚠️ 设备图必须放进 children，不能走 Button 的 `icon` 插槽：
+                    // 那个插槽固定 16×16 且不裁剪，图既画不大又会被压扁。
+                    // 更要紧的是这里曾经写成 `icon={<PointMarker type={null} />}` ——
+                    // 所有设备卡片都画成同一个通用「其他」标记，设备图标等于消失了
+                    //（2026-11-14 用户报「点位图侧边栏的图标去哪啦」，P1 Button 原生化时丢的）。
                     return (
                       <Button
                         key={t.value}
@@ -190,14 +195,29 @@ export function PlacePanel({
                         onClick={() => onArm(active ? null : t.value)}
                         aria-pressed={active}
                         tooltip={`放置${deviceTypeLabel(t.value)}`}
+                        // ⚠️ `[&>span>span]` 是 Astryx Button 的内容插槽（button > 内容包装 > 插槽）。
+                        // 它默认按 max-content 撑开，长设备名（「网关中控 · 智能音箱」）会把
+                        // 82px 宽的卡片顶到 98px、文字压到邻卡上；truncate 因此永远不生效。
+                        // 钉成 100% + min-w-0，truncate 才有东西可截。
                         className={cn(
-                          'relative h-auto min-w-0 flex-col gap-1 rounded-lg border-border bg-background px-1.5 py-2 text-center text-xs font-normal whitespace-normal text-fg-secondary shadow-none hover:border-border-strong hover:bg-subtle',
+                          'relative h-auto min-w-0 flex-col gap-1 rounded-lg border-border bg-background px-1.5 py-2 text-center text-xs font-normal whitespace-normal text-fg-secondary shadow-none hover:border-border-strong hover:bg-subtle [&>span>span]:w-full [&>span>span]:min-w-0',
                           active &&
                             'border-primary bg-primary/8 font-medium text-primary ring-2 ring-primary/20',
                         )}
-                        icon={<PointMarker type={null} />}
-                        label={n ? `${deviceTypeLabel(t.value)}（${n}）` : deviceTypeLabel(t.value)}
-                      />
+                        label={deviceTypeLabel(t.value)}
+                      >
+                        <span className="flex w-full flex-col items-center gap-1">
+                          <PointMarker type={t.value} className="size-6" />
+                          <span className="w-full truncate text-[11px] leading-tight">
+                            {deviceTypeLabel(t.value)}
+                          </span>
+                        </span>
+                        {n ? (
+                          <span className="absolute top-1 right-1 rounded-full bg-primary px-1.5 text-[10px] leading-4 font-semibold text-primary-foreground tabular-nums">
+                            {n}
+                          </span>
+                        ) : null}
+                      </Button>
                     )
                   })}
                 </div>
