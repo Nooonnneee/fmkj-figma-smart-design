@@ -720,6 +720,162 @@
       "h": 42,
       "origin": "agent",
       "note": "插件 after-sales；集合 service-records"
+    },
+    {
+      "id": "a-dt-categories",
+      "type": "feature",
+      "title": "设备类型 / 类别（11 个）",
+      "parentId": "n-mwgbir9b-9",
+      "x": 374,
+      "y": 372,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "11 个类别各带点位代号前缀（K/Z/L/S/D/V/C/G/N/AC/Q）；固定 11 类、系统维护不可增删改，保存产品时按设备类型自动带出。src/lib/device-types.ts:4,50-62；src/collections/Categories.ts:8,14,17-23；src/collections/Products.ts:37-53,84-88；代号复用见 src/board/packs/smart-home/ops.ts:51。"
+    },
+    {
+      "id": "a-dt-infer",
+      "type": "feature",
+      "title": "按名称推断设备类型（点位导入 / 竞品报价）",
+      "parentId": "n-mwgbir9b-9",
+      "x": 374,
+      "y": 438,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "inferDeviceType 按关键词匹配字典，用在点位导入和竞品报价文本解析，不参与 Products 创建。src/lib/device-types.ts:334；src/plugins/ai-import/point-import.ts:92；src/plugins/ai-copilot/tools/competitor-quote.ts:80。"
+    },
+    {
+      "id": "a-brand-brands",
+      "type": "feature",
+      "title": "品牌库（brands）",
+      "parentId": "n-mwgbir9b-a",
+      "x": 374,
+      "y": 504,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "产品必填品牌；产品库品牌筛选的数据来源是 getBrands()，页面据此计数过滤。src/collections/Brands.ts:8-16；src/collections/Products.ts:76-81；src/lib/cached-data.ts:138；src/app/(frontend)/(workspace)/products/page.tsx:95,141。"
+    },
+    {
+      "id": "a-brand-cost",
+      "type": "feature",
+      "title": "品牌拿货折扣（按账号）",
+      "parentId": "n-mwgbir9b-c",
+      "x": 674,
+      "y": 490,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "按品牌设置，但存在每个成员自己的账号设置里，不是品牌属性；只用于本人报价台的内部成本与毛利，不打印。src/collections/Users.ts:137-142；src/lib/services/cost-settings-service.ts:98-102；src/app/(frontend)/(workspace)/settings/cost-settings.tsx:26,135；src/lib/quote-costs.ts:83。"
+    },
+    {
+      "id": "a-user-members",
+      "type": "feature",
+      "title": "成员账号（users）",
+      "parentId": "n-mwgbir9b-c",
+      "x": 674,
+      "y": 556,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "后台由 CMS 管理员开通、停用即无法登录；Web 端开放自助注册（src/app/(frontend)/auth/register/route.ts:26、src/lib/app-auth.ts:241）；owner 2026-11-14 选定保留注册入口、改文档口径，决策记录将由 docs/plan-cleanup 分支并入 memory/learnings.jsonl:79，当前尚未进 main。现文档仍写「不开放」，待统一。src/collections/Users.ts:32-37,60-71（16-17 行注释仍写不开放，是待改的旧口径）；会话恢复见 src/lib/app-auth.ts:149，登录拦截见 src/lib/app-auth.ts:204-205。"
+    },
+    {
+      "id": "a-user-login",
+      "type": "page",
+      "title": "登录 / 注册页",
+      "parentId": "n-mwgbir9b-c",
+      "x": 674,
+      "y": 622,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "/login 与 /auth/*，走 app-session Cookie，与 Payload 后台 admins 登录完全分开。src/app/(frontend)/login/page.tsx:26,36；src/app/(frontend)/auth/login/route.ts:3；src/app/(frontend)/auth/register/route.ts:26；src/lib/app-auth.ts:121-149。"
+    },
+    {
+      "id": "a-user-profile",
+      "type": "feature",
+      "title": "个人抬头与默认设置",
+      "parentId": "n-mwgbir9b-c",
+      "x": 674,
+      "y": 682,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "users.companyProfile 存每人独立的报价/合同抬头、Logo、二维码、文档模板，并内含「报价成本与毛利设置」costSettings；未填回退系统默认。src/collections/Users.ts:87-95,139-140；写入 src/app/(frontend)/(workspace)/settings/company/route.ts:104-126；被报价/合同读取 src/lib/services/quote-service.ts:122、src/lib/services/contract-service.ts:63,70。"
+    },
+    {
+      "id": "a-style-page",
+      "type": "page",
+      "title": "风格化页 /ai/image/style",
+      "parentId": "n-mwgbir9b-l",
+      "x": 1274,
+      "y": 430,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "上传户型图选风格模板，保留墙体布局生成家具彩平图，需开启 ai-copilot 插件。src/app/(frontend)/(workspace)/ai/image/style/page.tsx:17-21,61；src/app/api/ai/images/style/route.ts:17,31。"
+    },
+    {
+      "id": "a-style-templates",
+      "type": "feature",
+      "title": "风格模板（10 套）",
+      "parentId": "n-mwgbir9b-l",
+      "x": 1274,
+      "y": 490,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "模板只是风格参考、不改变源户型布局；「不要改变墙线」的要求写在上游 prompt。src/lib/style-templates.ts:1,10；src/plugins/ai-copilot/style-transfer.ts:86-91。"
+    },
+    {
+      "id": "a-style-pointmap",
+      "type": "feature",
+      "title": "点位图 AI 精装彩平",
+      "parentId": "n-mwgbir9b-l",
+      "x": 1274,
+      "y": 556,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "点位图顶栏就地开弹窗，带入当前楼层底图生成；结果只能下载、不回填画布，弹窗关闭即丢弃。src/app/(frontend)/(workspace)/projects/[id]/point-map/point-map-editor.tsx:1369,2698-2701；ai-style-dialog.tsx:101-107；src/app/(frontend)/(workspace)/ai/image/style/style-transfer.tsx:325-333。"
+    },
+    {
+      "id": "a-channel-providers",
+      "type": "feature",
+      "title": "内置渠道白名单（9 个）",
+      "parentId": "n-mwgbir9b-m",
+      "x": 1274,
+      "y": 622,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "DeepSeek / NewAPI / 硅基流动 / 百炼两档 / 方舟 / Kimi / 智谱 / OpenRouter，域名与密钥环境变量在服务端一对一绑定。src/plugins/ai-copilot/templates.ts:6-70。"
+    },
+    {
+      "id": "a-channel-custom",
+      "type": "feature",
+      "title": "自定义渠道（OpenAI 兼容）",
+      "parentId": "n-mwgbir9b-m",
+      "x": 1274,
+      "y": 688,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "只收公网 HTTPS 地址与 AI_ 前缀的密钥变量名，密钥本身不入库。字段定义 src/globals/AiSettings.ts:189-200；校验：key 仅字母数字-_ src/globals/AiSettings.ts:211-212，密钥变量名必须 AI_ 开头 src/globals/AiSettings.ts:228-230，地址必须公网 HTTPS（排除私网） src/globals/AiSettings.ts:235-245 与 src/plugins/ai-copilot/templates.ts:80,86。"
+    },
+    {
+      "id": "a-channel-models",
+      "type": "page",
+      "title": "AI 设置（/admin/globals/ai-settings）",
+      "parentId": "n-mwgbir9b-m",
+      "x": 1274,
+      "y": 754,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "仅 CMS 管理员可见可改：模型列表、峰谷价目与倍率、渠道测试与拉取模型。src/globals/AiSettings.ts:252-272；端点 /status /presets /test /models /models/add 见 src/globals/ai-settings-endpoints.ts:306,424,481,529,568。"
     }
   ],
   "edges": [
@@ -834,6 +990,150 @@
       "to": "a-perm-roles",
       "origin": "agent",
       "label": "分享遵循项目权限"
+    },
+    {
+      "id": "a-e-dt-products",
+      "type": "data",
+      "from": "n-mwgbir9b-8",
+      "to": "n-mwgbir9b-9",
+      "origin": "agent",
+      "label": "产品 deviceType 取自字典，分类自动带出"
+    },
+    {
+      "id": "a-e-dt-import",
+      "type": "call",
+      "from": "a-pm-ai-import",
+      "to": "a-dt-infer",
+      "origin": "agent",
+      "label": "AI 识别按关键词推断设备类型"
+    },
+    {
+      "id": "a-e-brand-cat-dict",
+      "type": "data",
+      "from": "n-mwgbir9b-a",
+      "to": "a-dt-categories",
+      "origin": "agent",
+      "label": "产品分类与设备类别一一对应且只读"
+    },
+    {
+      "id": "a-e-brand-products",
+      "type": "data",
+      "from": "n-mwgbir9b-8",
+      "to": "a-brand-brands",
+      "origin": "agent",
+      "label": "产品.brand 必填，指向 brands"
+    },
+    {
+      "id": "a-e-brand-cost",
+      "type": "dep",
+      "from": "a-brand-cost",
+      "to": "a-user-profile",
+      "origin": "agent",
+      "label": "品牌折扣按账号存在 users.companyProfile"
+    },
+    {
+      "id": "a-e-user-credit",
+      "type": "data",
+      "from": "n-mwgbir9b-e",
+      "to": "a-user-members",
+      "origin": "agent",
+      "label": "积分流水回写 users.aiCredits"
+    },
+    {
+      "id": "a-e-user-collab",
+      "type": "dep",
+      "from": "a-user-members",
+      "to": "n-mwgbir9b-d",
+      "origin": "agent",
+      "label": "协作者字段指向 users；成员通过分享链接 / 邀请页自行加入"
+    },
+    {
+      "id": "a-e-user-login",
+      "type": "call",
+      "from": "a-user-login",
+      "to": "a-user-members",
+      "origin": "agent",
+      "label": "登录校验 users 集合与 status=active"
+    },
+    {
+      "id": "a-e-user-quote-profile",
+      "type": "data",
+      "from": "a-user-profile",
+      "to": "n-mwgbir9b-4",
+      "origin": "agent",
+      "label": "报价与合同用项目 owner 的抬头"
+    },
+    {
+      "id": "a-e-style-tpl-page",
+      "type": "data",
+      "from": "a-style-page",
+      "to": "a-style-templates",
+      "origin": "agent",
+      "label": "页面读取模板清单与服务端配置"
+    },
+    {
+      "id": "a-e-style-credit",
+      "type": "data",
+      "from": "a-style-page",
+      "to": "n-mwgbir9b-e",
+      "origin": "agent",
+      "label": "每次生成扣 8 积分并记流水"
+    },
+    {
+      "id": "a-e-style-pointmap",
+      "type": "call",
+      "from": "a-pm-editor",
+      "to": "a-style-pointmap",
+      "origin": "agent",
+      "label": "点位图顶栏带入当前楼层底图；结果仅可下载，不回填"
+    },
+    {
+      "id": "a-e-style-plugin",
+      "type": "dep",
+      "from": "a-style-page",
+      "to": "n-mwgbir9b-p",
+      "origin": "agent",
+      "label": "受 ai-copilot 插件开关控制"
+    },
+    {
+      "id": "a-e-channel-models-providers",
+      "type": "data",
+      "from": "a-channel-models",
+      "to": "a-channel-providers",
+      "origin": "agent",
+      "label": "模型列表的渠道下拉来自白名单"
+    },
+    {
+      "id": "a-e-channel-models-custom",
+      "type": "data",
+      "from": "a-channel-models",
+      "to": "a-channel-custom",
+      "origin": "agent",
+      "label": "模型可指向后台已保存的自定义渠道"
+    },
+    {
+      "id": "a-e-channel-chat",
+      "type": "call",
+      "from": "n-mwgbir9b-k",
+      "to": "n-mwgbir9b-m",
+      "origin": "agent",
+      "label": "对话按 ai-settings 里的模型选渠道与密钥"
+    },
+    {
+      "id": "a-e-channel-credit",
+      "type": "data",
+      "from": "n-mwgbir9b-m",
+      "to": "n-mwgbir9b-e",
+      "origin": "agent",
+      "label": "模型峰谷价目与倍率决定扣多少积分"
+    },
+    {
+      "id": "a-e-channel-admin",
+      "type": "dep",
+      "from": "a-channel-models",
+      "to": "a-perm-admin",
+      "origin": "agent",
+      "label": "仅后台管理员可读改"
     }
   ]
 }
