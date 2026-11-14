@@ -33,3 +33,6 @@ logs/
 /.figaro/
 /.impeccable/
 /.export-artifacts/
+
+# PLAN-MAP.md 的渲染产物（本地查看用，不入库）
+/plan-map.html
