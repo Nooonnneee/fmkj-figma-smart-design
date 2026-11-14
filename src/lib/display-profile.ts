@@ -13,7 +13,7 @@
 /** 一套显示方案。字段刻意与方案模板 PlanView 需要的参数对齐。 */
 export type DisplayProfile = {
   id: DisplayProfileId
-  /** 方案名（工作台选择器、模板中心卡片都用它） */
+  /** 方案名（点位图工作台的选择器用它） */
   label: string
   /** 一句话说明：什么时候用这套 */
   description: string
