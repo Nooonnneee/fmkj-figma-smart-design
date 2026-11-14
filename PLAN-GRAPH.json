@@ -876,6 +876,1602 @@
       "h": 42,
       "origin": "agent",
       "note": "仅 CMS 管理员可见可改：模型列表、峰谷价目与倍率、渠道测试与拉取模型。src/globals/AiSettings.ts:252-272；端点 /status /presets /test /models /models/add 见 src/globals/ai-settings-endpoints.ts:306,424,481,529,568。"
+    },
+    {
+      "id": "a2-main-proj-status-1",
+      "type": "feature",
+      "title": "状态：进行中 / 已归档",
+      "parentId": "n-mwgbir9b-2",
+      "x": 74,
+      "y": 1272,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "项目只有 active 进行中 / archived 已归档 两个状态，成员归档后只能改状态本身；归档时间随状态自动写入、恢复时清空。src/lib/projects.ts:22-25；src/collections/Projects.ts:57-64,151-153"
+    },
+    {
+      "id": "a2-main-proj-edit-1",
+      "type": "feature",
+      "title": "编辑信息",
+      "parentId": "n-mwgbir9b-2",
+      "x": 74,
+      "y": 1364,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "项目信息页默认是只读档案 + 交付进度，点「编辑信息」才出表单，保存或取消回到展示视图。src/app/(frontend)/(workspace)/projects/[id]/project-overview.tsx:60-61,115；page.tsx:13"
+    },
+    {
+      "id": "a2-main-proj-owner-1",
+      "type": "feature",
+      "title": "转让负责人",
+      "parentId": "n-mwgbir9b-2",
+      "x": 74,
+      "y": 1456,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "只有项目负责人能改 owner，且只能转给已加入的协作者；转让后原负责人自动留为「可编辑」协作者，不会失去访问权。src/collections/Projects.ts:105-130；src/lib/services/project-service.ts:80-97"
+    },
+    {
+      "id": "a2-main-proj-delete-1",
+      "type": "feature",
+      "title": "删除项目",
+      "parentId": "n-mwgbir9b-2",
+      "x": 74,
+      "y": 1548,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "仅项目负责人可删；有已签订合同的项目禁止删除（提示改为归档），删除时连带删报价与未签合同、AI 对话只解绑。src/app/(frontend)/(workspace)/projects/actions.ts:45-85；delete-project.tsx:60,72-73"
+    },
+    {
+      "id": "a2-main-proj-demo-1",
+      "type": "feature",
+      "title": "示例项目（isDemoTemplate）",
+      "parentId": "n-mwgbir9b-2",
+      "x": 74,
+      "y": 1640,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "CMS 勾选 isDemoTemplate 的母版项目在成员账号创建时自动克隆一份到其名下，项目列表也可手动「领取示例项目」。src/collections/Projects.ts:234-244；src/collections/Users.ts:44；src/lib/demo-project.ts:297；projects/page.tsx:195"
+    },
+    {
+      "id": "a2-main-proj-filter-1",
+      "type": "feature",
+      "title": "进行中 / 已归档筛选",
+      "parentId": "n-mwgbir9b-2",
+      "x": 74,
+      "y": 1732,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "项目列表按 view=archived 切换两组，两个计数来自 status 查询；旧项目缺 pointCount 时列表一次查询补算，不读整张点位图。projects/page.tsx:50-72,111-123,251-264；project-data.ts:75-87"
+    },
+    {
+      "id": "a2-main-pm-calib-1",
+      "type": "feature",
+      "title": "标定图纸比例",
+      "parentId": "n-mwgbir9b-3",
+      "x": 74,
+      "y": 1824,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "画布工具「标定比例（C）」沿已知墙段拖线并输入实际米数得到 mmPerUnit；未标定时网格是中性网格、符号按固定尺寸落图。board-toolbar.tsx:53；src/board/core/paper.ts:20-36；src/board/core/types.ts:75"
+    },
+    {
+      "id": "a2-main-pm-gen-1",
+      "type": "feature",
+      "title": "智能生成点位",
+      "parentId": "n-mwgbir9b-3",
+      "x": 74,
+      "y": 1916,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "按房间区域一键排布全屋智能与照明点位，会覆盖当前图纸已有点位并自动补齐房间区域，推入历史栈可撤销。point-map-editor.tsx:818；board-toolbar.tsx:425-426；src/board/packs/smart-home/ops.ts:352-355"
+    },
+    {
+      "id": "a2-main-pm-sheet-1",
+      "type": "feature",
+      "title": "图纸裁切上传",
+      "parentId": "n-mwgbir9b-3",
+      "x": 74,
+      "y": 2008,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "上传户型图后在 SheetCropper 里裁掉图框和标题栏，等比放进 3:2 白底标准图纸（2400×1600）再存媒体库，场景只记图片地址。sheet-cropper.tsx:65；src/lib/sheet-spec.ts:5-10；point-map/sheets/route.ts:13-15,66"
+    },
+    {
+      "id": "a2-main-pm-display-1",
+      "type": "feature",
+      "title": "显示方案（施工图 / 业主展示 / 技术交底 / 汇报演示）",
+      "parentId": "n-mwgbir9b-3",
+      "x": 74,
+      "y": 2100,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "随项目保存的交付形态，决定方案模板里点位图有没有网格、覆盖圈和光晕；不要和只存浏览器的临时「显示设置」混用。display-profile-picker.tsx:25；src/lib/display-profile.ts:32-45；src/collections/Projects.ts:328-340"
+    },
+    {
+      "id": "a2-main-pm-default-1",
+      "type": "feature",
+      "title": "项目默认型号",
+      "parentId": "n-mwgbir9b-3",
+      "x": 74,
+      "y": 2192,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "按设备类型给项目设默认产品，点位未指定产品时报价按它取型号；服务端校验类型在字典内、产品在售且类型一致。editor-panels.tsx:485；src/lib/project-defaults.ts:16-31；point-map/defaults/route.ts:6-17"
+    },
+    {
+      "id": "a2-main-pm-export-1",
+      "type": "feature",
+      "title": "导出当前图纸 PNG / 画板 JSON",
+      "parentId": "n-mwgbir9b-3",
+      "x": 74,
+      "y": 2284,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "画布工具栏两条前端导出：PNG 带图例与设备图标（含纸张尺寸），JSON 是整张画板数据；都不走后端打印路由。board-toolbar.tsx:365,375；point-map-editor.tsx:1057,1084"
+    },
+    {
+      "id": "a2-main-pm-savecap-1",
+      "type": "feature",
+      "title": "点位图保存上限（190KB）",
+      "parentId": "n-mwgbir9b-3",
+      "x": 74,
+      "y": 2376,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "保存时后端再压缩一次场景；内嵌 data: 图片超过 24KB 直接拒绝（要求先上传媒体库），整张点位图超过 190KB 也拒绝并提示拆楼层到新项目。point-map/data/route.ts:10-12,42,54-58"
+    },
+    {
+      "id": "a2-main-pm-draft-1",
+      "type": "feature",
+      "title": "本地草稿恢复",
+      "parentId": "n-mwgbir9b-3",
+      "x": 74,
+      "y": 2468,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "有未保存修改时停手 1 秒把场景写进 localStorage（fmkj:pointmap:draft:<项目id>），重开发现同版本草稿时提示恢复，保存成功后清掉。point-map-editor.tsx:224,601-633,2082-2098"
+    },
+    {
+      "id": "a2-main-quote-status-1",
+      "type": "feature",
+      "title": "报价状态：草稿 / 已发送 / 已确认",
+      "parentId": "n-mwgbir9b-4",
+      "x": 74,
+      "y": 2560,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "状态只有 draft 草稿 / sent 已发送 / accepted 已确认，保存时服务端按白名单校验；「已确认」才在报价台出现「生成合同」入口。src/lib/quotes.ts:3-7；src/lib/services/quote-service.ts:282-285；quote-editor.tsx:804-812"
+    },
+    {
+      "id": "a2-main-quote-gen-1",
+      "type": "feature",
+      "title": "从点位图生成报价",
+      "parentId": "n-mwgbir9b-4",
+      "x": 74,
+      "y": 2652,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "按统计范围（全部 / 不含灯具 / 仅开关…）把点位汇总成草稿报价：点位指定产品优先、其次项目默认型号，未匹配的记 pending 不计价。quote-controls.tsx:28,43-57；src/lib/services/quote-service.ts:75-146"
+    },
+    {
+      "id": "a2-main-quote-sync-1",
+      "type": "feature",
+      "title": "从点位图同步",
+      "parentId": "n-mwgbir9b-4",
+      "x": 74,
+      "y": 2744,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "把点位图最新数量同步进已有报价，保留临时改价、换过的同类型号、附加费用、优惠与备注；范围默认从标题推断。quote-editor.tsx:576,1011；src/lib/services/quote-service.ts:156-251"
+    },
+    {
+      "id": "a2-main-quote-swap-1",
+      "type": "feature",
+      "title": "逐行更换型号",
+      "parentId": "n-mwgbir9b-4",
+      "x": 74,
+      "y": 2836,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "报价行换型号只列同设备类型的在售产品（可按品牌/平台筛），可整类一起换，还能顺手设为项目默认型号；服务端拒绝跨类型和下架产品。swap-product-dialog.tsx:29,54-60；quote-service.ts:326-333；quote-editor.tsx:328"
+    },
+    {
+      "id": "a2-main-quote-final-1",
+      "type": "feature",
+      "title": "设为定稿报价",
+      "parentId": "n-mwgbir9b-4",
+      "x": 74,
+      "y": 2928,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "把项目里某份报价标成定稿，交付资料包与方案默认用它；定稿取值顺序是 合同依据 → 手动定稿 → 已接受 → 最新。set-final-button.tsx:13,31-39；src/lib/deliverables.ts:19-31；deliverables-service.ts:14-36"
+    },
+    {
+      "id": "a2-main-quote-feedback-1",
+      "type": "feature",
+      "title": "业主意向反馈处理",
+      "parentId": "n-mwgbir9b-4",
+      "x": 74,
+      "y": 3020,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "业主在免登录分享页勾「暂缓」并签名提交的意向反馈显示在报价页顶部，可标记已处理或「按意向生成调整版」（复制原报价、去掉暂缓项，原报价不动）。client-feedback-list.tsx:33,50-53,151-160；client-feedback-service.ts:227,251"
+    },
+    {
+      "id": "a2-main-quote-lock-1",
+      "type": "feature",
+      "title": "已签合同引用的报价锁定",
+      "parentId": "n-mwgbir9b-4",
+      "x": 74,
+      "y": 3112,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "报价被已签订合同引用时禁止修改（提示先撤销签订），被任何合同引用时禁止删除；归档项目上的报价也由同一守卫拦下。src/collections/Quotes.ts:62-72,86-102；src/lib/project-guards.ts:6-29"
+    },
+    {
+      "id": "a2-main-quote-print-1",
+      "type": "page",
+      "title": "/print/quotes/[id] 报价单打印",
+      "parentId": "n-mwgbir9b-4",
+      "x": 74,
+      "y": 3204,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "给客户的 A4 纵向报价单，一条路由承载 6 种版式（分区 / 标准 / 图文 / 精简 / 按系统 / 预算概览）× 风格，可导出 PDF 与图片。src/app/(frontend)/print/quotes/[id]/page.tsx:46；src/documents/registry.ts:13-31"
+    },
+    {
+      "id": "a2-main-contract-status-1",
+      "type": "feature",
+      "title": "合同状态：待签订 / 已签订",
+      "parentId": "n-mwgbir9b-5",
+      "x": 74,
+      "y": 3290,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "两档状态 draft 待签订 / signed 已签订；签订日期跟随状态自动写（签订时默认当天，撤销签订清空），也可在签订弹窗填实际日期。src/lib/contracts.ts:3-6；src/collections/Contracts.ts:142-144；contract-service.ts:198-224"
+    },
+    {
+      "id": "a2-main-contract-create-1",
+      "type": "feature",
+      "title": "从报价生成合同",
+      "parentId": "n-mwgbir9b-5",
+      "x": 74,
+      "y": 3382,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "每个项目只能有一份合同，选本项目一份报价生成，带入金额、甲方资料、地址、默认付款方式/工期/质保/条款；编号留空按 HT+日期-序号 自动生成。contract-editor.tsx:23-75；contract-service.ts:30-101；src/collections/Contracts.ts:26-42,97-104"
+    },
+    {
+      "id": "a2-main-contract-sign-1",
+      "type": "feature",
+      "title": "标记为已签订 / 撤销签订",
+      "parentId": "n-mwgbir9b-5",
+      "x": 74,
+      "y": 3474,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "合同顶部的签订操作，可先选签订日期再确认；签订后合同与依据报价都锁，撤销签订后才恢复可编辑，已签订合同不能删除。contract-preview.tsx:477,531-586；src/collections/Contracts.ts:163"
+    },
+    {
+      "id": "a2-main-contract-pay-1",
+      "type": "feature",
+      "title": "登记收款",
+      "parentId": "n-mwgbir9b-5",
+      "x": 74,
+      "y": 3566,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "签订后唯一还能改的是各期「已收款」勾选，期数、名称、比例随合同一起锁定。contract-preview.tsx:99-100,322,431；contract-service.ts:135-144；src/collections/Contracts.ts:129-140"
+    },
+    {
+      "id": "a2-main-contract-ratio-1",
+      "type": "feature",
+      "title": "付款比例合计 100%（最多 6 期）",
+      "parentId": "n-mwgbir9b-5",
+      "x": 74,
+      "y": 3658,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "付款方式最多 6 期，比例合计必须 100%，集合 hook 与服务层各校验一次；各期金额按比例算、最后一期补齐分位误差。src/collections/Contracts.ts:122-125,238；contract-service.ts:165-167；src/lib/contracts.ts:40-47"
+    },
+    {
+      "id": "a2-main-contract-guard-1",
+      "type": "feature",
+      "title": "合同约束：一份 / 不可换项目 / 已签不可删",
+      "parentId": "n-mwgbir9b-5",
+      "x": 74,
+      "y": 3750,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "合同与项目一对一（project unique）、生成后不能改挂到别的项目、报价必须属于同项目、已签订禁止删除，都在集合 hook 里，后台也绕不过。src/collections/Contracts.ts:93-104,163"
+    },
+    {
+      "id": "a2-main-contract-print-1",
+      "type": "page",
+      "title": "/print/contracts/[id] 合同打印",
+      "parentId": "n-mwgbir9b-5",
+      "x": 74,
+      "y": 3842,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "带报价附件的合同打印页，4 种版式（含报价附件 / 仅正文 / 正式版 / 订单确认书），附件另起一页。print/contracts/[id]/page.tsx:13-17；src/documents/registry.ts:42-58"
+    },
+    {
+      "id": "a2-main-contract-edit-1",
+      "type": "feature",
+      "title": "合同分区编辑",
+      "parentId": "n-mwgbir9b-5",
+      "x": 74,
+      "y": 3928,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "合同页显示与导出完全一致的预览，鼠标移到某一段点「编辑」只改那一段（编号 / 甲方 / 金额工期质保 / 付款方式 / 其他约定）。contract-preview.tsx:49-61,82,100；contract/page.tsx:25-26"
+    },
+    {
+      "id": "a2-main-archive-toggle-1",
+      "type": "feature",
+      "title": "归档 / 恢复项目",
+      "parentId": "n-mwgbir9b-6",
+      "x": 74,
+      "y": 4020,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "归档把项目 status 改为 archived 并自动记归档时间，恢复为 active 时清空；成员在归档态只能改状态字段，其余一律拒绝。archive-button.tsx:12,38；archive/actions.ts:15-32；src/collections/Projects.ts:57-64,133-153"
+    },
+    {
+      "id": "a2-main-archive-ready-1",
+      "type": "feature",
+      "title": "归档前资料核对",
+      "parentId": "n-mwgbir9b-6",
+      "x": 74,
+      "y": 4112,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "归档页四项检查：有点位、有定稿报价（合同依据/手动定稿/已确认）、合同已签订、各期收款已收齐；四项齐了归档按钮才转成主操作。archive/page.tsx:189-228,383-389"
+    },
+    {
+      "id": "a2-main-archive-package-1",
+      "type": "feature",
+      "title": "交付资料包（ZIP / 合并 PDF）",
+      "parentId": "n-mwgbir9b-6",
+      "x": 74,
+      "y": 4204,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "勾选单据后用隐藏框架逐份打开打印页收集 PDF 页，再下载 ZIP 或合成一份 PDF；路线有点位图、交底清单、定稿报价、方案、合同，插件开启时加施工交底/售后维保卡。archive/page.tsx:239-303,335；delivery-package.tsx:87,133,217；src/lib/doc-collect.ts:1-10"
+    },
+    {
+      "id": "a2-main-archive-share-1",
+      "type": "feature",
+      "title": "业主分享链接设置（有效期 / 访问密码）",
+      "parentId": "n-mwgbir9b-6",
+      "x": 74,
+      "y": 4296,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "归档页可改链接开关、有效期与访问密码；密码只存 sha256 摘要不回显，有效期已过期时开启链接直接拒绝。share-settings.tsx:27,32,87,102；share-settings-service.ts:40-107"
+    },
+    {
+      "id": "a2-main-archive-link-1",
+      "type": "feature",
+      "title": "复制业主预览链接 /share/[token]",
+      "parentId": "n-mwgbir9b-6",
+      "x": 74,
+      "y": 4388,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "链接开启后一键复制 /share/<token> 发给客户，客户免登录就能对比方案、勾暂缓设备并签名提交意向。copy-client-link.tsx:43；archive/page.tsx:330-332；share/[token]/page.tsx:272"
+    },
+    {
+      "id": "a2-main-archive-poster-1",
+      "type": "feature",
+      "title": "案例晒单海报（3:4 图组）",
+      "parentId": "n-mwgbir9b-6",
+      "x": 74,
+      "y": 4480,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "用点位图与定稿报价生成小红书/朋友圈 3:4 多图晒单，只用小区名或项目简称，自动隐藏业主姓名电话门牌。social-poster-dialog.tsx:55,162,182；archive/page.tsx:330,135-176"
+    },
+    {
+      "id": "a2-main-archive-deliver-1",
+      "type": "feature",
+      "title": "选定交付资料（定稿报价 / 交付方案模板）",
+      "parentId": "n-mwgbir9b-6",
+      "x": 74,
+      "y": 4572,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "归档页的交付资料选择：定稿报价被合同依据时锁定不可改，方案模板只能选业主方案（施工交底单独生成）。archive/page.tsx:344-360；template-picker-field.tsx:12；deliverables-service.ts:14-36"
+    },
+    {
+      "id": "a2-main-archive-readonly-1",
+      "type": "feature",
+      "title": "归档后全链只读",
+      "parentId": "n-mwgbir9b-6",
+      "x": 74,
+      "y": 4664,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "项目归档后点位图只读（readOnly 由 getProject 推出），报价与合同保存前都要过 assertProjectEditable，抛「项目已归档，恢复项目后才能修改」。project-data.ts:88-97；src/lib/project-guards.ts:6-29；src/collections/Quotes.ts:64；src/collections/Contracts.ts:95"
+    },
+    {
+      "id": "a2-data-prod-filter-1",
+      "type": "feature",
+      "title": "产品库筛选维度",
+      "parentId": "n-mwgbir9b-8",
+      "x": 374,
+      "y": 596,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "列表按 q/cat/type/brand/platform/min/max/status/img/sort/page 共 10 个查询参数过滤，品牌可多选、支持价格区间与有无图。src/app/(frontend)/(workspace)/products/page.tsx:68,106-122"
+    },
+    {
+      "id": "a2-data-prod-counts-2",
+      "type": "feature",
+      "title": "品牌筛选计数与折叠",
+      "parentId": "n-mwgbir9b-8",
+      "x": 374,
+      "y": 688,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "侧栏按当前筛选条件给每个品牌算命中数，只显示有货品牌，前 10 个常驻、其余折叠；页头同时显示在售产品数与品牌总数。src/app/(frontend)/(workspace)/products/page.tsx:135-142,210-214,241-244"
+    },
+    {
+      "id": "a2-data-prod-dump-3",
+      "type": "feature",
+      "title": "产品库整库导出 / 导入",
+      "parentId": "n-mwgbir9b-8",
+      "x": 374,
+      "y": 780,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "products 与 media、brands、categories 等一起按依赖顺序整库 dump/灌入，是当前唯一的产品批量搬运手段（无 CSV 导入页）。scripts/data-export.ts:18,28；scripts/data-import.ts:26"
+    },
+    {
+      "id": "a2-data-prod-image-4",
+      "type": "feature",
+      "title": "产品图片托管",
+      "parentId": "n-mwgbir9b-8",
+      "x": 374,
+      "y": 872,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "产品图片是 media 上传关系，自托管下按 S3 或本地 media 目录二选一存储，超大图带 width 参数由 sharp 转 WebP。src/collections/Products.ts:99；src/collections/Media.ts:9-15；src/payload.selfhost.config.ts:21,33-39,78-86"
+    },
+    {
+      "id": "a2-data-prod-access-5",
+      "type": "feature",
+      "title": "产品编辑权限",
+      "parentId": "n-mwgbir9b-8",
+      "x": 374,
+      "y": 964,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "成员可新增、改价、改产品（2026-11-13 owner 批准），删除只允许 CMS 管理员；空态文案也写明这一口径。src/collections/Products.ts:28-35；src/app/(frontend)/(workspace)/products/page.tsx:363"
+    },
+    {
+      "id": "a2-data-dt-types-1",
+      "type": "feature",
+      "title": "设备类型清单（34 项）",
+      "parentId": "n-mwgbir9b-9",
+      "x": 374,
+      "y": 1056,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "11 个类别下共 34 个设备类型，产品 deviceType 下拉与校验都取自这份常量。src/lib/device-types.ts:77-290,297-298,328-331"
+    },
+    {
+      "id": "a2-data-dt-symbols-2",
+      "type": "feature",
+      "title": "点位图标（30 个 SVG）",
+      "parentId": "n-mwgbir9b-9",
+      "x": 374,
+      "y": 1148,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "每个设备类型带一个 SymbolKey，图标是 public/point-symbols/<key>.svg，点位列与产品卡片共用。src/lib/device-types.ts:9-40,343,344-345；src/components/device-symbol.tsx:2,21"
+    },
+    {
+      "id": "a2-data-dt-order-3",
+      "type": "feature",
+      "title": "字典顺序与类别分组",
+      "parentId": "n-mwgbir9b-9",
+      "x": 374,
+      "y": 1240,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "展示面板、下拉、统计统一按类别 sortOrder 再按开关键数排序，DEVICE_GROUPS 是产品库侧栏的类别数据源。src/lib/device-types.ts:307-326"
+    },
+    {
+      "id": "a2-data-brand-logo-1",
+      "type": "feature",
+      "title": "品牌 Logo（brands.logo）",
+      "parentId": "n-mwgbir9b-a",
+      "x": 374,
+      "y": 1332,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "品牌可挂一张 media Logo，采购与备货核验单按品牌分组时直接打印它。src/collections/Brands.ts:24；src/app/(frontend)/print/projects/[id]/procurement/page.tsx:68-74,192"
+    },
+    {
+      "id": "a2-data-brand-access-2",
+      "type": "feature",
+      "title": "品牌维护权限",
+      "parentId": "n-mwgbir9b-a",
+      "x": 374,
+      "y": 1424,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "成员只读品牌，新增/改/删品牌都只允许 CMS 管理员，产品库只能选现有品牌。src/collections/Brands.ts:11-16"
+    },
+    {
+      "id": "a2-data-brand-landing-3",
+      "type": "feature",
+      "title": "公开页品牌墙",
+      "parentId": "n-mwgbir9b-a",
+      "x": 374,
+      "y": 1516,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "首页品牌墙用 public/brands/<slug>.webp 原色版与 <slug>-mono.webp 单色版两套图，数量文案取产品库统计。src/components/landing/brand-logos.ts:3,8,37-38；src/components/landing/library-section.tsx:38,46,57"
+    },
+    {
+      "id": "a2-data-user-status-1",
+      "type": "feature",
+      "title": "账号状态（启用 / 停用）",
+      "parentId": "n-mwgbir9b-c",
+      "x": 674,
+      "y": 774,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "status 只有 active/disabled 两值，仅 CMS 管理员可改；停用后登录直接被拒、已有项目保留。src/collections/Users.ts:59-71；src/lib/app-auth.ts:204-205"
+    },
+    {
+      "id": "a2-data-user-isolation-2",
+      "type": "feature",
+      "title": "users 与 admins 账号隔离",
+      "parentId": "n-mwgbir9b-c",
+      "x": 674,
+      "y": 866,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "成员不能进 /admin（access.admin=false），CMS 管理员只存在于 admins 集合且不可新建，后台登录用户固定为 admins。src/collections/Users.ts:15-19,32-38；src/collections/Admins.ts:5-12；src/payload.shared.ts:41-42"
+    },
+    {
+      "id": "a2-data-user-selfread-3",
+      "type": "feature",
+      "title": "成员资料只能读改自己",
+      "parentId": "n-mwgbir9b-c",
+      "x": 674,
+      "y": 958,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "users 的 read/update 收窄为本人 id，防止 /api/users 遍历他人邮箱手机号，管理员除外。src/collections/Users.ts:8-13,35-37"
+    },
+    {
+      "id": "a2-data-user-demo-4",
+      "type": "feature",
+      "title": "新成员自动克隆示例项目",
+      "parentId": "n-mwgbir9b-c",
+      "x": 674,
+      "y": 1050,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "账号创建后钩子复制一份示例母版项目给该成员（owner 是本人，可改可删），项目列表立即可用。src/collections/Users.ts:39-47；src/lib/demo-project.ts:293-300"
+    },
+    {
+      "id": "a2-data-user-session-5",
+      "type": "feature",
+      "title": "成员会话有效期",
+      "parentId": "n-mwgbir9b-c",
+      "x": 674,
+      "y": 1142,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "成员登录令牌 7 天过期、登录尝试次数不锁定，与 admins 的后台会话各走各的。src/collections/Users.ts:28-31；src/lib/app-auth.ts:149"
+    },
+    {
+      "id": "a2-data-collab-role-1",
+      "type": "feature",
+      "title": "协作者 read / edit 两级",
+      "parentId": "n-mwgbir9b-d",
+      "x": 674,
+      "y": 1234,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "collaborators 数组每人只有 read 或 edit，edit 才能改项目（403 拦截），owner 才能改负责人字段。src/lib/project-access.ts:6-7,141-147；src/collections/Projects.ts:99-104,297-323"
+    },
+    {
+      "id": "a2-data-collab-expiry-2",
+      "type": "feature",
+      "title": "分享链接有效期",
+      "parentId": "n-mwgbir9b-d",
+      "x": 674,
+      "y": 1326,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "shareConfig.expiresAt 为空即永不过期，过期后客户看到「这个链接已经过期」而不是 404；开着过期链接会被保存接口直接拒绝。src/lib/project-access.ts:51-56；src/lib/services/share-settings-service.ts:66-73,89-91；src/app/(frontend)/share/[token]/share-gate.tsx:5-9"
+    },
+    {
+      "id": "a2-data-collab-password-3",
+      "type": "feature",
+      "title": "分享访问密码",
+      "parentId": "n-mwgbir9b-d",
+      "x": 674,
+      "y": 1418,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "密码只存 sha256 摘要，校验通过后写一条用 PAYLOAD_SECRET 签名的 per-token cookie，改密码即需重新输入。src/lib/project-access.ts:58-70；src/app/(frontend)/share/[token]/actions.ts:24,35,49,68,95"
+    },
+    {
+      "id": "a2-data-collab-join-4",
+      "type": "page",
+      "title": "加入协作页 /join/[id]",
+      "parentId": "n-mwgbir9b-d",
+      "x": 674,
+      "y": 1510,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "带 token 的邀请页校验链接后让已有成员登录并把自己写进 collaborators，不开放陌生访客注册；edit 链接可把已有 read 升级为 edit。src/app/(frontend)/join/[id]/page.tsx:42-46；src/app/(frontend)/join/[id]/accept/route.ts:8-12,56-78"
+    },
+    {
+      "id": "a2-data-collab-token-5",
+      "type": "feature",
+      "title": "协作链接 token 与重置",
+      "parentId": "n-mwgbir9b-d",
+      "x": 674,
+      "y": 1596,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "token 存在 projects.shareConfig 里且字段级仅 CMS 管理员可读，分享对话框可复制或重置（旧链接立即失效）。src/collections/Projects.ts:342-353；src/app/(frontend)/(workspace)/projects/[id]/project-share-dialog.tsx:80-81,300-302"
+    },
+    {
+      "id": "a2-data-credit-balance-1",
+      "type": "feature",
+      "title": "余额计算与行锁",
+      "parentId": "n-mwgbir9b-e",
+      "x": 674,
+      "y": 1688,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "余额只能由新增流水改变：beforeChange 加 SELECT FOR UPDATE 算 balanceAfter（不足抛 402），afterChange 回写 users.aiCredits。src/collections/AiCreditLedger.ts:16-30,55-83"
+    },
+    {
+      "id": "a2-data-credit-redeemflow-2",
+      "type": "feature",
+      "title": "兑换码核销流程",
+      "parentId": "n-mwgbir9b-e",
+      "x": 674,
+      "y": 1780,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "读码、改 usedCount/redeemedBy、写积分流水在同一事务并锁码行；支持一码多用但每账号限兑一次、可设截止时间，用完自动置 disabled。src/lib/services/membership-service.ts:41,59-60,67-99,126-140；src/collections/RedemptionCodes.ts:85-121"
+    },
+    {
+      "id": "a2-data-credit-tasks-3",
+      "type": "feature",
+      "title": "积分任务（5 项）",
+      "parentId": "n-mwgbir9b-e",
+      "x": 674,
+      "y": 1872,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "绑定邮箱/绑定微信各 10 分，关注公众号、完善抬头、首份报价各 5 分；按 user+reason 查重保证终生一次，奖励同样落到积分流水。src/lib/credit-tasks.ts:22-63,72-85,158-167"
+    },
+    {
+      "id": "a2-data-credit-chatbill-4",
+      "type": "feature",
+      "title": "AI 对话计费链路",
+      "parentId": "n-mwgbir9b-e",
+      "x": 674,
+      "y": 1964,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "按峰谷价 × 倍率折算（1 积分=0.1 元，最少 1 分）+ 工具调用费，回复先以 cost=0 落库、扣费成功再回写，记账基础设施失败不扣费。src/plugins/ai-copilot/billing.ts:1-20,38-42,54,104-107；src/plugins/ai-copilot/reply-billing.ts:30-37；src/globals/AiSettings.ts:128,135-175"
+    },
+    {
+      "id": "a2-data-credit-imagebill-5",
+      "type": "feature",
+      "title": "AI 生图 / 风格化计费",
+      "parentId": "n-mwgbir9b-e",
+      "x": 674,
+      "y": 2056,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "生图按模型 cost（千问图像 3.0 Pro 5 分）扣，户型图风格化固定 8 分，先查余额不足直接拦回。src/plugins/ai-copilot/image-generation.ts:13-17；src/plugins/ai-copilot/style-transfer.ts:17；src/app/api/ai/images/route.ts:76-84；src/app/api/ai/images/style/route.ts:63-83"
+    },
+    {
+      "id": "a2-data-credit-page-6",
+      "type": "page",
+      "title": "会员与积分页 /membership",
+      "parentId": "n-mwgbir9b-e",
+      "x": 674,
+      "y": 2148,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "登录后展示余额、最近 30 条流水、可领任务与兑换码输入框，充值说明来自后台会员设置（已取消会员分级）。src/app/(frontend)/(workspace)/membership/page.tsx:10-49；src/app/(frontend)/(workspace)/membership/redeem/route.ts:6-13；src/lib/membership-policy.ts:9-18"
+    },
+    {
+      "id": "a2-data-tpl-frameworks-1",
+      "type": "feature",
+      "title": "版式框架（4 种）",
+      "parentId": "n-mwgbir9b-g",
+      "x": 974,
+      "y": 684,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "模板=版式框架×视觉主题：完整提案 8 章、场景故事 7 章、预算速览 4 章、施工交底（无价格），章节顺序由框架固定。src/plugins/proposal/framework.ts:97-129"
+    },
+    {
+      "id": "a2-data-tpl-themes-2",
+      "type": "feature",
+      "title": "DECK_THEMES 视觉主题（10 套）",
+      "parentId": "n-mwgbir9b-g",
+      "x": 974,
+      "y": 776,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "栖序雅致/墨金臻选/原木自然/晨岚现代/赤陶中古/素白极简/晨曦暖调/东方雅韵/海盐柔雅/岩灰建筑，后台模板的下拉即这份清单。src/plugins/proposal/deck/themes.ts:224-235,269；src/collections/ProposalTemplates.ts:11-21"
+    },
+    {
+      "id": "a2-data-tpl-builtin-3",
+      "type": "feature",
+      "title": "内置模板（12 套）",
+      "parentId": "n-mwgbir9b-g",
+      "x": 974,
+      "y": 868,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "11 套业主方案 + 1 套施工交底作为兜底，后台无启用模板时直接用；后台同标识记录会覆盖内置文案。src/plugins/proposal/templates.ts:68-141,144-146；src/plugins/proposal/registry.ts:25-40"
+    },
+    {
+      "id": "a2-data-tpl-apply-4",
+      "type": "feature",
+      "title": "模板如何应用到项目",
+      "parentId": "n-mwgbir9b-g",
+      "x": 974,
+      "y": 960,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "选定模板写进 projects.proposalTemplate，打印页优先取 ?template= 再取项目保存值，都没有才回落默认 qixu。src/collections/Projects.ts:264-270；src/app/(frontend)/print/projects/[id]/proposal/page.tsx:92-95；src/app/(frontend)/(workspace)/projects/[id]/archive/page.tsx:180-184"
+    },
+    {
+      "id": "a2-data-tpl-thumb-5",
+      "type": "feature",
+      "title": "缩略图与样张生成",
+      "parentId": "n-mwgbir9b-g",
+      "x": 974,
+      "y": 1052,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "缩略图与样张是模板定义实时渲染（后台编辑页顶部预览、选择器、/templates 共用），只有 OG 分享卡才跑脚本截图到 public/proposal-templates。src/plugins/proposal/preview.tsx:94-120；src/components/admin/template-preview-field.tsx:8-15；scripts/generate-template-thumbnails.mjs:9-20；src/app/(frontend)/templates/[slug]/page.tsx:27-31"
+    },
+    {
+      "id": "a2-data-tpl-canvas-6",
+      "type": "feature",
+      "title": "方案页画布 1440×960 与 A4 横版换算",
+      "parentId": "n-mwgbir9b-g",
+      "x": 974,
+      "y": 1144,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "业主方案按 1440×960 设计稿排版、打印时 zoom 0.7795 落到横版纸面，只有施工交底直接按 297×210mm 排。src/plugins/proposal/deck/parts.tsx:33,54；src/plugins/proposal/preview.tsx:26-30；src/plugins/proposal/construction-deck.tsx:38"
+    },
+    {
+      "id": "a2-data-print-survey-1",
+      "type": "page",
+      "title": "现场勘测确认单",
+      "parentId": "n-mwgbir9b-h",
+      "x": 974,
+      "y": 1236,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "给客户与勘测工程师现场核查全屋强弱电、网络、窗帘盒与安装条件，成员登录后打开 /print/projects/[id]/survey。src/app/(frontend)/print/projects/[id]/survey/page.tsx:22,115,137,164,67"
+    },
+    {
+      "id": "a2-data-print-wiring-2",
+      "type": "page",
+      "title": "强弱电布线与水电交底单",
+      "parentId": "n-mwgbir9b-h",
+      "x": 974,
+      "y": 1322,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "给水电施工与现场复核使用，按房间列布线与预留规范并留施工负责人签字位。src/app/(frontend)/print/projects/[id]/wiring/page.tsx:25,245,284,447"
+    },
+    {
+      "id": "a2-data-print-plans-3",
+      "type": "page",
+      "title": "点位图打印页",
+      "parentId": "n-mwgbir9b-h",
+      "x": 974,
+      "y": 1408,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "给安装与交底看：每张图纸一页带点位与图例，末页附点位统计；点位为空时不出图。src/app/(frontend)/print/projects/[id]/plans/page.tsx:29,136-137,237-238"
+    },
+    {
+      "id": "a2-data-print-proposal-4",
+      "type": "page",
+      "title": "智能家居方案",
+      "parentId": "n-mwgbir9b-h",
+      "x": 974,
+      "y": 1494,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "给业主的横版方案演示，按模板（章节+主题）渲染，受 proposal 插件开关控制，未开启直接 404。src/app/(frontend)/print/projects/[id]/proposal/page.tsx:30,33,72"
+    },
+    {
+      "id": "a2-data-print-procurement-5",
+      "type": "page",
+      "title": "采购与备货核验单",
+      "parentId": "n-mwgbir9b-h",
+      "x": 974,
+      "y": 1580,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "给内部采购与到场开箱核验：按品牌分组列设备与库存，可用 ?cost= 切换「含内部成本 / 隐藏成本（到场核验）」两种版本。src/app/(frontend)/print/projects/[id]/procurement/page.tsx:28,49,104-106,136"
+    },
+    {
+      "id": "a2-data-print-checklist-6",
+      "type": "page",
+      "title": "点位交底清单",
+      "parentId": "n-mwgbir9b-h",
+      "x": 974,
+      "y": 1666,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "给安装团队逐点打勾，可按房间/设备/图纸三种排法，支持点位范围 scope 过滤。src/app/(frontend)/print/projects/[id]/checklist/page.tsx:35,64-66,108,156-157"
+    },
+    {
+      "id": "a2-data-print-handover-7",
+      "type": "page",
+      "title": "场景与账号交付移交单",
+      "parentId": "n-mwgbir9b-h",
+      "x": 974,
+      "y": 1752,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "给业主的交付件：账号与全屋网络交接、主控节点位置、联动场景卡与现场验收确认；没有点位值时给空态。src/app/(frontend)/print/projects/[id]/handover/page.tsx:26,96-99,108-109,130,263"
+    },
+    {
+      "id": "a2-data-print-aftersales-8",
+      "type": "page",
+      "title": "售后维保卡与配置备份单",
+      "parentId": "n-mwgbir9b-h",
+      "x": 974,
+      "y": 1838,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "给业主与售后看：质保权益、全屋设备台账与维保记录，受 after-sales 插件开关控制。src/app/(frontend)/print/projects/[id]/after-sales/page.tsx:30,58,122-123,173,219"
+    },
+    {
+      "id": "a2-data-print-quote-9",
+      "type": "page",
+      "title": "报价单打印页",
+      "parentId": "n-mwgbir9b-h",
+      "x": 974,
+      "y": 1924,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "给客户的 A4 纵向报价单，6 种版式（分区/标准/图文/精简/按系统/预算概览）×风格，产品图是否显示取决于本人 companyProfile.printProductImages。src/app/(frontend)/print/quotes/[id]/page.tsx:35,43,138-142"
+    },
+    {
+      "id": "a2-data-print-contract-10",
+      "type": "page",
+      "title": "合同打印页",
+      "parentId": "n-mwgbir9b-h",
+      "x": 974,
+      "y": 2010,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "给客户签字的 A4 纵向合同，4 种版式（含报价附件/仅正文/正式版/订单确认书）。src/app/(frontend)/print/contracts/[id]/page.tsx:11,14,59"
+    },
+    {
+      "id": "a2-data-print-toolbar-11",
+      "type": "feature",
+      "title": "打印工具条（导出 PDF / 图片）",
+      "parentId": "n-mwgbir9b-h",
+      "x": 974,
+      "y": 2096,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "每个打印页顶部工具条切版式与风格、按 data-export-page 节点导出 PDF 或图片，支持 auto=pdf 自动导出和 auto=collect 回传资料包。src/components/print-toolbar.tsx:48-52,117-127"
+    },
+    {
+      "id": "a2-data-print-layouts-12",
+      "type": "feature",
+      "title": "文档版式与风格包",
+      "parentId": "n-mwgbir9b-h",
+      "x": 974,
+      "y": 2188,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "DOC_KINDS 定义报价/点位图/合同/交底清单的版式集合，风格由 doc-styles 插件提供的 6 套样式叠加，默认值取本人 documentDefaults。src/documents/registry.ts:9-69,95-113；src/plugins/doc-styles/styles.ts:179-186；src/lib/cached-data.ts:345-346"
+    },
+    {
+      "id": "a2-data-site-home-1",
+      "type": "page",
+      "title": "首页 /",
+      "parentId": "n-mwgbir9b-i",
+      "x": 974,
+      "y": 2280,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "免登录可见，用示例母版项目实时演示点位图、方案、报价与交付文档，带 canonical 与站点级 OG 图。src/app/(frontend)/page.tsx:24-37；src/app/(frontend)/layout.tsx:34-68"
+    },
+    {
+      "id": "a2-data-site-catalog-2",
+      "type": "page",
+      "title": "图例与产品库 /catalog",
+      "parentId": "n-mwgbir9b-i",
+      "x": 974,
+      "y": 2366,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "免登录看 11 大系统图例与各系统代表在售型号，明确不显示内部成本，完整产品库需登录。src/app/(frontend)/catalog/page.tsx:30-35,129,136"
+    },
+    {
+      "id": "a2-data-site-brand-3",
+      "type": "page",
+      "title": "品牌标识 /brand",
+      "parentId": "n-mwgbir9b-i",
+      "x": 974,
+      "y": 2452,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "免登录的品牌资源页：标识、应用图标、品牌色与规范，提供 SVG/PNG 下载。src/app/(frontend)/brand/page.tsx:12-16,58-59"
+    },
+    {
+      "id": "a2-data-site-docs-4",
+      "type": "page",
+      "title": "文档中心 /docs",
+      "parentId": "n-mwgbir9b-i",
+      "x": 974,
+      "y": 2538,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "免登录的用户文档，覆盖五步工作流、点位画板、报价联动与 AI 计费规则，模型清单按当前启用的 AI 模型生成。src/app/(frontend)/docs/page.tsx:10-24"
+    },
+    {
+      "id": "a2-data-site-download-5",
+      "type": "page",
+      "title": "下载桌面客户端 /download",
+      "parentId": "n-mwgbir9b-i",
+      "x": 974,
+      "y": 2624,
+      "w": 144,
+      "h": 42,
+      "origin": "agent",
+      "note": "免登录下载 Windows / macOS 客户端，固定地址 /downloads/desktop/latest/{windows|mac-arm64|mac-x64} 跳当前版本。src/app/(frontend)/download/page.tsx:21-25,92-165；src/app/(frontend)/downloads/desktop/latest/[target]/route.ts:10-20"
+    },
+    {
+      "id": "a2-data-site-seo-6",
+      "type": "feature",
+      "title": "站点级 SEO / OG",
+      "parentId": "n-mwgbir9b-i",
+      "x": 974,
+      "y": 2710,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "全站 metadata 走 siteUrl() 生成 metadataBase，默认分享图 /brand/fmkj-og.png，另有无 cookie 的 robots.ts 与 sitemap.ts 只列 6 个公开页。src/app/(frontend)/layout.tsx:26-68；src/lib/site-url.ts:21-28；src/app/robots.ts:11-30；src/app/sitemap.ts:5-42"
+    },
+    {
+      "id": "a2-data-site-boundary-7",
+      "type": "feature",
+      "title": "免登录边界",
+      "parentId": "n-mwgbir9b-i",
+      "x": 974,
+      "y": 2802,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "免登录只有首页/catalog/brand/docs/download 与客户分享页；工作台整层由 layout 拦登录，打印页各自 redirect /login，robots 对 /projects /products /print /share /join 等一律 disallow。src/app/(frontend)/(workspace)/layout.tsx:13-17；src/app/robots.ts:11-27；src/app/(frontend)/print/quotes/[id]/page.tsx:56；src/app/(frontend)/share/[token]/page.tsx:271-285"
+    },
+    {
+      "id": "a2-ai-tools",
+      "type": "feature",
+      "title": "AI 工具注册表",
+      "parentId": "n-mwgbir9b-k",
+      "x": 1274,
+      "y": 840,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "核心工具与插件工具共一份注册表，缺 handler 的工具会被静默丢弃。src/plugins/ai-copilot/registry.ts:34-61；src/plugins/ai-copilot/core-ai.ts:13,649-650；src/plugins/ai-copilot/tools/admin-ai.ts:537"
+    },
+    {
+      "id": "a2-ai-perms",
+      "type": "feature",
+      "title": "AI 工具权限白名单",
+      "parentId": "n-mwgbir9b-k",
+      "x": 1274,
+      "y": 932,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "每个工具声明权限，注册时校验其全部落在所属插件的 permissions 白名单内，权限取值固定 17 项。src/plugins/ai-types.ts:12-32；src/plugins/ai-catalog.ts:54-67；src/plugins/ai-copilot/registry.ts:104-113"
+    },
+    {
+      "id": "a2-ai-guards",
+      "type": "feature",
+      "title": "AI 工具执行守卫",
+      "parentId": "n-mwgbir9b-k",
+      "x": 1274,
+      "y": 1024,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "写操作工具执行前查项目三级角色，归档项目一律拦截并提示先恢复。src/plugins/ai-copilot/registry.ts:130-164；src/lib/project-guards.ts:6,13-29"
+    },
+    {
+      "id": "a2-ai-history",
+      "type": "feature",
+      "title": "AI 会话与消息存储",
+      "parentId": "n-mwgbir9b-k",
+      "x": 1274,
+      "y": 1116,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "会话按用户隔离，最多列 30 条会话、单会话 200 条消息，历史只带最近 24 条且含工具摘要。src/collections/AiConversations.ts:14-27；src/plugins/ai-copilot/conversations.ts:5-30；src/plugins/ai-copilot/chat-handler.ts:40-41,211-255"
+    },
+    {
+      "id": "a2-ai-vision",
+      "type": "feature",
+      "title": "识图与视觉模型排序",
+      "parentId": "n-mwgbir9b-k",
+      "x": 1274,
+      "y": 1208,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "视觉模型按 visionScore 排序挑首选，识图结果与 CAD 检测融合后落成点位。src/plugins/ai-copilot/vision.ts:32-91；src/plugins/ai-copilot/upload-handler.ts:394,788"
+    },
+    {
+      "id": "a2-ai-imagegen",
+      "type": "feature",
+      "title": "AI 生图",
+      "parentId": "n-mwgbir9b-k",
+      "x": 1274,
+      "y": 1300,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "生图按模型单价扣积分，ai-copilot 关闭时路由直接 404。src/plugins/ai-copilot/image-generation.ts:11-27；src/app/api/ai/images/route.ts:34-35,56"
+    },
+    {
+      "id": "a2-ai-billing",
+      "type": "feature",
+      "title": "对话逐轮计费",
+      "parentId": "n-mwgbir9b-k",
+      "x": 1274,
+      "y": 1392,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "每轮先以 cost=0 落消息，调用成功后按模型峰谷价加工具费回填扣分，最少 1 分。src/plugins/ai-copilot/billing.ts:18,42,101-106；src/plugins/ai-copilot/reply-billing.ts:39-52；src/plugins/ai-copilot/chat-handler.ts:641-651"
+    },
+    {
+      "id": "a2-ai-skills",
+      "type": "feature",
+      "title": "对话技能模板",
+      "parentId": "n-mwgbir9b-k",
+      "x": 1274,
+      "y": 1484,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "技能模板由插件注册的技能清单生成，分类固定为点位审查/选型报价/图纸识图/交付话术/自定义。src/plugins/ai-copilot/templates.ts:772；src/plugins/ai-types.ts:64-67"
+    },
+    {
+      "id": "a2-ai-style-wallmask",
+      "type": "feature",
+      "title": "墙线 mask 保布局",
+      "parentId": "n-mwgbir9b-l",
+      "x": 1274,
+      "y": 1576,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "每套风格共用同一套墙线 mask 与「不要改变墙线」提示词，源图限 12MB。src/plugins/ai-copilot/style-transfer.ts:23-33,86-95,113-119"
+    },
+    {
+      "id": "a2-ai-style-cost",
+      "type": "feature",
+      "title": "风格化固定扣 8 积分",
+      "parentId": "n-mwgbir9b-l",
+      "x": 1274,
+      "y": 1668,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "每次生成固定扣 8 积分，余额不足返回 402 且不发起生成。src/plugins/ai-copilot/style-transfer.ts:17；src/app/api/ai/images/style/route.ts:63-68"
+    },
+    {
+      "id": "a2-ai-style-media",
+      "type": "feature",
+      "title": "风格化结果只下载不回填",
+      "parentId": "n-mwgbir9b-l",
+      "x": 1274,
+      "y": 1760,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "结果写入 Media 集合但只回下载链接，不回填点位图画布、弹窗关闭即丢弃。src/plugins/ai-copilot/style-transfer.ts:146-168；src/app/(frontend)/(workspace)/ai/image/style/style-transfer.tsx:320-333；src/app/(frontend)/(workspace)/projects/[id]/point-map/point-map-editor.tsx:2698-2701"
+    },
+    {
+      "id": "a2-ai-displayprofile",
+      "type": "feature",
+      "title": "点位图显示方案",
+      "parentId": "n-mwgbir9b-l",
+      "x": 1274,
+      "y": 1852,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "4 套显示方案只有方案模板的平面图页消费，grid 参数传入后从未使用。src/lib/display-profile.ts:21-72；src/plugins/proposal/deck/pages/plan.tsx:54-55,102；src/app/(frontend)/(workspace)/projects/[id]/point-map/display-profile-action.ts:15-31"
+    },
+    {
+      "id": "a2-ai-style-config",
+      "type": "feature",
+      "title": "风格化独立网关",
+      "parentId": "n-mwgbir9b-l",
+      "x": 1274,
+      "y": 1944,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "风格化走独立网关与 AI_APIKEY_FAN_KEY，不在 AI 渠道配置的模型列表里。src/plugins/ai-copilot/style-transfer.ts:13-19；src/app/api/ai/images/style/route.ts:37-41"
+    },
+    {
+      "id": "a2-ai-keyenv",
+      "type": "feature",
+      "title": "密钥只存环境变量名",
+      "parentId": "n-mwgbir9b-m",
+      "x": 1274,
+      "y": 2036,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "渠道只存密钥的环境变量名，密钥本身不入库，自定义渠道变量名必须以 AI_ 开头。src/globals/AiSettings.ts:190-235；src/plugins/ai-copilot/templates.ts:13-70；src/plugins/ai-copilot/server.ts:58-114"
+    },
+    {
+      "id": "a2-ai-pricing",
+      "type": "feature",
+      "title": "峰谷价目与计费倍率",
+      "parentId": "n-mwgbir9b-m",
+      "x": 1274,
+      "y": 2128,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "峰谷价按北京时间工作日 9-12、14-18 分档，积分=倍率×人民币成本÷0.1 元。src/globals/AiSettings.ts:79-186；src/plugins/ai-copilot/billing.ts:18,54-60"
+    },
+    {
+      "id": "a2-ai-channeltest",
+      "type": "feature",
+      "title": "渠道测试与拉取模型",
+      "parentId": "n-mwgbir9b-m",
+      "x": 1274,
+      "y": 2220,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "渠道测试发一次最小对话、15 秒超时，拉取模型走 OpenAI 兼容 /models，两个端点都限 CMS 管理员。src/globals/ai-settings-endpoints.ts:481-560"
+    },
+    {
+      "id": "a2-ai-presets",
+      "type": "feature",
+      "title": "预设模型一键导入",
+      "parentId": "n-mwgbir9b-m",
+      "x": 1274,
+      "y": 2312,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "预设模型清单可一键导入 aiModels，端点同样限 CMS 管理员。src/globals/ai-settings-endpoints.ts:424-477"
+    },
+    {
+      "id": "a2-ai-auto",
+      "type": "feature",
+      "title": "Auto 智能路由",
+      "parentId": "n-mwgbir9b-m",
+      "x": 1274,
+      "y": 2404,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "Auto 模式先按场景排序可用模型再路由，对话中还会按已调用的工具重新选模型。src/plugins/ai-copilot/server.ts:224-285；src/plugins/ai-copilot/chat-handler.ts:200,565-577"
+    },
+    {
+      "id": "a2-ops-role-boundary",
+      "type": "feature",
+      "title": "三级角色边界",
+      "parentId": "n-mwgbir9b-o",
+      "x": 1574,
+      "y": 804,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "项目只有 owner/edit/read 三级，角色每次由 owner 与 collaborators 现算，不落库。src/lib/project-access.ts:6,121-160"
+    },
+    {
+      "id": "a2-ops-archive-whitelist",
+      "type": "feature",
+      "title": "归档只读白名单",
+      "parentId": "n-mwgbir9b-o",
+      "x": 1574,
+      "y": 896,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "归档后仅白名单字段可改，其余字段逐个比对后拒绝。src/collections/Projects.ts:57-64,133-143；src/lib/project-guards.ts:13-29"
+    },
+    {
+      "id": "a2-ops-share-perm",
+      "type": "feature",
+      "title": "分享链接权限",
+      "parentId": "n-mwgbir9b-o",
+      "x": 1574,
+      "y": 988,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "分享用 token 加可选过期与 sha256 密码，非 owner 读不到 token 也改不了配置。src/lib/project-access.ts:9-112；src/app/(frontend)/(workspace)/projects/[id]/share/route.ts:66,72-100,141-147"
+    },
+    {
+      "id": "a2-ops-admin-isolation",
+      "type": "feature",
+      "title": "CMS 与员工账号隔离",
+      "parentId": "n-mwgbir9b-o",
+      "x": 1574,
+      "y": 1080,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "后台管理员与员工是两个集合，员工不能进 /admin，管理员账号只能后台创建。src/lib/access.ts:6,14-19；src/collections/Users.ts:33-37；src/collections/Admins.ts:7-16"
+    },
+    {
+      "id": "a2-ops-join",
+      "type": "feature",
+      "title": "邀请链接加入协作",
+      "parentId": "n-mwgbir9b-o",
+      "x": 1574,
+      "y": 1172,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "邀请加入只允许已有成员账号，mode=login 验邮箱密码，edit 链接可把 read 协作者升级。src/app/(frontend)/join/[id]/accept/route.ts:10-11,47,68-70"
+    },
+    {
+      "id": "a2-ops-operator",
+      "type": "feature",
+      "title": "平台运营身份",
+      "parentId": "n-mwgbir9b-o",
+      "x": 1574,
+      "y": 1264,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "运营身份来自环境变量邮箱、admins 邮箱或 demo 账号，只有它能看客户使用报告。src/lib/platform-operator.ts:13-29；src/app/(frontend)/(workspace)/settings/reports/page.tsx:16,30"
+    },
+    {
+      "id": "a2-ops-reports",
+      "type": "feature",
+      "title": "客户使用与诊断报告",
+      "parentId": "n-mwgbir9b-o",
+      "x": 1574,
+      "y": 1356,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "报告只有 /settings/reports 一处入口并按运营身份门禁，但能力中心的工具入口被挂在了 room-insights 插件下。src/app/(frontend)/(workspace)/settings/reports/page.tsx:10-30；src/lib/usage-diagnostics.ts:178；src/lib/plugin-tools.ts:56-62"
+    },
+    {
+      "id": "a2-ops-credit-entry",
+      "type": "feature",
+      "title": "积分账单双入口",
+      "parentId": "n-mwgbir9b-o",
+      "x": 1574,
+      "y": 1448,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "同一份 ai-credit-ledger 有两个视图：成员在 /membership 看自己最近 30 条，超管在 /admin 看全集。src/collections/AiCreditLedger.ts:39-52；src/app/(frontend)/(workspace)/membership/page.tsx:24-27"
+    },
+    {
+      "id": "a2-ops-plugin-ai-copilot",
+      "type": "feature",
+      "title": "AI 对话插件 ai-copilot",
+      "parentId": "n-mwgbir9b-p",
+      "x": 1574,
+      "y": 1540,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "category=ai、stage=global 的常驻对话插件，关掉后对话、生图、风格化三处路由都 404。src/plugins/index.ts:29-38；src/plugins/ai-copilot/chat-handler.ts:179；src/app/api/ai/images/route.ts:34-35"
+    },
+    {
+      "id": "a2-ops-plugin-doc-styles",
+      "type": "feature",
+      "title": "文档风格插件 doc-styles",
+      "parentId": "n-mwgbir9b-p",
+      "x": 1574,
+      "y": 1632,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "category=template、stage=quote，提供扩展打印风格包，availableStyles 按开关过滤。src/plugins/index.ts:41-51；src/plugins/doc-styles/styles.ts:179；src/documents/registry.ts:75"
+    },
+    {
+      "id": "a2-ops-plugin-proposal",
+      "type": "feature",
+      "title": "方案模板插件 proposal",
+      "parentId": "n-mwgbir9b-p",
+      "x": 1574,
+      "y": 1724,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "category=template、stage=quote，打印方案前检查 flags.proposal，否则 notFound。src/plugins/index.ts:54-63；src/app/(frontend)/print/projects/[id]/proposal/page.tsx:72"
+    },
+    {
+      "id": "a2-ops-plugin-room-insights",
+      "type": "feature",
+      "title": "房间分析插件 room-insights",
+      "parentId": "n-mwgbir9b-p",
+      "x": 1574,
+      "y": 1816,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "category=tool、stage=design，点位图页与方案画廊按开关决定是否显示房间完整度。src/plugins/index.ts:66-75；src/app/(frontend)/(workspace)/projects/[id]/point-map/page.tsx:104；src/plugins/room-insights/ai.ts:26-30"
+    },
+    {
+      "id": "a2-ops-plugin-smart-select",
+      "type": "feature",
+      "title": "智能选型插件 smart-select",
+      "parentId": "n-mwgbir9b-p",
+      "x": 1574,
+      "y": 1908,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "category=tool、stage=design，按平台与预算档位一键配单，AI 工具费 2 积分。src/plugins/index.ts:78-87；src/plugins/smart-select/ai.ts:24-28；src/app/(frontend)/(workspace)/projects/[id]/point-map/page.tsx:102"
+    },
+    {
+      "id": "a2-ops-plugin-ai-import",
+      "type": "feature",
+      "title": "识图导入插件 ai-import",
+      "parentId": "n-mwgbir9b-p",
+      "x": 1574,
+      "y": 2000,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "category=ai、stage=design，插件自身 tools 为空只有识图技能，真正的识图实现在 ai-copilot 的 upload-handler，归属待确认。src/plugins/index.ts:90-97；src/plugins/ai-import/ai.ts:32-33；src/plugins/ai-copilot/upload-handler.ts:788"
+    },
+    {
+      "id": "a2-ops-plugin-dwg-import",
+      "type": "feature",
+      "title": "DWG 导入插件 dwg-import",
+      "parentId": "n-mwgbir9b-p",
+      "x": 1574,
+      "y": 2092,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "category=tool、stage=design，通过 DWG_CONVERTER_URL 与 TOKEN 接外部转换服务，点位图页还会额外检查转换配置。src/plugins/index.ts:102-115；src/app/(frontend)/(workspace)/projects/[id]/point-map/page.tsx:103"
+    },
+    {
+      "id": "a2-ops-plugin-after-sales",
+      "type": "feature",
+      "title": "售后维保插件 after-sales",
+      "parentId": "n-mwgbir9b-p",
+      "x": 1574,
+      "y": 2184,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "category=tool、stage=after，项目归档后仍继续加载维保记录。src/plugins/index.ts:117-127；src/app/(frontend)/(workspace)/projects/[id]/archive/page.tsx:91；src/app/(frontend)/(workspace)/projects/[id]/after-sales/page.tsx:25"
+    },
+    {
+      "id": "a2-ops-plugin-toggle",
+      "type": "feature",
+      "title": "插件开关落库与合并",
+      "parentId": "n-mwgbir9b-p",
+      "x": 1574,
+      "y": 2276,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "开关按插件 id 写进个人 companyProfile.disabledPlugins，getPluginFlags 再与公司级合并成最终布尔表。src/plugins/state.ts:12-23；src/collections/Users.ts:133；src/globals/CompanySettings.ts:95；src/lib/cached-data.ts:347-349；src/app/(frontend)/(workspace)/settings/company/route.ts:92-96"
+    },
+    {
+      "id": "a2-ops-plugin-ai-meta",
+      "type": "feature",
+      "title": "插件向 AI 注册元数据",
+      "parentId": "n-mwgbir9b-p",
+      "x": 1574,
+      "y": 2368,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "插件把 tools/skills/knowledge/guidance/permissions 注册进 AI，缺 handler 的工具会被静默丢弃。src/plugins/ai-catalog.ts:14-67；src/plugins/ai-copilot/registry.ts:46-61"
+    },
+    {
+      "id": "a2-ops-shadow-deploy",
+      "type": "feature",
+      "title": "影子部署建容器",
+      "parentId": "n-mwgbir9b-q",
+      "x": 1574,
+      "y": 2460,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "发布先备份库，再建新目录复用旧 .env（绝不重生成 PAYLOAD_SECRET），用 override 在端口/网络/卷三处 !override 起影子容器。deploy/shadow-release.sh:111-204"
+    },
+    {
+      "id": "a2-ops-shadow-verify",
+      "type": "feature",
+      "title": "接线验证与冒烟闸门",
+      "parentId": "n-mwgbir9b-q",
+      "x": 1574,
+      "y": 2552,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "影子起来后必须验证接上生产网络、素材卷至少 10 个文件、/login 200，再跑冒烟，任一失败都不切流量。deploy/shadow-release.sh:205-267"
+    },
+    {
+      "id": "a2-ops-traffic-cut",
+      "type": "feature",
+      "title": "Caddy 切流与回滚",
+      "parentId": "n-mwgbir9b-q",
+      "x": 1574,
+      "y": 2644,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "切流只改 Caddy 的 reverse_proxy 端口、validate 后重启，回滚前先确认目标端口真在监听。deploy/shadow-release.sh:46-90,272-289"
+    },
+    {
+      "id": "a2-ops-migrate",
+      "type": "feature",
+      "title": "部署时必跑迁移",
+      "parentId": "n-mwgbir9b-q",
+      "x": 1574,
+      "y": 2736,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "新版本带 schema 变更时必须跑 payload migrate，否则字段不存在会让功能静默失效。deploy/shadow-release.sh:150-169；.github/workflows/ci.yml:127"
+    },
+    {
+      "id": "a2-ops-backup",
+      "type": "feature",
+      "title": "每日备份与校验",
+      "parentId": "n-mwgbir9b-q",
+      "x": 1574,
+      "y": 2828,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "每日 pg_dump -Fc 并用 pg_restore --list 校验可解析，数据库留 14 天、素材每 7 天留 2 份，磁盘不足 3G 跳过。deploy/backup.sh:13-25,44-46,62-70；deploy/DEPLOY.md:158-187"
+    },
+    {
+      "id": "a2-ops-ci-gates",
+      "type": "feature",
+      "title": "六道构建门禁",
+      "parentId": "n-mwgbir9b-q",
+      "x": 1574,
+      "y": 2920,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "构建前依次跑切换自托管配置、oxfmt、eslint、tsc、knowledge:check、单测，最后跑生产构建并校验 BUILD_ID。.github/workflows/ci.yml:48-72；.github/workflows/ci-selfhosted.yml:74-100"
+    },
+    {
+      "id": "a2-ops-ci-smoke",
+      "type": "feature",
+      "title": "CI 真库冒烟",
+      "parentId": "n-mwgbir9b-q",
+      "x": 1574,
+      "y": 3012,
+      "w": 168,
+      "h": 48,
+      "origin": "agent",
+      "note": "冒烟用真实 Postgres 建库、migrate、seed 后跑 e2e/smoke.mjs，失败上传截图与 failures.json。.github/workflows/ci.yml:78-171；.github/workflows/ci-selfhosted.yml:158-176；e2e/smoke.mjs:34-60,147,553"
     }
   ],
   "edges": [
@@ -1134,6 +2730,1206 @@
       "to": "a-perm-admin",
       "origin": "agent",
       "label": "仅后台管理员可读改"
+    },
+    {
+      "id": "a2-main-e-proj-status-1",
+      "type": "data",
+      "from": "a2-main-proj-status-1",
+      "to": "a-proj-stage",
+      "origin": "agent",
+      "label": "进度自动推导按 status 判定是否已归档"
+    },
+    {
+      "id": "a2-main-e-proj-edit-1",
+      "type": "dep",
+      "from": "a2-main-proj-edit-1",
+      "to": "a-proj-detail",
+      "origin": "agent",
+      "label": "编辑视图在项目详情页内切换"
+    },
+    {
+      "id": "a2-main-e-proj-owner-1",
+      "type": "data",
+      "from": "a2-main-proj-owner-1",
+      "to": "a-perm-roles",
+      "origin": "agent",
+      "label": "转让与协作者角色判定共用 canManageProject / getProjectRole"
+    },
+    {
+      "id": "a2-main-e-proj-delete-1",
+      "type": "dep",
+      "from": "a2-main-proj-delete-1",
+      "to": "n-mwgbir9b-5",
+      "origin": "agent",
+      "label": "有已签订合同时禁止删除项目"
+    },
+    {
+      "id": "a2-main-e-proj-demo-1",
+      "type": "dep",
+      "from": "a2-main-proj-demo-1",
+      "to": "a-user-members",
+      "origin": "agent",
+      "label": "新成员账号创建时自动克隆示例项目"
+    },
+    {
+      "id": "a2-main-e-proj-filter-1",
+      "type": "data",
+      "from": "a2-main-proj-filter-1",
+      "to": "n-mwgbir9b-6",
+      "origin": "agent",
+      "label": "归档后项目从进行中列表移到已归档"
+    },
+    {
+      "id": "a2-main-e-pm-calib-1",
+      "type": "call",
+      "from": "a2-main-pm-calib-1",
+      "to": "a-pm-editor",
+      "origin": "agent",
+      "label": "标定是画布工具，结果写进图纸 mmPerUnit"
+    },
+    {
+      "id": "a2-main-e-pm-gen-1",
+      "type": "call",
+      "from": "a2-main-pm-gen-1",
+      "to": "a-pm-rooms",
+      "origin": "agent",
+      "label": "智能生成按房间区域排点位，无区域时自动补齐"
+    },
+    {
+      "id": "a2-main-e-pm-sheet-1",
+      "type": "data",
+      "from": "a2-main-pm-sheet-1",
+      "to": "a-pm-editor",
+      "origin": "agent",
+      "label": "裁切后的标准图纸作为点位图底图"
+    },
+    {
+      "id": "a2-main-e-pm-display-1",
+      "type": "data",
+      "from": "a2-main-pm-display-1",
+      "to": "n-mwgbir9b-g",
+      "origin": "agent",
+      "label": "显示方案决定方案模板里点位图怎么渲染"
+    },
+    {
+      "id": "a2-main-e-pm-default-1",
+      "type": "data",
+      "from": "a2-main-pm-default-1",
+      "to": "n-mwgbir9b-8",
+      "origin": "agent",
+      "label": "默认型号从产品库选，校验在售与设备类型"
+    },
+    {
+      "id": "a2-main-e-pm-export-1",
+      "type": "dep",
+      "from": "a2-main-pm-export-1",
+      "to": "a-pm-editor",
+      "origin": "agent",
+      "label": "导出是画布工具栏的前端动作，复用当前场景"
+    },
+    {
+      "id": "a2-main-e-pm-savecap-1",
+      "type": "data",
+      "from": "a2-main-pm-savecap-1",
+      "to": "n-mwgbir9b-2",
+      "origin": "agent",
+      "label": "保存写的是项目的 pointMap JSON 字段"
+    },
+    {
+      "id": "a2-main-e-pm-draft-1",
+      "type": "dep",
+      "from": "a2-main-pm-draft-1",
+      "to": "a-pm-editor",
+      "origin": "agent",
+      "label": "草稿只在编辑器里产生与恢复"
+    },
+    {
+      "id": "a2-main-e-quote-status-1",
+      "type": "route",
+      "from": "a2-main-quote-status-1",
+      "to": "n-mwgbir9b-5",
+      "origin": "agent",
+      "label": "报价已确认后报价台提示生成合同"
+    },
+    {
+      "id": "a2-main-e-quote-gen-1",
+      "type": "data",
+      "from": "a2-main-quote-gen-1",
+      "to": "n-mwgbir9b-3",
+      "origin": "agent",
+      "label": "设备清单与数量从点位图统计"
+    },
+    {
+      "id": "a2-main-e-quote-sync-1",
+      "type": "data",
+      "from": "a2-main-quote-sync-1",
+      "to": "n-mwgbir9b-3",
+      "origin": "agent",
+      "label": "同步再读点位图最新点位"
+    },
+    {
+      "id": "a2-main-e-quote-swap-1",
+      "type": "data",
+      "from": "a2-main-quote-swap-1",
+      "to": "n-mwgbir9b-8",
+      "origin": "agent",
+      "label": "候选型号来自产品库同设备类型在售产品"
+    },
+    {
+      "id": "a2-main-e-quote-final-1",
+      "type": "data",
+      "from": "a2-main-quote-final-1",
+      "to": "n-mwgbir9b-6",
+      "origin": "agent",
+      "label": "定稿报价供交付资料包与方案使用"
+    },
+    {
+      "id": "a2-main-e-quote-feedback-1",
+      "type": "call",
+      "from": "a2-main-quote-feedback-1",
+      "to": "a-site-share",
+      "origin": "agent",
+      "label": "反馈来源是分享页提交的意向"
+    },
+    {
+      "id": "a2-main-e-quote-lock-1",
+      "type": "dep",
+      "from": "a2-main-quote-lock-1",
+      "to": "n-mwgbir9b-5",
+      "origin": "agent",
+      "label": "锁定条件看合同是否已签订并引用这份报价"
+    },
+    {
+      "id": "a2-main-e-quote-print-1",
+      "type": "call",
+      "from": "a2-main-quote-print-1",
+      "to": "a-print-center",
+      "origin": "agent",
+      "label": "报价打印路由归打印文档中心"
+    },
+    {
+      "id": "a2-main-e-contract-status-1",
+      "type": "data",
+      "from": "a2-main-contract-status-1",
+      "to": "a-proj-stage",
+      "origin": "agent",
+      "label": "项目进度用 contractStatus 判断合同待签/已签"
+    },
+    {
+      "id": "a2-main-e-contract-create-1",
+      "type": "data",
+      "from": "a2-main-contract-create-1",
+      "to": "n-mwgbir9b-4",
+      "origin": "agent",
+      "label": "金额与明细来自依据报价"
+    },
+    {
+      "id": "a2-main-e-contract-sign-1",
+      "type": "dep",
+      "from": "a2-main-contract-sign-1",
+      "to": "a-contract-lock",
+      "origin": "agent",
+      "label": "签订触发合同与依据报价锁定"
+    },
+    {
+      "id": "a2-main-e-contract-pay-1",
+      "type": "dep",
+      "from": "a2-main-contract-pay-1",
+      "to": "a-contract-lock",
+      "origin": "agent",
+      "label": "锁定后只放开收款登记"
+    },
+    {
+      "id": "a2-main-e-contract-ratio-1",
+      "type": "dep",
+      "from": "a2-main-contract-ratio-1",
+      "to": "a-contract-page",
+      "origin": "agent",
+      "label": "保存合同页时校验比例合计 100%"
+    },
+    {
+      "id": "a2-main-e-contract-guard-1",
+      "type": "data",
+      "from": "a2-main-contract-guard-1",
+      "to": "n-mwgbir9b-2",
+      "origin": "agent",
+      "label": "合同与项目一对一，已签合同也影响项目删除"
+    },
+    {
+      "id": "a2-main-e-contract-print-1",
+      "type": "call",
+      "from": "a2-main-contract-print-1",
+      "to": "a-print-center",
+      "origin": "agent",
+      "label": "合同打印路由归打印文档中心"
+    },
+    {
+      "id": "a2-main-e-contract-edit-1",
+      "type": "dep",
+      "from": "a2-main-contract-edit-1",
+      "to": "a-contract-page",
+      "origin": "agent",
+      "label": "分区编辑是合同页的编辑入口"
+    },
+    {
+      "id": "a2-main-e-archive-toggle-1",
+      "type": "data",
+      "from": "a2-main-archive-toggle-1",
+      "to": "n-mwgbir9b-2",
+      "origin": "agent",
+      "label": "归档/恢复写项目的 status 与 archivedAt"
+    },
+    {
+      "id": "a2-main-e-archive-ready-1",
+      "type": "data",
+      "from": "a2-main-archive-ready-1",
+      "to": "n-mwgbir9b-5",
+      "origin": "agent",
+      "label": "合同与收款数据决定资料是否齐备"
+    },
+    {
+      "id": "a2-main-e-archive-package-1",
+      "type": "call",
+      "from": "a2-main-archive-package-1",
+      "to": "a-print-center",
+      "origin": "agent",
+      "label": "资料包逐份调用打印路由收集 PDF"
+    },
+    {
+      "id": "a2-main-e-archive-share-1",
+      "type": "data",
+      "from": "a2-main-archive-share-1",
+      "to": "a-site-share",
+      "origin": "agent",
+      "label": "链接设置控制 share/[token] 能否打开"
+    },
+    {
+      "id": "a2-main-e-archive-link-1",
+      "type": "dep",
+      "from": "a2-main-archive-link-1",
+      "to": "a-site-share",
+      "origin": "agent",
+      "label": "复制的是分享页地址"
+    },
+    {
+      "id": "a2-main-e-archive-poster-1",
+      "type": "data",
+      "from": "a2-main-archive-poster-1",
+      "to": "n-mwgbir9b-3",
+      "origin": "agent",
+      "label": "海报楼层图与设备统计来自点位图"
+    },
+    {
+      "id": "a2-main-e-archive-deliver-1",
+      "type": "data",
+      "from": "a2-main-archive-deliver-1",
+      "to": "n-mwgbir9b-4",
+      "origin": "agent",
+      "label": "定稿报价必须是本项目报价之一"
+    },
+    {
+      "id": "a2-main-e-archive-readonly-1",
+      "type": "dep",
+      "from": "a2-main-archive-readonly-1",
+      "to": "n-mwgbir9b-4",
+      "origin": "agent",
+      "label": "只读守卫拦在报价与合同保存前"
+    },
+    {
+      "id": "a2-e-prod-filter-1",
+      "type": "data",
+      "from": "a2-data-prod-filter-1",
+      "to": "n-mwgbir9b-9",
+      "origin": "agent",
+      "label": "type/cat 筛选值直接来自设备类型字典"
+    },
+    {
+      "id": "a2-e-prod-counts-2",
+      "type": "data",
+      "from": "a2-data-prod-counts-2",
+      "to": "a-brand-brands",
+      "origin": "agent",
+      "label": "品牌侧栏读 brands 自行计数"
+    },
+    {
+      "id": "a2-e-prod-dump-3",
+      "type": "data",
+      "from": "a2-data-prod-dump-3",
+      "to": "n-mwgbir9b-8",
+      "origin": "agent",
+      "label": "整库 dump 里的 products 就是本模块数据"
+    },
+    {
+      "id": "a2-e-prod-image-4",
+      "type": "data",
+      "from": "a2-data-prod-image-4",
+      "to": "a-prod-list",
+      "origin": "agent",
+      "label": "产品库页用 media.url 渲染产品图"
+    },
+    {
+      "id": "a2-e-prod-access-5",
+      "type": "dep",
+      "from": "a2-data-prod-access-5",
+      "to": "a-perm-admin",
+      "origin": "agent",
+      "label": "删除产品仍只允许后台 CMS 管理员"
+    },
+    {
+      "id": "a2-e-dt-types-1",
+      "type": "data",
+      "from": "a2-data-dt-types-1",
+      "to": "n-mwgbir9b-8",
+      "origin": "agent",
+      "label": "产品 deviceType 必填项取自这份清单"
+    },
+    {
+      "id": "a2-e-dt-symbols-2",
+      "type": "data",
+      "from": "a2-data-dt-symbols-2",
+      "to": "a-pm-editor",
+      "origin": "agent",
+      "label": "点位图与打印点位图用同一套符号"
+    },
+    {
+      "id": "a2-e-dt-order-3",
+      "type": "data",
+      "from": "a2-data-dt-order-3",
+      "to": "a-prod-list",
+      "origin": "agent",
+      "label": "产品库侧栏类别顺序按字典排序"
+    },
+    {
+      "id": "a2-e-brand-logo-1",
+      "type": "data",
+      "from": "a2-data-brand-logo-1",
+      "to": "a-brand-brands",
+      "origin": "agent",
+      "label": "Logo 是品牌库的字段"
+    },
+    {
+      "id": "a2-e-brand-access-2",
+      "type": "dep",
+      "from": "a2-data-brand-access-2",
+      "to": "a-perm-admin",
+      "origin": "agent",
+      "label": "品牌增删改只允许 CMS 管理员"
+    },
+    {
+      "id": "a2-e-brand-landing-3",
+      "type": "data",
+      "from": "a2-data-brand-landing-3",
+      "to": "a-site-pages",
+      "origin": "agent",
+      "label": "首页品牌墙是公开页的一部分"
+    },
+    {
+      "id": "a2-e-user-status-1",
+      "type": "call",
+      "from": "a2-data-user-status-1",
+      "to": "a-user-login",
+      "origin": "agent",
+      "label": "登录校验 status=active，停用即拒"
+    },
+    {
+      "id": "a2-e-user-isolation-2",
+      "type": "dep",
+      "from": "a2-data-user-isolation-2",
+      "to": "a-perm-admin",
+      "origin": "agent",
+      "label": "admins 是另一套账号，users 不能进后台"
+    },
+    {
+      "id": "a2-e-user-selfread-3",
+      "type": "data",
+      "from": "a2-data-user-selfread-3",
+      "to": "a-user-members",
+      "origin": "agent",
+      "label": "同一条 users 集合的读取规则"
+    },
+    {
+      "id": "a2-e-user-demo-4",
+      "type": "data",
+      "from": "a2-data-user-demo-4",
+      "to": "a-proj-list",
+      "origin": "agent",
+      "label": "新建账号后项目列表多出一份示例项目"
+    },
+    {
+      "id": "a2-e-user-session-5",
+      "type": "data",
+      "from": "a2-data-user-session-5",
+      "to": "a-user-login",
+      "origin": "agent",
+      "label": "登录后写入的会话有效期"
+    },
+    {
+      "id": "a2-e-collab-role-1",
+      "type": "data",
+      "from": "a2-data-collab-role-1",
+      "to": "a-perm-roles",
+      "origin": "agent",
+      "label": "协作者 read/edit 即项目三级角色里的两级"
+    },
+    {
+      "id": "a2-e-collab-expiry-2",
+      "type": "data",
+      "from": "a2-data-collab-expiry-2",
+      "to": "a-collab-share",
+      "origin": "agent",
+      "label": "expiresAt 存在 shareConfig 里"
+    },
+    {
+      "id": "a2-e-collab-password-3",
+      "type": "data",
+      "from": "a2-data-collab-password-3",
+      "to": "a-collab-share",
+      "origin": "agent",
+      "label": "passwordHash 与解锁 cookie 属同一分享配置"
+    },
+    {
+      "id": "a2-e-collab-join-4",
+      "type": "call",
+      "from": "a2-data-collab-join-4",
+      "to": "a-user-members",
+      "origin": "agent",
+      "label": "加入协作要求已有成员账号登录"
+    },
+    {
+      "id": "a2-e-collab-token-5",
+      "type": "data",
+      "from": "a2-data-collab-token-5",
+      "to": "a-collab-share",
+      "origin": "agent",
+      "label": "token 是分享链接的凭证主体"
+    },
+    {
+      "id": "a2-e-credit-balance-1",
+      "type": "data",
+      "from": "a2-data-credit-balance-1",
+      "to": "a-credit-ledger",
+      "origin": "agent",
+      "label": "余额由流水集合的钩子算出并回写"
+    },
+    {
+      "id": "a2-e-credit-redeemflow-2",
+      "type": "data",
+      "from": "a2-data-credit-redeemflow-2",
+      "to": "a-credit-redeem",
+      "origin": "agent",
+      "label": "核销的是 redemption-codes 集合"
+    },
+    {
+      "id": "a2-e-credit-tasks-3",
+      "type": "data",
+      "from": "a2-data-credit-tasks-3",
+      "to": "a-credit-ledger",
+      "origin": "agent",
+      "label": "任务奖励以流水形式入账"
+    },
+    {
+      "id": "a2-e-credit-chatbill-4",
+      "type": "call",
+      "from": "a2-data-credit-chatbill-4",
+      "to": "a-ai-chat",
+      "origin": "agent",
+      "label": "每轮对话结束后按用量扣费"
+    },
+    {
+      "id": "a2-e-credit-imagebill-5",
+      "type": "call",
+      "from": "a2-data-credit-imagebill-5",
+      "to": "a-style-page",
+      "origin": "agent",
+      "label": "风格化页每次生成扣 8 积分"
+    },
+    {
+      "id": "a2-e-credit-page-6",
+      "type": "call",
+      "from": "a2-data-credit-page-6",
+      "to": "a-credit-redeem",
+      "origin": "agent",
+      "label": "会员与积分页提交兑换码核销"
+    },
+    {
+      "id": "a2-e-tpl-frameworks-1",
+      "type": "data",
+      "from": "a2-data-tpl-frameworks-1",
+      "to": "a-tpl-proposal",
+      "origin": "agent",
+      "label": "方案演示按框架决定章节"
+    },
+    {
+      "id": "a2-e-tpl-themes-2",
+      "type": "data",
+      "from": "a2-data-tpl-themes-2",
+      "to": "a-tpl-proposal",
+      "origin": "agent",
+      "label": "方案演示的配色与版式来自主题"
+    },
+    {
+      "id": "a2-e-tpl-builtin-3",
+      "type": "data",
+      "from": "a2-data-tpl-builtin-3",
+      "to": "a-tpl-page",
+      "origin": "agent",
+      "label": "模板站展示后台模板或内置兜底"
+    },
+    {
+      "id": "a2-e-tpl-apply-4",
+      "type": "data",
+      "from": "a2-data-tpl-apply-4",
+      "to": "a-archive-page",
+      "origin": "agent",
+      "label": "归档页选交付方案模板并写回项目"
+    },
+    {
+      "id": "a2-e-tpl-thumb-5",
+      "type": "data",
+      "from": "a2-data-tpl-thumb-5",
+      "to": "a-tpl-page",
+      "origin": "agent",
+      "label": "模板站的卡片缩略图由同一套渲染产出"
+    },
+    {
+      "id": "a2-e-tpl-canvas-6",
+      "type": "data",
+      "from": "a2-data-tpl-canvas-6",
+      "to": "a-tpl-proposal",
+      "origin": "agent",
+      "label": "方案页画布尺寸决定打印缩放"
+    },
+    {
+      "id": "a2-e-print-survey-1",
+      "type": "route",
+      "from": "a-print-center",
+      "to": "a2-data-print-survey-1",
+      "origin": "agent",
+      "label": "打印中心第 1 条：给客户与勘测工程师"
+    },
+    {
+      "id": "a2-e-print-wiring-2",
+      "type": "route",
+      "from": "a-print-center",
+      "to": "a2-data-print-wiring-2",
+      "origin": "agent",
+      "label": "打印中心第 2 条：给水电施工"
+    },
+    {
+      "id": "a2-e-print-plans-3",
+      "type": "route",
+      "from": "a-print-center",
+      "to": "a2-data-print-plans-3",
+      "origin": "agent",
+      "label": "打印中心第 3 条：给安装交底"
+    },
+    {
+      "id": "a2-e-print-proposal-4",
+      "type": "route",
+      "from": "a-print-center",
+      "to": "a2-data-print-proposal-4",
+      "origin": "agent",
+      "label": "打印中心第 4 条：给业主"
+    },
+    {
+      "id": "a2-e-print-procurement-5",
+      "type": "route",
+      "from": "a-print-center",
+      "to": "a2-data-print-procurement-5",
+      "origin": "agent",
+      "label": "打印中心第 5 条：给内部采购"
+    },
+    {
+      "id": "a2-e-print-checklist-6",
+      "type": "route",
+      "from": "a-print-center",
+      "to": "a2-data-print-checklist-6",
+      "origin": "agent",
+      "label": "打印中心第 6 条：给安装团队"
+    },
+    {
+      "id": "a2-e-print-handover-7",
+      "type": "route",
+      "from": "a-print-center",
+      "to": "a2-data-print-handover-7",
+      "origin": "agent",
+      "label": "打印中心第 7 条：给业主交付"
+    },
+    {
+      "id": "a2-e-print-aftersales-8",
+      "type": "route",
+      "from": "a-print-center",
+      "to": "a2-data-print-aftersales-8",
+      "origin": "agent",
+      "label": "打印中心第 8 条：给业主与售后"
+    },
+    {
+      "id": "a2-e-print-quote-9",
+      "type": "route",
+      "from": "a-print-center",
+      "to": "a2-data-print-quote-9",
+      "origin": "agent",
+      "label": "打印中心第 9 条：给客户"
+    },
+    {
+      "id": "a2-e-print-contract-10",
+      "type": "route",
+      "from": "a-print-center",
+      "to": "a2-data-print-contract-10",
+      "origin": "agent",
+      "label": "打印中心第 10 条：给客户签字"
+    },
+    {
+      "id": "a2-e-print-toolbar-11",
+      "type": "data",
+      "from": "a2-data-print-toolbar-11",
+      "to": "a-print-center",
+      "origin": "agent",
+      "label": "所有打印页共用这条工具条导出"
+    },
+    {
+      "id": "a2-e-print-layouts-12",
+      "type": "data",
+      "from": "a2-data-print-layouts-12",
+      "to": "a-print-tpl",
+      "origin": "agent",
+      "label": "版式与风格包共同决定打印外观"
+    },
+    {
+      "id": "a2-e-site-home-1",
+      "type": "route",
+      "from": "a-site-pages",
+      "to": "a2-data-site-home-1",
+      "origin": "agent",
+      "label": "6 个公开页之一"
+    },
+    {
+      "id": "a2-e-site-catalog-2",
+      "type": "route",
+      "from": "a-site-pages",
+      "to": "a2-data-site-catalog-2",
+      "origin": "agent",
+      "label": "6 个公开页之一"
+    },
+    {
+      "id": "a2-e-site-brand-3",
+      "type": "route",
+      "from": "a-site-pages",
+      "to": "a2-data-site-brand-3",
+      "origin": "agent",
+      "label": "6 个公开页之一"
+    },
+    {
+      "id": "a2-e-site-docs-4",
+      "type": "route",
+      "from": "a-site-pages",
+      "to": "a2-data-site-docs-4",
+      "origin": "agent",
+      "label": "6 个公开页之一"
+    },
+    {
+      "id": "a2-e-site-download-5",
+      "type": "route",
+      "from": "a-site-pages",
+      "to": "a2-data-site-download-5",
+      "origin": "agent",
+      "label": "6 个公开页之一"
+    },
+    {
+      "id": "a2-e-site-seo-6",
+      "type": "data",
+      "from": "a2-data-site-seo-6",
+      "to": "a-site-pages",
+      "origin": "agent",
+      "label": "站点级 metadata 与 sitemap 覆盖这 6 页"
+    },
+    {
+      "id": "a2-e-site-boundary-7",
+      "type": "dep",
+      "from": "a2-data-site-boundary-7",
+      "to": "a-site-pages",
+      "origin": "agent",
+      "label": "免登录范围就是这 6 个公开页加分享页"
+    },
+    {
+      "id": "a2-e-ai-tools-registry",
+      "type": "call",
+      "from": "a2-ai-tools",
+      "to": "a-plugin-registry",
+      "origin": "agent",
+      "label": "工具来自插件注册的 10 个插件加核心工具"
+    },
+    {
+      "id": "a2-e-ai-perms-tools",
+      "type": "dep",
+      "from": "a2-ai-perms",
+      "to": "a2-ai-tools",
+      "origin": "agent",
+      "label": "工具声明的权限必须在所属插件白名单内"
+    },
+    {
+      "id": "a2-e-ai-guards-role",
+      "type": "dep",
+      "from": "a2-ai-guards",
+      "to": "n-mwgbir9b-o",
+      "origin": "agent",
+      "label": "工具写操作复用项目三级角色与归档只读校验"
+    },
+    {
+      "id": "a2-e-ai-history-chat",
+      "type": "data",
+      "from": "a2-ai-history",
+      "to": "a-ai-chat",
+      "origin": "agent",
+      "label": "对话读写 ai-conversations 与 ai-messages"
+    },
+    {
+      "id": "a2-e-ai-vision-tools",
+      "type": "call",
+      "from": "a2-ai-vision",
+      "to": "a2-ai-tools",
+      "origin": "agent",
+      "label": "点位规划与识图工具调用视觉模型"
+    },
+    {
+      "id": "a2-e-ai-vision-channel",
+      "type": "data",
+      "from": "a2-ai-vision",
+      "to": "n-mwgbir9b-m",
+      "origin": "agent",
+      "label": "视觉模型从 ai-settings 的模型列表里排序挑选"
+    },
+    {
+      "id": "a2-e-ai-imagegen-credit",
+      "type": "data",
+      "from": "a2-ai-imagegen",
+      "to": "a-credit-ledger",
+      "origin": "agent",
+      "label": "生成前预检积分、按模型单价写流水"
+    },
+    {
+      "id": "a2-e-ai-billing-ledger",
+      "type": "data",
+      "from": "a2-ai-billing",
+      "to": "n-mwgbir9b-e",
+      "origin": "agent",
+      "label": "每轮调用写 ai-credit-ledger 并回填用户余额"
+    },
+    {
+      "id": "a2-e-ai-billing-tools",
+      "type": "data",
+      "from": "a2-ai-billing",
+      "to": "a2-ai-tools",
+      "origin": "agent",
+      "label": "积分里的工具费取自各工具注册的 cost"
+    },
+    {
+      "id": "a2-e-ai-skills-tools",
+      "type": "dep",
+      "from": "a2-ai-skills",
+      "to": "a2-ai-tools",
+      "origin": "agent",
+      "label": "技能模板与工具同源注册"
+    },
+    {
+      "id": "a2-e-ai-skills-page",
+      "type": "data",
+      "from": "a2-ai-skills",
+      "to": "a-ai-page",
+      "origin": "agent",
+      "label": "AI 工作台读取技能模板清单"
+    },
+    {
+      "id": "a2-e-ai-vision-import",
+      "type": "call",
+      "from": "a2-ai-vision",
+      "to": "a-pm-ai-import",
+      "origin": "agent",
+      "label": "识图导入入口用的是这套视觉能力，归属待确认"
+    },
+    {
+      "id": "a2-e-style-wallmask-tpl",
+      "type": "dep",
+      "from": "a2-ai-style-wallmask",
+      "to": "a-style-templates",
+      "origin": "agent",
+      "label": "每套风格模板都走同一套墙线 mask 流程"
+    },
+    {
+      "id": "a2-e-style-cost-credit",
+      "type": "data",
+      "from": "a2-ai-style-cost",
+      "to": "n-mwgbir9b-e",
+      "origin": "agent",
+      "label": "每次生成扣 8 积分并记流水"
+    },
+    {
+      "id": "a2-e-style-cost-config",
+      "type": "dep",
+      "from": "a2-ai-style-cost",
+      "to": "a2-ai-style-config",
+      "origin": "agent",
+      "label": "未配风格化密钥时先返回 503，谈不到扣分"
+    },
+    {
+      "id": "a2-e-style-media-pointmap",
+      "type": "data",
+      "from": "a2-ai-style-media",
+      "to": "a-style-pointmap",
+      "origin": "agent",
+      "label": "点位图弹窗结果只回下载链接，不回填画布"
+    },
+    {
+      "id": "a2-e-style-media-page",
+      "type": "data",
+      "from": "a2-ai-style-media",
+      "to": "a-style-page",
+      "origin": "agent",
+      "label": "风格化页同样是下载结果而非保存"
+    },
+    {
+      "id": "a2-e-style-dp-proposal",
+      "type": "data",
+      "from": "a2-ai-displayprofile",
+      "to": "a-tpl-proposal",
+      "origin": "agent",
+      "label": "显示方案唯一消费点是方案模板平面图页"
+    },
+    {
+      "id": "a2-e-style-dp-editor",
+      "type": "data",
+      "from": "a2-ai-displayprofile",
+      "to": "a-pm-editor",
+      "origin": "agent",
+      "label": "点位图页选择显示方案并写 projects.displayProfile"
+    },
+    {
+      "id": "a2-e-style-config-channel",
+      "type": "dep",
+      "from": "a2-ai-style-config",
+      "to": "n-mwgbir9b-m",
+      "origin": "agent",
+      "label": "风格化用独立密钥，不在 AI 渠道配置里，边界待确认"
+    },
+    {
+      "id": "a2-e-keyenv-custom",
+      "type": "data",
+      "from": "a2-ai-keyenv",
+      "to": "a-channel-custom",
+      "origin": "agent",
+      "label": "自定义渠道只存 AI_ 前缀的变量名"
+    },
+    {
+      "id": "a2-e-keyenv-providers",
+      "type": "data",
+      "from": "a2-ai-keyenv",
+      "to": "a-channel-providers",
+      "origin": "agent",
+      "label": "内置渠道的密钥环境变量与服务端一对一绑定"
+    },
+    {
+      "id": "a2-e-pricing-models",
+      "type": "data",
+      "from": "a2-ai-pricing",
+      "to": "a-channel-models",
+      "origin": "agent",
+      "label": "峰谷价目与倍率写在模型配置里"
+    },
+    {
+      "id": "a2-e-pricing-billing",
+      "type": "data",
+      "from": "a2-ai-pricing",
+      "to": "a2-ai-billing",
+      "origin": "agent",
+      "label": "价目决定每轮对话扣多少积分"
+    },
+    {
+      "id": "a2-e-channeltest-models",
+      "type": "call",
+      "from": "a2-ai-channeltest",
+      "to": "a-channel-models",
+      "origin": "agent",
+      "label": "测试与拉取模型都直接调渠道接口"
+    },
+    {
+      "id": "a2-e-presets-models",
+      "type": "data",
+      "from": "a2-ai-presets",
+      "to": "a-channel-models",
+      "origin": "agent",
+      "label": "预设清单导入后成为模型列表的一行"
+    },
+    {
+      "id": "a2-e-auto-chat",
+      "type": "call",
+      "from": "a2-ai-auto",
+      "to": "a-ai-chat",
+      "origin": "agent",
+      "label": "Auto 模式在对话里挑模型并失败切换"
+    },
+    {
+      "id": "a2-e-auto-models",
+      "type": "data",
+      "from": "a2-ai-auto",
+      "to": "a-channel-models",
+      "origin": "agent",
+      "label": "路由只在有密钥的启用模型里选"
+    },
+    {
+      "id": "a2-e-role-collab",
+      "type": "dep",
+      "from": "a2-ops-role-boundary",
+      "to": "a-collab-share",
+      "origin": "agent",
+      "label": "协作者与分享角色都落到同一套三级角色"
+    },
+    {
+      "id": "a2-e-archive-page",
+      "type": "data",
+      "from": "a2-ops-archive-whitelist",
+      "to": "a-archive-page",
+      "origin": "agent",
+      "label": "归档页按白名单呈现可改与只读"
+    },
+    {
+      "id": "a2-e-archive-guards",
+      "type": "dep",
+      "from": "a2-ops-archive-whitelist",
+      "to": "a2-ai-guards",
+      "origin": "agent",
+      "label": "AI 写操作复用同一归档拦截"
+    },
+    {
+      "id": "a2-e-share-site",
+      "type": "dep",
+      "from": "a2-ops-share-perm",
+      "to": "a-site-share",
+      "origin": "agent",
+      "label": "分享页遵循分享 token、过期与密码规则"
+    },
+    {
+      "id": "a2-e-share-collab",
+      "type": "data",
+      "from": "a2-ops-share-perm",
+      "to": "a-collab-share",
+      "origin": "agent",
+      "label": "分享配置与协作者列表同一份数据"
+    },
+    {
+      "id": "a2-e-admin-perm",
+      "type": "dep",
+      "from": "a2-ops-admin-isolation",
+      "to": "a-perm-admin",
+      "origin": "agent",
+      "label": "后台管理员集合与员工集合互不通用"
+    },
+    {
+      "id": "a2-e-admin-users",
+      "type": "dep",
+      "from": "a2-ops-admin-isolation",
+      "to": "a-user-members",
+      "origin": "agent",
+      "label": "员工账号 admin 入口直接关闭"
+    },
+    {
+      "id": "a2-e-join-collab",
+      "type": "route",
+      "from": "a2-ops-join",
+      "to": "a-collab-share",
+      "origin": "agent",
+      "label": "邀请链接接受后写入协作者列表"
+    },
+    {
+      "id": "a2-e-operator-reports",
+      "type": "call",
+      "from": "a2-ops-operator",
+      "to": "a2-ops-reports",
+      "origin": "agent",
+      "label": "只有运营身份能打开客户使用报告"
+    },
+    {
+      "id": "a2-e-credit-ledger-view",
+      "type": "data",
+      "from": "a2-ops-credit-entry",
+      "to": "a-credit-ledger",
+      "origin": "agent",
+      "label": "两个入口读同一份积分流水"
+    },
+    {
+      "id": "a2-e-credit-user",
+      "type": "dep",
+      "from": "a2-ops-credit-entry",
+      "to": "a-user-members",
+      "origin": "agent",
+      "label": "账单余额取自 users.aiCredits"
+    },
+    {
+      "id": "a2-e-plugin-ai-chat",
+      "type": "call",
+      "from": "a2-ops-plugin-ai-copilot",
+      "to": "a-ai-chat",
+      "origin": "agent",
+      "label": "插件提供侧栏常驻对话"
+    },
+    {
+      "id": "a2-e-plugin-ai-page",
+      "type": "call",
+      "from": "a2-ops-plugin-ai-copilot",
+      "to": "a-ai-page",
+      "origin": "agent",
+      "label": "插件提供 AI 工作台与风格化页"
+    },
+    {
+      "id": "a2-e-plugin-doc-print",
+      "type": "data",
+      "from": "a2-ops-plugin-doc-styles",
+      "to": "a-print-tpl",
+      "origin": "agent",
+      "label": "插件提供扩展打印风格包"
+    },
+    {
+      "id": "a2-e-plugin-proposal-tpl",
+      "type": "data",
+      "from": "a2-ops-plugin-proposal",
+      "to": "a-tpl-proposal",
+      "origin": "agent",
+      "label": "插件提供三个方案模板"
+    },
+    {
+      "id": "a2-e-plugin-proposal-print",
+      "type": "call",
+      "from": "a2-ops-plugin-proposal",
+      "to": "a-print-center",
+      "origin": "agent",
+      "label": "打印路由里的 proposal 由插件供数据"
+    },
+    {
+      "id": "a2-e-plugin-rooms",
+      "type": "call",
+      "from": "a2-ops-plugin-room-insights",
+      "to": "a-pm-rooms",
+      "origin": "agent",
+      "label": "点位图与方案画廊调用房间完整度分析"
+    },
+    {
+      "id": "a2-e-plugin-select",
+      "type": "call",
+      "from": "a2-ops-plugin-smart-select",
+      "to": "a-pm-select",
+      "origin": "agent",
+      "label": "点位图页调用智能选型"
+    },
+    {
+      "id": "a2-e-plugin-import",
+      "type": "call",
+      "from": "a2-ops-plugin-ai-import",
+      "to": "a-pm-ai-import",
+      "origin": "agent",
+      "label": "点位图页的 AI 识别导入入口"
+    },
+    {
+      "id": "a2-e-plugin-dwg",
+      "type": "call",
+      "from": "a2-ops-plugin-dwg-import",
+      "to": "a-pm-dwg",
+      "origin": "agent",
+      "label": "点位图页的 DWG 导入入口"
+    },
+    {
+      "id": "a2-e-plugin-after",
+      "type": "data",
+      "from": "a2-ops-plugin-after-sales",
+      "to": "a-ops-service",
+      "origin": "agent",
+      "label": "插件读写 service-records 维保记录"
+    },
+    {
+      "id": "a2-e-toggle-registry",
+      "type": "dep",
+      "from": "a2-ops-plugin-toggle",
+      "to": "a-plugin-registry",
+      "origin": "agent",
+      "label": "开关按插件 id 与 ready 状态算最终可用性"
+    },
+    {
+      "id": "a2-e-toggle-company",
+      "type": "data",
+      "from": "a2-ops-plugin-toggle",
+      "to": "n-mwgbir9b-c",
+      "origin": "agent",
+      "label": "个人开关存在成员账号的 companyProfile 里"
+    },
+    {
+      "id": "a2-e-meta-tools",
+      "type": "call",
+      "from": "a2-ops-plugin-ai-meta",
+      "to": "a2-ai-tools",
+      "origin": "agent",
+      "label": "插件把工具、技能与权限注册给 AI"
+    },
+    {
+      "id": "a2-e-meta-registry",
+      "type": "dep",
+      "from": "a2-ops-plugin-ai-meta",
+      "to": "a-plugin-registry",
+      "origin": "agent",
+      "label": "元数据按插件 id 聚合"
+    },
+    {
+      "id": "a2-e-deploy-migrate",
+      "type": "route",
+      "from": "a2-ops-shadow-deploy",
+      "to": "a2-ops-migrate",
+      "origin": "agent",
+      "label": "发布第 2.5 步在新库连生产网后跑迁移"
+    },
+    {
+      "id": "a2-e-verify-deploy",
+      "type": "route",
+      "from": "a2-ops-shadow-verify",
+      "to": "a2-ops-shadow-deploy",
+      "origin": "agent",
+      "label": "影子容器起来后逐项验证接线与健康"
+    },
+    {
+      "id": "a2-e-cut-verify",
+      "type": "route",
+      "from": "a2-ops-traffic-cut",
+      "to": "a2-ops-shadow-verify",
+      "origin": "agent",
+      "label": "冒烟通过才允许切流量"
+    },
+    {
+      "id": "a2-e-backup-deploy",
+      "type": "dep",
+      "from": "a2-ops-backup",
+      "to": "a2-ops-shadow-deploy",
+      "origin": "agent",
+      "label": "发布第 0 步先备份数据库"
+    },
+    {
+      "id": "a2-e-gates-smoke",
+      "type": "route",
+      "from": "a2-ops-ci-gates",
+      "to": "a2-ops-ci-smoke",
+      "origin": "agent",
+      "label": "六道门禁过后单独跑冒烟 job"
+    },
+    {
+      "id": "a2-e-smoke-verify",
+      "type": "dep",
+      "from": "a2-ops-ci-smoke",
+      "to": "a2-ops-shadow-verify",
+      "origin": "agent",
+      "label": "CI 与发布前跑的是同一份 smoke.mjs"
+    },
+    {
+      "id": "a2-e-gates-migrate",
+      "type": "data",
+      "from": "a2-ops-ci-gates",
+      "to": "a2-ops-migrate",
+      "origin": "agent",
+      "label": "CI 建库后同样用 payload migrate 建表"
     }
   ]
 }
