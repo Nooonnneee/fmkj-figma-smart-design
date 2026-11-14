@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
 import {
@@ -25,6 +25,7 @@ import type { AiModelOption, AiProjectContext } from '@/components/ai/ai-element
 import { BrandMark } from '@/components/brand/brand-mark'
 import { GuardedLink } from '@/components/guarded-link'
 import { LinkPending } from '@/components/link-pending'
+import { activeNavUrl } from '@/lib/nav-active'
 import { MembershipDialog } from '@/components/workspace-dialogs'
 import { Avatar } from '@astryxdesign/core/Avatar'
 import {
@@ -111,6 +112,14 @@ const capabilityNav = [
   },
 ] as const
 
+/** 侧边栏所有可点入口（含分组标题「能力中心」）—— 判定当前页要看全集，见 activeNavUrl */
+const ALL_NAV_URLS = [
+  ...workNav.map((i) => i.url),
+  ...settingsNav.map((i) => i.url),
+  ...capabilityNav.flatMap((g) => g.items.map((i) => i.url)),
+  '/capabilities',
+] as const
+
 /** 左下角两个按钮共用的样式：图标模式下都收成 32px 的方块 */
 const footerButton =
   'flex items-center rounded-lg outline-hidden transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
@@ -166,7 +175,12 @@ export function AppSidebar({
     (p) => p.id === 'ai-copilot' && p.status === 'ready' && p.enabled,
   )
   const effectiveMode = aiCopilotEnabled && state === 'expanded' ? mode : 'nav'
-  const isActive = (url: string) => pathname === url || pathname.startsWith(`${url}/`)
+  // ⚠️ 只让**最长匹配**的那条亮，否则父级入口会跟子路由一起亮
+  //（`/ai` 是 `/ai/image` 的前缀、`/capabilities` 是 `/capabilities/templates` 的前缀）。
+  // 2026-11-14 用户报「点了能力中心的选项一直是点击状态，切换也还是」就是这个。
+  // 判定逻辑在 lib/nav-active.ts，有单测盯住。
+  const activeUrl = useMemo(() => activeNavUrl(pathname, ALL_NAV_URLS), [pathname])
+  const isActive = (url: string) => activeUrl === url
   const collapsed = state === 'collapsed' && !isMobile
   const visibleSettingsNav = settingsNav.filter(
     (item) => showOperatorReports || item.url !== '/settings/reports',
