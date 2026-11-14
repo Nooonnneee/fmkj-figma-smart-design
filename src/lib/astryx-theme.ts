@@ -53,4 +53,4 @@ export const isAstryxTheme = (v: unknown): v is AstryxThemeId =>
  * 之所以敢写 `<html>`（虽然内层 `<div>` 会遮蔽它），是因为hydration 后
  * `<Theme theme={…}>` 会立刻把两处都改成同一个值，两者不冲突。
  */
-export const ASTRYX_THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('${ASTRYX_THEME_STORAGE_KEY}');var v=['neutral','stone','butter','matcha','chocolate','fanmeng'];document.documentElement.setAttribute('data-astryx-theme',v.indexOf(t)>-1?t:'${defaultThemeSlug}')}catch(e){}})()`
+export const ASTRYX_THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('${ASTRYX_THEME_STORAGE_KEY}');var v=['neutral','stone','butter','matcha','chocolate','fanmeng'];document.documentElement.setAttribute('data-astryx-theme',v.indexOf(t)>-1?t:'${defaultThemeSlug}');var m=localStorage.getItem('theme');var d=m==='dark'||(m!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.setAttribute('data-theme',d?'dark':'light')}catch(e){}})()`

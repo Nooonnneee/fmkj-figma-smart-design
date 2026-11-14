@@ -89,12 +89,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </a>
         )}
         <div id="root" tabIndex={-1}>
-          {/* Astryx 设计系统：提供主题上下文；主题可在「设置 → 外观」切换 */}
-          <AstryxThemeProvider>
-            <ThemeProvider>
+          {/* Astryx 设计系统：提供主题上下文；主题可在「设置 → 外观」切换。
+              ⚠️ 必须在 ThemeProvider **内层**：Astryx 的 `<Theme mode>` 要读
+              next-themes 的 resolvedTheme，包在外面 useTheme() 拿不到值，
+              组件 token 会永远停在浅色（暗色下深底深字）。 */}
+          <ThemeProvider>
+            <AstryxThemeProvider>
               <TooltipProvider>{children}</TooltipProvider>
-            </ThemeProvider>
-          </AstryxThemeProvider>
+            </AstryxThemeProvider>
+          </ThemeProvider>
         </div>
         {googleAnalyticsId && (
           <>
