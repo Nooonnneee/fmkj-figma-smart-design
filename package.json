@@ -17,7 +17,8 @@
     "start": "NODE_OPTIONS=--no-deprecation next start",
     "templates:seed": "NODE_OPTIONS=--no-deprecation payload run --input '{\"scriptPath\":\"scripts/seed-proposal-library.ts\"}'",
     "templates:thumbs": "node scripts/generate-template-thumbnails.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@astryxdesign/core": "0.7.11",
@@ -67,6 +68,7 @@
     "@types/node": "24.12.3",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "@vitest/coverage-v8": "5.1.0",
     "eslint": "10.14.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "oxfmt": "^0.73.0",
