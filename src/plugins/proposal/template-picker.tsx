@@ -214,7 +214,10 @@ export function TemplatePicker({
         onOpenChange={reset}
         width="min(1220px,96vw)"
         maxHeight="min(880px,94vh)"
-        padding={0}
+        // ⚠️ 不要传 padding={0}：Dialog 的内边距是 DialogHeader 唯一的左右/上下留白来源，
+        // 清零后标题会贴着弹窗左边框，`endContent` 的 -8px 补偿还会把标题顶到弹窗**外面**
+        // （2026-11-14 归档页实测：h2 的 y=19，弹窗 y=27，标题压在页面顶栏上）。
+        // 需要贴边的只有内容区，交给 LayoutContent padding={0}。
         // 原 DialogContent 用 `h-[min(880px,94vh)]` 钉死高度：预览视图的 iframe 靠容器
         // 高度算缩放比例，改成 fit-content 会算成 0。用 inline style 把定高补回来
         // （mergeProps 里调用方 style 最后合并，优先于官方 `height: fit-content`）。
@@ -401,7 +404,7 @@ export function TemplatePicker({
                                 className="w-full"
                                 isDisabled={!canChoose(t) || busy}
                                 onClick={() => void choose(t.value)}
-                                label={'预览样张'}
+                                label={chooseLabel(t)}
                               />
                             ) : null}
                           </td>
@@ -563,7 +566,7 @@ export function TemplatePicker({
                             size="sm"
                             isDisabled={!canChoose(activeT) || busy}
                             onClick={() => void choose(activeT.value)}
-                            label={'预览'}
+                            label={chooseLabel(activeT)}
                           />
                         ) : null}
                       </div>

@@ -59,15 +59,13 @@ export function ArchiveTemplatePicker({
           size="sm"
           className="ml-7 h-8 gap-2 text-xs sm:ml-0"
           label={`交付方案模板：${current?.label ?? '未选择'}，点击${editable ? '更换' : '查看'}`}
-          icon={
-            current ? (
-              <Swatches colors={current.swatches} />
-            ) : (
-              <LayoutTemplate className="size-3.5" />
-            )
-          }
+          // ⚠️ 色板不能放 Button 的 `icon` 插槽：该插槽是固定 16×16 且 overflow 可见，
+          // 48px 宽的四个色块会从插槽里溢出来压住后面的文字（2026-11-14 实测截图）。
+          // 放进 children 里由 flex 正常排版。
+          icon={current ? undefined : <LayoutTemplate className="size-3.5" />}
         >
           <span className="flex min-w-0 items-center gap-2">
+            {current ? <Swatches colors={current.swatches} /> : null}
             <span className="max-w-28 truncate">{current?.label ?? '选择模板'}</span>
             <span className="text-muted-foreground">{editable ? '更换' : '查看'}</span>
           </span>

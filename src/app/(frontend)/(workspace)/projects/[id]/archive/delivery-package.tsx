@@ -259,11 +259,13 @@ export function DeliveryPackage({
             <label
               htmlFor={`pkg-${d.key}`}
               className={cn(
-                'flex min-w-44 flex-1 items-center gap-2',
+                // min-w-44 在 390px 下会把标题挤成两行（「售后维 / 保卡」），窄屏不再强制最小宽度
+                'flex flex-1 items-center gap-2 sm:min-w-44',
                 !d.url && 'text-muted-foreground',
               )}
             >
-              <span className="text-sm font-medium">{d.title}</span>
+              {/* nowrap：标题都不长，窄屏下被挤成「售后维 / 保卡」比换行更难读 */}
+              <span className="text-sm font-medium whitespace-nowrap">{d.title}</span>
               {d.note ? (
                 <span className="text-xs text-muted-foreground tabular-nums">{d.note}</span>
               ) : null}

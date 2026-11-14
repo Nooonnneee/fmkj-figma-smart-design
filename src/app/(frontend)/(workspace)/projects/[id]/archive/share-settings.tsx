@@ -129,9 +129,12 @@ export function ShareSettings({ projectId, config }: { projectId: string; config
         </Field>
 
         <div className="flex items-center gap-3">
+          {/* shrink-0：窄屏（390px 实测）下按钮默认 `flex:0 1 auto; min-width:0`，
+              会被右侧说明文字压成「保存…」。 */}
           <Button
             type="button"
             size="sm"
+            className="shrink-0"
             isDisabled={saving}
             isLoading={saving}
             onClick={save}

@@ -266,6 +266,88 @@ async function main() {
     await check(page, p, { gated: true, loggedIn, errs })
   }
 
+  // ── 归档页的交付方案弹窗：几何与本地化 ──────────────────
+  // 2026-11-14 用户报「归档页面显示有问题 / 更换方案的弹窗显示有问题」，
+  // 三个缺陷都只在**看截图**时才暴露，页面不报错、文字也存在：
+  //   1. 弹窗传了 padding={0}，标题被 endContent 的 -8px 补偿顶到弹窗外面；
+  //   2. 色板放进了 Button 的 16×16 `icon` 插槽，溢出压住「栖序雅致」；
+  //   3. 没套 InternationalizationProvider，日期控件是英文占位符。
+  // 前两条靠几何断言，第三条直接读 placeholder。
+  if (PID && (!only.length || only.some((o) => '归档弹窗'.includes(o) || 'archive'.includes(o)))) {
+    const problems = []
+    const dlg = { page: '归档弹窗', name: '归档弹窗', path: `/projects/${PID}/archive`, problems }
+    await page
+      .goto(`${BASE}/projects/${PID}/archive`, { waitUntil: 'load', timeout: 15000 })
+      .catch(() => {})
+    await sleep(2500)
+
+    const trigger = page.locator('[aria-label*="交付方案模板"]').first()
+    if (!(await trigger.count())) {
+      problems.push('找不到「交付方案模板」按钮')
+    } else {
+      // 触发按钮：文字不能被色板盖住
+      const overlap = await trigger.evaluate((el) => {
+        const swatch = el.querySelector('.size-3')?.parentElement
+        if (!swatch) return null
+        // 只认**叶子**文字节点：外层包裹 span 也含中文，拿它会算出假重叠
+        const label = [...el.querySelectorAll('span')].find(
+          (s) => /[一-龥]/.test(s.textContent || '') && !s.contains(swatch),
+        )
+        if (!label) return null
+        const a = label.getBoundingClientRect()
+        const b = swatch.getBoundingClientRect()
+        // 正常是色板在左、文字在右，留一个 gap；文字左边跑到色板右边之内就是被压住了
+        return Math.round(a.left - b.right)
+      })
+      if (overlap !== null && overlap < 0) {
+        problems.push(`色板盖住了按钮文字（重叠 ${-overlap}px）`)
+      }
+
+      await trigger.click()
+      await sleep(1500)
+      const geo = await page.evaluate(() => {
+        const d = document.querySelector('dialog[open]')
+        if (!d) return { found: false }
+        const r = d.getBoundingClientRect()
+        const h2 = d.querySelector('h2')?.getBoundingClientRect()
+        return {
+          found: true,
+          dialog: [r.left, r.top, r.right, r.bottom],
+          title: h2 ? [h2.left, h2.top, h2.right, h2.bottom] : null,
+          placeholders: [...d.ownerDocument.querySelectorAll('input')]
+            .map((i) => i.placeholder)
+            .filter(Boolean),
+        }
+      })
+      if (!geo.found) {
+        problems.push('弹窗没有打开')
+      } else if (!geo.title) {
+        problems.push('弹窗缺少标题')
+      } else {
+        const [dl, dt, dr] = geo.dialog
+        const [tl, tt, tr] = geo.title
+        if (tt < dt - 0.5 || tl < dl - 0.5 || tr > dr + 0.5) {
+          problems.push(
+            `标题跑出弹窗（标题 ${tl.toFixed(0)},${tt.toFixed(0)}，弹窗 ${dl.toFixed(0)},${dt.toFixed(0)}）`,
+          )
+        }
+      }
+      // 英文占位符只在中文产品里算缺陷
+      const english = (geo.placeholders || []).filter((p) => /Select a (date|time)/i.test(p))
+      if (english.length) problems.push(`组件文案没有本地化：${english.join('、')}`)
+      await page.keyboard.press('Escape').catch(() => {})
+      await sleep(400)
+    }
+
+    if (problems.length) {
+      console.log(`  ❌ 归档弹窗       ${problems.length} 个问题`)
+      for (const p of problems) fail('归档弹窗', '断言', p)
+    } else {
+      console.log(`  ✅ 归档弹窗       标题在框内 · 无重叠 · 文案已中文化`)
+    }
+    results.push(dlg)
+  }
+
   await browser.close()
 
   const bad = results.filter((r) => r.problems.length)
