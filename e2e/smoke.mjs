@@ -348,6 +348,55 @@ async function main() {
     results.push(dlg)
   }
 
+  // ── 点位图侧边栏：设备卡片必须各画各的图标 ────────────────
+  // 2026-11-14 用户报「点位图侧边栏的图标去哪啦」：P1 Button 原生化时把
+  // 每张卡的图标都写成了 `icon={<PointMarker type={null} />}`，25 张卡全画成
+  // 同一个通用「其他」标记。页面不报错、文字也在，只有数图标种类才发现。
+  // 断言：卡片数量 ≥ 5 时，图片 src 的**种类**必须与卡片数相当（占位图只有 1 种）。
+  if (
+    PID &&
+    (!only.length || only.some((o) => '点位图图标'.includes(o) || 'point-map'.includes(o)))
+  ) {
+    const problems = []
+    await page
+      .goto(`${BASE}/projects/${PID}/point-map`, { waitUntil: 'load', timeout: 20000 })
+      .catch(() => {})
+    await sleep(5000)
+    const info = await page
+      .evaluate(() => {
+        const aside = document.querySelector('.point-map-aside')
+        if (!aside) return { found: false }
+        const cards = [...aside.querySelectorAll('button[draggable="true"]')]
+        const srcs = cards.map((c) => c.querySelector('img')?.getAttribute('src') ?? null)
+        return {
+          found: true,
+          cards: cards.length,
+          missing: srcs.filter((s) => !s).length,
+          distinct: new Set(srcs.filter(Boolean)).size,
+          overflow: cards.filter((c) => c.scrollWidth > c.clientWidth + 1).length,
+        }
+      })
+      .catch(() => ({ found: false }))
+    if (!info.found) {
+      problems.push('找不到点位图右侧设备面板')
+    } else if (info.cards < 5) {
+      problems.push(`设备卡片只有 ${info.cards} 张，可能没渲染`)
+    } else {
+      if (info.missing) problems.push(`${info.missing} 张卡片没有图标`)
+      if (info.distinct < info.cards / 2) {
+        problems.push(`图标退化了：${info.cards} 张卡片只有 ${info.distinct} 种图`)
+      }
+      if (info.overflow) problems.push(`${info.overflow} 张卡片的文字溢出卡片`)
+    }
+    if (problems.length) {
+      console.log(`  ❌ 点位图图标     ${problems.length} 个问题`)
+      for (const p of problems) fail('点位图图标', '断言', p)
+    } else {
+      console.log(`  ✅ 点位图图标     ${info.cards} 张卡片 · ${info.distinct} 种图标 · 无溢出`)
+    }
+    results.push({ name: '点位图图标', path: `/projects/${PID}/point-map`, problems })
+  }
+
   await browser.close()
 
   const bad = results.filter((r) => r.problems.length)
