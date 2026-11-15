@@ -29,6 +29,7 @@ vi.mock('next/image', () => ({
 import { resolveDisplayProfile } from '@/lib/display-profile'
 import type { ProjectDocsData } from '@/lib/project-docs'
 import type { ManagedScene } from '@/lib/scenes'
+import { deckPages } from './index'
 import { buildDeck, codeRange, installNote, roomScenes, yuanShort } from './model'
 import { buildNetworkCamera } from './network-camera'
 import { CoverPage } from './pages/cover'
@@ -260,6 +261,68 @@ describe('投资明细分页：最后一页留出不含项色块', () => {
       expect(flat, `n=${n}`).toEqual(list(n))
     }
   })
+
+  /**
+   * 真装配取证：不手写 `paginateRows(..., 12, 9)`，而是走 deckPages 渲染整套方案。
+   * 行数用「N 行报价明细」精确控制，让 full / last 两个参数各自可观测：
+   * - 20 行：base [12,8]；改成 (6,9) → 4 页；改成 (12,4) → 3 页；
+   * - 13 行：base [12,1]；改成 (12,15) → 1 页。
+   * 页数、页眉「（n/m）」或行落点任何一处变了，这里必须红。
+   */
+  const quoteDocs = (n: number) =>
+    docs({
+      points: [],
+      rooms: [],
+      total: 0,
+      quote: {
+        id: 'q1',
+        title: '全屋智能方案',
+        status: 'accepted',
+        total: n * 100,
+        discount: 0,
+        fees: [],
+        items: Array.from({ length: n }, (_, i) => ({
+          id: `li-${i}`,
+          product: null,
+          deviceType: 'downlight',
+          name: `灯具${i + 1}`,
+          sku: `SKU-${i + 1}`,
+          unit: '只',
+          price: 100,
+          quantity: 1,
+        })),
+      },
+    })
+
+  const investPagesOf = (d: ProjectDocsData) =>
+    deckPages(d, DECK_THEMES.qixu, { markers: 'symbol', insights: true, sections: ['investment'] })
+      .map((page) => renderToStaticMarkup(page))
+      .filter((html) => /data-figma-frame="([^"]*)"/.exec(html)?.[1]?.includes('07 投资明细'))
+
+  it('装配层 20 行：中间页满 12 行、末页 8 行，页眉印（1/2）（2/2）', () => {
+    const invest = investPagesOf(quoteDocs(20))
+
+    expect(invest).toHaveLength(2)
+    expect(invest[0]).toContain('07 投资明细（1/2）')
+    expect(invest[0]).toContain('Q12')
+    expect(invest[0]).not.toContain('Q13')
+    expect(invest[1]).toContain('07 投资明细（2/2）')
+    expect(invest[1]).toContain('Q13')
+    expect(invest[1]).toContain('Q20')
+    // 不含项色块只印在末页
+    expect(invest[0]).not.toContain('不含项目 / 业主另配')
+    expect(invest[1]).toContain('不含项目 / 业主另配')
+  })
+
+  it('装配层 13 行：末页 1 行也是两页（不会因为只多 1 行就挤进一页）', () => {
+    const invest = investPagesOf(quoteDocs(13))
+
+    expect(invest).toHaveLength(2)
+    expect(invest[0]).toContain('Q12')
+    expect(invest[0]).not.toContain('Q13')
+    expect(invest[1]).toContain('07 投资明细（2/2）')
+    expect(invest[1]).toContain('Q13')
+  })
 })
 
 describe('其余空间分页', () => {
@@ -487,8 +550,9 @@ describe('封面：客户第一眼看到的预算必须正确', () => {
     return { ...ctx, theme: DECK_THEMES[themeId] }
   }
 
-  it('栖序 band 封面版式本身不印预算（只有品牌 / 标题 / 项目信息）', () => {
-    // 这是真实行为：band 版式没有金额栏。断言它不出现，避免有人误以为改了排版。
+  it('当前实现：栖序 band 封面版式不印预算（只有品牌 / 标题 / 项目信息）', () => {
+    // 当前实现的排版里 band 版式没有金额栏。这是产品口径问题（band 是否该印预算），
+    // 不是「正确行为」的定论；这里只记录现状，断言它不出现，避免有人误以为改了排版。
     const html = renderToStaticMarkup(
       createElement(CoverPage, { ctx: ctxWithAmount(12345.6, 'qixu'), no: 1, total: 8 }),
     )
