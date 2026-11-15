@@ -20,6 +20,7 @@ import type { Project, Quote } from '@/payload-types'
 import { getProject, getProjectDeals } from '../project-data'
 import { CreateContractPanel, type ContractValues, type QuoteOption } from './contract-editor'
 import { ContractActions, ContractSectionEdit } from './contract-preview'
+import { WORKBENCH_SECTION_HEADING_CLASS } from '@/components/page-header'
 
 /**
  * 合同：每个项目一份，由报价生成。默认显示与导出完全一致的合同预览（和打印页共用 ContractDocument），
@@ -40,9 +41,9 @@ export default async function ProjectContractPage({ params }: { params: Promise<
   if (!contract) {
     const defaultQuote = options.find((q) => q.status === 'accepted') ?? options[0]
     return (
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
         <header>
-          <h2 className="text-xl font-semibold tracking-tight">合同</h2>
+          <h2 className={WORKBENCH_SECTION_HEADING_CLASS}>合同</h2>
         </header>
         {readOnly ? (
           <EmptyState
@@ -142,11 +143,11 @@ export default async function ProjectContractPage({ params }: { params: Promise<
         : null
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-xl font-semibold tracking-tight">合同</h2>
+            <h2 className={WORKBENCH_SECTION_HEADING_CLASS}>合同</h2>
             <Badge
               variant={signed ? 'success' : 'neutral'}
               label={contractStatusLabel(contract.status)}

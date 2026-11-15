@@ -15,7 +15,7 @@ export default async function CustomerUsageReportsPage() {
   // 报告包含全体客户的联系方式与项目数据：只对平台运营人员开放，普通成员不加载任何数据
   if (!(await isPlatformOperator(user))) {
     return (
-      <section className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+      <section className="mx-auto flex w-full max-w-5xl flex-col gap-5">
         <PageHeader
           title="客户使用与运维诊断报告"
           description="汇总全体客户的使用数据，仅对平台运营人员开放"
@@ -30,7 +30,7 @@ export default async function CustomerUsageReportsPage() {
   const report = await loadCustomerUsageReport()
 
   return (
-    <section className="mx-auto flex w-full max-w-6xl flex-col gap-5">
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-5">
       <PageHeader
         title="客户使用与运维诊断报告"
         description="实时汇总客户项目转化漏斗、户型图 CAD 识别复盘、AI 模型 Auto 路由分布与异常排障日志"

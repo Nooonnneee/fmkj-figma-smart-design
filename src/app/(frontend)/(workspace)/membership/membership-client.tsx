@@ -104,7 +104,7 @@ export function MembershipClient({
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-5">
       <PageHeader
         title="会员与积分"
         description="平台所有功能统一按 AI 积分扣除，不再区分会员等级。可用兑换码充值积分，完成绑定与成长任务也可领取积分。"

@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { ArrowLeft, Palette } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
+import { PageHeader, PageShell } from '@/components/page-header'
 import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
 import { STYLE_TEMPLATES } from '@/lib/style-templates'
@@ -20,41 +21,41 @@ export default async function StyleTransferPage() {
   const flags = await getPluginFlags(user.id)
   if (!flags['ai-copilot']) {
     return (
-      <div className="mx-auto w-full max-w-xl">
-        <EmptyState
-          icon={<Palette className="size-5" />}
-          title="「AI 对话侧栏（高级）」插件已关闭"
-          description="户型图风格化依赖 AI 插件，请先在插件中心开启。"
-          action={
-            <Button
-              size="sm"
-              variant="secondary"
-              href="/capabilities/ai-copilot"
-              label="去插件页开启"
-            />
-          }
-        />
-      </div>
+      <PageShell>
+        <PageHeader title="户型图风格化" />
+        <section className="flex w-full flex-col items-center gap-3 rounded-xl border border-dashed px-6 py-14">
+          <EmptyState
+            icon={<Palette className="size-5" />}
+            title="「AI 对话侧栏（高级）」插件已关闭"
+            description="户型图风格化依赖 AI 插件，请先在插件中心开启。"
+            action={
+              <Button
+                size="sm"
+                variant="secondary"
+                href="/capabilities/ai-copilot"
+                label="去插件页开启"
+              />
+            }
+          />
+        </section>
+      </PageShell>
     )
   }
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium tracking-[0.18em] text-primary">AI FLOOR PLAN</p>
-          <h1 className="mt-1 text-2xl font-semibold">户型图风格化</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            上传户型图，选择风格模板，保留墙体布局生成家具彩平图。
-          </p>
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          href="/ai/image"
-          icon={<ArrowLeft />}
-          label="返回 AI 生图"
-        />
-      </div>
+    <PageShell>
+      <PageHeader
+        title="户型图风格化"
+        description="上传户型图，选择风格模板，保留墙体布局生成家具彩平图。"
+        actions={
+          <Button
+            variant="ghost"
+            size="sm"
+            href="/ai/image"
+            icon={<ArrowLeft />}
+            label="返回 AI 生图"
+          />
+        }
+      />
       <StyleTransfer
         configured={styleTransferConfigured()}
         cost={STYLE_TRANSFER_COST}
@@ -65,6 +66,6 @@ export default async function StyleTransferPage() {
           file,
         }))}
       />
-    </div>
+    </PageShell>
   )
 }

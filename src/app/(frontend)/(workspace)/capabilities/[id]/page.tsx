@@ -68,7 +68,7 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
   }))
 
   return (
-    <section className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-5">
       <div className="flex items-center justify-between gap-2">
         <Button
           variant="ghost"

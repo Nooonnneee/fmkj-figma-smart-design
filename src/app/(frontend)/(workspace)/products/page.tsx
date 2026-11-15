@@ -233,7 +233,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-5">
       <PageHeader
         title="产品库"
         description={

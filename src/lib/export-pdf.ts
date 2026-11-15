@@ -407,6 +407,14 @@ async function prepareNodeForExport(el: HTMLElement): Promise<() => void> {
     cur = cur.parentElement
   }
 
+  // 手机窄屏预览时纵向长文是「铺满屏宽重排」的（styles.css 的窄屏规则）：
+  // 宽度、页边距、表头折行都跟 A4 不一样。导出期间给根节点打 data-exporting，
+  // 让那些窄屏规则全部失效，再按 A4 原始尺寸渲染，保证导出结果与桌面端一致。
+  if (el.dataset.exportPage === 'flow') {
+    el.setAttribute('data-exporting', '')
+    restores.push(() => el.removeAttribute('data-exporting'))
+  }
+
   // 若是纵向长文档（flow）但受外层窄屏限制宽度不足 A4（794px），临时固定为 210mm 标准宽度
   if (el.dataset.exportPage === 'flow' && el.offsetWidth < 740) {
     const prevW = el.style.width

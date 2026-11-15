@@ -808,13 +808,49 @@ html:has([data-landing]) {
     transform: translateY(6px);
   }
 }
-/* 手机与小程序窄屏预览打印页时，按屏幕宽度等比缩放纸张（导出 PDF / 图片时通过行内 zoom:1 还原 1:1 高清尺寸） */
+/* 手机与小程序窄屏预览打印页时：定宽画布按屏幕宽度等比缩放
+   （导出 PDF / 图片时通过行内 zoom:1 还原 1:1 高清尺寸）。 */
 @media screen and (max-width: 1460px) {
-  article[data-export-page='flow'] {
-    zoom: var(--paper-zoom, 1);
-  }
   section[data-export-page]:not([data-figma-frame]) {
     zoom: var(--sheet-zoom, 1);
+  }
+}
+
+/*
+ * 纵向长文（报价单 / 合同 / 交底清单）在窄屏上**重排**，不缩放。
+ *
+ * 原来这里也走 `zoom: var(--paper-zoom)`：390 宽实测 0.4710，A4 纸 374px 宽，
+ * 正文 11.5px × 0.47 ≈ 5.4px 视觉字号 —— 「手机上看报价单给业主看」这个最常用的
+ * 场景根本读不清（2026-11-15 视觉审计）。
+ *
+ * 重排后：纸张铺满屏宽、页边距收窄到 12px、表头允许换行、字号保持原尺寸。
+ *
+ * 导出 PDF 时 `export-pdf.ts` 会把 zoom 还原为 1、把宽度临时固定为 210mm，并给根节点
+ * 打上 `data-exporting` —— 下面每条规则都用 `:not([data-exporting])` 排除该状态，
+ * 所以导出结果仍是 A4 原始页边距（14mm），和桌面端导出完全一致。不要在导出期间依赖这些规则。
+ *
+ * 断点取 A4 纸宽 794 + 两侧留白 16 = 810：比这更宽的屏幕（1024 平板、桌面）保持
+ * 原来 794px 的纸张预览不变，只有真正放不下 A4 手机的屏幕才重排。
+ */
+@media screen and (max-width: 809px) {
+  article[data-export-page='flow']:not([data-exporting]) {
+    width: 100%;
+    min-width: 0;
+    padding-left: 12px;
+    padding-right: 12px;
+    /* 纸张边框与投影保留，但左右不留白边，把宽度全部让给正文 */
+    margin-left: 0;
+    margin-right: 0;
+  }
+  /* 表格本身已是 w-full；关键是表头文字允许折行，否则「单价 / 金额」这类短列宽会把表撑出屏幕 */
+  article[data-export-page='flow']:not([data-exporting]) th {
+    white-space: normal;
+  }
+  /* 单元格左右内距收窄，给正文多留 16–24px */
+  article[data-export-page='flow']:not([data-exporting]) td,
+  article[data-export-page='flow']:not([data-exporting]) th {
+    padding-left: 4px;
+    padding-right: 4px;
   }
 }
 
