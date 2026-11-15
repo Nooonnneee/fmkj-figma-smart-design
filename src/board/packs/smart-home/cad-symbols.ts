@@ -200,15 +200,26 @@ type CadShapeFamily = 'round-head' | 'wall-slim' | 'spot-head' | 'semi-wall' | '
 /**
  * 登记门槛（全量 157 个 variant + 34 个设备类型逐一扫过）：
  *
- * 1. 图例里有圆弧 —— 具体看该设备类型实际用的 CAD 图元（`CAD[SymbolKey]`）：
+ * 1. 图例里有圆弧 —— 看该设备类型**实际渲染用的**图元（`LINEAR_CAD` / `CAD`）：
  *    只有 `circle` 和 `A rx ry` 两种；画成矩形 / 直线的图例拉长后仍是矩形 / 直线，
- *    语义没丢，不登记（面板灯、灯带、线性吊灯、方形筒灯等）。
+ *    语义没丢，不登记（面板灯、灯带、线性吊灯等）。
+ *    不能只看 `CAD[SymbolKey]`：`CAD['track-light']` / `CAD['other-light']` 本身有 circle，
+ *    但 track / magnetic-track / magnetic-light / t5 实际走 `LINEAR_CAD`（纯直线，无圆弧）。
  * 2. 落图框偏离画幅超过 10%：`|boxW/boxH ÷ viewBoxW/viewBoxH − 1| > 0.10`。
  *    低于 10% 的椭圆看不出区别，不值得为它另画一套（筒灯 1.2%–1.9%、吊灯 0.5%）。
- * 3. 圆弧半径小于落图框短边 15% 时，即使框偏离 >10% 视觉上也看不出来，同样不登记
- *    （当前数据里没有族落在这个区间，留作规则）。
  *
- * 按这个门槛，之前漏登记的是 6 个族 / 33 个 variant（椭圆化 = 落图框 w/h ÷ 画幅 w/h − 1）：
+ * 按这两个门槛，未登记的共 18 个族：
+ * - 11 个无圆弧：ceiling-panel、linear-pendant、multi-pendant-linear、pendant、
+ *   chandelier、multi-pendant-round、track、magnetic-track、magnetic-light、t5、led-strip；
+ * - 7 个有圆弧但偏离 < 10%：downlight-recessed 1.93%、downlight-recessed-square 0%、
+ *   downlight-surface 1.23%、downlight-surface-square 0%、ceiling-round 0.82%、
+ *   ceiling-square 0%、floor-lamp 0%。
+ *
+ * 方形筒灯（downlight-recessed-square / downlight-surface-square）用的是
+ * `CAD['downlight']` 的「圆 + 十字」，不是矩形 / 直线图例；它们不登记是因为目标框
+ * 1×1、偏离 0%，而不是「矩形拉长语义不变」。
+ *
+ * 已登记的族里有 6 个是补登记的漏网（椭圆化 = 落图框 w/h ÷ 画幅 w/h − 1）：
  *   spot-recessed(-17.3%)、spot-recessed-square(-24.1%)、spot-surface(-16.1%)、
  *   spot-surface-square(-16.1%)、wall-round(-15.9%)、recessed-wall(+16.4% ~ +55.5%)。
  * 其中 recessed-wall 用的是墙上半圆图例（不是矩形），所以按圆弧族处理。

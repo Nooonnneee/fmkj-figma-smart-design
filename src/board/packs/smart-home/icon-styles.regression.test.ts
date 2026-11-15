@@ -381,6 +381,11 @@ describe('A2. 共享符号键的灯具按「这个点位」选 CAD 画面（回�
   it('已登记族的描边落图后与 32×32 图例同宽：symbolSize=28 时都是 1.75px', () => {
     // 旧写法 CAD_STROKE_WIDTH=2 是模板单位：32×32 图例落图 1.75px，100 宽的按画幅
     // 图例只有 0.17–0.56px。新写法按 max(W,H)/16 反推，落图后与普通图标同宽。
+    //
+    // 口径更正：82b74fc 提交说明里的「画灯 90×16 降到 1.0px 后 1:1 仍是同样的块」
+    // 不准确。10x 实测 stroke 6.25 → 暗像素 18/140，stroke 1.0 → 9/140：暗像素减半、
+    // 更淡，不是同样的块。1:1 尺度下两者都只有 5px 高，肉眼都呈块状，但线宽确实在起作用；
+    // 「画幅只占 90 宽画幅的 18%」是主因，与线宽是两个因素，不能据此说线宽无效。
     for (const c of arcCases) {
       const art = lookOf(c.o, { iconStyle: 'cad' }).art!
       const svg = decodeURIComponent(art.src)
