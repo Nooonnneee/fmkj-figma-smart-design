@@ -170,6 +170,11 @@ export function lookOf(o: Pick<SymbolObj, 'symbolId' | 'data'>, opts?: LookOptio
       : (sketchArt(t.value) ?? sketchArt(t.symbol)),
     productImage: opts?.productImage ?? null,
     linear: lineArt,
+    // 非方形比例的形状族让 CAD 按真实画幅另画图例（不然圆灯罩会被拉成椭圆）
+    cadRatio:
+      style === 'cad' && isVariant && cadGeom && (cadGeom.gw !== 1 || cadGeom.gh !== 1)
+        ? { familyId: v!.family.id, gw: cadGeom.gw, gh: cadGeom.gh }
+        : undefined,
   }
   const styled = applyIconArt(base, resolveIconArt(style, input))
   // 灯光款式在 CAD / 手绘 / 照片下也保留线形灯具的长度示意
@@ -192,17 +197,25 @@ function defaultGeomOf(
 
 /**
  * CAD 风格该用的主体比例（全代码库唯一真值来源）：
- * - 灯光款式且 sizeCm 的 [宽, 深] 两维都已知 → 真实比例（gw = 1，gh = 深 / 宽）；
+ * - 灯光款式且 sizeCm 的 [宽, 深] 两维都已知 → 真实比例（深 / 宽）；
  * - 其余情况（只有宽、sizeCm 为 null、非灯光款式）→ 默认平面图标的比例。
  * 非灯光款式（socket / camera ……）没有真实尺寸，默认图标本身是方框的仍然返回 null，
  * 几何保持方形（与今天一致）。
+ *
+ * 比例必须归一化到「长边 = 1」（max(gw, gh) = 1）：symbolGeom 的固定显示尺寸分支是
+ * `w = L * gw; h = L * gh`，隐含 gw / gh 不超过 1。竖长设备（13×28 → 深/宽 = 2.15）
+ * 若不归一，W 会用 28 去乘 2.15，在未标定的图纸上比其他符号高 2.5 倍。
  */
 function cadGeomOf(
   variant: LightingVariant | undefined,
   defaultGeom: { gw: number; gh: number } | null,
 ): { gw: number; gh: number } | null {
   const size = variant?.sizeCm
-  if (size && size[1] != null && size[0] > 0) return { gw: 1, gh: size[1] / size[0] }
+  if (size && size[1] != null && size[0] > 0) {
+    const r = size[1] / size[0]
+    const m = Math.max(1, r)
+    return { gw: 1 / m, gh: r / m }
+  }
   if (!variant) return defaultGeom && isLineGeom(defaultGeom) ? defaultGeom : null
   return defaultGeom
 }

@@ -184,6 +184,38 @@ const LINEAR_CAD: Record<'track-light' | 'light-strip' | 'other-light', CadShape
 
 const LINEAR_TABLE = LINEAR_CAD as Record<string, CadShape[]>
 
+/**
+ * 宽高比明显不是方形的灯具（192×48 的弧形落地灯、13×28 的细杆壁灯、8.7×28 的轨道射灯头）
+ * 的 CAD 画法：按「目标画幅」另画一套，不把 32×32 的方图例拉伸。
+ *
+ * 画布落图用 preserveAspectRatio="none"，把方图例塞进 4:1 的框会把圆形灯罩压成飞碟、
+ * 把半圆压成蛋形。真实 CAD 图例是按设备实际形状画的：矩形就画矩形、圆就画圆 ——
+ * 所以这里按形状族生成图形，模板坐标系宽度固定 100、高度 = 100 × (gh / gw)，
+ * 即「画幅本身就已经是目标比例」，拉伸时形状不变形。
+ *
+ * 按形状族登记，而不是逐个 variant：同一形状族的多个尺寸共用一套画法。
+ */
+type CadShapeFamily = 'round-head' | 'wall-slim' | 'spot-head' | 'semi-wall'
+
+/**
+ * 只登记「图形里有圆弧、且目标画幅明显偏离 1」的族 —— 只有这些放进非方形框里
+ * 才会真的变成椭圆。矩形类（面板灯 / 灯带 / 线性吊灯）拉长后仍是矩形，语义没丢，
+ * 继续用原来的方形图例（不为了统一而把它们的细节重画掉）。
+ */
+const SHAPE_FAMILY: Record<string, CadShapeFamily> = {
+  // 弧形落地灯 4:1：圆形灯罩，拉长会变成飞碟
+  'floor-arc-lamp': 'round-head',
+  // 竖长壁灯：灯罩是半圆，拉长会变成蛋形
+  'wall-slim': 'wall-slim',
+  'swing-arm': 'wall-slim',
+  vanity: 'wall-slim',
+  // 横向壁灯：同样是半圆灯罩
+  'wall-half': 'semi-wall',
+  picture: 'semi-wall',
+  // 轨道射灯头 ~1:3.2：圆射灯头，拉长会变成竖向椭圆
+  'track-head': 'spot-head',
+}
+
 const TABLE = CAD as Record<string, CadShape[]>
 
 /** 取一个符号的 CAD 矢量定义；未知键返回 null（调用方退回默认图标） */
@@ -234,6 +266,83 @@ export function cadSymbolBodyForKey(key: SymbolKey | string, switchKeys?: number
 export function cadLinearBody(key: SymbolKey | string): string {
   const shapes = LINEAR_TABLE[key]
   return shapes ? renderShapes(shapes) : ''
+}
+
+/**
+ * 按目标画幅比例画一个形状正确的 CAD 图例（template 坐标 100 宽 × (100×gh/gw) 高）。
+ * 返回 null 表示这个族没有专用画法，调用方回退方形图例。
+ *
+ * 画法要点：所有曲线在模板坐标里就是正圆 / 正圆弧（`circle` 或 rx === ry 的 `A`），
+ * 而模板画幅本身已经是目标比例，所以落到目标框（等比缩放）后圆仍然是圆。
+ * 唯一会被拉长的是直线 —— 那是灯体该有的长度。
+ */
+function proportionedBody(family: CadShapeFamily, gw: number, gh: number): CadShape[] | null {
+  const W = 100
+  const H = (W * gh) / gw
+  // 圆半径按短边算，保证整圆不会超出画幅
+  const r = Math.min(W, H) * 0.26
+  switch (family) {
+    case 'round-head': {
+      // 弧形落地灯：圆形灯罩 + 落地支杆 + 底座横线
+      const cx = W / 2
+      const cy = Math.min(H * 0.5, W * 0.5)
+      return [circle(cx, cy, r), line(cx, cy + r, cx, H - 6), line(W * 0.2, H - 6, W * 0.8, H - 6)]
+    }
+    case 'wall-slim': {
+      // 细杆壁灯：贴墙竖线 + 半圆灯罩（半径横竖一致，落图后仍是半圆）
+      const R = Math.min(W * 0.3, H * 0.12)
+      const wallX = W * 0.16
+      const top = H * 0.16
+      return [
+        line(wallX, H * 0.04, wallX, H * 0.96),
+        // 以墙上 (wallX, top+R) 为圆心、R 为半径的右半圆：从顶点画弧到低点再闭合
+        path(`M${wallX} ${top} A${R} ${R} 0 0 1 ${wallX} ${top + 2 * R} Z`),
+        line(wallX + R, top + R, W * 0.92, top + R),
+        line(W * 0.92, top + R, W * 0.92, H * 0.9),
+      ]
+    }
+    case 'spot-head': {
+      // 轨道射灯头：正圆射灯头 + 上方短轨道
+      const cx = W / 2
+      const cy = H * 0.62
+      return [
+        circle(cx, cy, r),
+        line(cx, H * 0.16, cx, cy - r),
+        line(W * 0.2, H * 0.16, W * 0.8, H * 0.16),
+      ]
+    }
+    case 'semi-wall': {
+      // 半圆壁灯：贴墙竖线 + 右半圆灯罩（半径横竖一致）
+      const R = Math.min(W, H) * 0.46
+      const wallX = W * 0.1
+      const cy = H / 2
+      return [
+        line(wallX, H * 0.04, wallX, H * 0.96),
+        path(`M${wallX} ${cy - R} A${R} ${R} 0 0 1 ${wallX} ${cy + R} Z`),
+      ]
+    }
+    default:
+      return null
+  }
+}
+
+/**
+ * 由宽高比找形状族。`family` 是灯光款式所属的 family.id（look.ts 传下来），
+ * 只有登记过的族才会出按比例画的图例。
+ */
+export function cadProportionedBody(
+  familyId: string,
+  gw: number,
+  gh: number,
+): { body: string; viewBox: string } | null {
+  const family = SHAPE_FAMILY[familyId]
+  if (!family) return null
+  const shapes = proportionedBody(family, gw, gh)
+  if (!shapes) return null
+  const W = 100
+  const H = (W * gh) / gw
+  const fmt = (n: number) => +n.toFixed(3)
+  return { body: renderShapes(shapes), viewBox: `0 0 ${fmt(W)} ${fmt(H)}` }
 }
 
 /**

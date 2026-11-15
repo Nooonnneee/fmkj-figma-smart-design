@@ -20,7 +20,7 @@ import type { SymbolArt, SymbolLook } from '@/board/core/symbols'
 import type { IconStyle } from '@/board/core/types'
 import type { SymbolKey } from '@/lib/device-types'
 
-import { cadArtFor } from './cad-symbols'
+import { cadArtFor, cadProportionedBody } from './cad-symbols'
 import { SYMBOL_ASSET_PAD, SYMBOL_ASSET_VERSION, SYMBOL_ASSETS } from './symbols.generated'
 
 export type { IconStyle }
@@ -97,6 +97,12 @@ export type IconArtInput = {
    * LED 灯带共用，按键选细长矢量会把它们画成一条线。
    */
   linear?: boolean
+  /**
+   * CAD 的目标画幅比例 + 灯光款式族：非方形比例的形状族（弧形落地灯、细杆壁灯、
+   * 轨道射灯头……）按真实形状另画一套图例，而不是把 32×32 的方图例拉伸成椭圆。
+   * 由 lookOf 的 cadGeomOf 算好传进来，保证几何与图形是同一个真值来源。
+   */
+  cadRatio?: { familyId: string; gw: number; gh: number }
 }
 
 /**
@@ -110,7 +116,11 @@ export function resolveIconArt(style: IconStyle | undefined, input: IconArtInput
       return art ? { kind: 'image', art } : imageOrNull(input.fallback)
     }
     case 'cad': {
-      const art = cadArtFor(input.symbol, input.switchKeys, input.linear)
+      // 非方形比例的形状族（弧形落地灯 / 细杆壁灯 / 轨道射灯头）：按目标画幅另画一套，
+      // 圆还是圆；其余族沿用 32×32 的方形图例（线性灯具用 160×6）。
+      const ratio = input.cadRatio
+      const proportioned = ratio ? cadProportionedBody(ratio.familyId, ratio.gw, ratio.gh) : null
+      const art = proportioned ?? cadArtFor(input.symbol, input.switchKeys, input.linear)
       if (!art) return imageOrNull(input.fallback)
       return {
         kind: 'vector',

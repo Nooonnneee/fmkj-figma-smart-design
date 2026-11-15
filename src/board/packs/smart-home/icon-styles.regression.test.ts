@@ -58,6 +58,23 @@ const wh = (o: SymbolObj, style: ViewSettings['iconStyle'], mmPerUnit = 1) => {
   return { w: +g.w.toFixed(1), h: +g.h.toFixed(1) }
 }
 
+/**
+ * CAD 该用的主体比例（测试侧的期望值，与 look.ts 的 cadGeomOf 同一口径）：
+ * - sizeCm 两维已知 → 真实比例，并归一化到长边 = 1（symbolGeom 的固定尺寸分支隐含这个前提）；
+ * - 否则 → 默认平面图标的比例。
+ */
+const expectedCadGeom = (
+  size: [number, number | null] | null,
+  plain: { gw: number; gh: number },
+) => {
+  if (size && size[1] != null && size[0] > 0) {
+    const r = size[1] / size[0]
+    const m = Math.max(1, r)
+    return { gw: 1 / m, gh: r / m }
+  }
+  return { gw: plain.gw, gh: plain.gh }
+}
+
 describe('A. 线形灯具在 CAD / 实拍下保持细长比例', () => {
   // 复核给出的基准：2 米轨道灯曾经被画成 2000×2000 的大方块
   const cases = [
@@ -169,6 +186,57 @@ describe('A2. 共享符号键的灯具按「这个点位」选 CAD 画面（回�
     expect(wh(o, 'cad')).toEqual(wh(o, 'default'))
   })
 
+  it('未标定图纸上，所有竖长设备的 CAD 长边 == symbolSize（不是被放大 2.5 倍）', () => {
+    // 回归：cadGeomOf 曾返回 { gw: 1, gh: 深/宽 }，而 symbolGeom 固定尺寸分支是
+    // `w = L * gw; h = L * gh`，隐含 gw/gh ≤ 1。竖长设备（深/宽 = 2.15）于是把长边
+    // 乘到 60–71，比其它符号高 2.5 倍。修复方式是把比例归一化到长边 = 1。
+    const vertical = LIGHTING.flatMap((f) =>
+      f.variants
+        .filter((v) => v.sizeCm && v.sizeCm[1] != null && v.sizeCm[1] > v.sizeCm[0])
+        .map((v) => ({
+          name: `${f.name} ${v.label}`,
+          o: point(f.deviceType, v.id, v.sizeCm, false),
+        })),
+    )
+    expect(vertical.length, '没有竖长款式，断言形同虚设').toBeGreaterThan(0)
+    for (const c of vertical) {
+      const g = geomOf(c.o, 'cad')
+      // 未标定（mmPerUnit = 1 但 real = false）走固定尺寸分支：长边必须是 symbolSize
+      expect(+Math.max(g.w, g.h).toFixed(4), `${c.name} CAD 长边`).toBe(28)
+      expect(g.h, `${c.name} 应为竖长`).toBeGreaterThan(g.w)
+      const [wc, hc] = c.o.sizeCm as [number, number]
+      expect(g.h / g.w, c.name).toBeCloseTo(hc / wc, 9)
+    }
+  })
+
+  it('CAD 矢量按目标画幅画：圆灯罩在非方形框里仍是正圆', () => {
+    // 回归：32×32 的方图例用 preserveAspectRatio="none" 拉进 4:1 / 1:2.15 的框后，
+    // 圆灯罩变成椭圆、半圆变成蛋形。修复方式是按形状族出一套画幅本就等于目标比例的图例。
+    const cases = [
+      {
+        o: point('other-light', 'lt-floor-arc-lamp-192x48cm-76x19', [192, 48], true),
+        family: 'floor-arc-lamp',
+      },
+      { o: point('wall-light', 'lt-wall-light-13x28cm-5x11', [13, 28], true), family: 'wall-slim' },
+      { o: point('wall-light', 'lt-wall-light-20x10cm-8x4', [20, 10], true), family: 'wall-half' },
+      { o: point('track-light', 'lt-track-light'), family: 'track-head' },
+    ]
+    for (const c of cases) {
+      const art = lookOf(c.o, { iconStyle: 'cad' }).art!
+      const svg = decodeURIComponent(art.src)
+      const vb = svg.match(/viewBox="([^"]+)"/)?.[1]
+      expect(vb, c.family).toBeTruthy()
+      const [, , vw, vh] = vb!.split(/\s+/).map(Number)
+      // 画幅本身就是目标比例（不是 32×32 的方图例）
+      expect(vh / vw, `${c.family} 画幅应与几何同比`).toBeCloseTo(art.gh / art.gw, 3)
+      // 所有圆弧的横竖半径相等（circle 或 A 指令），所以落图后不会被拉成椭圆
+      for (const m of svg.matchAll(/<circle[^>]*r="([\d.]+)"/g)) expect(+m[1]).toBeGreaterThan(0)
+      for (const m of svg.matchAll(/A([\d.]+) ([\d.]+) /g))
+        expect(+m[1], `${c.family} 圆弧半径必须横竖相等`).toBeCloseTo(+m[2], 6)
+      expect(svg, c.family).not.toContain('viewBox="0 0 32 32"')
+    }
+  })
+
   it('没有真实尺寸的灯具：CAD 跟随默认图标比例（轨道射灯头 / LED 灯带）', () => {
     const cases = [
       {
@@ -192,19 +260,25 @@ describe('A2. 共享符号键的灯具按「这个点位」选 CAD 画面（回�
     }
   })
 
-  it('轨道射灯头 / LED 灯带仍用 32×32 的方形矢量画面，只是几何按默认比例落图', () => {
-    const cases = [
-      { o: point('track-light', 'lt-track-light'), ratio: 0.3095 / 1 },
-      { o: point('light-strip', 'lt-led-light'), ratio: 1 / 0.3492 },
-    ]
-    for (const c of cases) {
-      const art = lookOf(c.o, { iconStyle: 'cad' }).art!
-      // applyIconArt 写入的矢量画面比例：方形 32×32 → 1×1；线性 160×6 → 1×0.0375
-      expect({ gw: art.gw, gh: art.gh }, c.o.symbolId).toEqual({ gw: 1, gh: 1 })
-      expect(decodeURIComponent(art.src), c.o.symbolId).toContain('viewBox="0 0 32 32"')
-      const g = art.geom!
-      expect(g.gw / g.gh, c.o.symbolId).toBeCloseTo(c.ratio, 2)
-    }
+  it('轨道射灯头用按画幅画的矢量（圆形不拉伸），LED 灯带仍用 32×32 方图例', () => {
+    // 轨道射灯头 ~1:3.2，画幅明显偏离方形且图形里有圆 → 按目标画幅另画一套
+    const head = point('track-light', 'lt-track-light')
+    const headArt = lookOf(head, { iconStyle: 'cad' }).art!
+    const headSvg = decodeURIComponent(headArt.src)
+    expect(headSvg).not.toContain('viewBox="0 0 32 32"')
+    const [, , hw, hh] = headSvg
+      .match(/viewBox="([^"]+)"/)![1]
+      .split(/\s+/)
+      .map(Number)
+    expect(hh / hw).toBeCloseTo(headArt.gh / headArt.gw, 3)
+    expect(headArt.geom!.gw / headArt.geom!.gh).toBeCloseTo(0.3095, 2)
+
+    // LED 灯带是矩形（拉长仍是矩形），继续用方形图例，几何按默认比例落图
+    const strip = point('light-strip', 'lt-led-light')
+    const stripArt = lookOf(strip, { iconStyle: 'cad' }).art!
+    expect({ gw: stripArt.gw, gh: stripArt.gh }).toEqual({ gw: 1, gh: 1 })
+    expect(decodeURIComponent(stripArt.src)).toContain('viewBox="0 0 32 32"')
+    expect(stripArt.geom!.gw / stripArt.geom!.gh).toBeCloseTo(1 / 0.3492, 2)
   })
 
   it('真线形灯具在 CAD 下保持 9c31acf 验证过的细长数字（不受本次修复影响）', () => {
@@ -258,15 +332,12 @@ describe('A2. 共享符号键的灯具按「这个点位」选 CAD 画面（回�
     for (const { variant, deviceType } of variants) {
       const o = point(deviceType, variant.id)
       const plain = lookOf(o).art!
-      // 期望比例：sizeCm [宽, 深] 两维都已知时用真实比例，否则用默认平面图标的比例
-      const size = variant.sizeCm
-      const want =
-        size && size[1] != null ? { gw: 1, gh: size[1] / size[0] } : { gw: plain.gw, gh: plain.gh }
+      const want = expectedCadGeom(variant.sizeCm, plain)
       const cadArt = lookOf(o, { iconStyle: 'cad' }).art!
       const geom = cadArt.geom ?? { gw: cadArt.gw, gh: cadArt.gh }
       if (Math.abs(geom.gw - want.gw) > 1e-9 || Math.abs(geom.gh - want.gh) > 1e-9)
         mismatch.push(
-          `${variant.id}（${deviceType}，sizeCm=${JSON.stringify(size)}，默认 ${plain.gw}×${plain.gh}，` +
+          `${variant.id}（${deviceType}，sizeCm=${JSON.stringify(variant.sizeCm)}，默认 ${plain.gw}×${plain.gh}，` +
             `期望 ${want.gw}×${want.gh}，实际 ${geom.gw}×${geom.gh}）`,
         )
     }
@@ -279,11 +350,7 @@ describe('A2. 共享符号键的灯具按「这个点位」选 CAD 画面（回�
       for (const v of f.variants) {
         const o = point(f.deviceType, v.id, v.sizeCm, true)
         const plain = lookOf(o).art!
-        const size = v.sizeCm
-        const want =
-          size && size[1] != null
-            ? { gw: 1, gh: size[1] / size[0] }
-            : { gw: plain.gw, gh: plain.gh }
+        const want = expectedCadGeom(v.sizeCm, plain)
         const g = geomOf(o, 'cad')
         const got = g.h / g.w
         const expected = want.gh / want.gw
