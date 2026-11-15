@@ -1,5 +1,7 @@
 import { appAuth } from '@/lib/app-auth'
 import {
+  channelNotFoundResponse,
+  decodeChannelKeyParam,
   handleDeleteChannel,
   handleUpdateChannel,
   readJsonBody,
@@ -26,10 +28,12 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   const user = await appAuth.getCurrentUser()
   if (!user) return Response.json({ ok: false, error: '请先登录' }, { status: 401 })
   const { key } = await params
+  const channelKey = decodeChannelKeyParam(key)
+  if (channelKey === null) return channelNotFoundResponse()
   const payload = await getPayloadClient()
   return handleUpdateChannel(
     { userId: String(user.id), payload },
-    decodeURIComponent(key),
+    channelKey,
     await readJsonBody(request),
   )
 }
@@ -40,6 +44,8 @@ export async function DELETE(request: Request, { params }: RouteContext) {
   const user = await appAuth.getCurrentUser()
   if (!user) return Response.json({ ok: false, error: '请先登录' }, { status: 401 })
   const { key } = await params
+  const channelKey = decodeChannelKeyParam(key)
+  if (channelKey === null) return channelNotFoundResponse()
   const payload = await getPayloadClient()
-  return handleDeleteChannel({ userId: String(user.id), payload }, decodeURIComponent(key))
+  return handleDeleteChannel({ userId: String(user.id), payload }, channelKey)
 }

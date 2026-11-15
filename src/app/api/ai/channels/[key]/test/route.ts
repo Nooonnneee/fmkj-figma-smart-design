@@ -1,5 +1,10 @@
 import { appAuth } from '@/lib/app-auth'
-import { handleTestChannel, rejectCrossOrigin } from '@/lib/ai-channels-http'
+import {
+  channelNotFoundResponse,
+  decodeChannelKeyParam,
+  handleTestChannel,
+  rejectCrossOrigin,
+} from '@/lib/ai-channels-http'
 import { getPayloadClient } from '@/lib/payload'
 
 /**
@@ -24,6 +29,8 @@ export async function POST(request: Request, { params }: RouteContext) {
   const user = await appAuth.getCurrentUser()
   if (!user) return Response.json({ ok: false, error: '请先登录' }, { status: 401 })
   const { key } = await params
+  const channelKey = decodeChannelKeyParam(key)
+  if (channelKey === null) return channelNotFoundResponse()
   const payload = await getPayloadClient()
-  return handleTestChannel({ userId: String(user.id), payload }, decodeURIComponent(key))
+  return handleTestChannel({ userId: String(user.id), payload }, channelKey)
 }

@@ -80,6 +80,31 @@ export function rejectCrossOrigin(request: Request): Response | null {
   return result.ok ? null : json({ ok: false, error: result.error }, 403)
 }
 
+/**
+ * 解出 URL 里的 `:key`。Next 给的是路径里的原始片段，可能含畸形百分号编码
+ * （`%E0%A4%A`、`%FF`）——`decodeURIComponent` 对它们抛 `URIError`。
+ * 这个函数必须**返回 null 而不是抛错**：以前解码在 `handle*` 的 try 之外，
+ * 异常一路冒到 Next，变成 500 HTML，客户端拿不到「渠道不存在」。
+ *
+ * 非法编码按「不存在」处理（404，而不是 400）：400 会泄露「这个 key 编码合法但不属于你」
+ * 与「编码本身非法」的差异，404 与正常找不到的响应完全一致。
+ */
+export function decodeChannelKeyParam(raw: string): string | null {
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 与 `updateChannel` / `deleteChannel` / `testChannel` 抛出的 404 **逐字节一致**：
+ * `{ ok: false, error: '找不到这个渠道' }`。测试会拿真实调用做形状对比，避免两处漂移。
+ */
+export function channelNotFoundResponse(): Response {
+  return json({ ok: false, error: '找不到这个渠道' }, 404)
+}
+
 export async function readJsonBody(request: Request): Promise<ChannelInputBody> {
   try {
     const raw = (await request.json()) as unknown
