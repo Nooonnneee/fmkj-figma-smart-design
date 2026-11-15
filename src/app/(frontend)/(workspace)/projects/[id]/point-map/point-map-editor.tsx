@@ -1428,7 +1428,14 @@ export function PointMapEditor({
       />
 
       {/* ==================== 顶部工具栏（唯一的操作入口）：左（楼层 · 工具 · 历史）｜中（当前步骤的主操作）｜右（显示 · 缩放 · 导出 · 报价 · 保存状态） ==================== */}
-      <div className="flex h-12 shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-background px-2.5 [scrollbar-width:none]">
+      {/*
+        工具条放不下时换行，而不是横向滚动：多出 AI 右栏后，1440 下画布只剩 1072px，
+        而这一排操作约需 1300px。原来的 overflow-x-auto 会把「生成报价」「已保存」
+        滚到视口外，用户看不到主操作；换行保证每个按钮始终可见。
+        高度用 min-h-12 而非固定 h-12，换行后画布 flex-1 自然少一点高度。
+      */}
+      <div className="flex min-h-12 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-border bg-background px-2.5 py-1">
+        {/* 左侧组允许收缩（min-w-0），把富余空间让给右侧固定宽度的一排操作按钮 */}
         <div className="flex min-w-max flex-1 items-center gap-1">
           {/* 楼层切换：切换 / 总览 / 当前图纸的重命名、清除标定、删除都在这一个菜单里；添加图纸用中间的「上传户型图」 */}
           {snap.sheets.length ? (
@@ -1742,7 +1749,12 @@ export function PointMapEditor({
           </div>
         )}
 
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-0.5">
+        {/*
+          shrink-0：这一组含缩放/导出/生成报价，原本 min-w-0 flex-1 在窄画布下会被压缩，
+          内容（justify-end）向左侧溢出，压在「生成点位」按钮上（1440 三列并排时实测重叠 74px）。
+          不压缩 + 外层 overflow-x-auto，窄窗口改成工具栏内部横向滚动，页面本身不出现滚动条。
+        */}
+        <div className="flex shrink-0 items-center justify-end gap-0.5">
           {readOnly ? null : (
             <ToolbarIconButton
               label={mobilePlaceOpen ? '收起设备面板' : '放置设备'}
