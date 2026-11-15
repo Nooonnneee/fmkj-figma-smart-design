@@ -148,17 +148,17 @@ export function lookOf(o: Pick<SymbolObj, 'symbolId' | 'data'>, opts?: LookOptio
   const isVariant = !!v && v.family.deviceType === dt
   // 默认风格的图形：灯光款式用款式图，其余用 look 里的那张（同为回退链的终点）
   const fallback = isVariant ? (artOf(v!.art) ?? base.art) : base.art
-  // 线形灯具（轨道、线性吊灯、T5……）：CAD 线稿和产品照片本身是 1:1 方框，
-  // 直接按方框落图会把 2 米轨道画成 2 米见方。几何一律钉在默认风格的细长比例上，
-  // 图形本身按自己的画面画满这个框（见 SymbolArt.geom），其他设备保持方形。
-  //
-  // 这个判断必须按「点位」算，而且在 resolveIconArt 之前算：track-light / light-strip /
-  // other-light 三个符号键被真线形灯具和落地灯、弧形落地灯、轨道射灯头、LED 灯带共用，
-  // 只看键会给后者选 160×6 的细长 CAD 画面（26.7:1）。这里用的是同一条 isElongated，
-  // 下面的 geom 覆盖复用它，保证只有一个真值来源。
-  const keepAspect = defaultGeomOf(base.art, fallback)
-  const elongated =
-    !!keepAspect && isElongated(isVariant ? v!.family.linear : undefined, keepAspect)
+  // 默认风格的主体比例：CAD 找不到真实尺寸时回退它，照片 / 手绘的线形落图也用它
+  const plainGeom = defaultGeomOf(base.art, fallback)
+  // CAD 的几何比例（唯一真值来源）。必须按「点位」算，而且在 resolveIconArt 之前算：
+  // track-light / light-strip / other-light 三个符号键被真线形灯具和落地灯、弧形落地灯、
+  // 轨道射灯头、LED 灯带共用，只看键会给后者选错画面和比例。
+  const cadGeom = cadGeomOf(isVariant ? v : undefined, plainGeom)
+  // CAD 线稿的 160×6 细长画面只给「落图后确实是条线」的符号（否则方框图标会被拉碎）。
+  // 它只决定用哪张画；比例已经在 cadGeomOf 里定死，不参与几何计算。
+  const lineArt = isLineGeom(cadGeom ?? plainGeom)
+  // 手绘 / 照片沿用旧规则：只有细长灯具按默认比例落图，其余保持图形自己的方框
+  const slenderForPhoto = !!plainGeom && isLineGeom(plainGeom, isVariant && v!.family.linear)
   const input: IconArtInput = {
     symbol: t.symbol,
     switchKeys: 'keys' in t ? t.keys : undefined,
@@ -169,13 +169,19 @@ export function lookOf(o: Pick<SymbolObj, 'symbolId' | 'data'>, opts?: LookOptio
       ? (artOf(v!.art) ?? sketchArt(t.value) ?? sketchArt(t.symbol))
       : (sketchArt(t.value) ?? sketchArt(t.symbol)),
     productImage: opts?.productImage ?? null,
-    linear: elongated,
+    linear: lineArt,
+    // 非方形比例的形状族让 CAD 按真实画幅另画图例（不然圆灯罩会被拉成椭圆）
+    cadRatio:
+      style === 'cad' && isVariant && cadGeom && (cadGeom.gw !== 1 || cadGeom.gh !== 1)
+        ? { familyId: v!.family.id, gw: cadGeom.gw, gh: cadGeom.gh }
+        : undefined,
   }
   const styled = applyIconArt(base, resolveIconArt(style, input))
   // 灯光款式在 CAD / 手绘 / 照片下也保留线形灯具的长度示意
   const look = isVariant ? { ...styled, linear: v!.family.linear } : styled
-  // 真线形灯具：CAD / 照片的方框按默认风格的细长比例落图（上面的 elongated 已经算过）
-  if (look.art && keepAspect && elongated) look.art = { ...look.art, geom: keepAspect }
+  // CAD 钉 cadGeom；手绘 / 照片仍按旧的细长规则钉默认比例（照片不能为普通灯具变形）
+  const targetGeom = style === 'cad' ? cadGeom : slenderForPhoto ? plainGeom : null
+  if (look.art && targetGeom) look.art = { ...look.art, geom: targetGeom }
   if (styledCache.size < STYLED_CACHE_MAX) styledCache.set(k, look)
   return look
 }
@@ -189,15 +195,40 @@ function defaultGeomOf(
   return art ? { gw: art.gw, gh: art.gh } : null
 }
 
-/** 长宽比偏离 1 超过 5 倍就算细长（兜住没标 linear、但图形明显是条线的灯具） */
-const ELONGATED = 5
-const aspectOf = (g: { gw: number; gh: number }) => g.gh / g.gw
+/**
+ * CAD 风格该用的主体比例（全代码库唯一真值来源）：
+ * - 灯光款式且 sizeCm 的 [宽, 深] 两维都已知 → 真实比例（深 / 宽）；
+ * - 其余情况（只有宽、sizeCm 为 null、非灯光款式）→ 默认平面图标的比例。
+ * 非灯光款式（socket / camera ……）没有真实尺寸，默认图标本身是方框的仍然返回 null，
+ * 几何保持方形（与今天一致）。
+ *
+ * 比例必须归一化到「长边 = 1」（max(gw, gh) = 1）：symbolGeom 的固定显示尺寸分支是
+ * `w = L * gw; h = L * gh`，隐含 gw / gh 不超过 1。竖长设备（13×28 → 深/宽 = 2.15）
+ * 若不归一，W 会用 28 去乘 2.15，在未标定的图纸上比其他符号高 2.5 倍。
+ */
+function cadGeomOf(
+  variant: LightingVariant | undefined,
+  defaultGeom: { gw: number; gh: number } | null,
+): { gw: number; gh: number } | null {
+  const size = variant?.sizeCm
+  if (size && size[1] != null && size[0] > 0) {
+    const r = size[1] / size[0]
+    const m = Math.max(1, r)
+    return { gw: 1 / m, gh: r / m }
+  }
+  if (!variant) return defaultGeom && isLineGeom(defaultGeom) ? defaultGeom : null
+  return defaultGeom
+}
+
+/** 长宽比偏离 1 超过 5 倍就算一条线（只用于「用哪张画」，不参与 CAD 比例计算） */
+const LINE_RATIO = 5
 
 /**
- * 默认图标是不是一条细长的线：有 `linear` 标记，或长宽比偏离 1 超过 5 倍
- * （兜住没标 linear、但图形明显是条线的灯具）。普通设备返回 false，几何保持方形。
+ * 这个比例画出来是不是一条线：长宽比偏离 1 超过 5 倍，或调用方明确标了线形灯具。
+ * 默认图标是条线的符号在 CAD 下用 160×6 的画面，照片 / 手绘按它决定是否钉默认比例。
  */
-function isElongated(linear: boolean | undefined, defaultGeom: { gw: number; gh: number }) {
-  const a = aspectOf(defaultGeom)
-  return Boolean(linear) || a < 1 / ELONGATED || a > ELONGATED
+function isLineGeom(geom: { gw: number; gh: number } | null, linear = false) {
+  if (!geom) return false
+  const a = geom.gh / geom.gw
+  return linear || a < 1 / LINE_RATIO || a > LINE_RATIO
 }
