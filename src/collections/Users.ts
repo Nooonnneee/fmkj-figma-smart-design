@@ -4,6 +4,7 @@ import { CACHE_TAGS, expireOnChange, expireOnDelete } from '@/lib/cache-tags'
 import { fieldCmsAdminOnly, isCmsAdmin, isMember } from '@/lib/access'
 import { DEFAULT_CONTRACT_TERMS } from '@/lib/contracts'
 import { cloneDemoProjectForUser } from '@/lib/demo-project'
+import { assertChannelBaseUrl } from '@/lib/ai-channels-url-guard'
 
 /** 成员只能读取和修改自己的账号资料，防止通过 /api/users 遍历其他用户的邮箱与手机号。 */
 const selfOrCmsAdmin: Access = ({ req }) => {
@@ -143,6 +144,108 @@ export const Users: CollectionConfig = {
             description:
               '在系统「设置 → 报价成本与毛利」里修改：品牌拿货折扣、附加费用成本占比与毛利率底线，仅本人在报价台可见',
           },
+        },
+        {
+          /**
+           * 成员自填的 AI 渠道（客户自带 key）。2026-11-15 提案乙节已批准：只在桌面客户端开放。
+           *
+           * 安全约定（改这个字段前先读 `src/lib/ai-channels-url-guard.ts`）：
+           * - `apiKeyCipher` 是 AES-256-GCM 密文（`src/lib/ai-channels-crypto.ts`），字段级
+           *   `read: () => false`，任何 API 响应都不会带出来；服务端内部读库要用
+           *   `overrideAccess: true`（字段级 read 权限管不到 overrideAccess）。
+           * - 读写走 `/api/users/channels` 端点，**只认 `req.user`**，不接受请求体里的 userId。
+           * - `baseUrl` 必须是公网 HTTPS，且比 `normalizeCustomBaseUrl` 更严（拒绝 IP 字面值、
+           *   非 443 端口、user:pass@ 形式），发请求前还会做一次 DNS 解析校验。
+           */
+          name: 'aiChannels',
+          label: '我的 AI 渠道（自带 key）',
+          type: 'array',
+          labels: { singular: 'AI 渠道', plural: 'AI 渠道' },
+          admin: {
+            description:
+              '客户自带的 AI 渠道，只在桌面客户端「我的 AI 配置」里填写。密钥加密存储，页面与接口都不会显示明文。',
+          },
+          fields: [
+            {
+              name: 'key',
+              label: '渠道标识',
+              type: 'text',
+              required: true,
+              maxLength: 40,
+              validate: (value: unknown) => {
+                if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{1,40}$/.test(value)) {
+                  return '标识只能用字母、数字、- 和 _，最多 40 字'
+                }
+                return true
+              },
+            },
+            { name: 'label', label: '显示名', type: 'text', required: true, maxLength: 60 },
+            {
+              name: 'baseUrl',
+              label: '接口根地址',
+              type: 'text',
+              required: true,
+              maxLength: 300,
+              validate: (value: unknown) => {
+                try {
+                  assertChannelBaseUrl(value)
+                  return true
+                } catch (error) {
+                  return (error as Error).message || '接口地址无效'
+                }
+              },
+            },
+            {
+              // 密文：任何 API 响应都不得出现。服务端内部读库必须 overrideAccess: true。
+              name: 'apiKeyCipher',
+              label: '密钥（加密存储）',
+              type: 'text',
+              maxLength: 4096,
+              access: { read: () => false },
+              admin: {
+                readOnly: true,
+                description: '仅供服务端解密使用，不会出现在任何接口响应里',
+              },
+            },
+            {
+              name: 'apiKeyHint',
+              label: '密钥提示',
+              type: 'text',
+              maxLength: 16,
+              admin: {
+                readOnly: true,
+                description: '只读展示：例如 ...abcd，让客户确认填的是哪个 key',
+              },
+            },
+            {
+              name: 'models',
+              label: '模型名',
+              type: 'text',
+              hasMany: true,
+              maxLength: 120,
+              admin: { description: '该渠道下可选的模型名（纯文本），可留空' },
+            },
+            { name: 'enabled', label: '启用', type: 'checkbox', defaultValue: true },
+            {
+              name: 'lastCheckedAt',
+              label: '最近检查时间',
+              type: 'date',
+              admin: { readOnly: true },
+            },
+            {
+              name: 'lastCheckOk',
+              label: '最近检查是否通过',
+              type: 'checkbox',
+              admin: { readOnly: true },
+            },
+            {
+              name: 'lastCheckError',
+              label: '最近检查错误',
+              type: 'text',
+              maxLength: 300,
+              admin: { readOnly: true },
+            },
+          ],
         },
       ],
     },

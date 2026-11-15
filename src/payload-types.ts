@@ -308,6 +308,33 @@ export interface User {
       | number
       | boolean
       | null;
+    /**
+     * 客户自带的 AI 渠道，只在桌面客户端「我的 AI 配置」里填写。密钥加密存储，页面与接口都不会显示明文。
+     */
+    aiChannels?:
+      | {
+          key: string;
+          label: string;
+          baseUrl: string;
+          /**
+           * 仅供服务端解密使用，不会出现在任何接口响应里
+           */
+          apiKeyCipher?: string | null;
+          /**
+           * 只读展示：例如 ...abcd，让客户确认填的是哪个 key
+           */
+          apiKeyHint?: string | null;
+          /**
+           * 该渠道下可选的模型名（纯文本），可留空
+           */
+          models?: string[] | null;
+          enabled?: boolean | null;
+          lastCheckedAt?: string | null;
+          lastCheckOk?: boolean | null;
+          lastCheckError?: string | null;
+          id?: string | null;
+        }[]
+      | null;
   };
   createdBy?:
     | ({
@@ -1653,6 +1680,21 @@ export interface UsersSelect<T extends boolean = true> {
         documentDefaults?: T;
         disabledPlugins?: T;
         costSettings?: T;
+        aiChannels?:
+          | T
+          | {
+              key?: T;
+              label?: T;
+              baseUrl?: T;
+              apiKeyCipher?: T;
+              apiKeyHint?: T;
+              models?: T;
+              enabled?: T;
+              lastCheckedAt?: T;
+              lastCheckOk?: T;
+              lastCheckError?: T;
+              id?: T;
+            };
       };
   createdBy?: T;
   updatedBy?: T;
