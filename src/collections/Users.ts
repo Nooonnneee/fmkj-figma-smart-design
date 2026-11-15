@@ -153,7 +153,7 @@ export const Users: CollectionConfig = {
            * - `apiKeyCipher` 是 AES-256-GCM 密文（`src/lib/ai-channels-crypto.ts`），字段级
            *   `read: () => false`，任何 API 响应都不会带出来；服务端内部读库要用
            *   `overrideAccess: true`（字段级 read 权限管不到 overrideAccess）。
-           * - 读写走 `/api/users/channels` 端点，**只认 `req.user`**，不接受请求体里的 userId。
+           * - 读写走 `/api/ai/channels` 端点，**只认 `req.user`**，不接受请求体里的 userId。
            * - `baseUrl` 必须是公网 HTTPS，且比 `normalizeCustomBaseUrl` 更严（拒绝 IP 字面值、
            *   非 443 端口、user:pass@ 形式），发请求前还会做一次 DNS 解析校验。
            */

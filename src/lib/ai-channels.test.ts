@@ -253,6 +253,22 @@ describe('复核补的回归：局部更新、类型闸、长度闸', () => {
     expect(updated.baseUrl).toBe('https://api.example.com/v1')
   })
 
+  it('PATCH baseUrl: "" 保留原值（旧前端用空串表示不修改）', async () => {
+    const { payload, db } = await seeded()
+    const updated = await updateChannel(payload, 'u1', 'c1', { baseUrl: '' })
+    expect(updated.baseUrl).toBe('https://api.example.com/v1')
+    expect(readChannels(db.get('u1'))[0].baseUrl).toBe('https://api.example.com/v1')
+  })
+
+  it('PATCH label: "" → 400「请填写渠道显示名」，原值不变', async () => {
+    const { payload, db } = await seeded()
+    await expect(updateChannel(payload, 'u1', 'c1', { label: '' })).rejects.toMatchObject({
+      status: 400,
+      message: '请填写渠道显示名',
+    })
+    expect(readChannels(db.get('u1'))[0].label).toBe('原名')
+  })
+
   it('PATCH enabled: "false"（字符串）→ 400，绝不静默当成 true 或回退', async () => {
     const { payload, db } = await seeded()
     await expect(
