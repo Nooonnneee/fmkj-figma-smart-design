@@ -29,6 +29,7 @@ import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/Segme
 import { Tooltip } from '@astryxdesign/core/Tooltip'
 import type { SystemPack } from '@/board/core/pack'
 import { SYMBOL_SIZES } from '@/board/core/symbols'
+import { ICON_STYLE_OPTIONS } from '@/board/core/types'
 import type { BoardTool, LayerId, ViewSettings } from '@/board/core/types'
 import { cn } from '@/lib/utils'
 
@@ -221,6 +222,12 @@ export function BoardLayersPanel({
             { value: 'marker', label: '实心标记' },
           ]}
           onChange={(v) => onView({ symbolStyle: v as ViewSettings['symbolStyle'] })}
+        />
+        <Segmented
+          label="图标风格"
+          value={view.iconStyle ?? 'default'}
+          options={ICON_STYLE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+          onChange={(v) => onView({ iconStyle: v as ViewSettings['iconStyle'] })}
         />
         <Segmented
           label="符号尺寸"
@@ -576,6 +583,12 @@ export function BoardToolbar(props: {
                   { value: 'marker', label: '实心标记' },
                 ]}
                 onChange={(v) => onView({ symbolStyle: v as ViewSettings['symbolStyle'] })}
+              />
+              <Segmented
+                label="图标风格"
+                value={view.iconStyle ?? 'default'}
+                options={ICON_STYLE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                onChange={(v) => onView({ iconStyle: v as ViewSettings['iconStyle'] })}
               />
               <Segmented
                 label="符号大小"

@@ -18,7 +18,13 @@ import {
 import { areaPoly, moveObjects, rawBox, rotateSymbols, setAreaPoly, sheetAt } from '../core/ops'
 import type { SystemPack } from '../core/pack'
 import { fittingScale, formatMm, gridSpec, niceStep, rulerStep } from '../core/paper'
-import { symbolGeom, type SymbolGeom } from '../core/symbols'
+import {
+  lookOptionsFor,
+  symbolGeom,
+  type DeviceDefaults,
+  type ProductImageLookup,
+  type SymbolGeom,
+} from '../core/symbols'
 import type {
   AreaObj,
   BoardDoc,
@@ -64,6 +70,16 @@ export type BoardCanvasProps = {
   onContextMenu: (ctx: CanvasContext) => void
   dropType?: string
   onDrop?: (data: string, at: Vec) => void
+  /**
+   * 产品照片查表（可选）：只有 iconStyle === 'photo' 时会用到。
+   * 不传时 photo 风格回退默认图标——方案页、打印、导出都不需要改。
+   */
+  productImage?: ProductImageLookup | null
+  /**
+   * 项目默认型号（可选）：点位没有自己的 productId 时，按设备类型取默认型号的照片。
+   * 只影响实拍风格的显示，不写回图纸数据。
+   */
+  defaults?: DeviceDefaults | null
   className?: string
 }
 
@@ -172,18 +188,24 @@ export function BoardCanvas(props: BoardCanvasProps) {
   const effectsClipId = `board-effects-${useId().replace(/:/g, '')}`
 
   const shown = preview?.doc ?? doc
+  const productImage = props.productImage ?? null
+  const defaults = props.defaults ?? null
+
+  /** 统一的 look：图标风格来自 view.iconStyle，产品照片按需查表 */
+  const lookAt = useCallback(
+    (o: Pick<SymbolObj, 'symbolId' | 'data'>) =>
+      pack.look(o, lookOptionsFor(o, view.iconStyle, productImage, defaults)),
+    [pack, view.iconStyle, productImage, defaults],
+  )
 
   // 符号几何（显示尺寸、外接框、代号位置）
   const geoms = useMemo(() => {
     const map = new Map<string, SymbolGeom>()
     for (const o of shown.objects)
       if (o.kind === 'symbol')
-        map.set(
-          o.id,
-          symbolGeom(o, pack.look(o), view, sheetAt(shown, o.x, o.y)?.mmPerUnit ?? null),
-        )
+        map.set(o.id, symbolGeom(o, lookAt(o), view, sheetAt(shown, o.x, o.y)?.mmPerUnit ?? null))
     return map
-  }, [shown, pack, view])
+  }, [shown, lookAt, view])
   const geomsRef = useRef(geoms)
   geomsRef.current = geoms
 
@@ -653,7 +675,7 @@ export function BoardCanvas(props: BoardCanvasProps) {
             angle: props.armed!.angle ?? 0,
             ...props.armed!,
           }
-          const look = pack.look(o)
+          const look = lookAt(o)
           const g = symbolGeom(o, look, view, sheetAt(doc, o.x, o.y)?.mmPerUnit ?? null)
           return (
             <SymbolView
@@ -805,7 +827,7 @@ export function BoardCanvas(props: BoardCanvasProps) {
                     key={o.id}
                     o={o}
                     g={g}
-                    look={pack.look(o)}
+                    look={lookAt(o)}
                     small={Math.max(g.imgW, g.imgH) * z < SMALL_PX}
                   />
                 )
@@ -815,7 +837,7 @@ export function BoardCanvas(props: BoardCanvasProps) {
           {view.layers.symbol && view.labels
             ? objs.map((o) =>
                 o.kind === 'symbol' && o.code && !hidden.has(o.id) ? (
-                  <SymbolLabel key={o.id} o={o} g={geoms.get(o.id)!} color={pack.look(o).color} />
+                  <SymbolLabel key={o.id} o={o} g={geoms.get(o.id)!} color={lookAt(o).color} />
                 ) : null,
               )
             : null}

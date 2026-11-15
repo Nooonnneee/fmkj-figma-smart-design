@@ -1,8 +1,27 @@
 import { clamp, rotatedAabb } from './geometry'
-import type { Box, SymbolObj, ViewSettings } from './types'
+import type { Box, IconStyle, LookOptions, SymbolObj, ViewSettings } from './types'
 
-/** 符号图形：图片（大 / 小两档）、主体宽高（长边 = 1）、图片四周留白（相对主体长边） */
-export type SymbolArt = { src: string; srcSm: string; gw: number; gh: number; pad: number }
+/**
+ * 符号图形：图片（大 / 小两档）、主体宽高（长边 = 1）、图片四周留白（相对主体长边）。
+ * - fit = contain 时按原比例放进主体框（产品照片）；缺省 stretch，与现有 PNG 图标一致。
+ * - geom 用来覆盖「主体比例」：CAD 线稿和产品照片本身是 1:1，但线形灯具必须保持细长比例，
+ *   这时把默认风格的 gw/gh 带过来，几何按默认图标算，图形本身仍按自己的方框画。
+ */
+export type SymbolArt = {
+  src: string
+  srcSm: string
+  gw: number
+  gh: number
+  pad: number
+  fit?: 'stretch' | 'contain'
+  geom?: { gw: number; gh: number }
+}
+
+/** 主体比例：有覆盖就用覆盖，否则用图形自己的（CAD / 照片不动线形灯具的比例） */
+const artGeom = (art: SymbolArt) => art.geom ?? { gw: art.gw, gh: art.gh }
+
+/** SVG <image> 的 preserveAspectRatio：默认拉伸（现有 PNG 就是按主体框定死的） */
+export const artAspectRatio = (art: SymbolArt) => (art.fit === 'contain' ? 'xMidYMid meet' : 'none')
 
 /** 系统包对一个符号的解释：名称、颜色、平面符号图形、实心标记 */
 export type SymbolLook = {
@@ -10,6 +29,7 @@ export type SymbolLook = {
   key: string
   name: string
   color: string
+  /** 平面符号图形；null 表示这个风格下没有图形，画布退回实心标记 */
   art: SymbolArt | null
   marker: string | null
   /** 角标（如开关的键数） */
@@ -25,6 +45,49 @@ export const SYMBOL_SIZES = [
   { value: 28, label: '中' },
   { value: 36, label: '大' },
 ] as const
+/**
+ * 点位 → 产品照片地址的查表函数。可选：画布不传时 photo 风格一律回退默认图标，
+ * 所以方案页、打印、导出这些没有产品列表的渲染路径不用改签名。
+ */
+export type ProductImageLookup = (productId: string) => string | null | undefined
+
+/** 设备类型 → 项目默认型号（ProjectDefaults）。只读，不写回项目数据 */
+export type DeviceDefaults = Readonly<Record<string, string | undefined>>
+
+/**
+ * 一个点位在实拍风格下该用哪个产品的照片：
+ * 1. 点位自己带的 data.productId（AI / 历史数据可能有）；
+ * 2. 否则按设备类型取项目默认型号（新建点位只写 deviceType，靠这一条才有照片）；
+ * 3. 都没有 → null，回退默认图标。
+ */
+export function productIdForPoint(
+  o: Pick<SymbolObj, 'data'>,
+  defaults?: DeviceDefaults | null,
+): string | null {
+  const own = typeof o.data.productId === 'string' && o.data.productId ? o.data.productId : null
+  if (own) return own
+  const dt = typeof o.data.deviceType === 'string' ? o.data.deviceType : null
+  const fallback = dt && defaults ? defaults[dt] : null
+  return typeof fallback === 'string' && fallback ? fallback : null
+}
+
+/**
+ * 为一个点位生成 look 的附加选项：风格来自视图设置，产品照片来自可选的产品表。
+ * 产品按「点位 productId → 设备类型默认型号」取，再查照片；
+ * 只有 photo 风格才去查表，其余风格不碰产品数据。
+ */
+export function lookOptionsFor(
+  o: Pick<SymbolObj, 'data'>,
+  iconStyle: IconStyle | undefined,
+  products?: ProductImageLookup | null,
+  defaults?: DeviceDefaults | null,
+): LookOptions {
+  const style = iconStyle ?? 'default'
+  if (style !== 'photo' || !products) return { iconStyle: style }
+  const id = productIdForPoint(o, defaults)
+  return { iconStyle: style, productImage: id ? (products(id) ?? null) : null }
+}
+
 /** 实心标记在默认大小时的直径（与旧版点位图一致） */
 export const MARKER_BASE = 24
 export const LABEL_SIZE = 9
@@ -58,7 +121,9 @@ export function symbolGeom(
   view: Pick<ViewSettings, 'symbolStyle' | 'symbolSize'>,
   mmPerUnit: number | null,
 ): SymbolGeom {
-  const marker = view.symbolStyle === 'marker' || !look.art
+  // 矢量图标（CAD）也带 art（内联 data URL），所以这里不需要单独分支
+  const art = look.art
+  const marker = view.symbolStyle === 'marker' || !art
   let w: number
   let h: number
   let real = false
@@ -66,8 +131,9 @@ export function symbolGeom(
   if (marker) {
     w = h = MARKER_BASE * (view.symbolSize / DEFAULT_SYMBOL_SIZE)
   } else {
-    const { gw, gh } = look.art!
-    pad = look.art!.pad
+    // 线形灯具在 CAD / 照片风格下带 geom 覆盖，仍然按默认图标的细长比例落图
+    const { gw, gh } = artGeom(art!)
+    pad = art!.pad
     if (o.real && o.sizeCm && mmPerUnit) {
       real = true
       const [wc, hc] = o.sizeCm
