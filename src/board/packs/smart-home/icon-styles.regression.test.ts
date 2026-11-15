@@ -377,11 +377,16 @@ describe('A2. 共享符号键的灯具按「这个点位」选 CAD 画面（回�
       expect(art, `gh/gw=${gh / gw}`).toBeTruthy()
       const [, , vw, vh] = art.viewBox.split(/\s+/).map(Number)
       const scale = 28 / Math.max(vw, vh)
-      const landing = +art.body.match(/stroke-width="([\d.]+)"/)![1] * scale
+      const stroke = +art.body.match(/stroke-width="([\d.]+)"/)![1]
+      const landing = stroke * scale
       const shortSide = Math.min(vw, vh) * scale
       // 看得见（远高于修复前 gh/gw=20 时的 0.028px）……
       expect(landing, `gh/gw=${gh / gw} 落图线宽`).toBeGreaterThan(0.5)
-      // ……但不超过短边的一半，不会把 1.4px 高的框糊成实心块
+      // ……但不超过短边的 40%（= 修复前 H=5 时的 2/5），不会把 1.4px 高的框糊成实心块。
+      // 旧上界是短边的一半（50%），比旧画法还粗；改成 40% 后这条断言必须真的能挡住回退。
+      expect(stroke, `gh/gw=${gh / gw} 线宽不得超过短边 40%`).toBeLessThanOrEqual(
+        Math.min(vw, vh) * 0.4 + 1e-9,
+      )
       expect(landing, `gh/gw=${gh / gw} 不得超过短边一半`).toBeLessThanOrEqual(shortSide / 2 + 1e-6)
     }
   })

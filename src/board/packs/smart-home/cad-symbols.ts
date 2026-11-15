@@ -395,17 +395,15 @@ function proportionedBody(
  * - 任意模板的缩放 s = 28 / max(W,H)。要落图 1.75px：stroke × s = 1.75
  *   → stroke = 1.75 × max(W,H) / 28 = max(W,H) / 16。
  *   模板 100 宽、高度 ≤ 100（横向族）时 = 6.25，正是「100 宽对应 28px」的换算。
- * - 极端比例把线宽夹住，避免两种坏结果：
- *   上界 min(W,H)/2：gh/gw=0.05 → H=5，若仍用 max/16=6.25，线宽会超过画幅高度，
- *     落图 1.4px 高的框里画 1.75px 线，糊成实心块；夹到 2.5（落图 0.7px）仍是一条线。
- *   下界 max(W,H)/64：gh/gw=20 → H=2000，长边 1/64 落图约 0.44px，保证再细的族
- *     也不是「看不见」；正常比例下 max/16 远高于它，不生效。
+ * - 极端比例把线宽夹在短边的 40%：gh/gw=0.05 → H=5，若仍用 max/16=6.25，线宽会
+ *   超过画幅高度，落图 1.4px 高的框里画 1.75px 线，糊成实心块。夹到 2（落图 0.56px）
+ *   仍是一条线。40% 正好是修复前 CAD_STROKE_WIDTH=2 在 H=5 时的比例（2/5），
+ *   所以极端比例不会比旧画法更粗；同时落图线宽不会低于 0.5px（看得见）。
+ *   这条上界只在短边 < 长边的 5/32（0.15625）时生效：所有已登记族的真实比例
+ *   （最扁的画灯 90×16 = 0.178）都在它之上，落图线宽仍是 1.75px，不受影响。
  */
 function strokeFor(W: number, H: number) {
-  const target = Math.max(W, H) / 16
-  const upper = Math.min(W, H) / 2
-  const lower = Math.max(W, H) / 64
-  return Math.min(upper, Math.max(lower, target))
+  return Math.min(Math.max(W, H) / 16, Math.min(W, H) / 2.5)
 }
 
 /**
