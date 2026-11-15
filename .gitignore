@@ -33,3 +33,8 @@ logs/
 /.figaro/
 /.impeccable/
 /.export-artifacts/
+
+# 运营物料（约 96MB 二进制：方案样张、报价单版式、点位图、推广文案）
+# 不随代码分发：里面有已作废的兑换码，且二进制不该混进源码仓库。
+# 备份在 ~/Backups/promotion-kit-*.tar.gz
+/promotion-kit/
