@@ -158,6 +158,32 @@ const CAD: Record<SymbolKey, CadShape[]> = {
   other: [path('M6 6 H26 V26 H6 Z'), path('M13 13 A3 3 0 1 1 19 13 Q19 16 16 17 V19')],
 }
 
+/**
+ * 线形灯具（灯带 / 轨道灯 / T5 灯管）的 CAD 画法：按细长画面另画一套。
+ *
+ * 这几类设备在图上本来就是一条线（真实尺寸下 2 米轨道只有几厘米宽），
+ * 如果沿用 32×32 的方形图例再塞进细长框，要么缩成一个小徽标、要么被拉成碎片。
+ * 这里用 160×6 的 viewBox 画「一条要装满整根灯的线」：两端端头 + 均匀的分段刻度。
+ */
+const LINEAR_VIEW_BOX = '0 0 160 6'
+const LINEAR_CAD: Record<'track-light' | 'light-strip' | 'other-light', CadShape[]> = {
+  // 轨道灯：上下两条细轨 + 均匀的灯具刻痕
+  'track-light': [
+    line(2, 1, 158, 1),
+    line(2, 5, 158, 5),
+    ...Array.from({ length: 7 }, (_, i) => line(16 + i * 21, 0, 16 + i * 21, 6)),
+  ],
+  // 灯带：一条线 + 密排短刻度（线性光源）
+  'light-strip': [
+    line(2, 3, 158, 3),
+    ...Array.from({ length: 17 }, (_, i) => line(8 + i * 9, 1.4, 8 + i * 9, 4.6)),
+  ],
+  // T5 灯管 / 其他线性灯具：灯管两端 + 中间灯丝
+  'other-light': [line(2, 2, 158, 2), line(2, 4, 158, 4), line(2, 1, 2, 5), line(158, 1, 158, 5)],
+}
+
+const LINEAR_TABLE = LINEAR_CAD as Record<string, CadShape[]>
+
 const TABLE = CAD as Record<string, CadShape[]>
 
 /** 取一个符号的 CAD 矢量定义；未知键返回 null（调用方退回默认图标） */
@@ -204,14 +230,36 @@ export function cadSymbolBodyForKey(key: SymbolKey | string, switchKeys?: number
   return cadSymbolBody(key)
 }
 
+/** 线性灯具是否有专门的细长矢量（有就优先用，几何也随之按线性画面算） */
+export function isLinearCadKey(key: SymbolKey | string): boolean {
+  return Boolean(LINEAR_TABLE[key])
+}
+
+/** 线性灯具的细长矢量图元（没有就返回空串） */
+export function cadLinearBody(key: SymbolKey | string): string {
+  const shapes = LINEAR_TABLE[key]
+  return shapes ? renderShapes(shapes) : ''
+}
+
+/** 图元 + 它自己的 viewBox：普通符号 32×32，线性灯具 160×6 */
+export function cadArtFor(
+  key: SymbolKey | string,
+  switchKeys?: number,
+): { body: string; viewBox: string } | null {
+  const linear = cadLinearBody(key)
+  if (linear) return { body: linear, viewBox: LINEAR_VIEW_BOX }
+  const body = cadSymbolBodyForKey(key, switchKeys)
+  return body ? { body, viewBox: CAD_VIEW_BOX } : null
+}
+
 /**
  * 完整的内联 SVG（导出用）：自带 xmlns 与 viewBox，可直接当 data URL 交给浏览器栅格化。
  * 导出路径不能直接插 <g>，因为 PNG 是通过 <image> 画进主 SVG 的。
  */
 export function cadSymbolSvg(key: SymbolKey | string, switchKeys?: number): string | null {
-  const body = cadSymbolBodyForKey(key, switchKeys)
-  if (!body) return null
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${CAD_VIEW_BOX}">${body}</svg>`
+  const art = cadArtFor(key, switchKeys)
+  if (!art) return null
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${art.viewBox}">${art.body}</svg>`
 }
 
 /** CAD 符号的 data URL（导出时内联用；encodeURIComponent 而不是 base64，避免中文环境下的编码问题） */

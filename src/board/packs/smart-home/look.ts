@@ -162,6 +162,34 @@ export function lookOf(o: Pick<SymbolObj, 'symbolId' | 'data'>, opts?: LookOptio
   const styled = applyIconArt(base, resolveIconArt(style, input))
   // 灯光款式在 CAD / 手绘 / 照片下也保留线形灯具的长度示意
   const look = isVariant ? { ...styled, linear: v!.family.linear } : styled
+  // 线形灯具（轨道、线性吊灯、T5……）：CAD 线稿和产品照片本身是 1:1 方框，
+  // 直接按方框落图会把 2 米轨道画成 2 米见方。几何一律钉在默认风格的细长比例上，
+  // 图形本身按自己的画面画满这个框（见 SymbolArt.geom），其他设备保持方形。
+  const keepAspect = defaultGeomOf(base.art, fallback)
+  if (look.art && keepAspect && isElongated(look.linear, keepAspect))
+    look.art = { ...look.art, geom: keepAspect }
   if (styledCache.size < STYLED_CACHE_MAX) styledCache.set(k, look)
   return look
+}
+
+/** 默认风格里的主体比例（手绘 / CAD 都用它当几何回退源） */
+function defaultGeomOf(
+  base: SymbolLook['art'],
+  fallback: SymbolLook['art'],
+): { gw: number; gh: number } | null {
+  const art = fallback ?? base
+  return art ? { gw: art.gw, gh: art.gh } : null
+}
+
+/** 长宽比偏离 1 超过 5 倍就算细长（兜住没标 linear、但图形明显是条线的灯具） */
+const ELONGATED = 5
+const aspectOf = (g: { gw: number; gh: number }) => g.gh / g.gw
+
+/**
+ * 默认图标是不是一条细长的线：有 `linear` 标记，或长宽比偏离 1 超过 5 倍
+ * （兜住没标 linear、但图形明显是条线的灯具）。普通设备返回 false，几何保持方形。
+ */
+function isElongated(linear: boolean | undefined, defaultGeom: { gw: number; gh: number }) {
+  const a = aspectOf(defaultGeom)
+  return Boolean(linear) || a < 1 / ELONGATED || a > ELONGATED
 }

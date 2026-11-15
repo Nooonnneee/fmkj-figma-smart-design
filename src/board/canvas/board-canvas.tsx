@@ -21,6 +21,7 @@ import { fittingScale, formatMm, gridSpec, niceStep, rulerStep } from '../core/p
 import {
   lookOptionsFor,
   symbolGeom,
+  type DeviceDefaults,
   type ProductImageLookup,
   type SymbolGeom,
 } from '../core/symbols'
@@ -74,6 +75,11 @@ export type BoardCanvasProps = {
    * 不传时 photo 风格回退默认图标——方案页、打印、导出都不需要改。
    */
   productImage?: ProductImageLookup | null
+  /**
+   * 项目默认型号（可选）：点位没有自己的 productId 时，按设备类型取默认型号的照片。
+   * 只影响实拍风格的显示，不写回图纸数据。
+   */
+  defaults?: DeviceDefaults | null
   className?: string
 }
 
@@ -183,12 +189,13 @@ export function BoardCanvas(props: BoardCanvasProps) {
 
   const shown = preview?.doc ?? doc
   const productImage = props.productImage ?? null
+  const defaults = props.defaults ?? null
 
   /** 统一的 look：图标风格来自 view.iconStyle，产品照片按需查表 */
   const lookAt = useCallback(
     (o: Pick<SymbolObj, 'symbolId' | 'data'>) =>
-      pack.look(o, lookOptionsFor(o, view.iconStyle, productImage)),
-    [pack, view.iconStyle, productImage],
+      pack.look(o, lookOptionsFor(o, view.iconStyle, productImage, defaults)),
+    [pack, view.iconStyle, productImage, defaults],
   )
 
   // 符号几何（显示尺寸、外接框、代号位置）

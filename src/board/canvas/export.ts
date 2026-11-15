@@ -10,28 +10,94 @@ import {
   LABEL_SIZE,
   lookOptionsFor,
   symbolGeom,
+  type DeviceDefaults,
   type ProductImageLookup,
 } from '../core/symbols'
-import type { BoardDoc, BoardFile, SheetObj, ViewSettings } from '../core/types'
+import type { BoardDoc, BoardFile, SheetObj, SymbolObj, ViewSettings } from '../core/types'
+import type { SymbolArt } from '../core/symbols'
 import { downloadBlob } from '@/lib/export-pdf'
 import { renderPointDisplayEffectsSvg } from '@/lib/point-display-effects'
 
 const esc = (s: string) =>
   s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 
-async function toDataUrl(url: string, cache: Map<string, string>) {
+/** 字节 → base64（分块，避免大图时 String.fromCharCode 爆栈；不依赖 FileReader，导出逻辑可在 Node 里测） */
+function bytesToBase64(bytes: Uint8Array): string {
+  let bin = ''
+  const CHUNK = 0x8000
+  for (let i = 0; i < bytes.length; i += CHUNK)
+    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+  return btoa(bin)
+}
+
+/** 取一张图并内联成 data URL；取不到（404 / 跨域 / 网络错误）直接抛错，由调用方决定回退。 */
+async function toDataUrl(url: string, cache: Map<string, string>): Promise<string> {
   if (url.startsWith('data:')) return url
   const hit = cache.get(url)
   if (hit) return hit
-  const blob = await (await fetch(url)).blob()
-  const data = await new Promise<string>((resolve, reject) => {
-    const r = new FileReader()
-    r.onload = () => resolve(String(r.result))
-    r.onerror = reject
-    r.readAsDataURL(blob)
-  })
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`图片加载失败（${res.status}）：${url}`)
+  const blob = await res.blob()
+  const bytes = new Uint8Array(await blob.arrayBuffer())
+  const data = `data:${blob.type || 'image/png'};base64,${bytesToBase64(bytes)}`
   cache.set(url, data)
   return data
+}
+
+/** 取图失败返回 null，让调用方回退到默认图标而不是把整张图纸导出弄挂 */
+export async function toDataUrlSafe(
+  url: string,
+  cache: Map<string, string>,
+): Promise<string | null> {
+  try {
+    return await toDataUrl(url, cache)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 导出一个点位要画的图：优先当前风格的图形，取不到就回退默认图标，
+ * 再取不到就回退实心标记；全都取不到才返回 null（跳过这个点位，不中断导出）。
+ * 纯函数、只依赖 fetch，测试里可以 mock。
+ */
+export async function resolveExportIcon(
+  o: SymbolObj,
+  view: ViewSettings,
+  pack: SystemPack,
+  opts: {
+    productImage?: ProductImageLookup | null
+    defaults?: DeviceDefaults | null
+    mmPerUnit?: number | null
+  },
+  cache: Map<string, string>,
+): Promise<
+  | { kind: 'art'; href: string; art: SymbolArt; geom: ReturnType<typeof symbolGeom> }
+  | { kind: 'marker'; href: string; geom: ReturnType<typeof symbolGeom> }
+  | null
+> {
+  const mmPerUnit = opts.mmPerUnit ?? null
+  const styled = pack.look(o, lookOptionsFor(o, view.iconStyle, opts.productImage, opts.defaults))
+  const g = symbolGeom(o, styled, view, mmPerUnit)
+  if (!g.marker && styled.art) {
+    const href = await toDataUrlSafe(styled.art.src, cache)
+    if (href) return { kind: 'art', href, art: styled.art, geom: g }
+  }
+  // 当前风格取不到图（产品照片 404 / 跨域 / CAD data URL 坏了）：退回默认图标
+  if (view.iconStyle && view.iconStyle !== 'default') {
+    const plain = pack.look(o, { iconStyle: 'default' })
+    const pg = symbolGeom(o, plain, view, mmPerUnit)
+    if (!pg.marker && plain.art) {
+      const href = await toDataUrlSafe(plain.art.src, cache)
+      if (href) return { kind: 'art', href, art: plain.art, geom: pg }
+    }
+  }
+  // 图标也没有：退回实心标记（与画布上「没有图形就画标记」一致）
+  if (styled.marker) {
+    const href = await toDataUrlSafe(styled.marker, cache)
+    if (href) return { kind: 'marker', href, geom: g }
+  }
+  return null
 }
 
 /**
@@ -49,8 +115,10 @@ export async function exportSheetPng(opts: {
   project: string
   /** 产品照片查表（可选）；不传时 photo 风格回退默认图标 */
   productImage?: ProductImageLookup | null
+  /** 项目默认型号（可选）：点位没有自己的 productId 时按设备类型取照片 */
+  defaults?: DeviceDefaults | null
 }) {
-  const { doc, files, sheet, pack, view, hidden, productImage = null } = opts
+  const { doc, files, sheet, pack, view, hidden, productImage = null, defaults = null } = opts
   const paper = PAPERS[pack.paper]
   const DPI = 150
   const k = DPI / 25.4
@@ -84,10 +152,14 @@ export async function exportSheetPng(opts: {
   parts.push(
     `<g transform="translate(${ox} ${oy}) scale(${u}) translate(${-sheet.x} ${-sheet.y})">`,
   )
-  if (sheetSrc)
-    parts.push(
-      `<image href="${await toDataUrl(sheetSrc, cache)}" x="${sheet.x}" y="${sheet.y}" width="${sheet.w}" height="${sheet.h}" opacity="${view.sheetOpacity}" preserveAspectRatio="none"/>`,
-    )
+  if (sheetSrc) {
+    // 底图取不到时只少一张底图，点位和图例照常导出
+    const href = await toDataUrlSafe(sheetSrc, cache)
+    if (href)
+      parts.push(
+        `<image href="${href}" x="${sheet.x}" y="${sheet.y}" width="${sheet.w}" height="${sheet.h}" opacity="${view.sheetOpacity}" preserveAspectRatio="none"/>`,
+      )
+  }
   parts.push(
     `<rect x="${sheet.x}" y="${sheet.y}" width="${sheet.w}" height="${sheet.h}" fill="none" stroke="#d4d4d4" stroke-width="${0.6 / u}"/>`,
   )
@@ -126,21 +198,27 @@ export async function exportSheetPng(opts: {
   const used = new Set<string>()
   for (const o of doc.objects) {
     if (o.kind !== 'symbol' || hidden.has(o.id) || !inside(o.x, o.y)) continue
-    // 导出跟着工具栏选的图标风格走；CAD 矢量在这里已经是内联 data URL，toDataUrl 直接透传
-    const look = pack.look(o, lookOptionsFor(o, view.iconStyle, productImage))
+    // 导出跟着工具栏选的图标风格走；CAD 矢量在这里已经是内联 data URL，toDataUrl 直接透传。
+    // 任何一张图取不到（照片 404 / 跨域）都回退默认图标，整张图纸照常导出。
+    const icon = await resolveExportIcon(
+      o,
+      view,
+      pack,
+      { productImage, defaults, mmPerUnit: sheetAt(doc, o.x, o.y)?.mmPerUnit ?? null },
+      cache,
+    )
+    if (!icon) continue
     used.add(o.id)
-    const g = symbolGeom(o, look, view, sheetAt(doc, o.x, o.y)?.mmPerUnit ?? null)
-    if (g.marker || !look.art) {
-      if (look.marker)
-        parts.push(
-          `<image href="${await toDataUrl(look.marker, cache)}" x="${o.x - g.w / 2}" y="${o.y - g.h / 2}" width="${g.w}" height="${g.h}"/>`,
-        )
-    } else {
-      const rot = o.angle ? ` transform="rotate(${toDeg(o.angle)} ${o.x} ${o.y})"` : ''
+    const { geom: g } = icon
+    const rot = o.angle ? ` transform="rotate(${toDeg(o.angle)} ${o.x} ${o.y})"` : ''
+    if (icon.kind === 'marker')
       parts.push(
-        `<image href="${await toDataUrl(look.art.src, cache)}" x="${o.x - g.imgW / 2}" y="${o.y - g.imgH / 2}" width="${g.imgW}" height="${g.imgH}" preserveAspectRatio="${artAspectRatio(look.art)}"${rot}/>`,
+        `<image href="${icon.href}" x="${o.x - g.w / 2}" y="${o.y - g.h / 2}" width="${g.w}" height="${g.h}"/>`,
       )
-    }
+    else
+      parts.push(
+        `<image href="${icon.href}" x="${o.x - g.imgW / 2}" y="${o.y - g.imgH / 2}" width="${g.imgW}" height="${g.imgH}" preserveAspectRatio="${artAspectRatio(icon.art)}"${rot}/>`,
+      )
   }
   parts.push('</g>')
 
@@ -156,13 +234,22 @@ export async function exportSheetPng(opts: {
     { objects: doc.objects.filter((o) => used.has(o.id)) },
     { iconStyle: view.iconStyle },
     productImage,
+    defaults,
   )
   const rowH = Math.min(7.2, (paper.h - 2 * margin - titleH - 14) / Math.max(1, rows.length)) * k
   for (const r of rows) {
-    const src = view.symbolStyle === 'plan' && r.look.art ? r.look.art.src : r.look.marker
-    if (src)
+    // 图例图标取不到就只画文字，不中断整张图纸的导出
+    const candidates =
+      view.symbolStyle === 'plan' && r.look.art ? [r.look.art.src, r.look.marker] : [r.look.marker]
+    let href: string | null = null
+    for (const src of candidates) {
+      if (!src) continue
+      href = await toDataUrlSafe(src, cache)
+      if (href) break
+    }
+    if (href)
       parts.push(
-        `<image href="${await toDataUrl(src, cache)}" x="${lx}" y="${ly}" width="${rowH * 0.85}" height="${rowH * 0.85}"/>`,
+        `<image href="${href}" x="${lx}" y="${ly}" width="${rowH * 0.85}" height="${rowH * 0.85}"/>`,
       )
     parts.push(
       `<text x="${lx + rowH}" y="${ly + rowH * 0.6}" font-size="${Math.min(3.2 * k, rowH * 0.5)}" fill="#222" font-family="system-ui,sans-serif">${esc(r.label)}</text>`,

@@ -20,7 +20,7 @@ import type { SymbolArt, SymbolLook } from '@/board/core/symbols'
 import type { IconStyle } from '@/board/core/types'
 import type { SymbolKey } from '@/lib/device-types'
 
-import { cadSymbolBodyForKey, cadSymbolSvg } from './cad-symbols'
+import { cadArtFor, cadSymbolBodyForKey } from './cad-symbols'
 import { SYMBOL_ASSET_PAD, SYMBOL_ASSET_VERSION, SYMBOL_ASSETS } from './symbols.generated'
 
 export type { IconStyle }
@@ -70,7 +70,15 @@ export function photoArt(image: string | null | undefined): SymbolArt | null {
  * - { kind: 'vector' } 矢量（CAD，带 viewBox 的完整 SVG）；
  * - null 表示这个风格下没有可用图形，由调用方回退。
  */
-export type IconArt = { kind: 'image'; art: SymbolArt } | { kind: 'vector'; svg: string } | null
+export type IconArt =
+  | { kind: 'image'; art: SymbolArt }
+  | {
+      kind: 'vector'
+      svg: string
+      /** 矢量画面的比例（线性灯具是 160×6，普通符号 32×32） */
+      geom: { gw: number; gh: number }
+    }
+  | null
 
 export type IconArtInput = {
   /** 设备类型的符号键（switch / downlight / camera ……） */
@@ -96,8 +104,13 @@ export function resolveIconArt(style: IconStyle | undefined, input: IconArtInput
       return art ? { kind: 'image', art } : imageOrNull(input.fallback)
     }
     case 'cad': {
-      const svg = cadSymbolSvg(input.symbol, input.switchKeys)
-      return svg ? { kind: 'vector', svg } : imageOrNull(input.fallback)
+      const art = cadArtFor(input.symbol, input.switchKeys)
+      if (!art) return imageOrNull(input.fallback)
+      return {
+        kind: 'vector',
+        svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${art.viewBox}">${art.body}</svg>`,
+        geom: viewBoxAspect(art.viewBox),
+      }
     }
     case 'sketch':
       return imageOrNull(input.sketch ?? input.fallback)
@@ -110,6 +123,13 @@ export function resolveIconArt(style: IconStyle | undefined, input: IconArtInput
 const imageOrNull = (art: SymbolArt | null | undefined): IconArt =>
   art ? { kind: 'image', art } : null
 
+/** viewBox "0 0 W H" → 主体比例（长边归一，与其它 SymbolArt 的含义一致） */
+function viewBoxAspect(viewBox: string): { gw: number; gh: number } {
+  const [, , w, h] = viewBox.split(/\s+/).map(Number)
+  const L = Math.max(w, h) || 1
+  return { gw: w / L, gh: h / L }
+}
+
 /**
  * 把解析结果套到 SymbolLook 上。
  * 矢量也走 art.src（内联 data URL）：画布 <image> 和导出 toDataUrl 是同一套取图逻辑，
@@ -119,7 +139,9 @@ export function applyIconArt(look: SymbolLook, choice: IconArt): SymbolLook {
   if (!choice) return look
   if (choice.kind === 'image') return { ...look, art: choice.art }
   const src = vectorDataUrl(choice.svg)
-  return { ...look, art: { src, srcSm: src, ...UNIT_GEOM, pad: 0, fit: 'contain' } }
+  // 矢量图形按自己的 viewBox 画满整个主体框（stretch）：普通符号是方的、没有拉伸，
+  // 线性灯具会把「一条装满的画」拉伸到默认图标的细长比例上。
+  return { ...look, art: { src, srcSm: src, ...choice.geom, pad: 0, fit: 'stretch' } }
 }
 
 /** CAD 图标的 data URL（导出用；内联图元，不依赖网络） */

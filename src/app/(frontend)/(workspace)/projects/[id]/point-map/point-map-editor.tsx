@@ -1073,6 +1073,7 @@ export function PointMapEditor({
         hidden,
         project: projectName,
         productImage,
+        defaults,
       })
       download(blob, `${projectName}-${sheet.name}-点位图.png`)
       showToast({
@@ -1085,7 +1086,7 @@ export function PointMapEditor({
     } finally {
       dismissLoading()
     }
-  }, [activeSheet, board, view, hidden, projectName, showToast, productImage])
+  }, [activeSheet, board, view, hidden, projectName, showToast, productImage, defaults])
 
   const exportJson = useCallback(() => {
     download(
@@ -2047,6 +2048,7 @@ export function PointMapEditor({
               dropType={DRAG_TYPE}
               onDrop={onDrop}
               productImage={productImage}
+              defaults={defaults}
             />
             {armed || tool === 'area' || tool === 'calibrate' ? (
               <div className="absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-primary/30 bg-background/95 px-3 py-1.5 text-xs shadow-sm">

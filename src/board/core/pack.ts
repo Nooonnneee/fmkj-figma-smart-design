@@ -1,7 +1,7 @@
 import type { PointDisplayEffect } from '@/lib/point-display-effects'
 
 import type { PaperId } from './paper'
-import type { ProductImageLookup, SymbolLook } from './symbols'
+import type { DeviceDefaults, ProductImageLookup, SymbolLook } from './symbols'
 import type { BoardDoc, LayerId, LookOptions, SymbolObj, Vec } from './types'
 
 export type CheckLevel = 'error' | 'warning' | 'info'
@@ -66,9 +66,15 @@ export type SystemPack = {
   check: (doc: BoardDoc) => CheckIssue[]
   /**
    * 图例（按 look.key 汇总）。opts 与 look 相同，导出时图例要跟画布选中的图标风格一致。
-   * products 可选：photo 风格下按点位所选产品取照片；不传就回退默认图标。
+   * products / defaults 可选：photo 风格下按「点位产品 → 设备类型默认型号」取照片；
+   * 不传就回退默认图标。
    */
-  legend: (doc: BoardDoc, opts?: LookOptions, products?: ProductImageLookup | null) => LegendRow[]
+  legend: (
+    doc: BoardDoc,
+    opts?: LookOptions,
+    products?: ProductImageLookup | null,
+    defaults?: DeviceDefaults | null,
+  ) => LegendRow[]
   /** 导出模板 */
   export: { title: string; note: string }
   /** 智能辅助图层（可选） */
