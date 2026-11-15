@@ -227,8 +227,15 @@ describe('A2. 共享符号键的灯具按「这个点位」选 CAD 画面（回�
       const vb = svg.match(/viewBox="([^"]+)"/)?.[1]
       expect(vb, c.family).toBeTruthy()
       const [, , vw, vh] = vb!.split(/\s+/).map(Number)
-      // 画幅本身就是目标比例（不是 32×32 的方图例）
-      expect(vh / vw, `${c.family} 画幅应与几何同比`).toBeCloseTo(art.gh / art.gw, 3)
+      // 目标比例来自调用方 cadGeom（expectedCadGeom 与 look.ts 的 cadGeomOf 同一口径），
+      // 由 sizeCm / 默认图标比例独立算出——不派生自产出的 viewBox 本身，避免两侧同源自指。
+      const plain = lookOf(c.o).art!
+      const target = expectedCadGeom(c.o.sizeCm, plain)
+      // 画幅必须是调用方传入的目标比例（不是 32×32 的方图例；更不能拿 viewBox 自己证明自己）
+      expect(vh / vw, `${c.family} 画幅应与调用方传入的目标几何同比`).toBeCloseTo(
+        target.gh / target.gw,
+        3,
+      )
       // 所有圆弧的横竖半径相等（circle 或 A 指令），所以落图后不会被拉成椭圆
       for (const m of svg.matchAll(/<circle[^>]*r="([\d.]+)"/g)) expect(+m[1]).toBeGreaterThan(0)
       for (const m of svg.matchAll(/A([\d.]+) ([\d.]+) /g))
