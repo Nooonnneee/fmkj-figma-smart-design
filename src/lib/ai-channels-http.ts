@@ -9,6 +9,7 @@ import {
   type PayloadLike,
 } from '@/lib/ai-channels'
 import { ChannelUrlError } from '@/lib/ai-channels-url-guard'
+import { decodePathSegment } from '@/lib/safe-path-decode'
 
 /**
  * 成员 AI 渠道端点的 HTTP 层。
@@ -92,20 +93,21 @@ export function rejectCrossOrigin(request: Request): Response | null {
 }
 
 /**
- * 解出 URL 里的 `:key`。Next 给的是路径里的原始片段，可能含畸形百分号编码
- * （`%E0%A4%A`、`%FF`）——`decodeURIComponent` 对它们抛 `URIError`。
- * 这个函数必须**返回 null 而不是抛错**：以前解码在 `handle*` 的 try 之外，
- * 异常一路冒到 Next，变成 500 HTML，客户端拿不到「渠道不存在」。
+ * 解出 URL 里的 `:key`。
+ *
+ * **这一层不是畸形编码 500 的修复点**：Next 16 的路由匹配层在进入 route handler
+ * 之前就会 `decodeURIComponent` 动态段，畸形编码（`%E0%A4%A`、`%FF`）在那里已经
+ * 抛错变成 500，请求到不了这里。真正的拦截在 `src/proxy.ts`（matcher 覆盖
+ * `/api/ai/channels/:path*`，解码失败直接回 404）。
+ *
+ * 这里保留同样「解不出来返回 null」的行为，作为 proxy 被绕过（直接调用 handler、
+ * 未来路由结构调整）时的第二道防线。
  *
  * 非法编码按「不存在」处理（404，而不是 400）：400 会泄露「这个 key 编码合法但不属于你」
  * 与「编码本身非法」的差异，404 与正常找不到的响应完全一致。
  */
 export function decodeChannelKeyParam(raw: string): string | null {
-  try {
-    return decodeURIComponent(raw)
-  } catch {
-    return null
-  }
+  return decodePathSegment(raw)
 }
 
 /**

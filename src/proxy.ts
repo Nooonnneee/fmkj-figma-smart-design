@@ -1,5 +1,28 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
+import { decodePathSegment } from '@/lib/safe-path-decode'
+
+const AI_CHANNELS_PREFIX = '/api/ai/channels/'
+
+/**
+ * 畸形百分号编码的渠道 key 必须在 Next 的路由匹配层之前拦掉。
+ *
+ * Next 16.4.2 在调用 route handler **之前**就对动态段做 `decodeURIComponent`
+ * （`next/dist/shared/lib/router/utils/route-matcher.js`），`%E0%A4%A` / `%FF` / `%` / `%zz`
+ * 会直接抛 `DecodeError` → 500 `text/plain`，请求根本走不到 route handler 里的
+ * CSRF 校验、`appAuth` 和 `decodeChannelKeyParam`。把兜底放在 route handler 里是错的层。
+ *
+ * 这里按「渠道不存在」返回 404 + 同一份 JSON，与正常找不到逐字节一致：
+ * 不区分「编码非法」和「编码合法但不属于你」，避免泄露 key 的存在性。
+ *
+ * 注意：`request.nextUrl.pathname` 保留**原始**百分号编码（已实测 `%63%31`
+ * 仍是 `%63%31`），所以这里拿到的是可以直接解码的原始片段。
+ */
+function hasMalformedChannelSegment(pathname: string): boolean {
+  const rest = pathname.slice(AI_CHANNELS_PREFIX.length)
+  return rest.split('/').some((segment) => decodePathSegment(segment) === null)
+}
+
 /**
  * Payload 的 `/api/media/file/:filename` 只注册了 GET（见 payload/dist/uploads/endpoints），
  * **不处理 HEAD** —— 任何 HEAD 请求都会落到 404。
@@ -30,6 +53,13 @@ async function handleMediaHead(request: NextRequest): Promise<Response> {
  * 不做鉴权判断：每个页面、接口和 Server Action 仍各自校验登录与权限。
  */
 export async function proxy(request: NextRequest) {
+  if (
+    request.nextUrl.pathname.startsWith(AI_CHANNELS_PREFIX) &&
+    hasMalformedChannelSegment(request.nextUrl.pathname)
+  ) {
+    return NextResponse.json({ ok: false, error: '找不到这个渠道' }, { status: 404 })
+  }
+
   if (request.method === 'HEAD' && request.nextUrl.pathname.startsWith('/api/media/file/')) {
     try {
       return await handleMediaHead(request)
@@ -52,6 +82,8 @@ export const config = {
     '/settings/:path*',
     '/ai/:path*',
     '/quotes/:path*',
+    // 渠道 key 的畸形编码要在 Next 路由匹配抛 DecodeError 之前拦掉
+    '/api/ai/channels/:path*',
     // HEAD 探测：只影响 HEAD 请求（GET 仍由 Payload 直接处理，不走这里）
     '/api/media/file/:path*',
   ],
