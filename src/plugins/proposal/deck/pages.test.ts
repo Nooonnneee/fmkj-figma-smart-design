@@ -29,7 +29,7 @@ vi.mock('next/image', () => ({
 import { resolveDisplayProfile } from '@/lib/display-profile'
 import type { ProjectDocsData } from '@/lib/project-docs'
 import type { ManagedScene } from '@/lib/scenes'
-import { deckPages } from './index'
+import { deckPages, INVEST_PAGE_FULL_ROWS, INVEST_PAGE_LAST_ROWS } from './index'
 import { buildDeck, codeRange, installNote, roomScenes, yuanShort } from './model'
 import { buildNetworkCamera } from './network-camera'
 import { CoverPage } from './pages/cover'
@@ -322,6 +322,55 @@ describe('投资明细分页：最后一页留出不含项色块', () => {
     expect(invest[0]).not.toContain('Q13')
     expect(invest[1]).toContain('07 投资明细（2/2）')
     expect(invest[1]).toContain('Q13')
+  })
+
+  /**
+   * 上一轮漏网的地方：装配层只覆盖了 13 / 20 行，`last` 落在 8..12 这一段没人管。
+   * n=20 改成 last≥20 才红、n=13 改成 last≥13 才红，于是把调用点写成 (12, 12)
+   * 也全绿——但 10 / 12 / 24 行的页数会立刻变掉。下面按行数钉住页数、每页行数和页眉。
+   *
+   * 行落点用页面里真实的 Q 条目编号反推（Q01→第 0 行），不是复用 paginateRows 的输出；
+   * 这样页数、分页位置、条目没丢没重任何一处变了都会红。
+   */
+  const rowRefsOf = (html: string) => [
+    ...new Set([...html.matchAll(/Q(\d{2})/g)].map((match) => Number(match[1]) - 1)),
+  ]
+
+  it('装配层 9 / 10 / 11 / 12 / 24 行：页数、每页行数、行落点与页眉分页标记', () => {
+    const cases: Array<{ n: number; lens: number[]; parts: string[] }> = [
+      { n: 9, lens: [9], parts: [] },
+      { n: 10, lens: [7, 3], parts: ['（1/2）', '（2/2）'] },
+      { n: 11, lens: [8, 3], parts: ['（1/2）', '（2/2）'] },
+      { n: 12, lens: [9, 3], parts: ['（1/2）', '（2/2）'] },
+      { n: 24, lens: [12, 9, 3], parts: ['（1/3）', '（2/3）', '（3/3）'] },
+    ]
+
+    for (const { n, lens, parts } of cases) {
+      const invest = investPagesOf(quoteDocs(n))
+      const refs = invest.map(rowRefsOf)
+
+      expect(invest, `n=${n} 页数`).toHaveLength(lens.length)
+      expect(
+        refs.map((page) => page.length),
+        `n=${n} 每页行数`,
+      ).toEqual(lens)
+      // 行落点连续：第 k 页接着上一页往下，不丢行、不重复
+      expect(refs.flat(), `n=${n} 行落点`).toEqual(list(n))
+
+      for (const [i, page] of invest.entries()) {
+        expect(page, `n=${n} 第 ${i + 1} 页页眉`).toContain(`07 投资明细${parts[i] ?? ''}`)
+        // 不含项 / 有效期色块只印在末页（固定 top-[756px]，末页行数超限就会压上去）
+        if (i === lens.length - 1) expect(page, `n=${n} 末页色块`).toContain('不含项目 / 业主另配')
+        else expect(page, `n=${n} 第 ${i + 1} 页色块`).not.toContain('不含项目 / 业主另配')
+      }
+      expect(invest[0], `n=${n} 单页不应有分页标记`).not.toContain('（1/1）')
+    }
+  })
+
+  it('页容量常量本身钉住为 12 / 9（调用点行为见上一条）', () => {
+    // 这两条防的是「常量本身被改错」；上一条防的是「调用点没走常量 / 改错字面量」。
+    expect(INVEST_PAGE_FULL_ROWS).toBe(12)
+    expect(INVEST_PAGE_LAST_ROWS).toBe(9)
   })
 })
 

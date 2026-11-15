@@ -37,6 +37,14 @@ export {
 
 type PageRender = (no: number, total: number) => React.ReactNode
 
+/**
+ * 投资明细的分页容量：中间页每页 12 行，末页最多 9 行——末页底部固定 top-[756px]
+ * 要印「不含项 / 有效期」色块，多塞行会压到色块上。
+ * 导出是为了让装配层用例能钉住这两个值本身；调用点必须用常量，不要写字面量。
+ */
+export const INVEST_PAGE_FULL_ROWS = 12
+export const INVEST_PAGE_LAST_ROWS = 9
+
 const ALL_SECTIONS: DeckSection[] = [
   'cover',
   'plans',
@@ -170,7 +178,7 @@ function deckPageRenders(
         ...m.items.map((item) => ({ kind: 'item' as const, item })),
         ...m.fees.map((fee) => ({ kind: 'fee' as const, fee })),
       ]
-      const investPages = paginateRows(rows, 12, 9)
+      const investPages = paginateRows(rows, INVEST_PAGE_FULL_ROWS, INVEST_PAGE_LAST_ROWS)
       investPages.forEach((list, i) =>
         pages.push((no, total) => (
           <InvestmentPage
