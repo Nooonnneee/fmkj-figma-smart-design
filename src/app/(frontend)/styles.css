@@ -795,15 +795,16 @@ html:has([data-landing]) {
  * 场景根本读不清（2026-11-15 视觉审计）。
  *
  * 重排后：纸张铺满屏宽、页边距收窄到 12px、表头允许换行、字号保持原尺寸。
- * 导出 PDF 时 export-pdf.ts 会把 zoom 还原为 1，并把宽度临时固定为 210mm，
- * 所以导出结果的物理尺寸不受这里的窄屏规则影响（样式只在窄屏的 screen 媒体查询里生效，
- * `@media print` 里也不会命中）。
+ *
+ * 导出 PDF 时 `export-pdf.ts` 会把 zoom 还原为 1、把宽度临时固定为 210mm，并给根节点
+ * 打上 `data-exporting` —— 下面每条规则都用 `:not([data-exporting])` 排除该状态，
+ * 所以导出结果仍是 A4 原始页边距（14mm），和桌面端导出完全一致。不要在导出期间依赖这些规则。
  *
  * 断点取 A4 纸宽 794 + 两侧留白 16 = 810：比这更宽的屏幕（1024 平板、桌面）保持
  * 原来 794px 的纸张预览不变，只有真正放不下 A4 手机的屏幕才重排。
  */
 @media screen and (max-width: 809px) {
-  article[data-export-page='flow'] {
+  article[data-export-page='flow']:not([data-exporting]) {
     width: 100%;
     min-width: 0;
     padding-left: 12px;
@@ -813,12 +814,12 @@ html:has([data-landing]) {
     margin-right: 0;
   }
   /* 表格本身已是 w-full；关键是表头文字允许折行，否则「单价 / 金额」这类短列宽会把表撑出屏幕 */
-  article[data-export-page='flow'] th {
+  article[data-export-page='flow']:not([data-exporting]) th {
     white-space: normal;
   }
   /* 单元格左右内距收窄，给正文多留 16–24px */
-  article[data-export-page='flow'] td,
-  article[data-export-page='flow'] th {
+  article[data-export-page='flow']:not([data-exporting]) td,
+  article[data-export-page='flow']:not([data-exporting]) th {
     padding-left: 4px;
     padding-right: 4px;
   }
