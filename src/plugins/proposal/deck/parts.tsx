@@ -7,6 +7,7 @@ import { PointDisplayEffects } from '@/components/point-display-effects'
 import { MiniAppCode } from '@/components/mini-app-code'
 import { brandLatin } from '@/documents/parts'
 import { brandInitials } from '@/lib/brand'
+import type { DisplayProfile } from '@/lib/display-profile'
 import { markerSrc } from '@/lib/point-marker-data'
 import { buildPointDisplayEffects, type PointDisplayEffect } from '@/lib/point-display-effects'
 import { areaLabelAnchor, areaOutline, type AreaInfo, type SheetInfo } from '@/lib/point-scene'
@@ -17,8 +18,18 @@ import type { ProposalMarkers } from '../templates'
 import { pad, type DeckModel, type DeckPoint } from './model'
 import type { DeckTheme } from './themes'
 
-/** lazy：缩略图与模板库里图片延迟加载（打印 / 导出时必须立即加载，默认 false） */
-export type DeckCtx = { m: DeckModel; theme: DeckTheme; markers: ProposalMarkers; lazy?: boolean }
+/**
+ * lazy：缩略图与模板库里图片延迟加载（打印 / 导出时必须立即加载，默认 false）
+ * profile：项目选定的显示方案，所有画平面图的页都从这里取网格 / 覆盖圈 / 光晕 / 底图透明度，
+ * 保证同一份方案里各页的平面图视觉一致（在 deckPageRenders 里统一解析一次）。
+ */
+export type DeckCtx = {
+  m: DeckModel
+  theme: DeckTheme
+  markers: ProposalMarkers
+  lazy?: boolean
+  profile: DisplayProfile
+}
 
 /** 方案图片的加载方式：导出需要同步加载；缩略图延迟加载，避免一次拉取多张大图 */
 export const imgLoading = (ctx: DeckCtx) =>
@@ -529,7 +540,7 @@ export function PlanView({
   displayEffects?: boolean
   /** 显示网格。不传则保持此前的做法（不画网格）。 */
   grid?: boolean
-  /** 底图透明度 0–1。不传则用 0.72。 */
+  /** 底图透明度系数 0–1，乘在主题底图透明度（浅色 0.62 / 深色 0.8）上。不传则不额外淡化。 */
   sheetOpacity?: number
 }) {
   const box = crop ?? { x: 0, y: 0, w: SW, h: SH }

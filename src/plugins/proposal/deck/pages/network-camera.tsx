@@ -150,6 +150,11 @@ export function NetworkCameraPage({
           >
             <div className="flex h-[616px] items-center justify-center pt-[44px] pb-[12px]">
               {hasPlan && s ? (
+                /*
+                 * 覆盖展示页的职责就是画波形：覆盖圈与光晕在这页恒开，不随显示方案关掉，
+                 * 否则副标题、CoverageLegend 和图会互相打脸。方案只决定底图浓淡。
+                 * displayEffects 不单独传，让 PlanView 沿用 coverage（旧调用的兼容规则）。
+                 */
                 <PlanView
                   ctx={ctx}
                   sheet={s.sheet}
@@ -159,6 +164,8 @@ export function NetworkCameraPage({
                   height={560}
                   crop={contentCrop(s.sheet, s.areas, plotted)}
                   coverage
+                  grid={ctx.profile.grid}
+                  sheetOpacity={ctx.profile.sheetOpacity}
                 />
               ) : (
                 <div className="doc-body flex max-w-[660px] flex-col items-center gap-[18px] px-[36px] text-center text-[#787771]">

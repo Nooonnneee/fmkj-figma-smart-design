@@ -7,6 +7,7 @@ import { Fragment } from 'react'
 
 import { ScaledStack } from '@/components/scaled-frame'
 import { DocRoot } from '@/documents/parts'
+import { resolveDisplayProfile } from '@/lib/display-profile'
 import type { ProjectDocsData } from '@/lib/project-docs'
 
 import type { DeckSection } from '../framework'
@@ -95,7 +96,9 @@ function deckPageRenders(
 ): PageRender[] {
   const m = buildDeck(d)
   const network = buildNetworkCamera(m)
-  const ctx: DeckCtx = { m, theme, markers: 'symbol', lazy: opts.lazy }
+  // 显示方案只在这里解析一次：平面页 / 空间小平面 / 覆盖页共用，避免各页各读一套。
+  const profile = resolveDisplayProfile(d.project.displayProfile)
+  const ctx: DeckCtx = { m, theme, markers: 'symbol', lazy: opts.lazy, profile }
   const pages: PageRender[] = []
   const needsPoints = new Set<DeckSection>(['plans', 'system', 'zones', 'scenes', 'rooms'])
   const sections = (opts.sections?.length ? opts.sections : ALL_SECTIONS).filter(
