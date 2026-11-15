@@ -61,6 +61,7 @@ import {
 import type { AfterSalesData, ServiceRecordView } from '@/lib/services/after-sales-service'
 import { cn } from '@/lib/utils'
 
+import { WORKBENCH_SECTION_HEADING_CLASS } from '@/components/page-header'
 import {
   createConfigBackupAction,
   deleteServiceRecordAction,
@@ -264,7 +265,7 @@ export function AfterSalesBoard({
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <h2 className="text-xl font-semibold tracking-tight">售后维保</h2>
+            <h2 className={WORKBENCH_SECTION_HEADING_CLASS}>售后维保</h2>
           </div>
           <p className="text-sm text-muted-foreground">
             质保台账、检修与设备更换记录、配置备份

@@ -34,6 +34,7 @@ import { ArchiveTemplatePicker } from './template-picker-field'
 import { AfterSalesSummary } from './after-sales-summary'
 import { loadAfterSales } from '@/lib/services/after-sales-service'
 import { parseShareConfig } from '@/lib/project-access'
+import { WORKBENCH_SECTION_HEADING_CLASS } from '@/components/page-header'
 
 /** 归档：核对资料 → 确认定稿（一份报价、一份方案）→ 打包交付资料 → 归档（项目转为只读）。 */
 export default async function ProjectArchivePage({ params }: { params: Promise<{ id: string }> }) {
@@ -316,10 +317,10 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
   )
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
-          <h2 className="text-xl font-semibold tracking-tight">归档</h2>
+          <h2 className={WORKBENCH_SECTION_HEADING_CLASS}>归档</h2>
           {archived ? (
             <p className="text-sm text-muted-foreground">
               已于 {fmtLongDate(project.archivedAt)} 归档（只读）

@@ -1428,7 +1428,20 @@ export function PointMapEditor({
       />
 
       {/* ==================== 顶部工具栏（唯一的操作入口）：左（楼层 · 工具 · 历史）｜中（当前步骤的主操作）｜右（显示 · 缩放 · 导出 · 报价 · 保存状态） ==================== */}
-      <div className="flex h-12 shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-background px-2.5 [scrollbar-width:none]">
+      {/*
+        放不下就换行，不要横向滚动。
+
+        1024 宽实测（2026-11-15 视觉审计）：原来 `overflow-x-auto` + 右侧组
+        `min-w-0 flex-1 justify-end`，内容被压到比容器窄时向左侧溢出，
+        「同步报价」压住「生成点位」16px、「强弱电布线 Beta」徽标也压在它上面。
+        换行后每个按钮都有自己的位置：放得下仍是一行，放不下第二行接着排，
+        主操作「生成点位」不会被别的按钮盖住，页面本身也不出现横向滚动条。
+        高度用 min-h-12 而非固定 h-12，换行后画布 flex-1 自然少一点高度。
+
+        仍保留 `overflow-x-auto` 兜底：手机（390）上右侧那一组本身就比屏宽，
+        换行也放不下；交给工具条自己横向滚动，别让整个页面出现横向滚动条。
+      */}
+      <div className="flex min-h-12 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 overflow-x-auto border-b border-border bg-background px-2.5 py-1 [scrollbar-width:none]">
         <div className="flex min-w-max flex-1 items-center gap-1">
           {/* 楼层切换：切换 / 总览 / 当前图纸的重命名、清除标定、删除都在这一个菜单里；添加图纸用中间的「上传户型图」 */}
           {snap.sheets.length ? (
@@ -1742,7 +1755,12 @@ export function PointMapEditor({
           </div>
         )}
 
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-0.5">
+        {/*
+          shrink-0：这一组含缩放 / 导出 / 生成报价 / 保存状态，宽度不够时不能被压缩 ——
+          被压缩后里面的内容（justify-end）会向左侧溢出，压住中间的「生成点位」。
+          配合外层 flex-wrap，窄屏时整组换到第二行，而不是互相重叠。
+        */}
+        <div className="flex shrink-0 items-center justify-end gap-0.5">
           {readOnly ? null : (
             <ToolbarIconButton
               label={mobilePlaceOpen ? '收起设备面板' : '放置设备'}

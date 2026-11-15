@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Bot } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
+import { PageHeader, PageShell } from '@/components/page-header'
 import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
 import { getCompanyInfo } from '@/lib/cached-data'
@@ -43,23 +44,26 @@ export default async function AiPage({
 
   if (!flags['ai-copilot']) {
     return (
-      <section className="mx-auto flex w-full max-w-xl flex-col items-center gap-3 rounded-xl border border-dashed px-6 py-14 text-center">
-        <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <Bot className="size-6" />
-        </span>
-        <div className="space-y-1">
-          <h1 className="text-base font-semibold">「AI 对话侧栏（高级）」插件已关闭</h1>
-          <p className="text-xs text-muted-foreground">
-            该功能面向高级用户提供侧边栏常驻对话、技能模板库、多模型积分计费与跨插件调用。需要使用时可在插件中心开启。
-          </p>
-        </div>
-        <Button
-          size="sm"
-          variant="secondary"
-          href="/capabilities/ai-copilot"
-          label="去插件页开启"
-        />
-      </section>
+      <PageShell>
+        <PageHeader title="AI 对话" description="侧边栏常驻 AI 助手、技能模板与功能联动。" />
+        <section className="flex w-full flex-col items-center gap-3 rounded-xl border border-dashed px-6 py-14 text-center">
+          <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Bot className="size-6" />
+          </span>
+          <div className="space-y-1">
+            <h2 className="text-base font-semibold">「AI 对话侧栏（高级）」插件已关闭</h2>
+            <p className="text-xs text-muted-foreground">
+              该功能面向高级用户提供侧边栏常驻对话、技能模板库、多模型积分计费与跨插件调用。需要使用时可在插件中心开启。
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            href="/capabilities/ai-copilot"
+            label="去插件页开启"
+          />
+        </section>
+      </PageShell>
     )
   }
 
@@ -90,19 +94,24 @@ export default async function AiPage({
 
   return (
     // 视口高度减去 48px 顶栏和 main 的上下内边距
-    <div className="mx-auto flex h-[calc(100svh-5.5rem)] w-full max-w-3xl flex-col md:h-[calc(100svh-6.5rem)]">
-      <div className="flex items-center justify-between pb-2">
-        <span className="text-xs font-medium tracking-[0.18em] text-muted-foreground">AI 对话</span>
-        <Button size="sm" variant="secondary" href="/ai/image" label="AI 生图 →" />
-      </div>
-      <AiSidebarDock
-        plugins={plugins}
-        projects={projects}
-        credits={user.aiCredits ?? 0}
-        configured={aiConfigured(activeModels)}
-        models={activeModels}
-        initialInput={initialInput}
+    <div className="mx-auto flex w-full max-w-5xl flex-col">
+      <PageHeader
+        title="AI 对话"
+        description="在本页直接向 AI 提问、拖入户型图或点开一个常用任务。"
       />
+      <div className="flex h-[calc(100svh-11rem)] flex-col pt-3 md:h-[calc(100svh-12.5rem)]">
+        <div className="flex items-center justify-end pb-2">
+          <Button size="sm" variant="secondary" href="/ai/image" label="AI 生图 →" />
+        </div>
+        <AiSidebarDock
+          plugins={plugins}
+          projects={projects}
+          credits={user.aiCredits ?? 0}
+          configured={aiConfigured(activeModels)}
+          models={activeModels}
+          initialInput={initialInput}
+        />
+      </div>
     </div>
   )
 }

@@ -54,6 +54,7 @@ import {
 import { TextArea } from '@astryxdesign/core/TextArea'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { useToast } from '@astryxdesign/core/Toast'
+import { WORKBENCH_SECTION_HEADING_CLASS } from '@/components/page-header'
 import { Tooltip } from '@astryxdesign/core/Tooltip'
 import { contractStatusLabel } from '@/lib/contracts'
 import { DEVICE_TYPE_ORDER, deviceTypeLabel } from '@/lib/device-types'
@@ -612,7 +613,14 @@ export function QuoteEditor({
   )
 
   return (
-    <section className="mx-auto flex w-full max-w-6xl flex-col gap-5">
+    /*
+      pb-24：给右下角浮动的毛利胶囊留出安全区。
+      实测（1440×900）胶囊 264×40 停在 (1120,808)，而「报价备注」textarea 横向
+      289→1407、纵向 803→871，两者 bbox 相交 264×40 —— 滚到页面底部时胶囊正好
+      盖住备注框右下角的文字。底部留出 96px（胶囊 40 + 间距 32 + 再余 24），
+      备注框就永远滚不到胶囊下面。
+    */
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-5 pb-24">
       <SwapProductDialog
         open={Boolean(swapLine)}
         onOpenChange={(o) => !o && setSwapKey(null)}
@@ -626,6 +634,18 @@ export function QuoteEditor({
         canSetDefault={Boolean(project)}
         onConfirm={applySwap}
       />
+      {/*
+        页面标题：本页原来没有任何 h1/h2（视觉审计里是唯一一个「没有页面标题」的工作台页）。
+        项目条已给出「这是哪个项目」，这里补上这一页是什么 + 一句话说明，
+        字号与 `PageHeader` 的一级标题同级，左边缘与其他工作台页对齐。
+      */}
+      <div className="min-w-0">
+        <h2 className={WORKBENCH_SECTION_HEADING_CLASS}>报价</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          调整设备清单、附加费用与备注；保存后可在业主版报价单里导出 PDF。
+        </p>
+      </div>
+
       {/* 顶栏操作区（Untitled UI 面包屑 + 主次按钮） */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">

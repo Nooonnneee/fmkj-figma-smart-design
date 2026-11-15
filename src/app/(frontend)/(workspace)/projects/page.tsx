@@ -197,7 +197,7 @@ export default async function ProjectsPage({
   ) : null
 
   return (
-    <section className="mx-auto flex w-full max-w-6xl flex-col gap-5">
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-5">
       <PageHeader
         title="项目工作台"
         description={

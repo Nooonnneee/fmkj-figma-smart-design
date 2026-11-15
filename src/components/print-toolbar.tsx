@@ -31,6 +31,7 @@ import {
   renderPagesToPngDataUrls,
   waitForPageAssets,
 } from '@/lib/export-pdf'
+import { A4_LANDSCAPE_PX, A4_PORTRAIT_PX, resolvePrintPreview } from '@/lib/print-preview'
 import { cn } from '@/lib/utils'
 
 type Option = { value: string; label: string; href: string }
@@ -87,28 +88,50 @@ export function PrintToolbar({
     }
   }, [])
 
-  // 手机 / 小程序窄屏预览时：将固定宽度的 A4 纸张（210mm / 297mm）或 1440px 方案页等比缩放到屏幕宽度居中展示，
-  // 避免在窄屏下被挤压变形或只能看局部；点击导出时 export-pdf.ts 会临时将 zoom 还原为 1 按原始高清尺寸渲染。
+  // 手机 / 小程序窄屏预览：纵向长文（报价单 / 合同 / 交底）**铺满屏宽重排**，不再整页缩放 ——
+  // 390 宽下原来的 0.4710 缩放会把 11.5px 正文压到 5.4px，业主在手机上根本读不清。
+  // 定宽画布（点位图 / 方案页）仍然等比缩小，重排会破坏构图。
+  // 导出时 export-pdf.ts 会把 zoom 还原为 1（<article> 也会临时固定为 210mm），所以不影响 PDF 尺寸。
   useEffect(() => {
     const root = document.documentElement
-    const applyMobileFit = () => {
+    const applyPrintPreview = () => {
       const vw = Math.min(
         window.innerWidth || 9999,
         document.documentElement.clientWidth || 9999,
         window.visualViewport?.width || 9999,
         window.screen?.width || 9999,
       )
-      const fitFor = (w: number) =>
-        vw > 0 && vw < w + 16 ? Math.max(0.22, (vw - 16) / w).toFixed(4) : '1'
-      root.style.setProperty('--paper-zoom', fitFor(794))
-      root.style.setProperty('--sheet-zoom', fitFor(1123))
-      root.style.setProperty('--deck-zoom', fitFor(1440))
+      const px = (v: number) => `${(Math.round(v * 10000) / 10000).toFixed(4)}`
+      // 纵向长文：交给 CSS 重排（见 styles.css 的 `[data-export-page='flow']` 窄屏规则），zoom 恒为 1
+      root.style.setProperty(
+        '--paper-zoom',
+        px(
+          resolvePrintPreview({ paperWidth: A4_PORTRAIT_PX, viewportWidth: vw, kind: 'flow' }).zoom,
+        ),
+      )
+      root.style.setProperty(
+        '--paper-reflow',
+        resolvePrintPreview({ paperWidth: A4_PORTRAIT_PX, viewportWidth: vw, kind: 'flow' }).mode,
+      )
+      // 定宽画布：等比缩小
+      root.style.setProperty(
+        '--sheet-zoom',
+        px(
+          resolvePrintPreview({ paperWidth: A4_LANDSCAPE_PX, viewportWidth: vw, kind: 'sheet' })
+            .zoom,
+        ),
+      )
+      root.style.setProperty(
+        '--deck-zoom',
+        px(resolvePrintPreview({ paperWidth: 1440, viewportWidth: vw, kind: 'sheet' }).zoom),
+      )
     }
-    applyMobileFit()
-    window.addEventListener('resize', applyMobileFit)
+    applyPrintPreview()
+    window.addEventListener('resize', applyPrintPreview)
     return () => {
-      window.removeEventListener('resize', applyMobileFit)
+      window.removeEventListener('resize', applyPrintPreview)
       root.style.removeProperty('--paper-zoom')
+      root.style.removeProperty('--paper-reflow')
       root.style.removeProperty('--sheet-zoom')
       root.style.removeProperty('--deck-zoom')
     }

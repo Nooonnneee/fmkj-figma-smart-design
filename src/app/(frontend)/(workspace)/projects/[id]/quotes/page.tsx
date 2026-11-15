@@ -16,6 +16,7 @@ import { ClientFeedbackList, type FeedbackItem } from './client-feedback-list'
 import { DeleteQuoteButton, GenerateQuoteForm } from './quote-controls'
 import { SetFinalQuoteButton } from './set-final-button'
 import { quoteShortTitle } from '@/lib/project-name'
+import { WORKBENCH_SECTION_HEADING_CLASS } from '@/components/page-header'
 
 /** 报价：项目里的全部报价。从点位图生成，逐行换型号、改价后打印给客户。 */
 export default async function ProjectQuotesPage({
@@ -57,7 +58,7 @@ export default async function ProjectQuotesPage({
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
-          <h2 className="text-xl font-semibold tracking-tight">报价</h2>
+          <h2 className={WORKBENCH_SECTION_HEADING_CLASS}>报价</h2>
           <p className="text-sm text-muted-foreground">
             {points ? `已关联点位图 ${points} 个点位` : '未布置点位，可新建空白报价'}
           </p>
