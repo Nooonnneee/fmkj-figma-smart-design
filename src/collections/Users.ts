@@ -4,6 +4,7 @@ import { CACHE_TAGS, expireOnChange, expireOnDelete } from '@/lib/cache-tags'
 import { fieldCmsAdminOnly, isCmsAdmin, isMember } from '@/lib/access'
 import { DEFAULT_CONTRACT_TERMS } from '@/lib/contracts'
 import { cloneDemoProjectForUser } from '@/lib/demo-project'
+import { assertChannelBaseUrl } from '@/lib/ai-channels-url-guard'
 
 /** 成员只能读取和修改自己的账号资料，防止通过 /api/users 遍历其他用户的邮箱与手机号。 */
 const selfOrCmsAdmin: Access = ({ req }) => {
@@ -143,6 +144,144 @@ export const Users: CollectionConfig = {
             description:
               '在系统「设置 → 报价成本与毛利」里修改：品牌拿货折扣、附加费用成本占比与毛利率底线，仅本人在报价台可见',
           },
+        },
+        {
+          /**
+           * 成员自填的 AI 渠道（客户自带 key）。2026-11-15 提案乙节已批准：只在桌面客户端开放。
+           *
+           * 安全约定（改这个字段前先读 `src/lib/ai-channels-url-guard.ts`）：
+           * - `apiKeyCipher` 是 AES-256-GCM 密文（`src/lib/ai-channels-crypto.ts`），字段级
+           *   `read: () => false`，任何 API 响应都不会带出来；服务端内部读库要用
+           *   `overrideAccess: true`（字段级 read 权限管不到 overrideAccess）。
+           * - 读写走 `/api/ai/channels` 端点，**只认 `req.user`**，不接受请求体里的 userId。
+           * - `baseUrl` 必须是公网 HTTPS，且比 `normalizeCustomBaseUrl` 更严（拒绝 IP 字面值、
+           *   非 443 端口、user:pass@ 形式），发请求前还会做一次 DNS 解析校验。
+           */
+          name: 'aiChannels',
+          label: '我的 AI 渠道（自带 key）',
+          type: 'array',
+          labels: { singular: 'AI 渠道', plural: 'AI 渠道' },
+          /**
+           * 数组层写权限 = 只有 CMS 超管（后台里人工维护）。
+           *
+           * 为什么不是只给子字段加 `update: () => false`（**实测过，不够**）：
+           * Payload 处理 array 字段是**整段替换**行数据 —— 子字段被拒绝写入的值会变成
+           * `null`，而不是保留库里原来的值。成员一次 PATCH `/api/users` 就能把自己的
+           * `apiKeyCipher` / `lastCheckOk` 抹成 null（密文丢失，客户只能重填 key）。
+           * 在数组这一层关掉成员写权限后，成员既改不出伪造值，也抹不掉自己的密文。
+           *
+           * 成员维护渠道只走 `/api/ai/channels`：那条路径是服务层 `overrideAccess: true`，
+           * 字段级 access 对它不生效（Payload 的设计），所以白名单、条数上限、baseUrl
+           * 校验、加密全部由 `src/lib/ai-channels.ts` 负责。
+           *
+           * **已知的 GraphQL 行为（2026-11-15 复核，未改）**：成员调 `updateUser` 带
+           * `aiChannels` 会返回 200、`errors` 为空，但字段被这里的 access 静默丢弃 ——
+           * 既没写进去也没报错。安全上没问题（写不进、伪造不了），只是客户端会以为成功。
+           * 没有改成硬报错的原因：
+           * - 正常「设置 → 公司抬头」保存为了不抹掉同层其它字段，会把整个 companyProfile
+           *   读出来再写回（`(workspace)/settings/company/route.ts`），里面就含 aiChannels；
+           *   「见到 aiChannels 就 400」会误伤这条合法路径；
+           * - 要区分「值没变」还是「想改」，只能依赖 Payload 内部 access 过滤与钩子的执行
+           *   顺序（钩子能否看到被过滤掉的值没有稳定契约），属于会牵动框架行为的改动。
+           * 成员渠道的唯一受支持入口仍是 `/api/ai/channels`，文档与客户端都按这个口径。
+           */
+          access: {
+            create: ({ req }) => isCmsAdmin(req),
+            update: ({ req }) => isCmsAdmin(req),
+          },
+          admin: {
+            description:
+              '客户自带的 AI 渠道，只在桌面客户端「我的 AI 配置」里填写。密钥加密存储，页面与接口都不会显示明文。',
+          },
+          fields: [
+            {
+              name: 'key',
+              label: '渠道标识',
+              type: 'text',
+              required: true,
+              maxLength: 40,
+              validate: (value: unknown) => {
+                if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{1,40}$/.test(value)) {
+                  return '标识只能用字母、数字、- 和 _，最多 40 字'
+                }
+                return true
+              },
+            },
+            { name: 'label', label: '显示名', type: 'text', required: true, maxLength: 60 },
+            {
+              name: 'baseUrl',
+              label: '接口根地址',
+              type: 'text',
+              required: true,
+              maxLength: 300,
+              validate: (value: unknown) => {
+                try {
+                  assertChannelBaseUrl(value)
+                  return true
+                } catch (error) {
+                  return (error as Error).message || '接口地址无效'
+                }
+              },
+            },
+            {
+              // 密文：任何 API 响应都不得出现。服务端内部读库必须 overrideAccess: true。
+              // `update: () => false` 挡住集合层 REST/GraphQL：成员不能自己塞一个假密文
+              // （字段级 access 对服务端的 overrideAccess: true 不生效，所以 /api/ai/channels 照常写）。
+              name: 'apiKeyCipher',
+              label: '密钥（加密存储）',
+              type: 'text',
+              maxLength: 4096,
+              access: { read: () => false, create: () => false, update: () => false },
+              admin: {
+                readOnly: true,
+                description: '仅供服务端解密使用，不会出现在任何接口响应里',
+              },
+            },
+            {
+              name: 'apiKeyHint',
+              label: '密钥提示',
+              type: 'text',
+              maxLength: 16,
+              access: { create: () => false, update: () => false },
+              admin: {
+                readOnly: true,
+                description: '只读展示：例如 ...abcd，让客户确认填的是哪个 key',
+              },
+            },
+            {
+              name: 'models',
+              label: '模型名',
+              type: 'text',
+              hasMany: true,
+              maxLength: 120,
+              admin: { description: '该渠道下可选的模型名（纯文本），可留空' },
+            },
+            { name: 'enabled', label: '启用', type: 'checkbox', defaultValue: true },
+            // 检查结果只能由 /api/ai/channels/:key/test 写：`update: () => false` 挡住
+            // 集合层 REST/GraphQL 伪造「已验证」（否则将来按 lastCheckOk 计费/放量会被骗）。
+            {
+              name: 'lastCheckedAt',
+              label: '最近检查时间',
+              type: 'date',
+              access: { create: () => false, update: () => false },
+              admin: { readOnly: true },
+            },
+            {
+              name: 'lastCheckOk',
+              label: '最近检查是否通过',
+              type: 'checkbox',
+              access: { create: () => false, update: () => false },
+              admin: { readOnly: true },
+            },
+            {
+              name: 'lastCheckError',
+              label: '最近检查错误',
+              type: 'text',
+              maxLength: 300,
+              access: { create: () => false, update: () => false },
+              admin: { readOnly: true },
+            },
+          ],
         },
       ],
     },

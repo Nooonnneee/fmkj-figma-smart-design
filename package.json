@@ -15,6 +15,7 @@
     "lint": "eslint .",
     "payload": "NODE_OPTIONS=--no-deprecation payload",
     "smoke": "node e2e/smoke.mjs",
+    "test:channels-http": "node e2e/ai-channels-malformed-key.mjs",
     "start": "NODE_OPTIONS=--no-deprecation next start",
     "templates:seed": "NODE_OPTIONS=--no-deprecation payload run --input '{\"scriptPath\":\"scripts/seed-proposal-library.ts\"}'",
     "templates:thumbs": "node scripts/generate-template-thumbnails.mjs",
