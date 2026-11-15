@@ -40,3 +40,6 @@ logs/
 # 不随代码分发：里面有已作废的兑换码，且二进制不该混进源码仓库。
 # 备份在 ~/Backups/promotion-kit-*.tar.gz
 /promotion-kit/
+
+# PLAN-MAP.md 的渲染产物（本地查看用，不入库）
+/plan-map.html
