@@ -1,11 +1,8 @@
 import Image from 'next/image'
-import Link from 'next/link'
-import { ArrowUpRight, Sparkles } from 'lucide-react'
 
 import { EmptyState } from '@/components/empty-state'
 import { PageHeader } from '@/components/page-header'
 import { TemplateCard } from '@/components/proposal-template-card'
-import { Button } from '@astryxdesign/core/Button'
 import { pageTitle } from '@/lib/brand'
 import { allStyles } from '@/documents/registry'
 import { buildTemplateGallery } from '@/plugins/proposal/preview'
@@ -38,7 +35,7 @@ export default function TemplateCenterPage() {
     <section className="mx-auto flex w-full max-w-6xl flex-col gap-8">
       <PageHeader
         title="模板中心"
-        description="方案模板、点位图显示方案与文档风格，集中在这里查看与选用。"
+        description="方案模板、点位图显示方案与文档风格，集中在这里查看。"
       />
 
       {/* 方案模板 */}
@@ -86,23 +83,15 @@ export default function TemplateCenterPage() {
         <div>
           <h2 className="text-base font-semibold">点位图显示</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            设备图标样式、无线波纹、灯光光晕等显示效果。点位坐标与报价数据不受影响。
+            决定业主方案演示里点位图的底图浓淡、覆盖圈与灯光光晕怎么显示。点位坐标与报价数据不受影响。
           </p>
         </div>
-        <EmptyState
-          icon={<Sparkles className="size-5" />}
-          title="点位图显示方案正在开发"
-          description="目前可以在点位图页的画板设置里临时调整显示效果；独立的显示方案会在后续版本提供。"
-          action={
-            <Button
-              variant="secondary"
-              size="sm"
-              href="/projects"
-              icon={<ArrowUpRight />}
-              label="去项目里查看点位图"
-            />
-          }
-        />
+        {/* 显示方案已实现（src/lib/display-profile.ts），不再是「正在开发」。
+            选择入口在点位图页的「显示设置」浮层里，保存到当前项目，所以这里只做说明，
+            不重复放一套选择器。 */}
+        <p className="text-sm text-muted-foreground">
+          在项目的点位图页打开「显示设置」即可切换；所选方案保存在当前项目，换项目互不影响。
+        </p>
       </section>
 
       {/* 文档风格 */}
