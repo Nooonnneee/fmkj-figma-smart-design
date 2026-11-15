@@ -16,20 +16,34 @@ describe('checkSameOrigin（/api/ai/channels* 的 CSRF 校验）', () => {
     expect(r.ok).toBe(false)
   })
 
-  it('x-forwarded-host 也认（反向代理后面）', () => {
+  it('只认 Host：代理原样透传 Host 时同站照常放行', () => {
+    // nginx 的 `proxy_set_header Host $host` / Caddy 默认透传 → Host 就是公网域名
     expect(
       checkSameOrigin(
-        req({ host: '127.0.0.1:3000', 'x-forwarded-host': 'fmkj.top', origin: 'https://fmkj.top' }),
+        req({ host: 'fmkj.top', 'x-forwarded-host': 'fmkj.top', origin: 'https://fmkj.top' }),
       ).ok,
     ).toBe(true)
   })
 
-  it('x-forwarded-host 多值时任一匹配即可', () => {
-    expect(
-      checkSameOrigin(
-        req({ 'x-forwarded-host': 'fmkj.top, inner:3000', origin: 'https://fmkj.top' }),
-      ).ok,
-    ).toBe(true)
+  it('不认 X-Forwarded-Host：伪造 XFH 不能绕过（复核那条 201 的形态）', () => {
+    const foreign = checkSameOrigin(
+      req({
+        host: 'fmkj.top',
+        'x-forwarded-host': 'evil.example.com',
+        origin: 'https://evil.example.com',
+      }),
+    )
+    expect(foreign.ok).toBe(false)
+
+    // 即便 Host 是内网地址（代理没透传 Host），XFH 也不能把它洗成同站
+    const proxied = checkSameOrigin(
+      req({
+        host: '127.0.0.1:3000',
+        'x-forwarded-host': 'fmkj.top',
+        origin: 'https://fmkj.top',
+      }),
+    )
+    expect(proxied.ok).toBe(false)
   })
 
   it('端口不同算跨站（origin 带端口时按 host 比较）', () => {

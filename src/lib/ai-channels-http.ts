@@ -37,16 +37,27 @@ const json = (data: unknown, status = 200) => Response.json(data, { status })
  * 会话 Cookie 是 `SameSite=lax`，它挡不住顶层表单导航，也挡不住
  * `Content-Type: text/plain` 的「简单请求」——复核实测跨站带 Origin 的 POST 直接 201。
  * 这里的原则是**有 Origin 就必须是同站**：
- * - 带 `Origin` 且主机与请求 Host / `x-forwarded-host` 不一致 → 403；
+ * - 带 `Origin` 且主机与请求 `Host` 不一致 → 403；
  * - 没有 `Origin` 时退回看 `Sec-Fetch-Site`：`cross-site` → 403；
  * - 两者都没有（curl / 服务间调用）→ 放行。这类请求本来就不带浏览器会话 Cookie 的
  *   「自动附带」特性，CSRF 的前提不成立；真正的身份仍由 app-session 决定。
+ *
+ * **为什么只认 `Host`、故意不认 `X-Forwarded-Host`**：XFH 是客户端可以自己带的请求头，
+ * 只有当「前置代理一定会把它覆盖/剥掉」时才可信。复核实测 `Origin: https://evil.example.com`
+ * + `X-Forwarded-Host: evil.example.com` 能 201 放行；今天 nginx 示例不转发 XFH、浏览器也
+ * 加不了，但将来代理原样转发就会变成绕过。本仓库的部署拓扑（`deploy/DEPLOY.md` 的 nginx
+ * `proxy_set_header Host $host`、主站 Caddy 默认透传 Host）都能让应用看到真实 Host，
+ * 所以直接不认 XFH 是更小、更确定的攻击面。
+ *
+ * 部署前提（已写进 `deploy/DEPLOY.md` 第 6 节）：**代理必须原样传 Host**。若代理把 Host
+ * 改写成内网地址（如 127.0.0.1:3000）又只把域名放进 XFH，写渠道会被误判为跨站并 403。
  */
 export function checkSameOrigin(request: Request): { ok: true } | { ok: false; error: string } {
   const selfHosts = new Set<string>()
-  for (const raw of [request.headers.get('host'), request.headers.get('x-forwarded-host')]) {
-    if (!raw) continue
-    for (const part of raw.split(',')) {
+  const rawHost = request.headers.get('host')
+  if (rawHost) {
+    // 多值形态（`a, b`）在 Host 上不常见，仍按逗号拆开，行为和旧实现一致。
+    for (const part of rawHost.split(',')) {
       const host = part.trim().toLowerCase()
       if (host) selfHosts.add(host)
     }

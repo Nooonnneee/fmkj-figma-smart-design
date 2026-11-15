@@ -107,6 +107,11 @@ server { listen 80; server_name erp.example.com; return 301 https://$host$reques
 
 证书可在阿里云/腾讯云控制台免费申请。
 
+> **代理必须原样透传 `Host`**。成员 AI 渠道路由的 CSRF 判定只认 `Host`，**不认
+> `X-Forwarded-Host`**（XFH 可以被客户端伪造，代理原样转发时会被绕过）。上面 nginx 的
+> `proxy_set_header Host $host` 和主站 Caddy 的默认行为都满足；如果代理把 Host 改成
+> 内网地址（如 `127.0.0.1:3000`）而只把域名放进 XFH，写渠道会被判成跨站并返回 403。
+
 ## 7. 日常更新
 
 在 Figma Make 里改完、推到 GitHub 后，在服务器上：
