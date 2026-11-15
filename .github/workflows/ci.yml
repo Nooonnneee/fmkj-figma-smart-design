@@ -62,8 +62,10 @@ jobs:
       - name: 领域知识库与规则回归测试
         run: pnpm run knowledge:check
 
-      - name: 单元测试
-        run: pnpm test
+      # 覆盖率门槛：vitest.config.ts 里设了全局 thresholds，
+      # 覆盖率低于基线时 vitest 直接非零退出，这一步变红。
+      - name: 单元测试与覆盖率
+        run: pnpm run test:coverage
 
       # 生产构建门禁：复刻 Dockerfile builder（generate:importmap + payload build）。
       - name: 生产构建

@@ -89,8 +89,8 @@ jobs:
       - name: 领域知识库与规则回归测试
         run: pnpm run knowledge:check
 
-      - name: 单元测试
-        run: pnpm test
+      - name: 单元测试与覆盖率
+        run: pnpm run test:coverage
 
       - name: 生产构建
         run: |
