@@ -278,7 +278,10 @@ docker compose --profile tools run --rm tools run \
 - 只换 `PAYLOAD_SECRET`、不设 `AI_CHANNELS_OLD_KEYS`、也不跑脚本 → 库里的 `v1:k1:...`
   找不到 k1 的钥匙材料，**所有成员渠道同时解密失败**；用户只能重新填 key。
 - 没看到 `升级=0 失败=0` 就删 `AI_CHANNELS_OLD_KEYS` → 还没升级的条目立刻解不开；
-  把旧钥匙环补回去重跑脚本即可恢复（脚本不改坏数据）。
+  把旧钥匙环补回去重跑脚本即可恢复（脚本只重加密密文，不删除 `models` 等其它字段）。
+- 轮换窗口内让成员照常改渠道 → 脚本是「读整份 `companyProfile` → 重加密 → 写回」，
+  与成员同时保存会互相覆盖（最后写入者赢）。请在跑脚本前让成员暂停修改 AI 渠道，
+  或选择低峰期执行；脚本不会自动合并并发修改。
 - 改了 `AI_CHANNELS_KEY_ID` 却没给旧代次配 `AI_CHANNELS_OLD_KEYS` → 和第一条一样。
 - 旧格式密文没在换 secret 前升级 → 换完就永久解不开（见 10.1），所以顺序不能反。
 
