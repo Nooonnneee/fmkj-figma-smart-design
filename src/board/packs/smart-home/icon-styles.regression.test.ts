@@ -368,27 +368,59 @@ describe('A2. 共享符号键的灯具按「这个点位」选 CAD 画面（回�
     expect(stroke * (28 / 32)).toBeCloseTo(1.75, 2)
   })
 
-  it('极端比例描边夹在上下限：gh/gw = 20 / 0.05 时不消失、也不糊成实心', () => {
-    for (const [gw, gh] of [
-      [1, 20],
-      [1, 0.05],
-    ] as const) {
-      const art = cadProportionedBody('floor-arc-lamp', gw, gh)!
-      expect(art, `gh/gw=${gh / gw}`).toBeTruthy()
+  it('极端比例描边夹在短边 40%：0.05 / 4 / 20 的实测值', () => {
+    // 模板宽度固定 100，H = 100 × gh/gw；symbolSize=28 时 scale = 28 / max(100,H)。
+    const cases = [
+      // 超扁：目标 6.25 会让线比画幅还高，夹到 5 的 40% = 2（落图 0.56px，= 修复前）
+      { gh: 0.05, stroke: 2, landing: 0.56, clamped: true },
+      // 4:1：目标 25 仍低于上界 40，不夹（落图 1.75px）
+      { gh: 4, stroke: 25, landing: 1.75, clamped: false },
+      // 超长：目标 125 被夹到 100 的 40% = 40（落图 0.56px，高于旧下界的 0.44px）
+      { gh: 20, stroke: 40, landing: 0.56, clamped: true },
+    ] as const
+    for (const c of cases) {
+      const art = cadProportionedBody('floor-arc-lamp', 1, c.gh)!
+      expect(art, `gh/gw=${c.gh}`).toBeTruthy()
       const [, , vw, vh] = art.viewBox.split(/\s+/).map(Number)
       const scale = 28 / Math.max(vw, vh)
       const stroke = +art.body.match(/stroke-width="([\d.]+)"/)![1]
       const landing = stroke * scale
-      const shortSide = Math.min(vw, vh) * scale
-      // 看得见（远高于修复前 gh/gw=20 时的 0.028px）……
-      expect(landing, `gh/gw=${gh / gw} 落图线宽`).toBeGreaterThan(0.5)
-      // ……但不超过短边的 40%（= 修复前 H=5 时的 2/5），不会把 1.4px 高的框糊成实心块。
-      // 旧上界是短边的一半（50%），比旧画法还粗；改成 40% 后这条断言必须真的能挡住回退。
-      expect(stroke, `gh/gw=${gh / gw} 线宽不得超过短边 40%`).toBeLessThanOrEqual(
-        Math.min(vw, vh) * 0.4 + 1e-9,
-      )
-      expect(landing, `gh/gw=${gh / gw} 不得超过短边一半`).toBeLessThanOrEqual(shortSide / 2 + 1e-6)
+      const shortSide = Math.min(vw, vh)
+      expect(stroke, `gh/gw=${c.gh} 模板线宽`).toBeCloseTo(c.stroke, 6)
+      expect(landing, `gh/gw=${c.gh} 落图线宽`).toBeCloseTo(c.landing, 2)
+      // 任何比例都不超过短边 40%：超扁时等于 40%，正常比例时远低于它。
+      expect(stroke, `gh/gw=${c.gh} 不得超过短边 40%`).toBeLessThanOrEqual(shortSide * 0.4 + 1e-9)
+      if (c.clamped) expect(stroke, `gh/gw=${c.gh} 应被上界夹住`).toBeCloseTo(shortSide * 0.4, 6)
+      else expect(stroke, `gh/gw=${c.gh} 不应被夹`).toBeCloseTo(Math.max(vw, vh) / 16, 6)
     }
+  })
+
+  it('已登记族全部不被 40% 上界夹到：最扁的画灯 90×16 仍落 1.75px', () => {
+    // 登记 = cadProportionedBody 有专用画法；未登记族返回 null。
+    const registered = LIGHTING.filter((f) => cadProportionedBody(f.id, 1, 1))
+    expect(registered.length, '已登记形状族数量').toBe(13)
+    let flattest = { ratio: Infinity, label: '' }
+    for (const f of registered) {
+      for (const v of f.variants) {
+        const art = lookOf(point(f.deviceType, v.id, v.sizeCm), { iconStyle: 'cad' }).art!
+        const svg = decodeURIComponent(art.src)
+        const [, , vw, vh] = svg
+          .match(/viewBox="([^"]+)"/)![1]
+          .split(/\s+/)
+          .map(Number)
+        const stroke = +svg.match(/stroke-width="([\d.]+)"/)![1]
+        const short = Math.min(vw, vh)
+        const long = Math.max(vw, vh)
+        const ratio = short / long
+        if (ratio < flattest.ratio) flattest = { ratio, label: `${v.id}（${f.id}）` }
+        // 上界只在 ratio < 0.15625 时生效；已登记族都高于它，stroke 仍是 long/16。
+        expect(stroke, `${v.id} 不应被上界夹到`).toBe(+(long / 16).toFixed(2))
+        expect(stroke, `${v.id} 不超过短边 40%`).toBeLessThanOrEqual(short * 0.4 + 1e-9)
+        expect(stroke * (28 / long), `${v.id} 落图线宽`).toBeCloseTo(1.75, 2)
+      }
+    }
+    expect(flattest.ratio, `最扁的已登记族：${flattest.label}`).toBeCloseTo(16 / 90, 3)
+    expect(flattest.ratio, '最扁族仍高于 40% 上界的触发线').toBeGreaterThan(0.15625)
   })
 
   it('没有真实尺寸的灯具：CAD 跟随默认图标比例（轨道射灯头 / LED 灯带）', () => {
