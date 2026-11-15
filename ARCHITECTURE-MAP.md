@@ -352,12 +352,12 @@ flowchart TB
   STATE --> UI["settings/company route.ts:92<br/>→ CompanySettings.ts:95 disabledPlugins"]
 ```
 
-| 阶段 key | 名称           | 主链路      | 插件（实测 `stage`）                                                       |
-| -------- | -------------- | ----------- | -------------------------------------------------------------------------- |
-| `design` | 勘测与点位设计 | 信息 · 点位 | `room-insights` · `smart-select` · `ai-import` · `dwg-import`              |
-| `quote`  | 报价与方案     | 报价        | `doc-styles` · `proposal`                                                  |
-| `build`  | 签约与施工     | 合同        | **空**（无插件 `stage: 'build'`，`grep "stage: 'build'" src/plugins` → 0） |
-| `after`  | 交付与售后     | 归档        | `after-sales`                                                              |
+| 阶段 key | 名称           | 主链路      | 插件（实测 `stage`）                                                               |
+| -------- | -------------- | ----------- | ---------------------------------------------------------------------------------- |
+| `design` | 勘测与点位设计 | 信息 · 点位 | `room-insights` · `smart-select` · `ai-import` · `dwg-import`                      |
+| `quote`  | 报价与方案     | 报价        | `doc-styles` · `proposal`                                                          |
+| `build`  | 签约与施工     | 合同        | **空**（无插件 `stage: 'build'`，`grep "stage: 'build'" src/plugins` → 0）         |
+| `after`  | 交付与售后     | 归档        | `after-sales`                                                                      |
 | `global` | 全程助手       | 全程        | `ai-copilot` · `ha-mcp` · `business-card`（2026-11-13 新增，印刷物料，无 AI 工具） |
 
 **何时被加载**：
@@ -442,9 +442,10 @@ flowchart TB
 | 9   | `PROJECT-ARCHITECTURE.md` 未提及 `ha-mcp` 插件（`grep 'ha-mcp' PROJECT-ARCHITECTURE.md` → 0）                                                                                                | `index.ts:131` 注册了 `ha-mcp`（智能家居现场对接，global/ai）                                                                                                                                                                                            | 新插件未进治理文档                                                                                                                                                                                                                | 已修复：§3.2 插件清单与 §4.6.3 分类补 `ha-mcp`（index.ts:131，global/ai）                                                    |
 | 10  | `AGENTS.md`「Figma-Managed Payload Rules」：不要加 `db`、不要加 Postgres adapter、「用 `buildFigmaConfig()`」                                                                                | `src/payload.config.ts:1` 只有 `export { default } from './payload.selfhost.config'`；`payload.selfhost.config.ts:158` 用 `postgresAdapter`，`buildConfig` 直接调用                                                                                      | 项目已实质迁到自托管 Postgres；AGENTS.md 的 Figma 托管规则与现状矛盾，会误导接手方                                                                                                                                                | 已修复：AGENTS.md 该节顶部加「现状」说明，保留密钥/数据/CI 红线                                                              |
 
-| 11  | 上一版（基线 `36c6040`）写「9 个插件」，§五 阶段表 `global` 只有 ai-copilot · ha-mcp | `src/plugins/index.ts:144` 新增第 10 个插件 `business-card`（tool / global，名片印刷物料，无 AI 工具） | 按旧文档会漏掉 `/capabilities/business-card` 的归属 | 已修复：§一图、§五注册表与阶段/分类表、§三路由图均补 `business-card` |
-| 12  | 上一版写插件开关存在 `Users.ts:133` 的 `disabledPlugins` | 运行时读的是公司设置：`CompanySettings.ts:95`，`plugins/state.ts:18` 与 `(workspace)/layout.tsx:35` 都读它；`Users.ts:133` 只是遗留同名字段 | 按旧文档会改用户的字段，开关不生效 | 已修复：§五 改标 `CompanySettings.ts:95`，并注明 `Users.ts:133` 是遗留字段 |
-| 13  | 上一版 §六 扣费表写 `chat-handler.ts:665` / `core-handlers.ts:1278` / `route.ts:80` | 已统一走 `src/lib/credit-charge.ts:40` 的 `chargeAiCredits()`；实测 `:650 / :1393 / :79 / :78`，余额判断 `:213 / :1348 / :69 / :63` | 行号漂移，且漏掉「扣费失败不阻断主流程」这一层 | 已修复：§六 按 `chargeAiCredits` 重写扣费表，并补 `pg-row-lock.ts` 的并发说明 |
+| 11 | 上一版（基线 `36c6040`）写「9 个插件」，§五 阶段表 `global` 只有 ai-copilot · ha-mcp | `src/plugins/index.ts:144` 新增第 10 个插件 `business-card`（tool / global，名片印刷物料，无 AI 工具） | 按旧文档会漏掉 `/capabilities/business-card` 的归属 | 已修复：§一图、§五注册表与阶段/分类表、§三路由图均补 `business-card` |
+| 12 | 上一版写插件开关存在 `Users.ts:133` 的 `disabledPlugins` | 运行时读的是公司设置：`CompanySettings.ts:95`，`plugins/state.ts:18` 与 `(workspace)/layout.tsx:35` 都读它；`Users.ts:133` 只是遗留同名字段 | 按旧文档会改用户的字段，开关不生效 | 已修复：§五 改标 `CompanySettings.ts:95`，并注明 `Users.ts:133` 是遗留字段 |
+| 13 | 上一版 §六 扣费表写 `chat-handler.ts:665` / `core-handlers.ts:1278` / `route.ts:80` | 已统一走 `src/lib/credit-charge.ts:40` 的 `chargeAiCredits()`；实测 `:650 / :1393 / :79 / :78`，余额判断 `:213 / :1348 / :69 / :63` | 行号漂移，且漏掉「扣费失败不阻断主流程」这一层 | 已修复：§六 按 `chargeAiCredits` 重写扣费表，并补 `pg-row-lock.ts` 的并发说明 |
+
 ## 附录 B：维护须知
 
 本图从以下文件提取，任何一处变了就要回来看对应章节：
