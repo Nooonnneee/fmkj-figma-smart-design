@@ -253,28 +253,28 @@ describe('A2. 共享符号键的灯具按「这个点位」选 CAD 画面（回�
       o: point('spotlight', 'lt-recessed-mount-directional-light-20cm-8', [5, null], true),
       circles: 1,
       arcs: 0,
-      radius: (W: number, H: number) => Math.min(W, H) * 0.26,
+      radius: (W: number, H: number) => Math.min(W, H) * 0.1875,
     },
     {
       name: '嵌入式射灯（方）',
       o: point('spotlight', 'lt-recessed-mount-directional-light-20cm-8-2', [5, null], true),
       circles: 1,
       arcs: 0,
-      radius: (W: number, H: number) => Math.min(W, H) * 0.26,
+      radius: (W: number, H: number) => Math.min(W, H) * 0.1875,
     },
     {
       name: '明装射灯（圆）',
       o: point('spotlight', 'lt-surface-mount-directional-light-20cm-8', [5, null], true),
       circles: 1,
       arcs: 0,
-      radius: (W: number, H: number) => Math.min(W, H) * 0.26,
+      radius: (W: number, H: number) => Math.min(W, H) * 0.1875,
     },
     {
       name: '明装射灯（方）',
       o: point('spotlight', 'lt-surface-mount-directional-light-20cm-8-2', [5, null], true),
       circles: 1,
       arcs: 0,
-      radius: (W: number, H: number) => Math.min(W, H) * 0.26,
+      radius: (W: number, H: number) => Math.min(W, H) * 0.1875,
     },
     {
       name: '圆壁灯 20cm',
@@ -322,6 +322,37 @@ describe('A2. 共享符号键的灯具按「这个点位」选 CAD 画面（回�
     }
   })
 
+  it('射灯：圆灯头沿用原图例半径 0.1875 短边，两束斜线都从圆外开始', () => {
+    // 回归：新射灯族曾用通用半径 0.26 短边，而画幅按真实比例拉高后，第一束线的起点
+    // 到圆心只有 0.243–0.258 短边（< 0.26），线从圆内穿出，10x 下像放大镜。
+    // 原图例 CAD['spotlight'] 是 circle r=6/32、起点 (17,17) 距圆心 7.07/32 = 0.221 短边，
+    // 两束线都从圆外开始。这里直接量生成的 SVG，而不是只比半径。
+    const spots: Array<[string, SymbolObj]> = [
+      ['嵌入式射灯（圆）', point('spotlight', 'lt-recessed-mount-directional-light-20cm-8')],
+      ['嵌入式射灯（方）', point('spotlight', 'lt-recessed-mount-directional-light-20cm-8-2')],
+      ['明装射灯（圆）', point('spotlight', 'lt-surface-mount-directional-light-20cm-8')],
+      ['明装射灯（方）', point('spotlight', 'lt-surface-mount-directional-light-20cm-8-2')],
+    ]
+    for (const [name, o] of spots) {
+      const svg = decodeURIComponent(lookOf(o, { iconStyle: 'cad' }).art!.src)
+      const [, , vw, vh] = svg
+        .match(/viewBox="([^"]+)"/)![1]
+        .split(/\s+/)
+        .map(Number)
+      const short = Math.min(vw, vh)
+      const [, cx, cy, r] = svg.match(/<circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/)!
+      // 先量「起点是否在圆外」——这是复核要恢复的语义；半径放在后面只作形状锚定。
+      const starts = [...svg.matchAll(/<line x1="([\d.]+)" y1="([\d.]+)"/g)].map((m) => [
+        +m[1],
+        +m[2],
+      ])
+      expect(starts.length, `${name} 光束数量`).toBe(2)
+      for (const [x, y] of starts)
+        expect(Math.hypot(x - +cx, y - +cy), `${name} 光束起点应在圆外`).toBeGreaterThan(+r)
+      expect(+r / short, `${name} 圆半径`).toBeCloseTo(0.1875, 3)
+    }
+  })
+
   it('全量守卫：含圆弧且落图框偏离画幅 >10% 的图例都已按画幅重画（157 variant + 34 设备类型）', () => {
     // 判定门槛与 cad-symbols.ts 的 SHAPE_FAMILY 注释一致：
     // 图例含 circle / A 圆弧，且「落图框比例 ÷ 画幅比例」偏离超过 10% —— 这种图例
@@ -351,6 +382,17 @@ describe('A2. 共享符号键的灯具按「这个点位」选 CAD 画面（回�
   it('已登记族的描边落图后与 32×32 图例同宽：symbolSize=28 时都是 1.75px', () => {
     // 旧写法 CAD_STROKE_WIDTH=2 是模板单位：32×32 图例落图 1.75px，100 宽的按画幅
     // 图例只有 0.17–0.56px。新写法按 max(W,H)/16 反推，落图后与普通图标同宽。
+    //
+    // 口径说明：82b74fc 提交说明里的「画灯 90×16 降到 1.0px」指的是**落图值**，
+    // 不是模板 stroke 值。该图例的模板 viewBox 是 100×17.778，symbolSize=28 时缩放
+    // 28/100 = 0.28。按本文件的落图方式实测（1:1 落图 28×5 = 140 格，dark<200）：
+    //   模板 stroke 6.25（落图 1.75px）→ 暗像素 18/140
+    //   模板 stroke 3.571（落图 1.0px）→ 暗像素 18/140
+    //   模板 stroke 1.0（落图 0.28px）→ 暗像素 9/140
+    // 即落图 1.0px 与落图 1.75px 的暗像素相同，原话成立：1:1 下都只有 5px 高，都呈块状；
+    // 真正减半的是模板 1.0 / 落图 0.28px 那一档。主因是画幅高度太小：模板半圆直径
+    // 16.36（占 100 模板宽的 16.4%），落图后画幅只有 5px 高（占 28px 宽的 18%）；
+    // 与线宽是两个因素。别把模板值和落图值混为一谈。
     for (const c of arcCases) {
       const art = lookOf(c.o, { iconStyle: 'cad' }).art!
       const svg = decodeURIComponent(art.src)
