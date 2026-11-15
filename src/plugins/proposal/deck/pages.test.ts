@@ -31,6 +31,7 @@ import type { ProjectDocsData } from '@/lib/project-docs'
 import type { ManagedScene } from '@/lib/scenes'
 import { buildDeck, codeRange, installNote, roomScenes, yuanShort } from './model'
 import { buildNetworkCamera } from './network-camera'
+import { CoverPage } from './pages/cover'
 import { paginateRows, type InvestRow } from './pages/investment'
 import { paginateRooms } from './pages/rooms'
 import { deckScenes } from './pages/scenes'
@@ -211,44 +212,52 @@ const ctxOf = (d: ProjectDocsData): DeckCtx => ({
   profile: resolveDisplayProfile(undefined),
 })
 
+/**
+ * 投资明细分页：中间页每页 full 行，最后一页最多 last 行。
+ *
+ * 行为判断（不是猜）：调用方是 deck/index.tsx 的 `paginateRows(rows, 12, 9)`，
+ * InvestmentPage 在 `isLast` 时会在固定 top-[756px] 处印「不含项 / 有效期」色块，
+ * 所以末页最多只能放 9 行。因此总行数 > 9 时必然至少两页 —— 10 / 11 / 12 行
+ * 都是两页（10→7+3、11→8+3、12→9+3），不是一页。旧测试标题「12 行以内仍一页」
+ * 与真实行为和版面约束相反，已按真实行为改写。
+ */
 describe('投资明细分页：最后一页留出不含项色块', () => {
-  it('行数不超过 last 时一页放完', () => {
-    expect(paginateRows([1, 2, 3], 12, 9)).toEqual([[1, 2, 3]])
+  const list = (n: number) => Array.from({ length: n }, (_, i) => i)
+  const lens = (n: number) => paginateRows(list(n), 12, 9).map((p) => p.length)
+
+  it('不超过 last（9 行）时一页放完', () => {
+    expect(paginateRows(list(3), 12, 9)).toEqual([list(3)])
     expect(paginateRows([], 12, 9)).toEqual([[]])
+    expect(lens(9)).toEqual([9])
   })
 
-  it('12 行以内但超过 9 行：仍一页（last 是最后一页容量）', () => {
-    expect(
-      paginateRows(
-        Array.from({ length: 9 }, (_, i) => i),
-        12,
-        9,
-      ),
-    ).toHaveLength(1)
+  it('10 / 11 / 12 行：末页要留色块，必须是两页', () => {
+    expect(lens(10)).toEqual([7, 3])
+    expect(lens(11)).toEqual([8, 3])
+    expect(lens(12)).toEqual([9, 3])
+    for (const n of [10, 11, 12]) {
+      for (const len of lens(n)) expect(len, `n=${n}`).toBeLessThanOrEqual(12)
+    }
   })
 
-  it('超过 last 时分页，最后页不超过 last 行', () => {
-    const list = Array.from({ length: 20 }, (_, i) => i)
-    const pages = paginateRows(list, 12, 9)
-    expect(pages[0]).toHaveLength(12)
-    for (const p of pages.slice(1)) expect(p.length).toBeLessThanOrEqual(9)
+  it('超过 last 时分页，中间页满 12 行、最后页不超过 9 行', () => {
+    for (const n of [13, 20, 21, 25, 40]) {
+      const pages = paginateRows(list(n), 12, 9)
+      for (const page of pages.slice(0, -1)) expect(page.length, `n=${n} 中间页`).toBe(12)
+      expect(pages.at(-1)!.length, `n=${n} 末页`).toBeLessThanOrEqual(9)
+    }
   })
 
   it('刚好整除时从上一页挪 3 行到最后一页（不出现只剩 0 行的末页）', () => {
     // 24 行：12 + 12 → 末页拆成 9 + 3
-    const pages = paginateRows(
-      Array.from({ length: 24 }, (_, i) => i),
-      12,
-      9,
-    )
-    expect(pages.map((p) => p.length)).toEqual([12, 9, 3])
+    expect(lens(24)).toEqual([12, 9, 3])
+    expect(lens(22)).toEqual([12, 7, 3])
   })
 
   it('分页不丢行也不重复：所有页码拼起来等于原清单', () => {
-    for (const n of [0, 1, 9, 10, 12, 13, 21, 24, 25, 40]) {
-      const list = Array.from({ length: n }, (_, i) => i)
-      const flat = paginateRows(list, 12, 9).flat()
-      expect(flat, `n=${n}`).toEqual(list)
+    for (const n of [0, 1, 9, 10, 11, 12, 13, 21, 22, 24, 25, 40]) {
+      const flat = paginateRows(list(n), 12, 9).flat()
+      expect(flat, `n=${n}`).toEqual(list(n))
     }
   })
 })
@@ -462,6 +471,67 @@ describe('网络 / 摄像头页：分组与未上图点位', () => {
     })
     const model = buildNetworkCamera(buildDeck(d))!
     expect(model.unmappedPoints.map((p) => p.code)).toEqual(['V09'])
+  })
+})
+
+describe('封面：客户第一眼看到的预算必须正确', () => {
+  /**
+   * 封面直接用 ctx.m.finalAmount 印预算（7 种封面版式里 6 种都有这一行），
+   * 是「给客户的 PDF 算错钱」最直接的出口。这里真的渲染 CoverPage，
+   * 断言页面 HTML 里出现格式化后的金额，而不是只测 yuanShort。
+   */
+  const ctxWithAmount = (amount: number, themeId: keyof typeof DECK_THEMES) => {
+    const ctx = ctxOf(docs({ total: amount, quote: null }))
+    // 方案金额在没有报价时取 d.total；这里从模型入口确认一次，避免断言建立在假设上
+    expect(ctx.m.finalAmount).toBe(amount)
+    return { ...ctx, theme: DECK_THEMES[themeId] }
+  }
+
+  it('栖序 band 封面版式本身不印预算（只有品牌 / 标题 / 项目信息）', () => {
+    // 这是真实行为：band 版式没有金额栏。断言它不出现，避免有人误以为改了排版。
+    const html = renderToStaticMarkup(
+      createElement(CoverPage, { ctx: ctxWithAmount(12345.6, 'qixu'), no: 1, total: 8 }),
+    )
+    expect(html).not.toContain('INVESTMENT')
+    expect(html).not.toContain('方案预算')
+    expect(html).not.toContain('¥')
+  })
+
+  it('其余 6 种版式都把预算印在客户看得到的位置，且格式正确', () => {
+    // 每种封面版式至少取一个主题：immersive / split / type / gallery / arch / architectural
+    const cases: Array<[keyof typeof DECK_THEMES, string]> = [
+      ['noir', '¥12,345.6'],
+      ['grove', '¥12,345.6'],
+      ['mono', '¥12,345.6'],
+      ['terra', '¥12,345.6'],
+      ['linen', '¥12,345.6'],
+      ['slate', '¥12,345.6'],
+    ]
+    for (const [themeId, amount] of cases) {
+      const html = renderToStaticMarkup(
+        createElement(CoverPage, { ctx: ctxWithAmount(12345.6, themeId), no: 1, total: 8 }),
+      )
+      expect(html, themeId).toContain(amount)
+      // 未格式化的原始浮点不能出现在页面上
+      expect(html, themeId).not.toContain('>12345.6<')
+    }
+  })
+
+  it('左文右图（split）封面：预算用千分位、整数不带小数', () => {
+    const html = renderToStaticMarkup(
+      createElement(CoverPage, { ctx: ctxWithAmount(1234.5, 'grove'), no: 1, total: 8 }),
+    )
+    expect(html).toContain('方案预算')
+    expect(html).toContain('¥1,234.5')
+  })
+
+  it('金额为 0 时封面印 ¥0，不出现 NaN / undefined', () => {
+    const html = renderToStaticMarkup(
+      createElement(CoverPage, { ctx: ctxWithAmount(0, 'grove'), no: 1, total: 8 }),
+    )
+    expect(html).toContain('¥0')
+    expect(html).not.toContain('NaN')
+    expect(html).not.toContain('undefined')
   })
 })
 

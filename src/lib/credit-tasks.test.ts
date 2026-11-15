@@ -51,7 +51,13 @@ describe('grantTaskCreditIfEligible：每项任务终生只发一次', () => {
     expect(create).not.toHaveBeenCalled()
   })
 
-  it('首次领取：按任务规格写正数流水，备注带任务说明', async () => {
+  /**
+   * 分值写死业务认可的数字（独立于实现）：绑定邮箱 / 微信各 10 分、首份报价 5 分。
+   * 如果实现里的 CREDIT_TASKS 被改成 999 / 500，这里必须红；不能写 `delta === spec.credits`，
+   * 那是同义反复，改分值永远不会被发现。
+   */
+  it('首次领取：按业务分值写正数流水，备注带任务说明', async () => {
+    const EXPECTED = { id: 'first_quote', credits: 5, reason: '任务奖励 · 生成首份报价单' } as const
     const create = vi.fn(async (_args: WriteArgs) => ({}))
     mocks.getPayloadClient.mockResolvedValue({
       count: vi.fn(async () => ({ totalDocs: 0 })),
@@ -59,14 +65,28 @@ describe('grantTaskCreditIfEligible：每项任务终生只发一次', () => {
       create,
     })
 
-    const r = await grantTaskCreditIfEligible('u-1', 'first_quote')
-    const spec = CREDIT_TASKS.find((t) => t.id === 'first_quote')!
-    expect(r).toEqual({ granted: true, credits: spec.credits, reason: spec.ledgerReason })
+    const r = await grantTaskCreditIfEligible('u-1', EXPECTED.id)
+    expect(r).toEqual({ granted: true, credits: 5, reason: EXPECTED.reason })
     expect(create.mock.calls[0]![0].data).toMatchObject({
       user: 'u-1',
-      delta: spec.credits,
-      reason: spec.ledgerReason,
+      delta: 5,
+      reason: EXPECTED.reason,
     })
+  })
+
+  it('全部分值钉住业务数字：绑定邮箱 10 / 微信 10 / 公众号 5 / 抬头 5 / 首报价 5', () => {
+    const expected: Record<string, number> = {
+      bind_email: 10,
+      bind_wechat: 10,
+      follow_official_account: 5,
+      complete_company_profile: 5,
+      first_quote: 5,
+    }
+    for (const [id, credits] of Object.entries(expected)) {
+      const spec = CREDIT_TASKS.find((t) => t.id === id)
+      expect(spec, id).toBeTruthy()
+      expect(spec!.credits, id).toBe(credits)
+    }
   })
 
   it('微信绑定奖励：同一 openid 已在活跃账号领取过则拒绝（防换号刷分）', async () => {
@@ -158,6 +178,42 @@ describe('redeemCodeForUser：兑换码的其余守卫', () => {
   }
 
   const user = { id: 'u-1' } as never
+
+  /**
+   * 入账金额必须等于兑换码权益本身。
+   * 期望值写死（100 分），不从 creditsAdded 反推 —— 否则把 delta 改成 creditsAdded * 2
+   * 也能通过全部测试，而客户会被多发 / 少发积分。
+   */
+  it('写入流水的 delta 精确等于兑换码权益（100 分）', async () => {
+    const payload = fakePayload(codeDoc({ credits: 100 }))
+    mocks.getPayloadClient.mockResolvedValue(payload)
+
+    const r = await redeemCodeForUser(user, 'FMKJ-TEST')
+
+    expect(r).toMatchObject({ ok: true, creditsAdded: 100 })
+    const ledger = payload.create.mock.calls[0]![0].data
+    expect(ledger).toMatchObject({ user: 'u-1', delta: 100 })
+    expect(ledger.reason).toBe('兑换码充值：新用户体验包')
+  })
+
+  it('权益为小数时向下取整，不会发出零头积分（12.9 → 12）', async () => {
+    const payload = fakePayload(codeDoc({ credits: 12.9 }))
+    mocks.getPayloadClient.mockResolvedValue(payload)
+
+    const r = await redeemCodeForUser(user, 'FMKJ-TEST')
+    expect(r).toMatchObject({ ok: true, creditsAdded: 12 })
+    // 100 分写死；去掉 Math.trunc 会得到 12.9，这里必须红
+    expect(payload.create.mock.calls[0]![0].data.delta).toBe(12)
+  })
+
+  it('负数权益按 0 处理并拒绝（不会出现负数充值）', async () => {
+    const payload = fakePayload(codeDoc({ credits: -50 }))
+    mocks.getPayloadClient.mockResolvedValue(payload)
+
+    const r = await redeemCodeForUser(user, 'FMKJ-TEST')
+    expect(r).toEqual({ ok: false, error: '该兑换码未配置有效权益' })
+    expect(payload.create).not.toHaveBeenCalled()
+  })
 
   it('兑换码大小写与首尾空格不影响核销（统一大写后查询）', async () => {
     const payload = fakePayload(codeDoc())

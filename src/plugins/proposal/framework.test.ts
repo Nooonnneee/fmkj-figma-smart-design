@@ -81,16 +81,50 @@ describe('章节与框架的取值一致性', () => {
     expect(kindOfFramework('budget')).toBe('owner')
   })
 
-  it('DECK_SECTIONS 声明「需要点位」与页面装配的过滤集合一致', () => {
-    // index.tsx 的 needsPoints 集合是运行时事实；这里对装配结果取证：
-    // 无点位时这些章节不应产生任何页。
-    const needs = new Set(['plans', 'system', 'zones', 'scenes', 'rooms'])
+  /**
+   * 这里只钉「声明」本身，名字就是它测的东西。
+   * 装配层的 needsPoints 集合在 deck/index.tsx 里是私有常量，无法从外部读到；
+   * 之前那条「声明与装配一致」把声明和硬编码字面量比，根本没碰装配层，
+   * 删掉 'zones' 也照样绿 —— 已删除。装配层真正可观测的证据是下面
+   * 「上传了图纸但一个点位都没有」那条（只有 plans 能凭空产出页面）。
+   */
+  it('DECK_SECTIONS 的 needsPoints 声明：平面/系统/空间/场景/其余空间需要点位', () => {
     const declared = DECK_SECTIONS.filter((s) => s.needsPoints).map((s) => s.value)
-    expect(new Set(declared)).toEqual(needs)
+    expect(new Set(declared)).toEqual(new Set(['plans', 'system', 'zones', 'scenes', 'rooms']))
   })
 })
 
 describe('deckPages 装配：页数与顺序', () => {
+  /**
+   * 装配层 `needsPoints` 集合里，只有 'plans' 是可观测的：
+   * system / zones / scenes / rooms 的渲染函数本身在无数据时就不 push 任何页，
+   * 即使从集合里删掉也不会多出一页（等价变异，测不出来）。这里只钉住真正
+   * 依赖该集合拦截的 'plans'：有图纸、无点位时必须 0 页。
+   */
+  it('有图纸但无点位时，装配层拦住平面页（needsPoints 里唯一可观测的章节）', () => {
+    const d = {
+      ...(emptyDocs() as unknown as Record<string, unknown>),
+      sheets: [
+        {
+          id: 's1',
+          elementId: 'e1',
+          index: 0,
+          name: '一层平面',
+          x: 0,
+          y: 0,
+          width: 1000,
+          height: 700,
+          fileId: 'floor',
+          url: '/floor.png',
+          missing: false,
+        },
+      ],
+    } as unknown as ProjectDocsData
+    expect(buildDeck(d).sheets).toHaveLength(1)
+    expect(
+      deckPages(d, DECK_THEMES.qixu, { markers: 'symbol', insights: true, sections: ['plans'] }),
+    ).toHaveLength(0)
+  })
   const emptyDocs = () =>
     ({
       project: {

@@ -42,8 +42,8 @@ const validInput = (over: Record<string, unknown> = {}) => ({
 
 describe('normalizeServiceInput：金额与日期的白名单', () => {
   it('收费服务保留两位小数：20.005 → 20.01（不按分丢掉）', () => {
-    // 20.005 在二进制里略小于 20.005，round 到 20；这里锁住实现的实际行为，
-    // 改实现（例如去掉 Math.round）会立刻变红。
+    // 表单字符串 20.006 乘以 100 后四舍五入到 20.01；这里锁住实现的实际行为，
+    // 改实现（例如去掉 Math.round）会立刻变成 20.006，测试变红。
     const r = normalizeServiceInput(validInput({ billing: 'paid', fee: '20.006' }) as never)
     expect(r.ok).toBe(true)
     if (r.ok) expect(r.data.fee).toBe(20.01)
