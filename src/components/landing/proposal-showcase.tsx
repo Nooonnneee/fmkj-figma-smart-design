@@ -122,20 +122,38 @@ function codeRange(codes: string[]) {
 /**
  * 首页「方案演示」模块：与下方「报价单」模块保持一致的交互体验——
  * 左侧吸顶切换「方案结构」与「视觉主题」，右侧将整套横版方案页面纵向排开，直接向下滚动浏览全部章节。
+ *
+ * `initialTheme` / `initialFramework` 只给分享页用：按项目在归档里选定的方案模板开场。
+ * 首页不传这两个参数，仍从 qixu + full 开始，行为与以前完全一致。
  */
 export function ProposalShowcase({
   data,
   company,
+  initialTheme,
+  initialFramework,
 }: {
   data: LandingShowcase
   company: CompanyInfo
+  /** 项目选定的方案模板对应的视觉主题；不传时用 qixu */
+  initialTheme?: DeckThemeId
+  /** 项目选定的方案模板对应的结构；不传时用 full */
+  initialFramework?: 'full' | 'story' | 'budget'
 }) {
-  const [themeId, setThemeId] = useState<DeckThemeId>('qixu')
-  const [frameworkId, setFrameworkId] = useState<'full' | 'story' | 'budget'>('full')
+  const [themeId, setThemeId] = useState<DeckThemeId>(initialTheme ?? 'qixu')
+  const [frameworkId, setFrameworkId] = useState<'full' | 'story' | 'budget'>(
+    initialFramework ?? 'full',
+  )
   const [zoomOpen, setZoomOpen] = useState(false)
   /** 首页预览只显示一页（其余用缩略图条切换）；放大弹窗仍显示全部页 */
   const [page, setPage] = useState(0)
   const theme = DECK_THEMES[themeId] ?? DECK_THEMES.qixu
+  // 分享页可能带一个首页选择器里没有的主题（terra / linen / slate）：
+  // 临时把它补进选择器，避免出现「画面是这个主题、选择器却没有一项选中」。
+  const themeIds = useMemo(
+    () =>
+      initialTheme && !THEME_IDS.includes(initialTheme) ? [initialTheme, ...THEME_IDS] : THEME_IDS,
+    [initialTheme],
+  )
   const activeFramework = FRAMEWORKS.find((f) => f.value === frameworkId) ?? FRAMEWORKS[0]!
   const activeChapters = useMemo(
     () =>
@@ -218,7 +236,7 @@ export function ProposalShowcase({
             <span className="text-xs text-muted-foreground">{theme.label}</span>
           </div>
           <div role="radiogroup" aria-label="方案视觉主题" className="grid grid-cols-2 gap-1.5">
-            {THEME_IDS.map((id) => {
+            {themeIds.map((id) => {
               const t = DECK_THEMES[id]
               const active = id === themeId
               return (
@@ -418,7 +436,7 @@ export function ProposalShowcase({
                   size="sm"
                   aria-label="方案视觉主题"
                 >
-                  {THEME_IDS.map((id) => {
+                  {themeIds.map((id) => {
                     const t = DECK_THEMES[id]
                     return (
                       <Tab

@@ -24,6 +24,8 @@ import { normalizeScene, planAreaOf, sceneAreas, scenePoints, sceneSheets } from
 import { projectDisplayName, quoteShortTitle } from '@/lib/project-name'
 import type { Media, Project } from '@/payload-types'
 import { PLUGIN_DOC_STYLES } from '@/plugins/doc-styles/styles'
+import { loadPublicProposalTemplates } from '@/plugins/proposal/registry'
+import { showcasePreset } from '@/plugins/proposal/templates'
 
 import { ClientDecisionPanel, type CompareQuote } from './client-decision-panel'
 import { ShareExportButton } from './share-export-button'
@@ -256,6 +258,11 @@ async function loadSharedShowcase(token: string) {
     library: { products: catalog.length, brands: 27 },
   }
 
+  // 方案演示按项目在归档里选定的模板开场（Projects.proposalTemplate）。
+  // 模板清单用系统身份读取：分享页是免登录页面，而 proposal-templates 的读权限只给了管理员与成员。
+  // 解析失败 / 模板停用 / 指向施工交底版时 preset 为 null，回落到组件默认的 qixu + full。
+  const preset = showcasePreset(project.proposalTemplate, await loadPublicProposalTemplates())
+
   // 演示链接（/share/demo）只能浏览，不能提交意向
   const shareCfg = parseShareConfig((project as unknown as { shareConfig?: unknown }).shareConfig)
   return {
@@ -265,6 +272,7 @@ async function loadSharedShowcase(token: string) {
     canSubmit: trimmed !== 'demo',
     state,
     passwordHash: shareCfg.passwordHash ?? null,
+    preset,
   }
 }
 
@@ -273,7 +281,7 @@ export default async function ClientSharePage({ params }: { params: Promise<{ to
   const { token } = await params
   const shared = await loadSharedShowcase(token)
   if (!shared) notFound()
-  const { data, company, compare, canSubmit, state, passwordHash } = shared
+  const { data, company, compare, canSubmit, state, passwordHash, preset } = shared
 
   // 链接已过期：给出明确说明，而不是 404——客户看到「链接已过期」才知道该找谁重发。
   if (state.status === 'expired') {
@@ -362,7 +370,12 @@ export default async function ClientSharePage({ params }: { params: Promise<{ to
         </section>
 
         <Section id="proposal" labelledBy="proposal-title" className="pt-20 sm:pt-28">
-          <ProposalShowcase data={data} company={company} />
+          <ProposalShowcase
+            data={data}
+            company={company}
+            initialTheme={preset?.theme}
+            initialFramework={preset?.framework}
+          />
         </Section>
 
         {data.quote ? (
