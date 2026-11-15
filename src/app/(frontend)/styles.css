@@ -177,7 +177,10 @@
   --inset-shadow-btn-neutral: inset 0 -1px 0 0 oklch(0.25 0.02 270 / 0.05);
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --animate-enter: enter 420ms cubic-bezier(0.25, 1, 0.5, 1) both;
+  /* 必须指向独立关键帧 workspace-enter（避开 tw-animate-css 的同名 enter），
+     fill-mode 用 backwards：动画结束后 transform / filter 回到 none，
+     否则 animate-enter 元素会留下 matrix/blur(0)，成为 fixed 后代的包含块。 */
+  --animate-enter: workspace-enter 420ms cubic-bezier(0.25, 1, 0.5, 1) backwards;
 }
 
 /*
