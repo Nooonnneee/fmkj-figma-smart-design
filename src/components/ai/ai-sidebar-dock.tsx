@@ -35,6 +35,7 @@ import {
   type AiProjectContext,
   type AiToolCall,
 } from '@/components/ai/ai-elements'
+import { aiDraftKey, readAiDraft, writeAiDraft } from '@/lib/ai-draft'
 import { cn } from '@/lib/utils'
 import { AI_MODELS, DEFAULT_AI_TEMPLATES, fillPromptTemplate } from '@/plugins/ai-copilot/templates'
 
@@ -122,6 +123,7 @@ export function AiSidebarDock({
   configured,
   models: customModels,
   initialInput,
+  userId,
 }: {
   plugins: AiConnectablePlugin[]
   projects: AiProjectContext[]
@@ -130,6 +132,8 @@ export function AiSidebarDock({
   models?: AiModelOption[]
   /** 打开时预先填进输入框的内容（例如从插件页带过来的问题） */
   initialInput?: string
+  /** 当前登录用户：草稿按「用户 + 会话」隔离存储，换账号不会看到别人的草稿 */
+  userId: string
 }) {
   const availableModels = customModels?.length ? customModels : AI_MODELS
   const pathname = usePathname()
@@ -159,7 +163,6 @@ export function AiSidebarDock({
   const [streaming, setStreaming] = useState(false)
   const [thinking, setThinking] = useState(false)
   const [statusText, setStatusText] = useState('')
-  const [input, setInput] = useState(initialInput ?? '')
   const [attachments, setAttachments] = useState<AiAttachment[]>([])
   const [dockDragging, setDockDragging] = useState(false)
   const scroller = useRef<HTMLDivElement>(null)
@@ -173,6 +176,46 @@ export function AiSidebarDock({
   const model = availableModels.find((m) => m.id === modelId) ?? availableModels[0]
   const project = projectList.find((p) => p.id === projectId) ?? null
   const activeTitle = conversations.find((c) => c.id === activeId)?.title ?? '新对话'
+
+  /*
+   * 输入框草稿。
+   *
+   * 面板在 inline / drawer 之间切换、抽屉开关时整个 dock 会卸载，原来放在
+   * useState 里的 input 随之丢失（实测：1440 输入 → 1439 → 回 1440 变空；
+   * 抽屉输入 → Esc → 重开变空）。这里把草稿按「用户 + 会话」写进 sessionStorage，
+   * 重挂时读回来。注意这是**卸载丢 state**，不是发送后清空的顺序问题。
+   *
+   * 键随 activeId 变化：不同会话独立草稿；新对话用 'new'。发送成功后的
+   * `setInput('')`（见 send）会把这个键删掉，不会残留已发送内容。
+   */
+  const draftKey = aiDraftKey(userId, activeId)
+  const [input, setInputState] = useState(() => {
+    if (initialInput) return initialInput
+    if (typeof window === 'undefined') return ''
+    return readAiDraft(window.sessionStorage, draftKey) ?? ''
+  })
+  const setInput = useCallback(
+    (value: string) => {
+      setInputState(value)
+      if (typeof window !== 'undefined') writeAiDraft(window.sessionStorage, draftKey, value)
+    },
+    [draftKey],
+  )
+  // 会话切换时把对应会话的草稿读回来（key 变了但组件没卸载的情况，例如新建对话拿到会话 id）。
+  // 已经打了字就不覆盖 —— 发送后 activeId 变化时用户可能又敲了内容。
+  const draftInitRef = useRef(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!draftInitRef.current) {
+      draftInitRef.current = true
+      if (initialInput) {
+        // 从插件页带过来的预填问题：写进草稿，跳走再回来还在
+        writeAiDraft(window.sessionStorage, draftKey, initialInput)
+        return
+      }
+    }
+    setInputState((current) => current || (readAiDraft(window.sessionStorage, draftKey) ?? ''))
+  }, [draftKey, initialInput])
 
   const loadConversations = useCallback(async () => {
     const res = await fetch('/ai/conversations').catch(() => null)

@@ -84,6 +84,7 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
           credits={user.aiCredits ?? 0}
           configured={aiConfigured(activeAiModels)}
           models={activeAiModels}
+          userId={user.id}
         />
       </AiPanelProvider>
     </SidebarProvider>

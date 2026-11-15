@@ -105,6 +105,8 @@ export type AiPanelProps = {
   credits: number
   configured: boolean
   models?: AiModelOption[]
+  /** 登录用户 id：草稿按「用户 + 会话」隔离存储，换账号看不到别人的草稿 */
+  userId: string
 }
 
 /**
@@ -119,7 +121,7 @@ export type AiPanelProps = {
  * 用普通文档流而不是 fixed：fixed 列 + 占位 div 会让画布页的悬浮按钮
  * （如报价单右下的毛利胶囊，z-30）浮到本栏上面；流式列没有这个问题。
  */
-export function AiPanel({ plugins, projects, credits, configured, models }: AiPanelProps) {
+export function AiPanel({ plugins, projects, credits, configured, models, userId }: AiPanelProps) {
   const { enabled, mode, setOpen, open } = useAiPanel()
   if (!enabled || mode === 'pending') return null
 
@@ -130,6 +132,7 @@ export function AiPanel({ plugins, projects, credits, configured, models }: AiPa
       credits={credits}
       configured={configured}
       models={models}
+      userId={userId}
     />
   )
 
