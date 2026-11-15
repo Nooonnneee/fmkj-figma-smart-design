@@ -195,12 +195,23 @@ const LINEAR_TABLE = LINEAR_CAD as Record<string, CadShape[]>
  *
  * 按形状族登记，而不是逐个 variant：同一形状族的多个尺寸共用一套画法。
  */
-type CadShapeFamily = 'round-head' | 'wall-slim' | 'spot-head' | 'semi-wall'
+type CadShapeFamily = 'round-head' | 'wall-slim' | 'spot-head' | 'semi-wall' | 'spot'
 
 /**
- * 只登记「图形里有圆弧、且目标画幅明显偏离 1」的族 —— 只有这些放进非方形框里
- * 才会真的变成椭圆。矩形类（面板灯 / 灯带 / 线性吊灯）拉长后仍是矩形，语义没丢，
- * 继续用原来的方形图例（不为了统一而把它们的细节重画掉）。
+ * 登记门槛（全量 157 个 variant + 34 个设备类型逐一扫过）：
+ *
+ * 1. 图例里有圆弧 —— 具体看该设备类型实际用的 CAD 图元（`CAD[SymbolKey]`）：
+ *    只有 `circle` 和 `A rx ry` 两种；画成矩形 / 直线的图例拉长后仍是矩形 / 直线，
+ *    语义没丢，不登记（面板灯、灯带、线性吊灯、方形筒灯等）。
+ * 2. 落图框偏离画幅超过 10%：`|boxW/boxH ÷ viewBoxW/viewBoxH − 1| > 0.10`。
+ *    低于 10% 的椭圆看不出区别，不值得为它另画一套（筒灯 1.2%–1.9%、吊灯 0.5%）。
+ * 3. 圆弧半径小于落图框短边 15% 时，即使框偏离 >10% 视觉上也看不出来，同样不登记
+ *    （当前数据里没有族落在这个区间，留作规则）。
+ *
+ * 按这个门槛，之前漏登记的是 6 个族 / 33 个 variant（椭圆化 = 落图框 w/h ÷ 画幅 w/h − 1）：
+ *   spot-recessed(-17.3%)、spot-recessed-square(-24.1%)、spot-surface(-16.1%)、
+ *   spot-surface-square(-16.1%)、wall-round(-15.9%)、recessed-wall(+16.4% ~ +55.5%)。
+ * 其中 recessed-wall 用的是墙上半圆图例（不是矩形），所以按圆弧族处理。
  */
 const SHAPE_FAMILY: Record<string, CadShapeFamily> = {
   // 弧形落地灯 4:1：圆形灯罩，拉长会变成飞碟
@@ -212,8 +223,16 @@ const SHAPE_FAMILY: Record<string, CadShapeFamily> = {
   // 横向壁灯：同样是半圆灯罩
   'wall-half': 'semi-wall',
   picture: 'semi-wall',
+  // 圆壁灯 / 嵌入式壁灯：CAD 图例都是「墙面竖线 + 半圆灯罩」，同上
+  'wall-round': 'semi-wall',
+  'recessed-wall': 'semi-wall',
   // 轨道射灯头 ~1:3.2：圆射灯头，拉长会变成竖向椭圆
   'track-head': 'spot-head',
+  // 嵌入式 / 明装射灯（圆形和方形款）：CAD 图例都是「正圆灯头 + 斜向光束」
+  'spot-recessed': 'spot',
+  'spot-recessed-square': 'spot',
+  'spot-surface': 'spot',
+  'spot-surface-square': 'spot',
 }
 
 const TABLE = CAD as Record<string, CadShape[]>
@@ -345,6 +364,21 @@ function proportionedBody(
         shapes: [
           line(wallX, H * 0.04, wallX, H * 0.96),
           path(`M${wallX} ${cy - R} A${R} ${R} 0 0 1 ${wallX} ${cy + R} Z`),
+        ],
+      }
+    }
+    case 'spot': {
+      // 嵌入式 / 明装射灯：沿用 CAD['spotlight'] 的「正圆灯头 + 斜向光束」，
+      // 只按画幅缩放坐标；圆的半径按短边取，落图后仍是正圆。
+      const cx = W * 0.375
+      const cy = H * 0.375
+      return {
+        W,
+        H,
+        shapes: [
+          circle(cx, cy, r),
+          line(W * 0.531, H * 0.531, W * 0.844, H * 0.844),
+          line(W * 0.656, H * 0.469, W * 0.844, H * 0.656),
         ],
       }
     }
