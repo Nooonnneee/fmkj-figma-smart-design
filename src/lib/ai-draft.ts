@@ -17,10 +17,35 @@
 
 const PREFIX = 'fmkj:ai-draft'
 
+/** 草稿存储只需要这三个方法（方便测试注入替身）。 */
+export type DraftStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
+
 /** 草稿键：用户 + 会话。conversationId 为空表示「新对话」。 */
 export function aiDraftKey(userId: string, conversationId: string | null): string {
   // 真实会话加 `c:` 前缀，避免会话 id 恰好是 'new' 时和「新对话」的键撞上。
   return `${PREFIX}:${userId}:${conversationId ? `c:${conversationId}` : 'new'}`
+}
+
+/**
+ * 安全地取 sessionStorage。
+ *
+ * 浏览器禁用存储（隐私模式 / 企业策略）时，抛 SecurityError 的不是
+ * `getItem`，而是**属性 getter 本身**：`window.sessionStorage` 一读就炸。
+ * 只把方法调用包在 try 里不够 —— 表达式求值在进函数之前就抛了，Next 会
+ * 直接把整页渲染成 "This page couldn't load"（右栏和正文一起白屏）。
+ * 所以属性访问必须单独包起来，最坏退化成一页「没有草稿」。
+ *
+ * `read` 参数只为测试注入抛错的 getter，生产调用不带参数。
+ */
+export function getDraftStorage(
+  read: () => DraftStorage | null = () =>
+    typeof window === 'undefined' ? null : window.sessionStorage,
+): DraftStorage | null {
+  try {
+    return read()
+  } catch {
+    return null
+  }
 }
 
 /** 读草稿；没有、为空串或存储不可用（隐私模式）都返回 null。 */

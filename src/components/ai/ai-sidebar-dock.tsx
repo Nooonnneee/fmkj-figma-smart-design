@@ -35,7 +35,7 @@ import {
   type AiProjectContext,
   type AiToolCall,
 } from '@/components/ai/ai-elements'
-import { aiDraftKey, readAiDraft, writeAiDraft } from '@/lib/ai-draft'
+import { aiDraftKey, getDraftStorage, readAiDraft, writeAiDraft } from '@/lib/ai-draft'
 import { cn } from '@/lib/utils'
 import { AI_MODELS, DEFAULT_AI_TEMPLATES, fillPromptTemplate } from '@/plugins/ai-copilot/templates'
 
@@ -191,13 +191,12 @@ export function AiSidebarDock({
   const draftKey = aiDraftKey(userId, activeId)
   const [input, setInputState] = useState(() => {
     if (initialInput) return initialInput
-    if (typeof window === 'undefined') return ''
-    return readAiDraft(window.sessionStorage, draftKey) ?? ''
+    return readAiDraft(getDraftStorage(), draftKey) ?? ''
   })
   const setInput = useCallback(
     (value: string) => {
       setInputState(value)
-      if (typeof window !== 'undefined') writeAiDraft(window.sessionStorage, draftKey, value)
+      writeAiDraft(getDraftStorage(), draftKey, value)
     },
     [draftKey],
   )
@@ -205,16 +204,16 @@ export function AiSidebarDock({
   // 已经打了字就不覆盖 —— 发送后 activeId 变化时用户可能又敲了内容。
   const draftInitRef = useRef(false)
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    const storage = getDraftStorage()
     if (!draftInitRef.current) {
       draftInitRef.current = true
       if (initialInput) {
         // 从插件页带过来的预填问题：写进草稿，跳走再回来还在
-        writeAiDraft(window.sessionStorage, draftKey, initialInput)
+        writeAiDraft(storage, draftKey, initialInput)
         return
       }
     }
-    setInputState((current) => current || (readAiDraft(window.sessionStorage, draftKey) ?? ''))
+    setInputState((current) => current || (readAiDraft(storage, draftKey) ?? ''))
   }, [draftKey, initialInput])
 
   const loadConversations = useCallback(async () => {

@@ -1,6 +1,18 @@
+import { readFileSync } from 'node:fs'
+
 import { describe, expect, it } from 'vitest'
 
-import { aiDraftKey, readAiDraft, writeAiDraft } from './ai-draft'
+import { aiDraftKey, getDraftStorage, readAiDraft, writeAiDraft } from './ai-draft'
+
+/**
+ * 接线断言：下面测的是纯函数语义，这里确保 dock 真的调用了它。
+ * 复核的变异测试证明过「删掉 dock 里整段写回，326 个测试全绿」，
+ * 所以纯函数之外必须有一条盯着调用点的用例。
+ */
+const dockSource = readFileSync(
+  new URL('../components/ai/ai-sidebar-dock.tsx', import.meta.url),
+  'utf8',
+)
 
 /** 最小 sessionStorage 替身：只实现草稿模块用到的三个方法。 */
 function fakeStorage(initial: Record<string, string> = {}) {
@@ -72,5 +84,28 @@ describe('readAiDraft / writeAiDraft', () => {
     }
     expect(readAiDraft(broken, 'k')).toBeNull()
     expect(() => writeAiDraft(broken, 'k', 'x')).not.toThrow()
+  })
+})
+
+describe('storage 被禁用时降级为无草稿（应修 3）', () => {
+  it('sessionStorage 属性 getter 抛 SecurityError 时返回 null', () => {
+    expect(
+      getDraftStorage(() => {
+        throw new Error('SecurityError: storage is disabled')
+      }),
+    ).toBeNull()
+  })
+
+  it('降级后读写草稿都不抛错', () => {
+    const storage = getDraftStorage(() => {
+      throw new Error('SecurityError: storage is disabled')
+    })
+    expect(readAiDraft(storage, 'k')).toBeNull()
+    expect(() => writeAiDraft(storage, 'k', 'x')).not.toThrow()
+  })
+
+  it('dock 不直接访问 window.sessionStorage（否则禁用时整页白屏）', () => {
+    expect(dockSource).not.toContain('window.sessionStorage')
+    expect(dockSource).toContain('getDraftStorage()')
   })
 })
