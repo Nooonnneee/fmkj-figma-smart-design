@@ -1,0 +1,204 @@
+/**
+ * AI 对话输入框草稿的存取（纯函数，单测见 ai-draft.test.ts）。
+ *
+ * 为什么需要：`AiSidebarDock` 的 input 是组件内 state，而面板在
+ * `inline / drawer` 之间切换（跨 1440 断点）或抽屉关开时会整体卸载，
+ * 未发送的草稿会静默丢失。实测（干净树，1440↔1439）：
+ *   inline 输入 → 缩到 1439 → 回到 1440 → 输入框为空；
+ *   抽屉输入 → Esc → 重开 → 为空。
+ *
+ * 存 sessionStorage 而不是 localStorage：草稿只在当前标签页有意义，
+ * 关掉标签页就该消失，避免下次打开看到几天前的半句话。
+ *
+ * 键必须按「用户 + 会话」隔离：同一个浏览器换账号登录时，A 的草稿
+ * 不能出现在 B 的输入框里；不同会话各自的草稿也不能互相覆盖。
+ * 新对话（还没拿到服务端 conversationId）用固定后缀 `new`。
+ */
+
+import { useCallback, useEffect, useRef } from 'react'
+
+const PREFIX = 'fmkj:ai-draft'
+
+/** 草稿存储只需要这三个方法（方便测试注入替身）。 */
+export type DraftStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
+
+/** 草稿键：用户 + 会话。conversationId 为空表示「新对话」。 */
+export function aiDraftKey(userId: string, conversationId: string | null): string {
+  // 真实会话加 `c:` 前缀，避免会话 id 恰好是 'new' 时和「新对话」的键撞上。
+  return `${PREFIX}:${userId}:${conversationId ? `c:${conversationId}` : 'new'}`
+}
+
+/**
+ * 安全地取 sessionStorage。
+ *
+ * 浏览器禁用存储（隐私模式 / 企业策略）时，抛 SecurityError 的不是
+ * `getItem`，而是**属性 getter 本身**：`window.sessionStorage` 一读就炸。
+ * 只把方法调用包在 try 里不够 —— 表达式求值在进函数之前就抛了，Next 会
+ * 直接把整页渲染成 "This page couldn't load"（右栏和正文一起白屏）。
+ * 所以属性访问必须单独包起来，最坏退化成一页「没有草稿」。
+ *
+ * `read` 参数只为测试注入抛错的 getter，生产调用不带参数。
+ */
+export function getDraftStorage(
+  read: () => DraftStorage | null = () =>
+    typeof window === 'undefined' ? null : window.sessionStorage,
+): DraftStorage | null {
+  try {
+    return read()
+  } catch {
+    return null
+  }
+}
+
+/** 读草稿；没有、为空串或存储不可用（隐私模式）都返回 null。 */
+export function readAiDraft(storage: Pick<Storage, 'getItem'> | null, key: string): string | null {
+  if (!storage) return null
+  try {
+    const value = storage.getItem(key)
+    return value ? value : null
+  } catch {
+    return null
+  }
+}
+
+/** 会话切换时该显示哪条草稿：键没变就保持现状（用户正在打字），变了才读目标键。 */
+export function draftOnKeyChange(
+  previousKey: string,
+  nextKey: string,
+  storage: Pick<Storage, 'getItem'> | null,
+  currentInput: string,
+): { changed: boolean; value: string } {
+  if (previousKey === nextKey) return { changed: false, value: currentInput }
+  return { changed: true, value: readAiDraft(storage, nextKey) ?? '' }
+}
+
+/** 服务端确认受理这一轮：首个业务事件到达（meta / delta / tool）。status / reasoning 都不算。 */
+export function isDraftAcceptedEvent(type: string): boolean {
+  return type === 'meta' || type === 'delta' || type === 'tool'
+}
+
+export type AcceptedClearResult<T> = {
+  /** 这一事件是否让本轮从「未受理」首次跃迁到「已受理」。 */
+  newlyAccepted: boolean
+  /**
+   * 首次受理时应把输入框/附件清成什么。非首个受理事件或非受理事件时返回 null，
+   * 表示不做任何清空 —— 这是「发送后失败不恢复草稿」的支点：只有服务端真正
+   * 开始产出了，草稿才清空；在此之前失败要走 resolveDraftOnFailure 还回去。
+   * 函数只返回结果不清副作用，dock 拿到 clearTo 后再 setInput/setAttachments。
+   */
+  clearTo: AiDraftState<T> | null
+}
+
+/**
+ * 解析「收到业务事件后是否已接受 + 首次受理清空」这段行为（纯函数，无副作用）。
+ * 把 dock 里 `isDraftAcceptedEvent && !accepted` 那对 setInput('')/setAttachments([])
+ * 的清空体抽到这里，让测试能对「首次受理真的清空了输入与附件」做行为级断言，
+ * 而不是盯源码字符串（删条件红、删清空体不红的假绿）。
+ */
+export function acceptedClearResult<T>(
+  accepted: boolean,
+  isAcceptedEvent: boolean,
+): AcceptedClearResult<T> {
+  // 已受理过或这一事件不算受理：不清空。
+  if (accepted || !isAcceptedEvent) return { newlyAccepted: false, clearTo: null }
+  // 首个业务事件：受理这一轮，并把输入与附件清空。
+  return { newlyAccepted: true, clearTo: { input: '', attachments: [] } }
+}
+
+export type AiDraftState<T> = { input: string; attachments: T[] }
+
+/**
+ * 「首次受理清空」的钩子版：把 dock 里那条 `acceptedClearResult(...) + setInput +
+ * setAttachments` 的接线收敛成一个可挂载的 hook，测试能对「收到首个业务事件 →
+ * 输入框与附件真的被清空」做行为级断言（挂载 hook、喂 meta 事件、断言清空回调
+ * 真正拿到 { input: '', attachments: [] }），不再用源码字符串断言。
+ *
+ * `onClear` 由调用方（dock）注入 `setInput` / `setAttachments` 的落地实现；hook
+ * 在其中**首次**收到业务类事件（meta / delta / tool）时只调用一次。之后的同轮
+ * 事件（status / reasoning，或已受理后的后续业务事件）不再触发，保证「只清一次」。
+ *
+ * `acceptedRef` 暴露给调用方，用于失败恢复判定：受理后才失败（accepted 已为 true）
+ * 不还原草稿；受理前失败走 resolveDraftOnFailure 还回去。ref 在事件处理器里读取
+ * 时是实时值，与 dock 现状的 `let accepted` 闭包语义一致。
+ */
+export function useDraftAcceptedClear<T>(onClear: (clearTo: AiDraftState<T>) => void): {
+  acceptedRef: { current: boolean }
+  onEvent: (type: string) => void
+} {
+  const acceptedRef = useRef(false)
+  // onClear 可能是组件每次渲染重建的新闭包（引用了 setInput/setAttachments 的最新
+  // state），用 ref 始终拿最新，避免事件处理器捕获到过时的清空落地点。
+  const onClearRef = useRef(onClear)
+  useEffect(() => {
+    onClearRef.current = onClear
+  })
+
+  const onEvent = useCallback((type: string) => {
+    if (acceptedRef.current) return
+    if (!acceptedClearResult<T>(false, isDraftAcceptedEvent(type)).clearTo) return
+    acceptedRef.current = true
+    onClearRef.current({ input: '', attachments: [] })
+  }, [])
+
+  return { acceptedRef, onEvent }
+}
+
+/**
+ * 发送失败时要还回去的草稿。用户在这期间已经重新输入/添加了内容时，
+ * 以用户新输入的为准，不覆盖。
+ *
+ * `current` 必须是取值函数而不是对象：`send()` 闭包里捕获的 input/attachments
+ * 是发送那一刻的旧值，等待期间用户继续输入更新的是新 state，旧闭包看不到。
+ * 传函数才能读到实时值。
+ */
+export function restoreDraft<T>(
+  snapshot: AiDraftState<T>,
+  current: () => AiDraftState<T>,
+): AiDraftState<T> {
+  const live = current()
+  return {
+    input: live.input || snapshot.input,
+    attachments: live.attachments.length ? live.attachments : snapshot.attachments,
+  }
+}
+
+/**
+ * 请求失败时的结局判定（与 fix/byok-draft-net 的 decideDraftOnFailure 同一语义）：
+ *
+ * - 受理前失败：这一轮什么都没发生 → 恢复草稿（内存 + sessionStorage），收起失败气泡。
+ * - 受理后失败：用户消息已落库、草稿已在受理时清空 → 再还回去会变成「旧文重返
+ *   输入框、再发一次 = 历史里同一条用户消息两遍」。保留错误气泡。
+ */
+export type DraftFailureDecision<T> =
+  | { kind: 'restore-draft'; draft: AiDraftState<T> }
+  | { kind: 'keep-error' }
+
+export function resolveDraftOnFailure<T>(
+  accepted: boolean,
+  storage: DraftStorage | null,
+  key: string,
+  snapshot: AiDraftState<T>,
+  current: () => AiDraftState<T>,
+): DraftFailureDecision<T> {
+  if (accepted) return { kind: 'keep-error' }
+  const draft = restoreDraft(snapshot, current)
+  // 内存里的输入框与 sessionStorage 必须一起恢复：只还原 state 的话，
+  // 面板一卸载（跨断点 / 关抽屉）草稿又没了。
+  writeAiDraft(storage, key, draft.input)
+  return { kind: 'restore-draft', draft }
+}
+
+/** 写草稿；空串等价于删除，避免留下无意义的键。存储异常一律忽略。 */
+export function writeAiDraft(
+  storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null,
+  key: string,
+  value: string,
+): void {
+  if (!storage) return
+  try {
+    if (value) storage.setItem(key, value)
+    else storage.removeItem(key)
+  } catch {
+    // 存储已满 / 被禁用：草稿丢失不应影响发送。
+  }
+}

@@ -4,6 +4,7 @@ import { ChevronRight } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
 import { Divider } from '@astryxdesign/core/Divider'
+import { AiPanelToggle } from '@/components/ai/ai-panel'
 import { AppearanceMenu } from '@/components/appearance-menu'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { APP_NAME } from '@/lib/brand'
@@ -50,6 +51,7 @@ export function SiteHeader() {
         <span className="truncate text-sm font-semibold text-foreground">{title}</span>
       </nav>
       <div className="ml-auto flex items-center gap-1">
+        <AiPanelToggle />
         <AppearanceMenu />
       </div>
     </header>

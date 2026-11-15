@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   AlertCircle,
@@ -35,6 +35,16 @@ import {
   type AiProjectContext,
   type AiToolCall,
 } from '@/components/ai/ai-elements'
+import {
+  aiDraftKey,
+  draftOnKeyChange,
+  getDraftStorage,
+  readAiDraft,
+  resolveDraftOnFailure,
+  useDraftAcceptedClear,
+  writeAiDraft,
+  type AiDraftState,
+} from '@/lib/ai-draft'
 import { cn } from '@/lib/utils'
 import { AI_MODELS, DEFAULT_AI_TEMPLATES, fillPromptTemplate } from '@/plugins/ai-copilot/templates'
 
@@ -122,6 +132,7 @@ export function AiSidebarDock({
   configured,
   models: customModels,
   initialInput,
+  userId,
 }: {
   plugins: AiConnectablePlugin[]
   projects: AiProjectContext[]
@@ -130,6 +141,8 @@ export function AiSidebarDock({
   models?: AiModelOption[]
   /** 打开时预先填进输入框的内容（例如从插件页带过来的问题） */
   initialInput?: string
+  /** 当前登录用户：草稿按「用户 + 会话」隔离存储，换账号不会看到别人的草稿 */
+  userId: string
 }) {
   const availableModels = customModels?.length ? customModels : AI_MODELS
   const pathname = usePathname()
@@ -159,7 +172,6 @@ export function AiSidebarDock({
   const [streaming, setStreaming] = useState(false)
   const [thinking, setThinking] = useState(false)
   const [statusText, setStatusText] = useState('')
-  const [input, setInput] = useState(initialInput ?? '')
   const [attachments, setAttachments] = useState<AiAttachment[]>([])
   const [dockDragging, setDockDragging] = useState(false)
   const scroller = useRef<HTMLDivElement>(null)
@@ -173,6 +185,73 @@ export function AiSidebarDock({
   const model = availableModels.find((m) => m.id === modelId) ?? availableModels[0]
   const project = projectList.find((p) => p.id === projectId) ?? null
   const activeTitle = conversations.find((c) => c.id === activeId)?.title ?? '新对话'
+
+  /*
+   * 输入框草稿。
+   *
+   * 面板在 inline / drawer 之间切换、抽屉开关时整个 dock 会卸载，原来放在
+   * useState 里的 input 随之丢失（实测：1440 输入 → 1439 → 回 1440 变空；
+   * 抽屉输入 → Esc → 重开变空）。这里把草稿按「用户 + 会话」写进 sessionStorage，
+   * 重挂时读回来。注意这是**卸载丢 state**，不是发送后清空的顺序问题。
+   *
+   * 键随 activeId 变化：不同会话独立草稿；新对话用 'new'。发送成功后的
+   * `setInput('')`（见 send）会把这个键删掉，不会残留已发送内容。
+   */
+  const draftKey = aiDraftKey(userId, activeId)
+  const [input, setInputState] = useState(() => {
+    if (initialInput) return initialInput
+    return readAiDraft(getDraftStorage(), draftKey) ?? ''
+  })
+  const setInput = useCallback(
+    (value: string) => {
+      setInputState(value)
+      writeAiDraft(getDraftStorage(), draftKey, value)
+    },
+    [draftKey],
+  )
+
+  // 首个业务事件（meta / delta / tool）到达 = 服务端已受理这一轮（用户消息已落库、
+  // 开始产出），此刻才清空草稿。status / reasoning 之前失败都不算送出。收敛成
+  // useDraftAcceptedClear 这个可挂载 hook：它只在首次受理时调用一次 onClear，
+  // 测试能对「首次受理真的清空输入与附件」做行为级断言，不再盯源码字符串。
+  const handleAcceptedClear = useCallback(
+    (t: AiDraftState<AiAttachment>) => {
+      setInput(t.input)
+      setAttachments(t.attachments)
+    },
+    [setInput],
+  )
+  const { acceptedRef, onEvent: emitAcceptedClear } =
+    useDraftAcceptedClear<AiAttachment>(handleAcceptedClear)
+  // 会话切换时必须**换成目标会话的草稿**（没有就空），不能因为当前输入框非空
+  // 就把旧会话内容带过去（实测：A 输入 → 切 B，B 显示 A 的内容）。
+  // 用「上一次的键」比较，只在键真正变化时同步一次；键没变（用户正在打字）
+  // 时绝不覆盖。
+  const draftKeyRef = useRef(draftKey)
+  const draftInitRef = useRef(false)
+  useEffect(() => {
+    const storage = getDraftStorage()
+    if (!draftInitRef.current) {
+      draftInitRef.current = true
+      if (initialInput) {
+        // 从插件页带过来的预填问题：写进草稿，跳走再回来还在
+        writeAiDraft(storage, draftKey, initialInput)
+        return
+      }
+    }
+    const sync = draftOnKeyChange(draftKeyRef.current, draftKey, storage, input)
+    if (!sync.changed) return
+    draftKeyRef.current = draftKey
+    setInputState(sync.value)
+  }, [draftKey, initialInput, input])
+
+  // 输入框与附件的实时值镜像：send() 闭包拿到的是发送那一刻的旧快照，等待期间
+  // 用户继续输入只会更新 state。失败恢复草稿时要读这里的最新值，
+  // 否则「用户新输入优先」永远走不到。layout effect 保证提交后立刻同步。
+  const liveDraftRef = useRef({ input, attachments })
+  useLayoutEffect(() => {
+    liveDraftRef.current = { input, attachments }
+  }, [input, attachments])
 
   const loadConversations = useCallback(async () => {
     const res = await fetch('/ai/conversations').catch(() => null)
@@ -466,6 +545,9 @@ export function AiSidebarDock({
       fullPayloadMessage = `${displayPrompt}\n\n【已上传附件】\n${blocks.join('\n\n')}`
     }
 
+    // 草稿快照：请求在受理前失败（500 / 网络中断 / 402）时原样还回输入框与附件。
+    const draftSnapshot = { input, attachments }
+
     const now = new Date().toISOString()
     const replyId = `pending-${Date.now()}`
     setMessages((prev) => [
@@ -493,8 +575,9 @@ export function AiSidebarDock({
         toolCalls: [],
       },
     ])
-    setInput('')
-    setAttachments([])
+    // 输入框与附件不在这里清空 —— 只有服务端确认受理（收到首个业务事件）后才清。
+    // 否则 500 / 网络中断会让用户的正文与附件凭空消失（实测 FAIL-500-DRAFT 复现）。
+    acceptedRef.current = false
     setStreaming(true)
     setThinking(true)
     setStatusText(readyAtts.some((a) => a.kind === 'image') ? '正在由视觉模型看图…' : '')
@@ -536,6 +619,14 @@ export function AiSidebarDock({
         for (const line of lines) {
           if (!line.trim()) continue
           const ev = JSON.parse(line) as { type: string; [k: string]: unknown }
+          if (ev.type === 'error') {
+            const err = new Error(String(ev.error)) as Error & { code?: string }
+            err.code = typeof ev.code === 'string' ? ev.code : undefined
+            throw err
+          }
+          // 首个业务事件时才触发第一次清空；类型不重要，事件类型判断在 hook 内。
+          // status/reasoning/done 等非受理事件不会把 accepted 置真，也不会清空。
+          emitAcceptedClear(ev.type)
           if (ev.type === 'meta' && typeof ev.conversationId === 'string') {
             const cid = ev.conversationId
             if (!activeId) {
@@ -613,23 +704,46 @@ export function AiSidebarDock({
         }
       }
     } catch (error) {
-      if ((error as Error).name === 'AbortError') dropReply()
-      else if ((error as Error & { code?: string }).code === 'billing_rejected') {
+      const aborted = (error as Error).name === 'AbortError'
+      const billingRejected = (error as Error & { code?: string }).code === 'billing_rejected'
+      // 受理前失败：这一轮什么都没发生，把草稿（内存 + sessionStorage）还回去。
+      // 受理后失败：用户消息已落库，草稿已在受理时清空，再还回去会重复发送。
+      const decision = resolveDraftOnFailure(
+        acceptedRef.current,
+        getDraftStorage(),
+        draftKey,
+        draftSnapshot,
+        () => liveDraftRef.current,
+      )
+      if (decision.kind === 'restore-draft') {
+        setInputState(decision.draft.input)
+        setAttachments(decision.draft.attachments)
+        dropReply()
+      }
+      if (aborted) {
+        // 用户主动停止：沿用原行为，收起这条未完成的回复气泡。
+        dropReply()
+      } else if (billingRejected) {
         // 业务拒绝（如并发扣费时积分不足）：回复内容已经流式发出，但本次没扣费，必须明确告诉用户。
         showToast({
           body: (error as Error).message || '积分不足，本次回复未计费',
           type: 'error',
         })
-      } else
-        patchReply((m) =>
-          m.content
-            ? m
-            : {
-                ...m,
-                content: `发送失败：${(error as Error).message || '请稍后重试'}`,
-                error: true,
-              },
-        )
+      } else {
+        if (decision.kind === 'restore-draft') {
+          showToast({ body: (error as Error).message || '发送失败，请稍后重试', type: 'error' })
+        } else {
+          patchReply((m) =>
+            m.content
+              ? m
+              : {
+                  ...m,
+                  content: `发送失败：${(error as Error).message || '请稍后重试'}`,
+                  error: true,
+                },
+          )
+        }
+      }
     } finally {
       setStreaming(false)
       setThinking(false)

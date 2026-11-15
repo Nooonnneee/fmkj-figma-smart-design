@@ -102,6 +102,7 @@ export default async function AiPage({
         configured={aiConfigured(activeModels)}
         models={activeModels}
         initialInput={initialInput}
+        userId={user.id}
       />
     </div>
   )

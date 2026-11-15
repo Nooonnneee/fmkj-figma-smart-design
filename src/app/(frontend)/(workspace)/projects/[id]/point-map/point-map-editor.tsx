@@ -1428,8 +1428,23 @@ export function PointMapEditor({
       />
 
       {/* ==================== 顶部工具栏（唯一的操作入口）：左（楼层 · 工具 · 历史）｜中（当前步骤的主操作）｜右（显示 · 缩放 · 导出 · 报价 · 保存状态） ==================== */}
-      <div className="flex h-12 shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-background px-2.5 [scrollbar-width:none]">
-        <div className="flex min-w-max flex-1 items-center gap-1">
+      {/*
+        工具条放不下时换行，而不是横向滚动：多出 AI 右栏后，1440 下画布只剩 1072px，
+        而这一排操作约需 1300px。原来的 overflow-x-auto 会把「生成报价」「已保存」
+        滚到视口外，用户看不到主操作；换行保证每个按钮始终可见。
+        高度用 min-h-12 而非固定 h-12，换行后画布 flex-1 自然少一点高度。
+
+        光给外层 flex-wrap 不够：内部三组如果各自不可收缩（min-w-max / shrink-0），
+        它们会作为一个整体溢出，外层根本没机会换行 —— 390 宽实测页面 scrollWidth
+        489（右侧组单独 479）。所以三组都改成 flex-wrap，让「放不下」先在组内解决；
+        组本身仍保持 min-width: auto，实在排不下时外层才把整组挪到下一行。
+        这样不需要给任何按钮固定像素宽度，窄屏用折行换取「每个按钮都在视口内」。
+        注意：组上**不要**加 min-w-0 —— 那会让组被压缩到小于内容宽度，两组的行
+        互相重叠（1440 实测重叠 66px，按钮点不到）。
+      */}
+      <div className="flex min-h-12 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-border bg-background px-2.5 py-1">
+        {/* 左侧组（楼层 · 工具 · 历史）：可折行，窄屏不再把右侧操作顶出视口 */}
+        <div className="flex flex-1 flex-wrap items-center gap-1">
           {/* 楼层切换：切换 / 总览 / 当前图纸的重命名、清除标定、删除都在这一个菜单里；添加图纸用中间的「上传户型图」 */}
           {snap.sheets.length ? (
             <>
@@ -1636,7 +1651,8 @@ export function PointMapEditor({
             <Badge variant="neutral" label={'只读'} />
           </div>
         ) : (
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {/* 中间组（当前步骤的主操作）：同样允许折行，390 宽时单独 386px 也会顶出视口 */}
             <div className="flex items-center">
               {/* 还没有图纸时它是主操作，带文字；有图纸后退为图标（新增楼层），只让当前步骤带文字 */}
               <Tooltip
@@ -1742,7 +1758,16 @@ export function PointMapEditor({
           </div>
         )}
 
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-0.5">
+        {/*
+          这一组含缩放/导出/生成报价，曾经是 min-w-0 flex-1，在窄画布下被压缩后内容
+          （justify-end）向左侧溢出，压在「生成点位」按钮上（1440 三列并排时实测重叠 74px）。
+          所以它不设 flex-1（不参与拉伸），也**不设 min-w-0**：min-width 保持 auto，
+          组的最小宽度就是内容的最小可换行宽度，外层 flex-wrap 才有机会把它整体
+          挪到下一行，而不是把它压缩到和左边组重叠（实测 1440 设 min-w-0 时两组
+          重叠 66px，按钮被压住点不到）。同时组自己开 flex-wrap：窄屏内部先折行，
+          390 宽时不会出现一整排 479px 溢出 —— 那正是 158da7f 想避免的情况。
+        */}
+        <div className="flex flex-wrap items-center justify-end gap-0.5">
           {readOnly ? null : (
             <ToolbarIconButton
               label={mobilePlaceOpen ? '收起设备面板' : '放置设备'}
