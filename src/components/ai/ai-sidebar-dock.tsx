@@ -36,6 +36,7 @@ import {
   type AiToolCall,
 } from '@/components/ai/ai-elements'
 import {
+  acceptedClearResult,
   aiDraftKey,
   draftOnKeyChange,
   getDraftStorage,
@@ -606,10 +607,13 @@ export function AiSidebarDock({
           const ev = JSON.parse(line) as { type: string; [k: string]: unknown }
           // 首个业务事件到达 = 服务端已受理这一轮（用户消息已落库、开始产出），
           // 此刻才可以清空草稿。status / reasoning 之前失败都不算送出。
-          if (isDraftAcceptedEvent(ev.type) && !accepted) {
-            accepted = true
-            setInput('')
-            setAttachments([])
+          // acceptedClearResult 传入 accepted 与「是否受理事件」，返回首次受理时
+          // 要清成的值（纯函数，dock 拿到后再落地副作用）。
+          const clear = acceptedClearResult<AiAttachment>(accepted, isDraftAcceptedEvent(ev.type))
+          if (clear.newlyAccepted) accepted = true
+          if (clear.clearTo) {
+            setInput(clear.clearTo.input)
+            setAttachments(clear.clearTo.attachments)
           }
           if (ev.type === 'meta' && typeof ev.conversationId === 'string') {
             const cid = ev.conversationId

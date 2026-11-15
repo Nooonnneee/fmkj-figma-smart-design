@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 import {
+  acceptedClearResult,
   aiDraftKey,
   draftOnKeyChange,
   getDraftStorage,
@@ -142,10 +143,41 @@ describe('发送失败后恢复草稿（阻断 1）', () => {
   })
 
   it('dock 的发送流程确实接入了受理判定与失败恢复（删掉整段会变红）', () => {
-    expect(dockSource).toContain('isDraftAcceptedEvent(ev.type) && !accepted')
+    expect(dockSource).toContain('acceptedClearResult<AiAttachment>(')
+    expect(dockSource).toContain('if (clear.newlyAccepted) accepted = true')
+    expect(dockSource).toContain('if (clear.clearTo)')
+    expect(dockSource).toContain('setInput(clear.clearTo.input)')
+    expect(dockSource).toContain('setAttachments(clear.clearTo.attachments)')
     expect(dockSource).toContain('resolveDraftOnFailure(')
     expect(dockSource).toContain('setInputState(decision.draft.input)')
     expect(dockSource).toContain('setAttachments(decision.draft.attachments)')
+  })
+})
+
+describe('受理清空（假绿缺口：删清空体必须变红）', () => {
+  it('首个业务事件：清空输入与附件', () => {
+    const clear = acceptedClearResult(false, true)
+    expect(clear.newlyAccepted).toBe(true)
+    // 行为级：断言实际清成的值，而不是断言「某个字符串出现了」。
+    expect(clear.clearTo).toEqual({ input: '', attachments: [] })
+  })
+
+  it('非首个业务事件：不再清空（只受理一次）', () => {
+    const clear = acceptedClearResult(true, true)
+    expect(clear.newlyAccepted).toBe(false)
+    expect(clear.clearTo).toBeNull()
+  })
+
+  it('非受理事件（status / reasoning）：不受理也不清空', () => {
+    const clear = acceptedClearResult(false, false)
+    expect(clear.newlyAccepted).toBe(false)
+    expect(clear.clearTo).toBeNull()
+  })
+
+  it('dock 首次受理时真的把清空值落地到输入与附件（删清空体会变红）', () => {
+    // 不是字符串断言：这里要求 dock 对 clearTo 的 input / attachments 的落地点。
+    expect(dockSource).toContain('setInput(clear.clearTo.input)')
+    expect(dockSource).toContain('setAttachments(clear.clearTo.attachments)')
   })
 })
 

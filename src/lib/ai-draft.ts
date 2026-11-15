@@ -75,6 +75,34 @@ export function isDraftAcceptedEvent(type: string): boolean {
   return type === 'meta' || type === 'delta' || type === 'tool'
 }
 
+export type AcceptedClearResult<T> = {
+  /** 这一事件是否让本轮从「未受理」首次跃迁到「已受理」。 */
+  newlyAccepted: boolean
+  /**
+   * 首次受理时应把输入框/附件清成什么。非首个受理事件或非受理事件时返回 null，
+   * 表示不做任何清空 —— 这是「发送后失败不恢复草稿」的支点：只有服务端真正
+   * 开始产出了，草稿才清空；在此之前失败要走 resolveDraftOnFailure 还回去。
+   * 函数只返回结果不清副作用，dock 拿到 clearTo 后再 setInput/setAttachments。
+   */
+  clearTo: AiDraftState<T> | null
+}
+
+/**
+ * 解析「收到业务事件后是否已接受 + 首次受理清空」这段行为（纯函数，无副作用）。
+ * 把 dock 里 `isDraftAcceptedEvent && !accepted` 那对 setInput('')/setAttachments([])
+ * 的清空体抽到这里，让测试能对「首次受理真的清空了输入与附件」做行为级断言，
+ * 而不是盯源码字符串（删条件红、删清空体不红的假绿）。
+ */
+export function acceptedClearResult<T>(
+  accepted: boolean,
+  isAcceptedEvent: boolean,
+): AcceptedClearResult<T> {
+  // 已受理过或这一事件不算受理：不清空。
+  if (accepted || !isAcceptedEvent) return { newlyAccepted: false, clearTo: null }
+  // 首个业务事件：受理这一轮，并把输入与附件清空。
+  return { newlyAccepted: true, clearTo: { input: '', attachments: [] } }
+}
+
 export type AiDraftState<T> = { input: string; attachments: T[] }
 
 /**
