@@ -253,28 +253,28 @@ describe('A2. 共享符号键的灯具按「这个点位」选 CAD 画面（回�
       o: point('spotlight', 'lt-recessed-mount-directional-light-20cm-8', [5, null], true),
       circles: 1,
       arcs: 0,
-      radius: (W: number, H: number) => Math.min(W, H) * 0.26,
+      radius: (W: number, H: number) => Math.min(W, H) * 0.1875,
     },
     {
       name: '嵌入式射灯（方）',
       o: point('spotlight', 'lt-recessed-mount-directional-light-20cm-8-2', [5, null], true),
       circles: 1,
       arcs: 0,
-      radius: (W: number, H: number) => Math.min(W, H) * 0.26,
+      radius: (W: number, H: number) => Math.min(W, H) * 0.1875,
     },
     {
       name: '明装射灯（圆）',
       o: point('spotlight', 'lt-surface-mount-directional-light-20cm-8', [5, null], true),
       circles: 1,
       arcs: 0,
-      radius: (W: number, H: number) => Math.min(W, H) * 0.26,
+      radius: (W: number, H: number) => Math.min(W, H) * 0.1875,
     },
     {
       name: '明装射灯（方）',
       o: point('spotlight', 'lt-surface-mount-directional-light-20cm-8-2', [5, null], true),
       circles: 1,
       arcs: 0,
-      radius: (W: number, H: number) => Math.min(W, H) * 0.26,
+      radius: (W: number, H: number) => Math.min(W, H) * 0.1875,
     },
     {
       name: '圆壁灯 20cm',
@@ -318,6 +318,37 @@ describe('A2. 共享符号键的灯具按「这个点位」选 CAD 画面（回�
         expect(rx, `${c.name} 圆弧半径`).toBeCloseTo(c.radius(vw, vh), 2)
       }
       expect(svg, c.name).not.toContain('<ellipse')
+    }
+  })
+
+  it('射灯：圆灯头沿用原图例半径 0.1875 短边，两束斜线都从圆外开始', () => {
+    // 回归：新射灯族曾用通用半径 0.26 短边，而画幅按真实比例拉高后，第一束线的起点
+    // 到圆心只有 0.243–0.258 短边（< 0.26），线从圆内穿出，10x 下像放大镜。
+    // 原图例 CAD['spotlight'] 是 circle r=6/32、起点 (17,17) 距圆心 7.07/32 = 0.221 短边，
+    // 两束线都从圆外开始。这里直接量生成的 SVG，而不是只比半径。
+    const spots: Array<[string, SymbolObj]> = [
+      ['嵌入式射灯（圆）', point('spotlight', 'lt-recessed-mount-directional-light-20cm-8')],
+      ['嵌入式射灯（方）', point('spotlight', 'lt-recessed-mount-directional-light-20cm-8-2')],
+      ['明装射灯（圆）', point('spotlight', 'lt-surface-mount-directional-light-20cm-8')],
+      ['明装射灯（方）', point('spotlight', 'lt-surface-mount-directional-light-20cm-8-2')],
+    ]
+    for (const [name, o] of spots) {
+      const svg = decodeURIComponent(lookOf(o, { iconStyle: 'cad' }).art!.src)
+      const [, , vw, vh] = svg
+        .match(/viewBox="([^"]+)"/)![1]
+        .split(/\s+/)
+        .map(Number)
+      const short = Math.min(vw, vh)
+      const [, cx, cy, r] = svg.match(/<circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/)!
+      // 先量「起点是否在圆外」——这是复核要恢复的语义；半径放在后面只作形状锚定。
+      const starts = [...svg.matchAll(/<line x1="([\d.]+)" y1="([\d.]+)"/g)].map((m) => [
+        +m[1],
+        +m[2],
+      ])
+      expect(starts.length, `${name} 光束数量`).toBe(2)
+      for (const [x, y] of starts)
+        expect(Math.hypot(x - +cx, y - +cy), `${name} 光束起点应在圆外`).toBeGreaterThan(+r)
+      expect(+r / short, `${name} 圆半径`).toBeCloseTo(0.1875, 3)
     }
   })
 
