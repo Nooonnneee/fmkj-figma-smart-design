@@ -74,25 +74,25 @@ export async function down({ db, payload, req }: MigrateDownArgs): Promise<void>
   ALTER TABLE "company_settings_ai_models" ALTER COLUMN "channel_id" SET DATA TYPE text;
   ALTER TABLE "company_settings_ai_models" ALTER COLUMN "channel_id" SET DEFAULT 'deepseek'::text;
   DROP TYPE "public"."enum_company_settings_ai_models_channel_id";
-  CREATE TYPE "public"."enum_company_settings_ai_models_channel_id" AS ENUM('deepseek', 'newapi', 'siliconflow', 'dashscope', 'ark', 'moonshot', 'zhipu', 'openrouter', 'custom');
+  CREATE TYPE "public"."enum_company_settings_ai_models_channel_id" AS ENUM('deepseek', 'newapi', 'siliconflow', 'dashscope', 'dashscope-token-plan', 'ark', 'moonshot', 'zhipu', 'openrouter', 'custom');
   ALTER TABLE "company_settings_ai_models" ALTER COLUMN "channel_id" SET DEFAULT 'deepseek'::"public"."enum_company_settings_ai_models_channel_id";
   ALTER TABLE "company_settings_ai_models" ALTER COLUMN "channel_id" SET DATA TYPE "public"."enum_company_settings_ai_models_channel_id" USING "channel_id"::"public"."enum_company_settings_ai_models_channel_id";
   ALTER TABLE "_company_settings_v_version_ai_models" ALTER COLUMN "channel_id" SET DATA TYPE text;
   ALTER TABLE "_company_settings_v_version_ai_models" ALTER COLUMN "channel_id" SET DEFAULT 'deepseek'::text;
   DROP TYPE "public"."enum__company_settings_v_version_ai_models_channel_id";
-  CREATE TYPE "public"."enum__company_settings_v_version_ai_models_channel_id" AS ENUM('deepseek', 'newapi', 'siliconflow', 'dashscope', 'ark', 'moonshot', 'zhipu', 'openrouter', 'custom');
+  CREATE TYPE "public"."enum__company_settings_v_version_ai_models_channel_id" AS ENUM('deepseek', 'newapi', 'siliconflow', 'dashscope', 'dashscope-token-plan', 'ark', 'moonshot', 'zhipu', 'openrouter', 'custom');
   ALTER TABLE "_company_settings_v_version_ai_models" ALTER COLUMN "channel_id" SET DEFAULT 'deepseek'::"public"."enum__company_settings_v_version_ai_models_channel_id";
   ALTER TABLE "_company_settings_v_version_ai_models" ALTER COLUMN "channel_id" SET DATA TYPE "public"."enum__company_settings_v_version_ai_models_channel_id" USING "channel_id"::"public"."enum__company_settings_v_version_ai_models_channel_id";
   ALTER TABLE "ai_settings_ai_models" ALTER COLUMN "channel_id" SET DATA TYPE text;
   ALTER TABLE "ai_settings_ai_models" ALTER COLUMN "channel_id" SET DEFAULT 'deepseek'::text;
   DROP TYPE "public"."enum_ai_settings_ai_models_channel_id";
-  CREATE TYPE "public"."enum_ai_settings_ai_models_channel_id" AS ENUM('deepseek', 'newapi', 'siliconflow', 'dashscope', 'ark', 'moonshot', 'zhipu', 'openrouter', 'custom');
+  CREATE TYPE "public"."enum_ai_settings_ai_models_channel_id" AS ENUM('deepseek', 'newapi', 'siliconflow', 'dashscope', 'dashscope-token-plan', 'ark', 'moonshot', 'zhipu', 'openrouter', 'custom');
   ALTER TABLE "ai_settings_ai_models" ALTER COLUMN "channel_id" SET DEFAULT 'deepseek'::"public"."enum_ai_settings_ai_models_channel_id";
   ALTER TABLE "ai_settings_ai_models" ALTER COLUMN "channel_id" SET DATA TYPE "public"."enum_ai_settings_ai_models_channel_id" USING "channel_id"::"public"."enum_ai_settings_ai_models_channel_id";
   ALTER TABLE "_ai_settings_v_version_ai_models" ALTER COLUMN "channel_id" SET DATA TYPE text;
   ALTER TABLE "_ai_settings_v_version_ai_models" ALTER COLUMN "channel_id" SET DEFAULT 'deepseek'::text;
   DROP TYPE "public"."enum__ai_settings_v_version_ai_models_channel_id";
-  CREATE TYPE "public"."enum__ai_settings_v_version_ai_models_channel_id" AS ENUM('deepseek', 'newapi', 'siliconflow', 'dashscope', 'ark', 'moonshot', 'zhipu', 'openrouter', 'custom');
+  CREATE TYPE "public"."enum__ai_settings_v_version_ai_models_channel_id" AS ENUM('deepseek', 'newapi', 'siliconflow', 'dashscope', 'dashscope-token-plan', 'ark', 'moonshot', 'zhipu', 'openrouter', 'custom');
   ALTER TABLE "_ai_settings_v_version_ai_models" ALTER COLUMN "channel_id" SET DEFAULT 'deepseek'::"public"."enum__ai_settings_v_version_ai_models_channel_id";
   ALTER TABLE "_ai_settings_v_version_ai_models" ALTER COLUMN "channel_id" SET DATA TYPE "public"."enum__ai_settings_v_version_ai_models_channel_id" USING "channel_id"::"public"."enum__ai_settings_v_version_ai_models_channel_id";`)
 }

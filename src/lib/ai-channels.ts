@@ -117,6 +117,10 @@ export type ChannelInputBody = {
   enabled?: unknown
 }
 
+/** 与 schema 的 maxLength 保持一致（集合层 500 字 vs 服务层 300 字曾经不一致，这里统一）。 */
+export const MAX_BASE_URL_LEN = 300
+export const MAX_LABEL_LEN = 60
+
 export type NormalizedChannelInput = {
   key: string
   label: string
@@ -130,23 +134,61 @@ export type NormalizedChannelInput = {
 /**
  * 白名单化入参。只认这几个字段，其余（包括 userId、lastCheckedAt、apiKeyHint 等）
  * 全部丢弃 —— 防止客户端自己伪造检查结果或往别的账号写数据。
+ *
+ * `opts.partial` 为 true 时表示「没传的字段保持原值」：
+ * 不传 models 不再被当成「清空模型列表」（那是个静默丢数据的 bug），
+ * 由调用方用 `undefined` 判断是否要覆盖。
  */
 export function normalizeChannelInput(
   body: ChannelInputBody,
-  opts: { requireApiKey: boolean },
+  opts: { requireApiKey: boolean; partial?: boolean },
 ): NormalizedChannelInput {
+  // 传了但类型不对 → 直接拒绝。以前是静默回退到默认值：`enabled: "false"`（字符串）
+  // 会被当成「未传」而落成 true，`models: "m1"` 会被当成空数组清空列表。
+  // `null` 一律视为「没传」（沿用旧行为），只有类型真正不对时才报错。
+  const wrongType = (value: unknown, ok: (v: unknown) => boolean) =>
+    value !== undefined && value !== null && !ok(value)
+  if (wrongType(body.label, (v) => typeof v === 'string')) {
+    throw new AiChannelInputError('渠道显示名格式不正确')
+  }
+  if (wrongType(body.baseUrl, (v) => typeof v === 'string')) {
+    throw new AiChannelInputError('接口地址格式不正确')
+  }
+  if (wrongType(body.apiKey, (v) => typeof v === 'string')) {
+    throw new AiChannelInputError('API Key 格式不正确')
+  }
+  if (wrongType(body.models, (v) => Array.isArray(v))) {
+    throw new AiChannelInputError('模型名必须是数组')
+  }
+  if (wrongType(body.enabled, (v) => typeof v === 'boolean')) {
+    throw new AiChannelInputError('启用状态只能是 true 或 false')
+  }
+
   const key = cleanText(body.key, 40)
   if (!CHANNEL_KEY_RE.test(key)) {
     throw new AiChannelInputError('渠道标识只能使用字母、数字、- 和 _，最多 40 字')
   }
-  const label = cleanText(body.label, 60)
-  if (!label) throw new AiChannelInputError('请填写渠道显示名')
+  // label：超长直接拒绝，而不是静默截断（集合层用 maxLength 拒绝，两条路径必须一致）
+  if (typeof body.label === 'string' && body.label.trim().length > MAX_LABEL_LEN) {
+    throw new AiChannelInputError(`渠道显示名最多 ${MAX_LABEL_LEN} 字`)
+  }
+  const label = cleanText(body.label, MAX_LABEL_LEN)
+  if (!label && !opts.partial) throw new AiChannelInputError('请填写渠道显示名')
 
-  let baseUrl: string
-  try {
-    baseUrl = assertChannelBaseUrl(body.baseUrl)
-  } catch (error) {
-    throw new AiChannelInputError(error instanceof ChannelUrlError ? error.message : '接口地址无效')
+  // baseUrl：服务层以前不做长度校验；schema 的 maxLength 在 overrideAccess 写库时不生效，
+  // 曾经能落 427 字。这里显式限制到与 schema 相同的 300 字。
+  if (typeof body.baseUrl === 'string' && body.baseUrl.trim().length > MAX_BASE_URL_LEN) {
+    throw new AiChannelInputError(`接口地址最多 ${MAX_BASE_URL_LEN} 字`)
+  }
+  let baseUrl = ''
+  if (body.baseUrl !== undefined && body.baseUrl !== null && body.baseUrl !== '') {
+    try {
+      baseUrl = assertChannelBaseUrl(body.baseUrl)
+    } catch (error) {
+      throw new AiChannelInputError((error as Error).message || '接口地址无效')
+    }
+  } else if (!opts.partial) {
+    throw new AiChannelInputError('请填写渠道接口地址')
   }
 
   const apiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : ''
@@ -159,7 +201,8 @@ export function normalizeChannelInput(
     baseUrl,
     apiKey,
     models: normalizeModels(body.models),
-    enabled: body.enabled !== false,
+    // 类型闸已经在上面拦掉一切非布尔值（含字符串 "false"），这里的 true 只是「没传」的默认。
+    enabled: typeof body.enabled === 'boolean' ? body.enabled : true,
   }
 }
 
@@ -286,6 +329,12 @@ export async function createChannel(
 
 /**
  * 修改渠道。渠道标识（URL 里的 :key）不可改；`apiKey` 留空表示不换 key。
+ *
+ * **局部更新语义**：没传（undefined / null）的字段保持原值。特别是 `models` —— 只改
+ * label 时以前会把 `["m1","m2","m3"]` 静默清成 `[]`。显式传 `models: []` 才是「清空」。
+ * 传空串给 label / baseUrl 同样按「没传」处理（旧前端会这么发）。
+ * 类型不对的字段（例如 `enabled: "false"`）直接 400，不静默回退。
+ *
  * 注意：检查结果（lastCheck*）不允许通过这个接口写 —— 只能由 /test 写，避免伪造「已验证」。
  */
 export async function updateChannel(
@@ -294,21 +343,35 @@ export async function updateChannel(
   channelKey: string,
   body: ChannelInputBody,
 ): Promise<PublicAiChannel> {
+  if (!CHANNEL_KEY_RE.test(channelKey)) {
+    throw new AiChannelInputError('找不到这个渠道', 404)
+  }
   const userDoc = await loadUser(payload, userId)
   const rows = readChannels(userDoc)
   const index = rows.findIndex((r) => r.key === channelKey)
   if (index === -1) throw new AiChannelInputError('找不到这个渠道', 404)
+  const prev = rows[index]
 
+  // 只有「字段缺席」（undefined / null，label / baseUrl 额外把空串算缺席）才回补原值。
+  // **类型不对的字段原样透传**，让 normalizeChannelInput 的类型闸报错 ——
+  // 否则 `enabled: "false"` 会被这里替换成原值，静默吞掉，客户端还以为改成功了。
+  const absent = (value: unknown) => value === undefined || value === null
   const input = normalizeChannelInput(
-    { ...body, key: channelKey, enabled: body.enabled ?? rows[index].enabled },
+    {
+      ...body,
+      key: channelKey,
+      label: absent(body.label) ? (prev.label ?? '') : body.label,
+      baseUrl: absent(body.baseUrl) || body.baseUrl === '' ? (prev.baseUrl ?? '') : body.baseUrl,
+      enabled: absent(body.enabled) ? (prev.enabled ?? true) : body.enabled,
+    },
     { requireApiKey: false },
   )
-  const prev = rows[index]
   const next: AiChannelRow = {
     ...prev,
     label: input.label,
     baseUrl: input.baseUrl,
-    models: input.models,
+    // 没传 models 就保留原列表（防静默清空）；显式传 [] 才清空
+    models: absent(body.models) ? (prev.models ?? []) : input.models,
     enabled: input.enabled,
     // 地址或密钥变了，旧的检查结果就不再代表当前配置，清掉避免误导
     ...(input.apiKey || input.baseUrl !== prev.baseUrl
@@ -330,6 +393,9 @@ export async function deleteChannel(
   userId: string,
   channelKey: string,
 ): Promise<{ ok: true }> {
+  if (!CHANNEL_KEY_RE.test(channelKey)) {
+    throw new AiChannelInputError('找不到这个渠道', 404)
+  }
   const userDoc = await loadUser(payload, userId)
   const rows = readChannels(userDoc)
   const nextRows = rows.filter((r) => r.key !== channelKey)
@@ -378,6 +444,9 @@ export type ChannelTestResult = {
  * 用该渠道真实请求一次 `/models`，把结果写回 lastCheck*。
  *
  * - 限流：每用户每渠道 10 次 / 分钟，另加每用户 30 次 / 分钟（多实例下不准确，见 rate-limit.ts）。
+ * - **顺序很重要**：先校验 key 格式、再确认这条渠道确实属于该用户，**最后**才消耗限流配额。
+ *   否则任何人拿 8KB 的垃圾 key 打 `/test` 都能往限流 Map 里塞条目（内存放大），
+ *   而且被限流器当成真实流量计数。
  * - 日志：只记 userId / 渠道标识 / 结果 / 耗时，**绝不记 key 明文或密文**。
  * - `fetchImpl` 只用于测试注入，生产调用不传。
  */
@@ -391,6 +460,19 @@ export async function testChannel(
     init?: { method?: string; headers?: Record<string, string>; timeoutMs?: number },
   ) => Promise<SafeFetchResult> = safeChannelFetch,
 ): Promise<ChannelTestResult> {
+  // 1) 格式闸：不合法的 key 直接 404，不进限流 Map、不读库
+  if (!CHANNEL_KEY_RE.test(channelKey)) {
+    throw new AiChannelInputError('找不到这个渠道', 404)
+  }
+
+  // 2) 归属闸：先确认这条渠道在这个用户名下
+  const userDoc = await loadUser(payload, userId)
+  const rows = readChannels(userDoc)
+  const index = rows.findIndex((r) => r.key === channelKey)
+  if (index === -1) throw new AiChannelInputError('找不到这个渠道', 404)
+  const row = rows[index]
+
+  // 3) 只有真实存在的渠道才消耗配额
   const perChannel = consumeRateLimit(`ai-channel-test:${userId}:${channelKey}`, 10, 60_000)
   const perUser = consumeRateLimit(`ai-channel-test-user:${userId}`, 30, 60_000)
   if (!perChannel.ok || !perUser.ok) {
@@ -400,12 +482,6 @@ export async function testChannel(
     )
     throw new AiChannelInputError(`检查太频繁，请 ${retry} 秒后再试`, 429)
   }
-
-  const userDoc = await loadUser(payload, userId)
-  const rows = readChannels(userDoc)
-  const index = rows.findIndex((r) => r.key === channelKey)
-  if (index === -1) throw new AiChannelInputError('找不到这个渠道', 404)
-  const row = rows[index]
   if (!row.apiKeyCipher) throw new AiChannelInputError('这个渠道还没有填 API Key', 400)
   if (!row.baseUrl) throw new AiChannelInputError('这个渠道还没有填接口地址', 400)
 

@@ -161,6 +161,23 @@ export const Users: CollectionConfig = {
           label: '我的 AI 渠道（自带 key）',
           type: 'array',
           labels: { singular: 'AI 渠道', plural: 'AI 渠道' },
+          /**
+           * 数组层写权限 = 只有 CMS 超管（后台里人工维护）。
+           *
+           * 为什么不是只给子字段加 `update: () => false`（**实测过，不够**）：
+           * Payload 处理 array 字段是**整段替换**行数据 —— 子字段被拒绝写入的值会变成
+           * `null`，而不是保留库里原来的值。成员一次 PATCH `/api/users` 就能把自己的
+           * `apiKeyCipher` / `lastCheckOk` 抹成 null（密文丢失，客户只能重填 key）。
+           * 在数组这一层关掉成员写权限后，成员既改不出伪造值，也抹不掉自己的密文。
+           *
+           * 成员维护渠道只走 `/api/ai/channels`：那条路径是服务层 `overrideAccess: true`，
+           * 字段级 access 对它不生效（Payload 的设计），所以白名单、条数上限、baseUrl
+           * 校验、加密全部由 `src/lib/ai-channels.ts` 负责。
+           */
+          access: {
+            create: ({ req }) => isCmsAdmin(req),
+            update: ({ req }) => isCmsAdmin(req),
+          },
           admin: {
             description:
               '客户自带的 AI 渠道，只在桌面客户端「我的 AI 配置」里填写。密钥加密存储，页面与接口都不会显示明文。',
@@ -197,11 +214,13 @@ export const Users: CollectionConfig = {
             },
             {
               // 密文：任何 API 响应都不得出现。服务端内部读库必须 overrideAccess: true。
+              // `update: () => false` 挡住集合层 REST/GraphQL：成员不能自己塞一个假密文
+              // （字段级 access 对服务端的 overrideAccess: true 不生效，所以 /api/ai/channels 照常写）。
               name: 'apiKeyCipher',
               label: '密钥（加密存储）',
               type: 'text',
               maxLength: 4096,
-              access: { read: () => false },
+              access: { read: () => false, create: () => false, update: () => false },
               admin: {
                 readOnly: true,
                 description: '仅供服务端解密使用，不会出现在任何接口响应里',
@@ -212,6 +231,7 @@ export const Users: CollectionConfig = {
               label: '密钥提示',
               type: 'text',
               maxLength: 16,
+              access: { create: () => false, update: () => false },
               admin: {
                 readOnly: true,
                 description: '只读展示：例如 ...abcd，让客户确认填的是哪个 key',
@@ -226,16 +246,20 @@ export const Users: CollectionConfig = {
               admin: { description: '该渠道下可选的模型名（纯文本），可留空' },
             },
             { name: 'enabled', label: '启用', type: 'checkbox', defaultValue: true },
+            // 检查结果只能由 /api/ai/channels/:key/test 写：`update: () => false` 挡住
+            // 集合层 REST/GraphQL 伪造「已验证」（否则将来按 lastCheckOk 计费/放量会被骗）。
             {
               name: 'lastCheckedAt',
               label: '最近检查时间',
               type: 'date',
+              access: { create: () => false, update: () => false },
               admin: { readOnly: true },
             },
             {
               name: 'lastCheckOk',
               label: '最近检查是否通过',
               type: 'checkbox',
+              access: { create: () => false, update: () => false },
               admin: { readOnly: true },
             },
             {
@@ -243,6 +267,7 @@ export const Users: CollectionConfig = {
               label: '最近检查错误',
               type: 'text',
               maxLength: 300,
+              access: { create: () => false, update: () => false },
               admin: { readOnly: true },
             },
           ],

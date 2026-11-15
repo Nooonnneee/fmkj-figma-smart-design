@@ -19,7 +19,7 @@ import {
   handleUpdateChannel,
 } from './ai-channels-http'
 import { open } from './ai-channels-crypto'
-import { resetRateLimits } from './rate-limit'
+import { rateLimitSize, resetRateLimits } from './rate-limit'
 
 const ORIGINAL_SECRET = process.env.PAYLOAD_SECRET
 
@@ -218,6 +218,154 @@ describe('渠道 CRUD', () => {
     } as never)
     expect(readChannels(db.get('u1'))[0].lastCheckOk).toBeUndefined()
     expect(readChannels(db.get('u2'))).toHaveLength(0)
+  })
+})
+
+describe('复核补的回归：局部更新、类型闸、长度闸', () => {
+  const seeded = async () => {
+    const fake = fakePayload({ u1: userDoc() })
+    await createChannel(fake.payload, 'u1', {
+      key: 'c1',
+      label: '原名',
+      baseUrl: 'https://api.example.com/v1',
+      apiKey: 'sk-original-key-1234',
+      models: ['m1', 'm2', 'm3'],
+    })
+    return fake
+  }
+
+  it('PATCH 只改 label：已存的模型列表**不能被清空**', async () => {
+    const { payload, db } = await seeded()
+    const updated = await updateChannel(payload, 'u1', 'c1', { label: '新名字' })
+    expect(updated.models).toEqual(['m1', 'm2', 'm3'])
+    expect(readChannels(db.get('u1'))[0].models).toEqual(['m1', 'm2', 'm3'])
+  })
+
+  it('PATCH 显式传 models: [] 才是清空', async () => {
+    const { payload } = await seeded()
+    const updated = await updateChannel(payload, 'u1', 'c1', { models: [] })
+    expect(updated.models).toEqual([])
+  })
+
+  it('PATCH 不带 baseUrl 也可（沿用原值），不会 400', async () => {
+    const { payload } = await seeded()
+    const updated = await updateChannel(payload, 'u1', 'c1', { label: '只改名字' })
+    expect(updated.baseUrl).toBe('https://api.example.com/v1')
+  })
+
+  it('PATCH enabled: "false"（字符串）→ 400，绝不静默当成 true 或回退', async () => {
+    const { payload, db } = await seeded()
+    await expect(
+      updateChannel(payload, 'u1', 'c1', { enabled: 'false' } as never),
+    ).rejects.toMatchObject({ status: 400 })
+    // 原值没被动过
+    expect(readChannels(db.get('u1'))[0].enabled).toBe(true)
+  })
+
+  it('PATCH enabled: false（真布尔）生效', async () => {
+    const { payload } = await seeded()
+    expect((await updateChannel(payload, 'u1', 'c1', { enabled: false })).enabled).toBe(false)
+  })
+
+  it('CREATE enabled: "false"（字符串）→ 400', async () => {
+    const { payload } = fakePayload({ u1: userDoc() })
+    await expect(
+      createChannel(payload, 'u1', {
+        key: 'c1',
+        label: 'C1',
+        baseUrl: 'https://api.example.com/v1',
+        apiKey: 'sk-abcdefgh',
+        enabled: 'false',
+      } as never),
+    ).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('models 传字符串 → 400（否则会被当成空数组清空）', async () => {
+    const { payload } = await seeded()
+    await expect(
+      updateChannel(payload, 'u1', 'c1', { models: 'm1' } as never),
+    ).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('label 超 60 字 → 400，不静默截断（与集合层 maxLength 一致）', async () => {
+    const { payload, db } = await seeded()
+    await expect(
+      updateChannel(payload, 'u1', 'c1', { label: 'x'.repeat(61) }),
+    ).rejects.toMatchObject({ status: 400 })
+    expect(readChannels(db.get('u1'))[0].label).toBe('原名')
+    await expect(
+      createChannel(payload, 'u1', {
+        key: 'c2',
+        label: 'y'.repeat(61),
+        baseUrl: 'https://api.example.com/v1',
+        apiKey: 'sk-abcdefgh',
+      }),
+    ).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('baseUrl 超 300 字 → 400，不落库（overrideAccess 写库不受 schema maxLength 约束）', async () => {
+    const { payload, db } = await seeded()
+    // 构造一个「合法但很长」的地址：主机名够长、路径也够长
+    const longUrl = `https://${'a'.repeat(60)}.example.com/${'p'.repeat(250)}`
+    expect(longUrl.length).toBeGreaterThan(300)
+    await expect(updateChannel(payload, 'u1', 'c1', { baseUrl: longUrl })).rejects.toMatchObject({
+      status: 400,
+    })
+    expect(readChannels(db.get('u1'))[0].baseUrl).toBe('https://api.example.com/v1')
+  })
+
+  it('渠道数量上限：第 21 个 400', async () => {
+    const { payload } = fakePayload({ u1: userDoc() })
+    for (let i = 0; i < 20; i += 1) {
+      await createChannel(payload, 'u1', {
+        key: `c${i}`,
+        label: `C${i}`,
+        baseUrl: 'https://api.example.com/v1',
+        apiKey: 'sk-abcdefgh',
+      })
+    }
+    await expect(
+      createChannel(payload, 'u1', {
+        key: 'c20',
+        label: 'C20',
+        baseUrl: 'https://api.example.com/v1',
+        apiKey: 'sk-abcdefgh',
+      }),
+    ).rejects.toMatchObject({ status: 400 })
+  })
+})
+
+describe('/test：格式不合法的 :key 不消耗限流配额', () => {
+  it('8KB 的垃圾 key：404 且限流表里一条都不留', async () => {
+    const { payload } = fakePayload({ u1: userDoc() })
+    const junk = 'x'.repeat(8192)
+    for (let i = 0; i < 40; i += 1) {
+      await expect(testChannel(payload, 'u1', junk)).rejects.toMatchObject({ status: 404 })
+    }
+    // 关键性质：**限流 Map 没被垃圾 key 污染**。
+    // 只看 404 不够 —— 把 consumeRateLimit 挪到格式闸之前，40 次垃圾请求照样 404，
+    // 但会留下 2 个桶（每渠道 + 每用户），攻击者拿 8KB 的 key 就能做内存放大。
+    expect(rateLimitSize()).toBe(0)
+  })
+
+  it('垃圾 key 打满 40 次之后，真实渠道的配额一点没被吃掉', async () => {
+    const { payload } = fakePayload({ u1: userDoc() })
+    await createChannel(payload, 'u1', {
+      key: 'real',
+      label: '真实渠道',
+      baseUrl: 'https://api.example.com/v1',
+      apiKey: 'sk-real-quota',
+    })
+    const junk = 'z'.repeat(8192)
+    for (let i = 0; i < 40; i += 1) {
+      await expect(testChannel(payload, 'u1', junk)).rejects.toMatchObject({ status: 404 })
+    }
+    const okFetch = async () => ({ ok: true, status: 200, body: '{}' })
+    // 每渠道 10 次/分：垃圾请求不该占掉其中任何一次
+    for (let i = 0; i < 10; i += 1) {
+      await expect(testChannel(payload, 'u1', 'real', okFetch)).resolves.toBeTruthy()
+    }
+    await expect(testChannel(payload, 'u1', 'real', okFetch)).rejects.toMatchObject({ status: 429 })
   })
 })
 

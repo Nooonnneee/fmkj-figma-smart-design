@@ -31,6 +31,55 @@ import { ChannelUrlError } from '@/lib/ai-channels-url-guard'
 export type ChannelsContext = { userId: string; payload: PayloadLike }
 const json = (data: unknown, status = 200) => Response.json(data, { status })
 
+/**
+ * CSRF 校验：只对 `/api/ai/channels*` 这几个端点生效（不动全局，避免牵动别的路由）。
+ *
+ * 会话 Cookie 是 `SameSite=lax`，它挡不住顶层表单导航，也挡不住
+ * `Content-Type: text/plain` 的「简单请求」——复核实测跨站带 Origin 的 POST 直接 201。
+ * 这里的原则是**有 Origin 就必须是同站**：
+ * - 带 `Origin` 且主机与请求 Host / `x-forwarded-host` 不一致 → 403；
+ * - 没有 `Origin` 时退回看 `Sec-Fetch-Site`：`cross-site` → 403；
+ * - 两者都没有（curl / 服务间调用）→ 放行。这类请求本来就不带浏览器会话 Cookie 的
+ *   「自动附带」特性，CSRF 的前提不成立；真正的身份仍由 app-session 决定。
+ */
+export function checkSameOrigin(request: Request): { ok: true } | { ok: false; error: string } {
+  const selfHosts = new Set<string>()
+  for (const raw of [request.headers.get('host'), request.headers.get('x-forwarded-host')]) {
+    if (!raw) continue
+    for (const part of raw.split(',')) {
+      const host = part.trim().toLowerCase()
+      if (host) selfHosts.add(host)
+    }
+  }
+
+  const origin = request.headers.get('origin')
+  if (origin) {
+    let originHost: string
+    try {
+      originHost = new URL(origin).host.toLowerCase()
+    } catch {
+      return { ok: false, error: '请求来源无效' }
+    }
+    // 没有 Host 头（罕见的非浏览器客户端）时不因此拒绝，交给会话校验。
+    if (selfHosts.size > 0 && !selfHosts.has(originHost)) {
+      return { ok: false, error: '跨站请求已被拒绝' }
+    }
+    return { ok: true }
+  }
+
+  const site = request.headers.get('sec-fetch-site')
+  if (site && site.toLowerCase() === 'cross-site') {
+    return { ok: false, error: '跨站请求已被拒绝' }
+  }
+  return { ok: true }
+}
+
+/** route.ts 的统一入口：先过 CSRF，不通过直接 403。 */
+export function rejectCrossOrigin(request: Request): Response | null {
+  const result = checkSameOrigin(request)
+  return result.ok ? null : json({ ok: false, error: result.error }, 403)
+}
+
 export async function readJsonBody(request: Request): Promise<ChannelInputBody> {
   try {
     const raw = (await request.json()) as unknown

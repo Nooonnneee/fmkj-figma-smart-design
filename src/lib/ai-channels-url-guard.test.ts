@@ -103,6 +103,41 @@ describe('IP 判定函数', () => {
     for (const ip of ['2606:4700:4700::1111', '2001:4860:4860::8888'])
       expect(isBlockedIPv6(ip)).toBe(false)
   })
+
+  it('IPv4 的每一种内嵌写法都被识别（复核补的缺口）', () => {
+    for (const ip of [
+      '::127.0.0.1', // IPv4-compatible
+      '::7f00:1', // IPv4-compatible 的十六进制写法
+      '::ffff:0:127.0.0.1', // IPv4-translated ::ffff:0:0/96
+      '::ffff:7f00:1',
+      '2002:7f00:1::', // 6to4 2002::/16
+      '64:ff9b::127.0.0.1', // NAT64
+      // 公网内嵌也一并拒绝？不 —— 这些只在内嵌**内网** IP 时拒绝
+      '::8.8.8.8',
+      '2002:0808:0808::',
+    ]) {
+      // 内嵌公网 IPv4 的写法不按「内网」拒绝，交给 DNS/上游，但本函数对它返回 false
+      expect(isBlockedIPv6(ip)).toBe(!/8\.|0808/.test(ip))
+    }
+  })
+
+  it('新补的保留网段：fec0::/10、100::/64、2001:db8::/32', () => {
+    for (const ip of ['fec0::1', '100::1', '2001:db8::1']) expect(isBlockedIPv6(ip)).toBe(true)
+    // 邻近的公网地址不该被误伤
+    for (const ip of ['2001:4860:4860::8888', '2606:4700:4700::1111'])
+      expect(isBlockedIPv6(ip)).toBe(false)
+  })
+
+  it('点分 IPv6 字面值出现在 URL 里时被静态拒绝', () => {
+    for (const url of [
+      'https://[::ffff:0:127.0.0.1]/v1',
+      'https://[2002:7f00:1::]/v1',
+      'https://[fec0::1]/v1',
+      'https://[2001:db8::1]/v1',
+    ]) {
+      expectReject(() => assertChannelBaseUrl(url))
+    }
+  })
 })
 
 describe('safeChannelFetch：不跟随重定向 / DNS 层拦截', () => {

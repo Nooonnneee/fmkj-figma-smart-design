@@ -1,5 +1,10 @@
 import { appAuth } from '@/lib/app-auth'
-import { handleCreateChannel, handleListChannels, readJsonBody } from '@/lib/ai-channels-http'
+import {
+  handleCreateChannel,
+  handleListChannels,
+  readJsonBody,
+  rejectCrossOrigin,
+} from '@/lib/ai-channels-http'
 import { getPayloadClient } from '@/lib/payload'
 
 /**
@@ -7,6 +12,10 @@ import { getPayloadClient } from '@/lib/payload'
  *
  * 身份只来自 `appAuth.getCurrentUser()`（app-session Cookie）。请求体里即使带了
  * `userId` 也会被 `readJsonBody` 丢掉 —— 服务层只接受这里传入的 userId。
+ *
+ * 每个方法都先过 `rejectCrossOrigin`（跨站 Origin → 403）：会话 Cookie 的
+ * SameSite=lax 挡不住顶层表单导航和简单请求，不加这一层就能被别的站点带着
+ * Cookie 写数据（复核实测跨站 POST 直接 201）。
  *
  * 「只在桌面客户端开放」是产品口径：网页端不显示入口。**不在这里用 UA 拦截**，
  * 因为 UA 可伪造、不是安全边界；真正的权限是「这个账号里有没有合法的加密渠道」。
@@ -18,7 +27,9 @@ async function requireUser() {
   return user ?? null
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const crossOrigin = rejectCrossOrigin(request)
+  if (crossOrigin) return crossOrigin
   const user = await requireUser()
   if (!user) return Response.json({ ok: false, error: '请先登录' }, { status: 401 })
   const payload = await getPayloadClient()
@@ -26,6 +37,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const crossOrigin = rejectCrossOrigin(request)
+  if (crossOrigin) return crossOrigin
   const user = await requireUser()
   if (!user) return Response.json({ ok: false, error: '请先登录' }, { status: 401 })
   const payload = await getPayloadClient()

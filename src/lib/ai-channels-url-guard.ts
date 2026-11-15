@@ -128,31 +128,48 @@ function parseIPv6(input: string): number[] | null {
   return bytes
 }
 
-/** 判断 IPv6 是否落在必须拒绝的网段：回环、未指定、ULA、链路本地、IPv4 映射内网。 */
+/**
+ * 判断 IPv6 是否落在必须拒绝的网段。
+ *
+ * 覆盖：未指定 / 回环、IPv4 的每一种内嵌写法（映射 `::ffff:0:0/96`、兼容 `::a.b.c.d`、
+ * IPv4-translated `::ffff:0:0:0/96`、NAT64 `64:ff9b::/96`、6to4 `2002::/16`）、
+ * 链路本地、唯一本地、deprecated site-local、组播、以及文档/保留网段。
+ *
+ * 复核说这些「实际不可利用」（本机 EHOSTUNREACH，且 `dns.lookup` 对字面量原样返回），
+ * 但补进黑名单成本极低，属防御纵深。
+ */
 export function isBlockedIPv6(ip: string): boolean {
   const b = parseIPv6(ip)
   if (!b) return true
   const isV4 = (from: number) =>
     isBlockedIPv4(`${b[from]}.${b[from + 1]}.${b[from + 2]}.${b[from + 3]}`)
+  const zeros = (from: number, to: number) => b.slice(from, to).every((x) => x === 0)
+
   if (b.every((x) => x === 0)) return true // ::
-  if (b.slice(0, 15).every((x) => x === 0) && b[15] === 1) return true // ::1
-  // ::ffff:a.b.c.d —— IPv4 映射地址，取内嵌 IPv4 再判
-  if (b.slice(0, 10).every((x) => x === 0) && b[10] === 0xff && b[11] === 0xff) return isV4(12)
+  if (zeros(0, 15) && b[15] === 1) return true // ::1
+  // ::ffff:a.b.c.d —— IPv4 映射地址（::ffff:0:0/96），取内嵌 IPv4 再判
+  if (zeros(0, 10) && b[10] === 0xff && b[11] === 0xff) return isV4(12)
+  // ::a.b.c.d —— IPv4 兼容地址（deprecated），同样取内嵌 IPv4 再判。
+  // 注意这条必须放在「回环/未指定」之后，否则 ::1 会被误当成 0.0.0.1。
+  if (zeros(0, 12)) return isV4(12)
+  // ::ffff:0:a.b.c.d —— IPv4-translated（::ffff:0:0:0/96）
+  if (zeros(0, 8) && b[8] === 0xff && b[9] === 0xff && zeros(10, 12)) return isV4(12)
   // 64:ff9b::/96 —— NAT64，内嵌 IPv4 也要判
-  if (
-    b[0] === 0 &&
-    b[1] === 0x64 &&
-    b[2] === 0xff &&
-    b[3] === 0x9b &&
-    b.slice(4, 12).every((x) => x === 0)
-  )
-    return isV4(12)
+  if (b[0] === 0 && b[1] === 0x64 && b[2] === 0xff && b[3] === 0x9b && zeros(4, 12)) return isV4(12)
+  // 2002::/16 —— 6to4，内嵌 IPv4 在第 2~5 字节
+  if (b[0] === 0x20 && b[1] === 0x02) return isV4(2)
   // fe80::/10 链路本地
   if (b[0] === 0xfe && (b[1] & 0xc0) === 0x80) return true
+  // fec0::/10 —— deprecated site-local，行为等同内网，历史配置里还可能出现
+  if (b[0] === 0xfe && (b[1] & 0xc0) === 0xc0) return true
   // fc00::/7 唯一本地地址（含 fd00::/8）
   if ((b[0] & 0xfe) === 0xfc) return true
   // ff00::/8 组播
   if (b[0] === 0xff) return true
+  // 100::/64 —— 丢弃前缀（RFC 6666）
+  if (b[0] === 0x01 && b[1] === 0x00 && zeros(2, 8)) return true
+  // 2001:db8::/32 —— 文档专用
+  if (b[0] === 0x20 && b[1] === 0x01 && b[2] === 0x0d && b[3] === 0xb8) return true
   return false
 }
 
