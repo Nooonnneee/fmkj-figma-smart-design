@@ -106,6 +106,28 @@ export type BoardTool = 'select' | 'pan' | 'area' | 'calibrate'
 
 export type SymbolStyle = 'plan' | 'marker'
 
+/**
+ * 点位图标风格（与 symbolStyle 正交，由工具栏手动选择）：
+ * default = 现在的彩色点位图标；cad = 按电气图例画的线稿；sketch = Procreate 手绘图；photo = 产品照片。
+ * 不要把它塞进 symbolStyle：symbolStyle 已经持久化在旧视图里，改含义会让所有已保存的视图变样。
+ */
+export type IconStyle = 'default' | 'cad' | 'sketch' | 'photo'
+
+/** 工具栏里的图标风格选项（顺序即展示顺序） */
+export const ICON_STYLE_OPTIONS: { value: IconStyle; label: string; hint: string }[] = [
+  { value: 'default', label: '默认', hint: '现在的彩色图标' },
+  { value: 'cad', label: 'CAD', hint: 'CAD 图纸线稿' },
+  { value: 'sketch', label: '手绘', hint: 'Procreate 手绘图标' },
+  { value: 'photo', label: '实拍', hint: '产品照片，没有照片用默认图标' },
+]
+
+/**
+ * 解释符号时的附加选项（引擎只透传，含义由系统包决定）：
+ * - iconStyle：图标风格，缺省 default，与今天完全一致；
+ * - productImage：点位所选产品的照片地址，没有就回退默认图标。
+ */
+export type LookOptions = { iconStyle?: IconStyle; productImage?: string | null }
+
 /** 户型底图彩平风格：cad = 原始图纸；warm = 暖木彩平；modern = 现代极简彩平；blueprint = 工程蓝图 */
 export type SheetStyle = 'cad' | 'warm' | 'modern' | 'blueprint'
 
@@ -116,6 +138,8 @@ export type ViewSettings = {
   labels: boolean
   /** plan = 平面符号（工具箱风格）；marker = 实心标记 */
   symbolStyle: SymbolStyle
+  /** 平面图标风格（手动选择）；缺省 = 今天的彩色图标，旧视图读出来就是这个 */
+  iconStyle?: IconStyle
   /** 固定显示尺寸的符号大小（场景单位，图形长边） */
   symbolSize: number
   /** 底图不透明度 0–1 */

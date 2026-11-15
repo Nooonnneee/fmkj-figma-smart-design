@@ -7,7 +7,8 @@
  */
 import type { CheckIssue, LegendRow, SystemPack } from '@/board/core/pack'
 import { sheetAt, symbolsOf } from '@/board/core/ops'
-import type { BoardDoc } from '@/board/core/types'
+import { lookOptionsFor, type ProductImageLookup } from '@/board/core/symbols'
+import type { BoardDoc, LookOptions } from '@/board/core/types'
 import { DEVICE_TYPE_ORDER, deviceTypeOf } from '@/lib/device-types'
 
 import { analyzeDoc } from './codec'
@@ -115,10 +116,15 @@ function check(doc: BoardDoc): CheckIssue[] {
   return issues
 }
 
-function legend(doc: BoardDoc): LegendRow[] {
+function legend(
+  doc: BoardDoc,
+  opts?: LookOptions,
+  products?: ProductImageLookup | null,
+): LegendRow[] {
   const rows = new Map<string, LegendRow>()
   for (const s of symbolsOf(doc)) {
-    const look = lookOf(s)
+    // 图例跟着画布选中的图标风格走；photo 风格按点位所选产品取照片，没有就回退默认图标
+    const look = lookOf(s, lookOptionsFor(s, opts?.iconStyle, products))
     const row = rows.get(look.key)
     if (row) row.count++
     else {

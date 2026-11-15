@@ -5,7 +5,13 @@ import { areaPoly, sheetAt } from '../core/ops'
 import { areaLabelAnchor } from './hit'
 import type { SystemPack } from '../core/pack'
 import { fittingScale, formatMm, PAPERS } from '../core/paper'
-import { LABEL_SIZE, symbolGeom } from '../core/symbols'
+import {
+  artAspectRatio,
+  LABEL_SIZE,
+  lookOptionsFor,
+  symbolGeom,
+  type ProductImageLookup,
+} from '../core/symbols'
 import type { BoardDoc, BoardFile, SheetObj, ViewSettings } from '../core/types'
 import { downloadBlob } from '@/lib/export-pdf'
 import { renderPointDisplayEffectsSvg } from '@/lib/point-display-effects'
@@ -41,8 +47,10 @@ export async function exportSheetPng(opts: {
   view: ViewSettings
   hidden: ReadonlySet<string>
   project: string
+  /** 产品照片查表（可选）；不传时 photo 风格回退默认图标 */
+  productImage?: ProductImageLookup | null
 }) {
-  const { doc, files, sheet, pack, view, hidden } = opts
+  const { doc, files, sheet, pack, view, hidden, productImage = null } = opts
   const paper = PAPERS[pack.paper]
   const DPI = 150
   const k = DPI / 25.4
@@ -118,7 +126,8 @@ export async function exportSheetPng(opts: {
   const used = new Set<string>()
   for (const o of doc.objects) {
     if (o.kind !== 'symbol' || hidden.has(o.id) || !inside(o.x, o.y)) continue
-    const look = pack.look(o)
+    // 导出跟着工具栏选的图标风格走；CAD 矢量在这里已经是内联 data URL，toDataUrl 直接透传
+    const look = pack.look(o, lookOptionsFor(o, view.iconStyle, productImage))
     used.add(o.id)
     const g = symbolGeom(o, look, view, sheetAt(doc, o.x, o.y)?.mmPerUnit ?? null)
     if (g.marker || !look.art) {
@@ -129,7 +138,7 @@ export async function exportSheetPng(opts: {
     } else {
       const rot = o.angle ? ` transform="rotate(${toDeg(o.angle)} ${o.x} ${o.y})"` : ''
       parts.push(
-        `<image href="${await toDataUrl(look.art.src, cache)}" x="${o.x - g.imgW / 2}" y="${o.y - g.imgH / 2}" width="${g.imgW}" height="${g.imgH}" preserveAspectRatio="none"${rot}/>`,
+        `<image href="${await toDataUrl(look.art.src, cache)}" x="${o.x - g.imgW / 2}" y="${o.y - g.imgH / 2}" width="${g.imgW}" height="${g.imgH}" preserveAspectRatio="${artAspectRatio(look.art)}"${rot}/>`,
       )
     }
   }
@@ -142,7 +151,12 @@ export async function exportSheetPng(opts: {
     `<text x="${lx}" y="${ly + 5 * k}" font-size="${4 * k}" font-weight="700" fill="#111" font-family="system-ui,sans-serif">图例</text>`,
   )
   ly += 9 * k
-  const rows = pack.legend({ objects: doc.objects.filter((o) => used.has(o.id)) })
+  // 图例与画布同一套图标风格（photo 风格在图例里同样按「有照片用照片、没有用默认图标」）
+  const rows = pack.legend(
+    { objects: doc.objects.filter((o) => used.has(o.id)) },
+    { iconStyle: view.iconStyle },
+    productImage,
+  )
   const rowH = Math.min(7.2, (paper.h - 2 * margin - titleH - 14) / Math.max(1, rows.length)) * k
   for (const r of rows) {
     const src = view.symbolStyle === 'plan' && r.look.art ? r.look.art.src : r.look.marker

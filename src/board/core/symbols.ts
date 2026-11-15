@@ -1,8 +1,21 @@
 import { clamp, rotatedAabb } from './geometry'
-import type { Box, SymbolObj, ViewSettings } from './types'
+import type { Box, IconStyle, LookOptions, SymbolObj, ViewSettings } from './types'
 
-/** 符号图形：图片（大 / 小两档）、主体宽高（长边 = 1）、图片四周留白（相对主体长边） */
-export type SymbolArt = { src: string; srcSm: string; gw: number; gh: number; pad: number }
+/**
+ * 符号图形：图片（大 / 小两档）、主体宽高（长边 = 1）、图片四周留白（相对主体长边）。
+ * fit = contain 时按原比例放进主体框（产品照片）；缺省 stretch，与现有 PNG 图标一致。
+ */
+export type SymbolArt = {
+  src: string
+  srcSm: string
+  gw: number
+  gh: number
+  pad: number
+  fit?: 'stretch' | 'contain'
+}
+
+/** SVG <image> 的 preserveAspectRatio：默认拉伸（现有 PNG 就是按主体框定死的） */
+export const artAspectRatio = (art: SymbolArt) => (art.fit === 'contain' ? 'xMidYMid meet' : 'none')
 
 /** 系统包对一个符号的解释：名称、颜色、平面符号图形、实心标记 */
 export type SymbolLook = {
@@ -10,6 +23,7 @@ export type SymbolLook = {
   key: string
   name: string
   color: string
+  /** 平面符号图形；null 表示这个风格下没有图形，画布退回实心标记 */
   art: SymbolArt | null
   marker: string | null
   /** 角标（如开关的键数） */
@@ -25,6 +39,27 @@ export const SYMBOL_SIZES = [
   { value: 28, label: '中' },
   { value: 36, label: '大' },
 ] as const
+/**
+ * 点位 → 产品照片地址的查表函数。可选：画布不传时 photo 风格一律回退默认图标，
+ * 所以方案页、打印、导出这些没有产品列表的渲染路径不用改签名。
+ */
+export type ProductImageLookup = (productId: string) => string | null | undefined
+
+/**
+ * 为一个点位生成 look 的附加选项：风格来自视图设置，产品照片来自可选的产品表。
+ * 只有 photo 风格才去查表，其余风格不碰产品数据。
+ */
+export function lookOptionsFor(
+  o: Pick<SymbolObj, 'data'>,
+  iconStyle: IconStyle | undefined,
+  products?: ProductImageLookup | null,
+): LookOptions {
+  const style = iconStyle ?? 'default'
+  if (style !== 'photo' || !products) return { iconStyle: style }
+  const id = typeof o.data.productId === 'string' ? o.data.productId : null
+  return { iconStyle: style, productImage: id ? (products(id) ?? null) : null }
+}
+
 /** 实心标记在默认大小时的直径（与旧版点位图一致） */
 export const MARKER_BASE = 24
 export const LABEL_SIZE = 9
@@ -58,7 +93,9 @@ export function symbolGeom(
   view: Pick<ViewSettings, 'symbolStyle' | 'symbolSize'>,
   mmPerUnit: number | null,
 ): SymbolGeom {
-  const marker = view.symbolStyle === 'marker' || !look.art
+  // 矢量图标（CAD）也带 art（内联 data URL），所以这里不需要单独分支
+  const art = look.art
+  const marker = view.symbolStyle === 'marker' || !art
   let w: number
   let h: number
   let real = false
@@ -66,8 +103,8 @@ export function symbolGeom(
   if (marker) {
     w = h = MARKER_BASE * (view.symbolSize / DEFAULT_SYMBOL_SIZE)
   } else {
-    const { gw, gh } = look.art!
-    pad = look.art!.pad
+    const { gw, gh } = art!
+    pad = art!.pad
     if (o.real && o.sizeCm && mmPerUnit) {
       real = true
       const [wc, hc] = o.sizeCm

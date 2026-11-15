@@ -1,8 +1,8 @@
 import type { PointDisplayEffect } from '@/lib/point-display-effects'
 
 import type { PaperId } from './paper'
-import type { SymbolLook } from './symbols'
-import type { BoardDoc, LayerId, SymbolObj, Vec } from './types'
+import type { ProductImageLookup, SymbolLook } from './symbols'
+import type { BoardDoc, LayerId, LookOptions, SymbolObj, Vec } from './types'
 
 export type CheckLevel = 'error' | 'warning' | 'info'
 
@@ -57,12 +57,18 @@ export type SystemPack = {
   scale: number
   /** 图层名称（引擎的通用图层 → 本专业的叫法） */
   layers: { id: LayerId; name: string }[]
-  /** 解释符号：名称、颜色、平面符号、实心标记 */
-  look: (o: Pick<SymbolObj, 'symbolId' | 'data'>) => SymbolLook
+  /**
+   * 解释符号：名称、颜色、平面符号、实心标记。
+   * opts 可选（图标风格 / 产品照片）；不传就是默认图标，画布、导出、方案页都不会因此变样。
+   */
+  look: (o: Pick<SymbolObj, 'symbolId' | 'data'>, opts?: LookOptions) => SymbolLook
   /** 图纸检查 */
   check: (doc: BoardDoc) => CheckIssue[]
-  /** 图例（按 look.key 汇总） */
-  legend: (doc: BoardDoc) => LegendRow[]
+  /**
+   * 图例（按 look.key 汇总）。opts 与 look 相同，导出时图例要跟画布选中的图标风格一致。
+   * products 可选：photo 风格下按点位所选产品取照片；不传就回退默认图标。
+   */
+  legend: (doc: BoardDoc, opts?: LookOptions, products?: ProductImageLookup | null) => LegendRow[]
   /** 导出模板 */
   export: { title: string; note: string }
   /** 智能辅助图层（可选） */

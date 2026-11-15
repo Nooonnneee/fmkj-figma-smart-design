@@ -350,6 +350,11 @@ export function PointMapEditor({
   // 首次版本号为 0；needsSave 时用 -1 让页面一打开就处于「未保存」
   const dirty = !readOnly && savedVersion !== board.version
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products])
+  /** 产品照片查表：只有「实拍」图标风格用它，下架产品也保留照片（旧点位照常显示） */
+  const productImage = useCallback(
+    (id: string) => productById.get(id)?.image ?? null,
+    [productById],
+  )
   const activeByType = useMemo(() => {
     const map = new Map<string, PointProduct[]>()
     for (const p of products) {
@@ -1067,6 +1072,7 @@ export function PointMapEditor({
         view,
         hidden,
         project: projectName,
+        productImage,
       })
       download(blob, `${projectName}-${sheet.name}-点位图.png`)
       showToast({
@@ -1079,7 +1085,7 @@ export function PointMapEditor({
     } finally {
       dismissLoading()
     }
-  }, [activeSheet, board, view, hidden, projectName, showToast])
+  }, [activeSheet, board, view, hidden, projectName, showToast, productImage])
 
   const exportJson = useCallback(() => {
     download(
@@ -2040,6 +2046,7 @@ export function PointMapEditor({
               onContextMenu={onContextMenu}
               dropType={DRAG_TYPE}
               onDrop={onDrop}
+              productImage={productImage}
             />
             {armed || tool === 'area' || tool === 'calibrate' ? (
               <div className="absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-lg border border-primary/30 bg-background/95 px-3 py-1.5 text-xs shadow-sm">

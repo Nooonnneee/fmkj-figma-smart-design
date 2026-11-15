@@ -12,6 +12,8 @@ export const DEFAULT_VIEW: ViewSettings = {
   rulers: true,
   labels: false,
   symbolStyle: 'plan',
+  // 图标风格缺省就是今天的彩色图标；旧视图没有这个字段，读出来也是它
+  iconStyle: 'default',
   symbolSize: DEFAULT_SYMBOL_SIZE,
   sheetOpacity: 0.72,
   sheetStyle: 'cad',

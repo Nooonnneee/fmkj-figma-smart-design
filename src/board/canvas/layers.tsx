@@ -5,7 +5,7 @@ import { memo } from 'react'
 import { toDeg } from '../core/geometry'
 import { areaPoly } from '../core/ops'
 import type { OverlayShapes } from '../core/pack'
-import { LABEL_SIZE, type SymbolGeom, type SymbolLook } from '../core/symbols'
+import { artAspectRatio, LABEL_SIZE, type SymbolGeom, type SymbolLook } from '../core/symbols'
 import type { AreaObj, RawEl, SheetObj, SheetStyle, SymbolObj } from '../core/types'
 import { AREA_LABEL, areaLabelAnchor } from './hit'
 
@@ -206,12 +206,12 @@ export const SymbolView = memo(function SymbolView({
         ) : null
       ) : (
         <image
-          href={small ? art.srcSm : art.src}
+          href={small ? art!.srcSm : art!.src}
           x={o.x - g.imgW / 2}
           y={o.y - g.imgH / 2}
           width={g.imgW}
           height={g.imgH}
-          preserveAspectRatio="none"
+          preserveAspectRatio={artAspectRatio(art!)}
           transform={o.angle ? `rotate(${toDeg(o.angle)} ${o.x} ${o.y})` : undefined}
         />
       )}
