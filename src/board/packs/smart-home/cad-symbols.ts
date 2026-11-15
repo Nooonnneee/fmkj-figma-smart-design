@@ -226,19 +226,19 @@ export function cadSymbol(key: SymbolKey | string): CadShape[] | null {
 const esc = (s: string) =>
   s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 
-const attrs = (fill?: string) =>
-  `fill="${fill ?? 'none'}" stroke="${CAD_STROKE}" stroke-width="${CAD_STROKE_WIDTH}" stroke-linecap="round" stroke-linejoin="round"`
+const attrs = (fill?: string, stroke: number = CAD_STROKE_WIDTH) =>
+  `fill="${fill ?? 'none'}" stroke="${CAD_STROKE}" stroke-width="${+stroke.toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"`
 
-const renderShapes = (shapes: CadShape[]) =>
+const renderShapes = (shapes: CadShape[], stroke: number = CAD_STROKE_WIDTH) =>
   shapes
     .map((shape) => {
       switch (shape.t) {
         case 'path':
-          return `<path d="${esc(shape.d)}" ${attrs(shape.fill)}/>`
+          return `<path d="${esc(shape.d)}" ${attrs(shape.fill, stroke)}/>`
         case 'circle':
-          return `<circle cx="${shape.cx}" cy="${shape.cy}" r="${shape.r}" ${attrs(shape.fill)}/>`
+          return `<circle cx="${shape.cx}" cy="${shape.cy}" r="${shape.r}" ${attrs(shape.fill, stroke)}/>`
         case 'line':
-          return `<line x1="${shape.x1}" y1="${shape.y1}" x2="${shape.x2}" y2="${shape.y2}" ${attrs()}/>`
+          return `<line x1="${shape.x1}" y1="${shape.y1}" x2="${shape.x2}" y2="${shape.y2}" ${attrs(undefined, stroke)}/>`
       }
     })
     .join('')
@@ -276,54 +276,102 @@ export function cadLinearBody(key: SymbolKey | string): string {
  * 而模板画幅本身已经是目标比例，所以落到目标框（等比缩放）后圆仍然是圆。
  * 唯一会被拉长的是直线 —— 那是灯体该有的长度。
  */
-function proportionedBody(family: CadShapeFamily, gw: number, gh: number): CadShape[] | null {
+function proportionedBody(
+  family: CadShapeFamily,
+  gw: number,
+  gh: number,
+): { shapes: CadShape[]; W: number; H: number } | null {
   const W = 100
   const H = (W * gh) / gw
   // 圆半径按短边算，保证整圆不会超出画幅
   const r = Math.min(W, H) * 0.26
   switch (family) {
     case 'round-head': {
-      // 弧形落地灯：圆形灯罩 + 落地支杆 + 底座横线
+      // 弧形落地灯：圆形灯罩 + 落地支杆 + 底座横线。
+      // 底座固定在 H 的 90%，支杆从圆底连到座线：H 很小（宽画幅）时也不会出现
+      // 零长度支杆或画到画幅外的底座（旧写法 H-6 在 H≤6 时 y 为负）。
       const cx = W / 2
       const cy = Math.min(H * 0.5, W * 0.5)
-      return [circle(cx, cy, r), line(cx, cy + r, cx, H - 6), line(W * 0.2, H - 6, W * 0.8, H - 6)]
+      const baseY = H * 0.9
+      return {
+        W,
+        H,
+        shapes: [
+          circle(cx, cy, r),
+          line(cx, cy + r, cx, baseY),
+          line(W * 0.2, baseY, W * 0.8, baseY),
+        ],
+      }
     }
     case 'wall-slim': {
       // 细杆壁灯：贴墙竖线 + 半圆灯罩（半径横竖一致，落图后仍是半圆）
       const R = Math.min(W * 0.3, H * 0.12)
       const wallX = W * 0.16
       const top = H * 0.16
-      return [
-        line(wallX, H * 0.04, wallX, H * 0.96),
-        // 以墙上 (wallX, top+R) 为圆心、R 为半径的右半圆：从顶点画弧到低点再闭合
-        path(`M${wallX} ${top} A${R} ${R} 0 0 1 ${wallX} ${top + 2 * R} Z`),
-        line(wallX + R, top + R, W * 0.92, top + R),
-        line(W * 0.92, top + R, W * 0.92, H * 0.9),
-      ]
+      return {
+        W,
+        H,
+        shapes: [
+          line(wallX, H * 0.04, wallX, H * 0.96),
+          // 以墙上 (wallX, top+R) 为圆心、R 为半径的右半圆：从顶点画弧到低点再闭合
+          path(`M${wallX} ${top} A${R} ${R} 0 0 1 ${wallX} ${top + 2 * R} Z`),
+          line(wallX + R, top + R, W * 0.92, top + R),
+          line(W * 0.92, top + R, W * 0.92, H * 0.9),
+        ],
+      }
     }
     case 'spot-head': {
       // 轨道射灯头：正圆射灯头 + 上方短轨道
       const cx = W / 2
       const cy = H * 0.62
-      return [
-        circle(cx, cy, r),
-        line(cx, H * 0.16, cx, cy - r),
-        line(W * 0.2, H * 0.16, W * 0.8, H * 0.16),
-      ]
+      return {
+        W,
+        H,
+        shapes: [
+          circle(cx, cy, r),
+          line(cx, H * 0.16, cx, cy - r),
+          line(W * 0.2, H * 0.16, W * 0.8, H * 0.16),
+        ],
+      }
     }
     case 'semi-wall': {
       // 半圆壁灯：贴墙竖线 + 右半圆灯罩（半径横竖一致）
       const R = Math.min(W, H) * 0.46
       const wallX = W * 0.1
       const cy = H / 2
-      return [
-        line(wallX, H * 0.04, wallX, H * 0.96),
-        path(`M${wallX} ${cy - R} A${R} ${R} 0 0 1 ${wallX} ${cy + R} Z`),
-      ]
+      return {
+        W,
+        H,
+        shapes: [
+          line(wallX, H * 0.04, wallX, H * 0.96),
+          path(`M${wallX} ${cy - R} A${R} ${R} 0 0 1 ${wallX} ${cy + R} Z`),
+        ],
+      }
     }
     default:
       return null
   }
+}
+
+/**
+ * 模板坐标里的描边宽度：让「落图后的视觉线宽」与 32×32 图例一致，而不是与模板宽度挂钩。
+ *
+ * 推导（symbolSize = 28，模板长边落图 28px）：
+ * - 32×32 图例的描边 2 落图后 = 2 × 28/32 = 1.75px；
+ * - 任意模板的缩放 s = 28 / max(W,H)。要落图 1.75px：stroke × s = 1.75
+ *   → stroke = 1.75 × max(W,H) / 28 = max(W,H) / 16。
+ *   模板 100 宽、高度 ≤ 100（横向族）时 = 6.25，正是「100 宽对应 28px」的换算。
+ * - 极端比例把线宽夹住，避免两种坏结果：
+ *   上界 min(W,H)/2：gh/gw=0.05 → H=5，若仍用 max/16=6.25，线宽会超过画幅高度，
+ *     落图 1.4px 高的框里画 1.75px 线，糊成实心块；夹到 2.5（落图 0.7px）仍是一条线。
+ *   下界 max(W,H)/64：gh/gw=20 → H=2000，长边 1/64 落图约 0.44px，保证再细的族
+ *     也不是「看不见」；正常比例下 max/16 远高于它，不生效。
+ */
+function strokeFor(W: number, H: number) {
+  const target = Math.max(W, H) / 16
+  const upper = Math.min(W, H) / 2
+  const lower = Math.max(W, H) / 64
+  return Math.min(upper, Math.max(lower, target))
 }
 
 /**
@@ -337,12 +385,13 @@ export function cadProportionedBody(
 ): { body: string; viewBox: string } | null {
   const family = SHAPE_FAMILY[familyId]
   if (!family) return null
-  const shapes = proportionedBody(family, gw, gh)
-  if (!shapes) return null
-  const W = 100
-  const H = (W * gh) / gw
+  const art = proportionedBody(family, gw, gh)
+  if (!art) return null
   const fmt = (n: number) => +n.toFixed(3)
-  return { body: renderShapes(shapes), viewBox: `0 0 ${fmt(W)} ${fmt(H)}` }
+  return {
+    body: renderShapes(art.shapes, strokeFor(art.W, art.H)),
+    viewBox: `0 0 ${fmt(art.W)} ${fmt(art.H)}`,
+  }
 }
 
 /**
