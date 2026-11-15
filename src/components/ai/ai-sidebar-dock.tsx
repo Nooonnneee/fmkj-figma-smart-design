@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   AlertCircle,
@@ -39,7 +39,9 @@ import {
   aiDraftKey,
   draftOnKeyChange,
   getDraftStorage,
+  isDraftAcceptedEvent,
   readAiDraft,
+  resolveDraftOnFailure,
   writeAiDraft,
 } from '@/lib/ai-draft'
 import { cn } from '@/lib/utils'
@@ -227,6 +229,14 @@ export function AiSidebarDock({
     draftKeyRef.current = draftKey
     setInputState(sync.value)
   }, [draftKey, initialInput, input])
+
+  // 输入框与附件的实时值镜像：send() 闭包拿到的是发送那一刻的旧快照，等待期间
+  // 用户继续输入只会更新 state。失败恢复草稿时要读这里的最新值，
+  // 否则「用户新输入优先」永远走不到。layout effect 保证提交后立刻同步。
+  const liveDraftRef = useRef({ input, attachments })
+  useLayoutEffect(() => {
+    liveDraftRef.current = { input, attachments }
+  }, [input, attachments])
 
   const loadConversations = useCallback(async () => {
     const res = await fetch('/ai/conversations').catch(() => null)
@@ -520,6 +530,9 @@ export function AiSidebarDock({
       fullPayloadMessage = `${displayPrompt}\n\n【已上传附件】\n${blocks.join('\n\n')}`
     }
 
+    // 草稿快照：请求在受理前失败（500 / 网络中断 / 402）时原样还回输入框与附件。
+    const draftSnapshot = { input, attachments }
+
     const now = new Date().toISOString()
     const replyId = `pending-${Date.now()}`
     setMessages((prev) => [
@@ -547,8 +560,9 @@ export function AiSidebarDock({
         toolCalls: [],
       },
     ])
-    setInput('')
-    setAttachments([])
+    // 输入框与附件不在这里清空 —— 只有服务端确认受理（收到首个业务事件）后才清。
+    // 否则 500 / 网络中断会让用户的正文与附件凭空消失（实测 FAIL-500-DRAFT 复现）。
+    let accepted = false
     setStreaming(true)
     setThinking(true)
     setStatusText(readyAtts.some((a) => a.kind === 'image') ? '正在由视觉模型看图…' : '')
@@ -590,6 +604,13 @@ export function AiSidebarDock({
         for (const line of lines) {
           if (!line.trim()) continue
           const ev = JSON.parse(line) as { type: string; [k: string]: unknown }
+          // 首个业务事件到达 = 服务端已受理这一轮（用户消息已落库、开始产出），
+          // 此刻才可以清空草稿。status / reasoning 之前失败都不算送出。
+          if (isDraftAcceptedEvent(ev.type) && !accepted) {
+            accepted = true
+            setInput('')
+            setAttachments([])
+          }
           if (ev.type === 'meta' && typeof ev.conversationId === 'string') {
             const cid = ev.conversationId
             if (!activeId) {
@@ -667,23 +688,46 @@ export function AiSidebarDock({
         }
       }
     } catch (error) {
-      if ((error as Error).name === 'AbortError') dropReply()
-      else if ((error as Error & { code?: string }).code === 'billing_rejected') {
+      const aborted = (error as Error).name === 'AbortError'
+      const billingRejected = (error as Error & { code?: string }).code === 'billing_rejected'
+      // 受理前失败：这一轮什么都没发生，把草稿（内存 + sessionStorage）还回去。
+      // 受理后失败：用户消息已落库，草稿已在受理时清空，再还回去会重复发送。
+      const decision = resolveDraftOnFailure(
+        accepted,
+        getDraftStorage(),
+        draftKey,
+        draftSnapshot,
+        () => liveDraftRef.current,
+      )
+      if (decision.kind === 'restore-draft') {
+        setInputState(decision.draft.input)
+        setAttachments(decision.draft.attachments)
+        dropReply()
+      }
+      if (aborted) {
+        // 用户主动停止：沿用原行为，收起这条未完成的回复气泡。
+        dropReply()
+      } else if (billingRejected) {
         // 业务拒绝（如并发扣费时积分不足）：回复内容已经流式发出，但本次没扣费，必须明确告诉用户。
         showToast({
           body: (error as Error).message || '积分不足，本次回复未计费',
           type: 'error',
         })
-      } else
-        patchReply((m) =>
-          m.content
-            ? m
-            : {
-                ...m,
-                content: `发送失败：${(error as Error).message || '请稍后重试'}`,
-                error: true,
-              },
-        )
+      } else {
+        if (decision.kind === 'restore-draft') {
+          showToast({ body: (error as Error).message || '发送失败，请稍后重试', type: 'error' })
+        } else {
+          patchReply((m) =>
+            m.content
+              ? m
+              : {
+                  ...m,
+                  content: `发送失败：${(error as Error).message || '请稍后重试'}`,
+                  error: true,
+                },
+          )
+        }
+      }
     } finally {
       setStreaming(false)
       setThinking(false)

@@ -70,6 +70,58 @@ export function draftOnKeyChange(
   return { changed: true, value: readAiDraft(storage, nextKey) ?? '' }
 }
 
+/** 服务端确认受理这一轮：首个业务事件到达（meta / delta / tool）。status / reasoning 都不算。 */
+export function isDraftAcceptedEvent(type: string): boolean {
+  return type === 'meta' || type === 'delta' || type === 'tool'
+}
+
+export type AiDraftState<T> = { input: string; attachments: T[] }
+
+/**
+ * 发送失败时要还回去的草稿。用户在这期间已经重新输入/添加了内容时，
+ * 以用户新输入的为准，不覆盖。
+ *
+ * `current` 必须是取值函数而不是对象：`send()` 闭包里捕获的 input/attachments
+ * 是发送那一刻的旧值，等待期间用户继续输入更新的是新 state，旧闭包看不到。
+ * 传函数才能读到实时值。
+ */
+export function restoreDraft<T>(
+  snapshot: AiDraftState<T>,
+  current: () => AiDraftState<T>,
+): AiDraftState<T> {
+  const live = current()
+  return {
+    input: live.input || snapshot.input,
+    attachments: live.attachments.length ? live.attachments : snapshot.attachments,
+  }
+}
+
+/**
+ * 请求失败时的结局判定（与 fix/byok-draft-net 的 decideDraftOnFailure 同一语义）：
+ *
+ * - 受理前失败：这一轮什么都没发生 → 恢复草稿（内存 + sessionStorage），收起失败气泡。
+ * - 受理后失败：用户消息已落库、草稿已在受理时清空 → 再还回去会变成「旧文重返
+ *   输入框、再发一次 = 历史里同一条用户消息两遍」。保留错误气泡。
+ */
+export type DraftFailureDecision<T> =
+  | { kind: 'restore-draft'; draft: AiDraftState<T> }
+  | { kind: 'keep-error' }
+
+export function resolveDraftOnFailure<T>(
+  accepted: boolean,
+  storage: DraftStorage | null,
+  key: string,
+  snapshot: AiDraftState<T>,
+  current: () => AiDraftState<T>,
+): DraftFailureDecision<T> {
+  if (accepted) return { kind: 'keep-error' }
+  const draft = restoreDraft(snapshot, current)
+  // 内存里的输入框与 sessionStorage 必须一起恢复：只还原 state 的话，
+  // 面板一卸载（跨断点 / 关抽屉）草稿又没了。
+  writeAiDraft(storage, key, draft.input)
+  return { kind: 'restore-draft', draft }
+}
+
 /** 写草稿；空串等价于删除，避免留下无意义的键。存储异常一律忽略。 */
 export function writeAiDraft(
   storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null,

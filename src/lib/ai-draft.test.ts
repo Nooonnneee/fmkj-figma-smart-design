@@ -6,13 +6,15 @@ import {
   aiDraftKey,
   draftOnKeyChange,
   getDraftStorage,
+  isDraftAcceptedEvent,
   readAiDraft,
+  resolveDraftOnFailure,
   writeAiDraft,
 } from './ai-draft'
 
 /**
- * 接线断言：下面测的是纯函数语义，这里确保 dock 真的调用了它。
- * 复核的变异测试证明过「删掉 dock 里整段写回，326 个测试全绿」，
+ * 接线断言：上面测的是纯函数语义，这里确保 dock 真的调用了它们。
+ * 复核的变异测试证明过「把 dock 里整段写回删掉，326 个测试全绿」，
  * 所以纯函数之外必须有一条盯着调用点的用例。
  */
 const dockSource = readFileSync(
@@ -93,26 +95,57 @@ describe('readAiDraft / writeAiDraft', () => {
   })
 })
 
-describe('storage 被禁用时降级为无草稿（应修 3）', () => {
-  it('sessionStorage 属性 getter 抛 SecurityError 时返回 null', () => {
-    expect(
-      getDraftStorage(() => {
-        throw new Error('SecurityError: storage is disabled')
-      }),
-    ).toBeNull()
+describe('发送失败后恢复草稿（阻断 1）', () => {
+  const snapshot = { input: 'FAIL-500-DRAFT', attachments: [{ id: 'att-1' }] }
+
+  it('受理前失败：内存与 sessionStorage 一起还原', () => {
+    const s = fakeStorage()
+    const key = aiDraftKey('u1', 'conv-1')
+    // 发送瞬间清空（旧实现的时序）
+    writeAiDraft(s, key, '')
+    const decision = resolveDraftOnFailure(false, s, key, snapshot, () => ({
+      input: '',
+      attachments: [],
+    }))
+    expect(decision).toEqual({ kind: 'restore-draft', draft: snapshot })
+    expect(readAiDraft(s, key)).toBe('FAIL-500-DRAFT')
   })
 
-  it('降级后读写草稿都不抛错', () => {
-    const storage = getDraftStorage(() => {
-      throw new Error('SecurityError: storage is disabled')
+  it('受理后失败：不还原草稿（用户消息已落库，再发会重复）', () => {
+    const s = fakeStorage()
+    const key = aiDraftKey('u1', 'conv-1')
+    const decision = resolveDraftOnFailure(true, s, key, snapshot, () => ({
+      input: '',
+      attachments: [],
+    }))
+    expect(decision).toEqual({ kind: 'keep-error' })
+    expect(readAiDraft(s, key)).toBeNull()
+  })
+
+  it('等待期间用户重新输入：以新输入为准，不被旧快照覆盖', () => {
+    const decision = resolveDraftOnFailure(false, fakeStorage(), 'k', snapshot, () => ({
+      input: 'NEW-TYPE',
+      attachments: [],
+    }))
+    expect(decision).toEqual({
+      kind: 'restore-draft',
+      draft: { input: 'NEW-TYPE', attachments: [{ id: 'att-1' }] },
     })
-    expect(readAiDraft(storage, 'k')).toBeNull()
-    expect(() => writeAiDraft(storage, 'k', 'x')).not.toThrow()
   })
 
-  it('dock 不直接访问 window.sessionStorage（否则禁用时整页白屏）', () => {
-    expect(dockSource).not.toContain('window.sessionStorage')
-    expect(dockSource).toContain('getDraftStorage()')
+  it('只有 meta / delta / tool 算受理', () => {
+    expect(isDraftAcceptedEvent('meta')).toBe(true)
+    expect(isDraftAcceptedEvent('delta')).toBe(true)
+    expect(isDraftAcceptedEvent('tool')).toBe(true)
+    expect(isDraftAcceptedEvent('status')).toBe(false)
+    expect(isDraftAcceptedEvent('reasoning')).toBe(false)
+  })
+
+  it('dock 的发送流程确实接入了受理判定与失败恢复（删掉整段会变红）', () => {
+    expect(dockSource).toContain('isDraftAcceptedEvent(ev.type) && !accepted')
+    expect(dockSource).toContain('resolveDraftOnFailure(')
+    expect(dockSource).toContain('setInputState(decision.draft.input)')
+    expect(dockSource).toContain('setAttachments(decision.draft.attachments)')
   })
 })
 
@@ -146,5 +179,28 @@ describe('换会话不串草稿（阻断 2）', () => {
   it('dock 用上一次的键判断，只在键真正变化时同步', () => {
     expect(dockSource).toContain('draftOnKeyChange(draftKeyRef.current, draftKey')
     expect(dockSource).toContain('if (!sync.changed) return')
+  })
+})
+
+describe('storage 被禁用时降级为无草稿（应修 3）', () => {
+  it('sessionStorage 属性 getter 抛 SecurityError 时返回 null', () => {
+    expect(
+      getDraftStorage(() => {
+        throw new Error('SecurityError: storage is disabled')
+      }),
+    ).toBeNull()
+  })
+
+  it('降级后读写草稿都不抛错', () => {
+    const storage = getDraftStorage(() => {
+      throw new Error('SecurityError: storage is disabled')
+    })
+    expect(readAiDraft(storage, 'k')).toBeNull()
+    expect(() => writeAiDraft(storage, 'k', 'x')).not.toThrow()
+  })
+
+  it('dock 不直接访问 window.sessionStorage（否则禁用时整页白屏）', () => {
+    expect(dockSource).not.toContain('window.sessionStorage')
+    expect(dockSource).toContain('getDraftStorage()')
   })
 })
