@@ -35,17 +35,52 @@ function sealWithOldSecret(plain: string): string {
 
 type UserDoc = { id: string; companyProfile?: Record<string, unknown> | null }
 
+/**
+ * 模拟真实 Payload 的 `select` 行为（**这是上一轮假绿的原因**）。
+ *
+ * 实测 Payload 4.0.0-beta.4：`find({ select: { companyProfile: true } })` 会返回
+ * companyProfile 与渠道行，但 hasMany 文本子字段 `aiChannels[].models` 是 `[]`。
+ * 旧假 `find` 完全忽略 select、永远返回完整文档，所以「轮换脚本清空 models」
+ * 这条真实故障在单测里永远测不出来。
+ *
+ * 这里只实现本测试用到的形态；以后谁再给 find 加 select，就会按真实行为裁剪，
+ * 回归测试立刻变红。
+ */
+function applySelect(doc: UserDoc, select?: Record<string, boolean>): UserDoc {
+  if (!select) return structuredClone(doc)
+  const out: UserDoc = { id: doc.id }
+  if (select.companyProfile && doc.companyProfile) {
+    const profile = structuredClone(doc.companyProfile)
+    const rows = profile.aiChannels
+    if (Array.isArray(rows)) {
+      profile.aiChannels = rows.map((row) => ({ ...(row as object), models: [] }))
+    }
+    out.companyProfile = profile
+  }
+  return out
+}
+
 function fakePayload(seed: UserDoc[]) {
   const db = new Map<string, UserDoc>()
   for (const doc of seed) db.set(doc.id, structuredClone(doc))
   let updates = 0
+  let selectsSeen = 0
   const payload = {
-    async find({ page = 1, limit = 50 }: { page?: number; limit?: number }) {
+    async find({
+      page = 1,
+      limit = 50,
+      select,
+    }: {
+      page?: number
+      limit?: number
+      select?: Record<string, boolean>
+    }) {
+      if (select) selectsSeen += 1
       const all = [...db.values()]
       const start = (page - 1) * limit
-      const docs = all.slice(start, start + limit)
+      const docs = all.slice(start, start + limit).map((doc) => applySelect(doc, select))
       return {
-        docs: structuredClone(docs),
+        docs,
         hasNextPage: start + limit < all.length,
         totalPages: Math.ceil(all.length / limit),
       }
@@ -63,7 +98,7 @@ function fakePayload(seed: UserDoc[]) {
       return structuredClone(next)
     },
   }
-  return { payload, db, updateCount: () => updates }
+  return { payload, db, updateCount: () => updates, selectCount: () => selectsSeen }
 }
 
 const channelRow = (key: string, cipher: string, extra: Record<string, unknown> = {}) => ({
@@ -142,6 +177,45 @@ describe('reencryptChannelsOf', () => {
 })
 
 describe('reencryptAllChannels', () => {
+  /**
+   * 回归：2026-11-15 复核实测，脚本用 `select: { companyProfile: true }` 读用户，
+   * Payload 对 hasMany 子字段 `aiChannels[].models` 返回 `[]`，随后把这份 rows 写回，
+   * 每个渠道的模型列表被静默清空（真实库 `users_texts` 从 2 行变 0 行）。
+   *
+   * 这条用例里的假 `find` 现在会按 select 裁剪，所以谁把 select 加回来就会红。
+   */
+  it('轮换写回后，每个渠道的 models 必须原样保留', async () => {
+    const oldCipher = sealWithOldSecret('sk-keep-models')
+    process.env.PAYLOAD_SECRET = NEW_SECRET
+    process.env.AI_CHANNELS_KEY_ID = 'k2'
+    process.env.AI_CHANNELS_OLD_KEYS = JSON.stringify({ k1: OLD_SECRET })
+
+    const { payload, db, selectCount } = fakePayload([
+      {
+        id: 'u1',
+        companyProfile: {
+          name: '抬头一',
+          aiChannels: [
+            channelRow('c1', oldCipher, { models: ['m1', 'm2'] }),
+            channelRow('c2', oldCipher, { models: ['m3'] }),
+          ],
+        },
+      },
+    ])
+
+    const summary = await reencryptAllChannels(payload)
+    expect(summary.upgraded).toBe(2)
+    expect(summary.usersUpdated).toBe(1)
+
+    const rows = (
+      db.get('u1')!.companyProfile as { aiChannels: { key: string; models: string[] }[] }
+    ).aiChannels
+    expect(rows.find((r) => r.key === 'c1')!.models).toEqual(['m1', 'm2'])
+    expect(rows.find((r) => r.key === 'c2')!.models).toEqual(['m3'])
+    // 关键：find 不得使用 select（真实 Payload 会裁掉 hasMany 子字段）
+    expect(selectCount()).toBe(0)
+  })
+
   it('全库：升级旧代次、跳过已升级、统计正确', async () => {
     const oldA = sealWithOldSecret('sk-a')
     const oldB = sealWithOldSecret('sk-b')

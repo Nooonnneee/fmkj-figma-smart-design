@@ -47,14 +47,7 @@ type PayloadLike = {
     overrideAccess?: boolean
     limit?: number
     page?: number
-    select?: Record<string, boolean>
   }): Promise<{ docs: UserDocLike[]; hasNextPage?: boolean; totalPages?: number }>
-  findByID(args: {
-    collection: 'users'
-    id: string
-    depth?: number
-    overrideAccess?: boolean
-  }): Promise<unknown>
   update(args: {
     collection: 'users'
     id: string
@@ -67,13 +60,16 @@ type PayloadLike = {
 async function* iterateUsers(payload: PayloadLike, pageSize = 50): AsyncGenerator<UserDocLike> {
   let page = 1
   for (;;) {
+    // **不要加 `select: { companyProfile: true }`**：实测 Payload 4.0.0-beta.4 对
+    // hasMany 文本子字段（`aiChannels[].models`）会返回 `[]`。本函数的结果会被
+    // 原样写回 `companyProfile.aiChannels`，加了 select 就会把每个渠道的模型列表清空。
+    // `depth: 0` 已经足够轻（不展开关系），不需要再用 select 省字段。
     const result = await payload.find({
       collection: 'users',
       depth: 0,
       overrideAccess: true,
       limit: pageSize,
       page,
-      select: { companyProfile: true },
     })
     for (const doc of result.docs) yield doc
     if (result.hasNextPage === false) return
@@ -173,14 +169,8 @@ export async function reencryptAllChannels(
       continue
     }
 
-    // 重新读一次完整文档：上面 find 用了 select，只保证有 companyProfile
-    const fresh = (await payload.findByID({
-      collection: 'users',
-      id: String(doc.id),
-      depth: 0,
-      overrideAccess: true,
-    })) as { companyProfile?: Record<string, unknown> | null } | null
-    const profile = fresh?.companyProfile ?? {}
+    // `find` 已经返回完整文档（没有 select），直接用它的 companyProfile 写回。
+    const profile = doc.companyProfile ?? {}
     await payload.update({
       collection: 'users',
       id: String(doc.id),
