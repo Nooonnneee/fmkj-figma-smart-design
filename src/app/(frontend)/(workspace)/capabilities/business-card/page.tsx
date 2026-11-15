@@ -23,7 +23,7 @@ export default async function BusinessCardPage() {
   const flags = await getPluginFlags(user.id)
   if (!flags['business-card']) {
     return (
-      <section className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+      <section className="mx-auto flex w-full max-w-5xl flex-col gap-5">
         <h1 className="font-heading text-xl font-semibold">名片</h1>
         <p className="text-sm text-muted-foreground">
           「名片」插件已在「设置 → 插件」里关闭。重新启用后即可导出名片。

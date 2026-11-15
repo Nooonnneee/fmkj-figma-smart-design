@@ -33,7 +33,7 @@ export default async function NewProjectPage() {
     isProjectPlatform(lastPlatform) && lastPlatform !== '待定' ? lastPlatform : DEFAULT_PLATFORM
 
   return (
-    <section className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-5">
       <Button
         variant="ghost"
         size="sm"

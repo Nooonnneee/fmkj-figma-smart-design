@@ -47,7 +47,7 @@ export default async function SettingsPage() {
     .sort((a, b) => b.products - a.products || a.name.localeCompare(b.name, 'zh'))
 
   return (
-    <section className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-5">
       <PageHeader
         title="设置"
         description="外观主题、报价单与合同抬头、联系方式，以及报价内部成本与毛利规则"
@@ -57,10 +57,16 @@ export default async function SettingsPage() {
         页内分区导航：设置页把外观、品牌与联系、成本串成一条长表单，
         首屏只能看到主题选择，后面的业务设置要靠滚动找。吸顶的一排锚点
         让三块内容一眼可见（纯文本链接，不做 Tab——Tab 会打断浏览的连续性）。
+
+        **top 必须是全局顶栏的高度（h-12 = 48px），不能用 top-0**：
+        全局顶栏（site-header）是 `sticky top-0 z-50`，这里原来是 `top-0 z-10`，
+        吸顶后整条导航被顶栏压在下面 —— 实测滚动后 elementFromPoint 在「外观」链接
+        位置取到的是 HEADER，「外观 / 品牌与联系 / 成本与毛利」三个链接全部点不到。
+        改用 top-12 让导航停在顶栏下沿；z-index 保持 10 不动，否则会盖住顶栏的下拉菜单。
       */}
       <nav
         aria-label="设置分区"
-        className="sticky top-0 z-10 -mx-1 flex flex-wrap items-center gap-1 rounded-[var(--radius-container)] border bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+        className="sticky top-12 z-10 -mx-1 flex flex-wrap items-center gap-1 rounded-[var(--radius-container)] border bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80"
       >
         {[
           { href: '#settings-appearance', label: '外观' },
@@ -95,10 +101,10 @@ export default async function SettingsPage() {
           <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
         </Link>
       ) : null}
-      <div id="settings-appearance" className="scroll-mt-16">
+      <div id="settings-appearance" className="scroll-mt-24">
         <AppearanceSettings />
       </div>
-      <div id="settings-brand" className="scroll-mt-16">
+      <div id="settings-brand" className="scroll-mt-24">
         <CompanyForm
           initial={{
             name: company.name ?? '',
@@ -138,7 +144,7 @@ export default async function SettingsPage() {
           }}
         />
       </div>
-      <div id="settings-cost" className="scroll-mt-16">
+      <div id="settings-cost" className="scroll-mt-24">
         <CostSettingsCard initial={costSettings} brands={costBrands} />
       </div>
     </section>

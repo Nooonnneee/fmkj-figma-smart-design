@@ -11,6 +11,7 @@ import { yuan } from '@/lib/quotes'
 import { cn } from '@/lib/utils'
 
 import { ProjectForm, type ProjectFormValues } from '../project-form'
+import { WORKBENCH_SECTION_HEADING_CLASS } from '@/components/page-header'
 
 export type ProjectOverviewData = {
   id: string
@@ -82,7 +83,7 @@ export function ProjectOverview({
 
   if (editing) {
     return (
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
         <ProjectForm initial={form} owners={owners} onSaved={closeEditor} onCancel={closeEditor} />
         {danger}
       </div>
@@ -90,11 +91,11 @@ export function ProjectOverview({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-xl font-semibold tracking-tight">项目信息</h2>
+            <h2 className={WORKBENCH_SECTION_HEADING_CLASS}>项目信息</h2>
             <Badge variant={data.stage.variant} label={data.stage.label} />
           </div>
           <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-sm text-muted-foreground">
