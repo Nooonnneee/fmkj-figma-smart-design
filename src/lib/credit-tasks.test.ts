@@ -74,18 +74,39 @@ describe('grantTaskCreditIfEligible：每项任务终生只发一次', () => {
     })
   })
 
+  const EXPECTED_CREDITS: Record<string, number> = {
+    bind_email: 10,
+    bind_wechat: 10,
+    follow_official_account: 5,
+    complete_company_profile: 5,
+    first_quote: 5,
+  }
+
+  it('期望表覆盖 CREDIT_TASKS 全部任务：新增任务没有期望值时立刻红', () => {
+    // 只遍历手写的 expected 会静默跳过新任务（复核实测：临时加 bind_phone 分值 1000 仍然 446 全绿）。
+    // 先钉住「声明了哪些任务」，再由下面的断言逐个核对分值。
+    expect(Object.keys(EXPECTED_CREDITS).sort()).toEqual(CREDIT_TASKS.map((t) => t.id).sort())
+  })
+
   it('全部分值钉住业务数字：绑定邮箱 10 / 微信 10 / 公众号 5 / 抬头 5 / 首报价 5', () => {
-    const expected: Record<string, number> = {
-      bind_email: 10,
-      bind_wechat: 10,
-      follow_official_account: 5,
-      complete_company_profile: 5,
-      first_quote: 5,
-    }
-    for (const [id, credits] of Object.entries(expected)) {
+    for (const [id, credits] of Object.entries(EXPECTED_CREDITS)) {
       const spec = CREDIT_TASKS.find((t) => t.id === id)
       expect(spec, id).toBeTruthy()
       expect(spec!.credits, id).toBe(credits)
+    }
+  })
+
+  it('每项任务的流水备注两两不为前缀：否则先领的会堵死另一项', () => {
+    // grantTaskCreditUnlocked 的「已领取」判断是 reason LIKE '<ledgerReason>%'。
+    // 所以不只是「完全相等」会撞车：A 的备注是 B 的前缀时，领过 A 之后再领 B 会被判成已领取。
+    for (const a of CREDIT_TASKS) {
+      for (const b of CREDIT_TASKS) {
+        if (a.id === b.id) continue
+        expect(
+          b.ledgerReason.startsWith(a.ledgerReason),
+          `${a.id} 的流水备注「${a.ledgerReason}」是 ${b.id} 的前缀，会挡住 ${b.id} 的领取`,
+        ).toBe(false)
+      }
     }
   })
 
@@ -204,6 +225,28 @@ describe('redeemCodeForUser：兑换码的其余守卫', () => {
     expect(r).toMatchObject({ ok: true, creditsAdded: 12 })
     // 100 分写死；去掉 Math.trunc 会得到 12.9，这里必须红
     expect(payload.create.mock.calls[0]![0].data.delta).toBe(12)
+  })
+
+  /**
+   * 已知缺陷，记录现状（不修）：
+   * `credits` 在集合层是 number 字段，但数据库里可能残留脏值 / 后台导入非数字。
+   * `Number('abc')` → NaN，`Math.max(0, Math.trunc(NaN))` 仍是 NaN，
+   * `NaN === 0` 为 false，于是核销照常进行，流水写入 `delta: NaN`（Postgres 落库为 NULL）。
+   * 这不是本轮引入的问题，这里只钉住当前行为，避免它被悄悄改成「看起来正确」。
+   * 修的时候把这条标题改成期望的拒绝语义，并让 delta 不再可能是 null。
+   */
+  it('已知缺陷，记录现状：兑换码权益为非数字时流水 delta 落成 null（未修复）', async () => {
+    const payload = fakePayload(codeDoc({ credits: 'abc' as unknown as number }))
+    mocks.getPayloadClient.mockResolvedValue(payload)
+
+    const r = await redeemCodeForUser(user, 'FMKJ-TEST')
+
+    expect(r).toMatchObject({ ok: true })
+    expect(Number.isNaN(r.ok ? r.creditsAdded : NaN)).toBe(true)
+    const ledger = payload.create.mock.calls[0]![0].data
+    expect(Number.isNaN(ledger.delta)).toBe(true)
+    // Payload / Postgres 对 NaN 的序列化结果就是 null
+    expect(JSON.parse(JSON.stringify({ delta: ledger.delta }))).toEqual({ delta: null })
   })
 
   it('负数权益按 0 处理并拒绝（不会出现负数充值）', async () => {
