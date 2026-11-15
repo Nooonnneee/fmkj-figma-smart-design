@@ -209,6 +209,74 @@ docker exec fmkj-db-1 dropdb -U fmkj restore_drill
 
 客户端默认连接 `https://fmkj.top`（`desktop/app-config.json` 的 `defaultServerUrl`）。正式域名不同时，改这里后重新打包；私有部署的用户也可以在客户端「帮助 → 服务器设置」里填写自己的地址。
 
+## 10. 轮换 PAYLOAD_SECRET（成员 AI 渠道密钥）
+
+成员自填的 AI 渠道 key 用 AES-256-GCM 加密存库，钥匙材料是 `PAYLOAD_SECRET`，
+密文里带钥匙代次（`v1:<keyId>:...`）。**只换 `PAYLOAD_SECRET` 不按本节做，所有成员的
+渠道会同时解不开**，每次测试连通性都报「这个渠道的密钥无法解密（PAYLOAD_SECRET 可能已更换）」。
+注意换 `PAYLOAD_SECRET` 还会让所有人重新登录（它同时签 JWT），这是预期现象。
+
+### 10.1 先处理首版的旧格式密文（有就做，没有可跳过）
+
+最早一批密文是 `v1:<base64url>`（没有 keyId），它们的钥匙**固定是当前的
+`PAYLOAD_SECRET`**，`AI_CHANNELS_OLD_KEYS` 救不了。所以必须在换 secret **之前**
+先把它们升级成带代次的格式：
+
+```bash
+# 保持 .env 里的 PAYLOAD_SECRET / AI_CHANNELS_KEY_ID 不动，先空跑再真跑
+docker compose --profile tools run --rm tools run \
+  --input '{"scriptPath":"scripts/rotate-ai-channels-key.ts","scriptArgs":["--dry-run"]}'
+docker compose --profile tools run --rm tools run \
+  --input '{"scriptPath":"scripts/rotate-ai-channels-key.ts"}'
+```
+
+再空跑一次，看到 `升级=0 失败=0` 才继续。**先换 secret 再跑就晚了**：旧格式会被当成
+新 secret 派生，直接解密失败，只能让用户重新填 key。
+
+### 10.2 换钥匙（按顺序做）
+
+1. **先备份**（第 8 节）：`sudo /opt/fmkj/bin/fmkj-backup.sh --db-only`。
+2. 改 `.env`：`PAYLOAD_SECRET` 写新值，`AI_CHANNELS_KEY_ID` 改成新代次（如 `k2`），
+   旧代次和旧 secret 放进旧钥匙环：
+
+   ```dotenv
+   PAYLOAD_SECRET=<新 secret>
+   AI_CHANNELS_KEY_ID=k2
+   AI_CHANNELS_OLD_KEYS='{"k1":"<旧的 PAYLOAD_SECRET>"}'
+   ```
+
+3. 让应用用上新配置：`docker compose up -d app`。此时旧密文能靠 `k1` 解，新写入用 `k2`。
+4. 先空跑看条数：
+
+   ```bash
+   docker compose --profile tools run --rm tools run \
+     --input '{"scriptPath":"scripts/rotate-ai-channels-key.ts","scriptArgs":["--dry-run"]}'
+   ```
+
+   预期 `失败=0`，`升级` = 需要重加密的渠道数（`用户待更新` 是涉及的用户数）。
+
+5. 真跑：
+
+   ```bash
+   docker compose --profile tools run --rm tools run \
+     --input '{"scriptPath":"scripts/rotate-ai-channels-key.ts"}'
+   ```
+
+   看到 `升级=N 失败=0` 即完成；脚本幂等，中途断了补上 `AI_CHANNELS_OLD_KEYS` 重跑即可。
+
+6. **确认**：再空跑一次，必须 `升级=0 失败=0`。
+7. **确认之后**才从 `.env` 删掉 `AI_CHANNELS_OLD_KEYS`，再 `docker compose up -d app`。
+   顺手在桌面客户端点一次「测试连通性」，确认已有渠道仍可用。
+
+### 10.3 不按这个顺序做会怎样
+
+- 只换 `PAYLOAD_SECRET`、不设 `AI_CHANNELS_OLD_KEYS`、也不跑脚本 → 库里的 `v1:k1:...`
+  找不到 k1 的钥匙材料，**所有成员渠道同时解密失败**；用户只能重新填 key。
+- 没看到 `升级=0 失败=0` 就删 `AI_CHANNELS_OLD_KEYS` → 还没升级的条目立刻解不开；
+  把旧钥匙环补回去重跑脚本即可恢复（脚本不改坏数据）。
+- 改了 `AI_CHANNELS_KEY_ID` 却没给旧代次配 `AI_CHANNELS_OLD_KEYS` → 和第一条一样。
+- 旧格式密文没在换 secret 前升级 → 换完就永久解不开（见 10.1），所以顺序不能反。
+
 ## 已验证 / 未验证
 
 已在兼容 PostgreSQL 的测试库上验证：生产构建（不依赖数据库）、启动自动建表、全量数据导入（728 产品、745 图片、项目、报价）、管理员和员工设置密码后登录、图片上传和读取。
