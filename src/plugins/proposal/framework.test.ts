@@ -28,6 +28,7 @@ import {
 } from './framework'
 import { buildDeck } from './deck/model'
 import { deckPages, countDeckPages } from './deck/index'
+import { deckScenes } from './deck/pages/scenes'
 import { DECK_THEMES } from './deck/themes'
 
 describe('normalizeSections：编排规范', () => {
@@ -96,10 +97,12 @@ describe('章节与框架的取值一致性', () => {
 
 describe('deckPages 装配：页数与顺序', () => {
   /**
-   * 装配层 `needsPoints` 集合里，只有 'plans' 是可观测的：
-   * system / zones / scenes / rooms 的渲染函数本身在无数据时就不 push 任何页，
-   * 即使从集合里删掉也不会多出一页（等价变异，测不出来）。这里只钉住真正
-   * 依赖该集合拦截的 'plans'：有图纸、无点位时必须 0 页。
+   * 装配层 `needsPoints` 集合里，'plans' 和 'scenes' 是可观测的：
+   * - plans：有图纸、无点位时必须 0 页（渲染函数会为每张图纸无条件出一页）；
+   * - scenes：场景不限设备且空间没有点位时，deckScenes 仍会匹配出场景并渲染出页，
+   *   必须靠集合拦截才为 0（复核实测：从 needsPoints 删掉 'scenes' 会变成 1 页）。
+   * system / zones / rooms 的渲染函数在无数据时自己就不 push 任何页，
+   * 从集合里删掉也不会多出一页（等价变异，测不出来）。
    */
   it('有图纸但无点位时，装配层拦住平面页（needsPoints 里唯一可观测的章节）', () => {
     const d = {
@@ -123,6 +126,58 @@ describe('deckPages 装配：页数与顺序', () => {
     expect(buildDeck(d).sheets).toHaveLength(1)
     expect(
       deckPages(d, DECK_THEMES.qixu, { markers: 'symbol', insights: true, sections: ['plans'] }),
+    ).toHaveLength(0)
+  })
+  it('场景不限设备 + 空间无点位：装配层拦住场景页（needsPoints 里第二个可观测的章节）', () => {
+    // 后台场景允许 requiredDevices / anyDevices 都留空（不限设备）。
+    // 这种情况下 deckScenes 仍能从「有该场景标记但 0 点位」的空间匹配出场景并渲染出页，
+    // 所以真实方案要靠 needsPoints 里的 'scenes' 才为 0 页。
+    // 变红方式：从 deck/index.tsx 的 needsPoints 删掉 'scenes' → 这里变成 1 页。
+    const scene = {
+      id: 'sc-1',
+      name: '回家',
+      summary: '开灯并拉开窗帘',
+      headline: null,
+      subtitle: null,
+      tagline: null,
+      steps: [],
+      image: null,
+      scope: 'room' as const,
+      chapter: 'arrive',
+      roomTypes: [],
+      requiredDevices: [],
+      anyDevices: [],
+    }
+    const d = {
+      ...(emptyDocs() as unknown as Record<string, unknown>),
+      sceneLibrary: [scene],
+      rooms: [
+        {
+          areaId: 'a1',
+          areaIds: ['a1'],
+          name: '客厅',
+          areaType: 'living',
+          typeLabel: '客厅',
+          devices: [],
+          total: 0,
+          met: [],
+          missing: [],
+          warnings: [],
+          scenes: [`${scene.name}：${scene.summary}`],
+          score: 100,
+          floorName: '一层',
+          displayName: '客厅',
+          sheets: [],
+          points: [],
+          lines: [],
+          subtotal: 0,
+        },
+      ],
+    } as unknown as ProjectDocsData
+    // 先证明场景匹配本身不是空转：deckScenes 能产出 1 个场景
+    expect(deckScenes(buildDeck(d))).toHaveLength(1)
+    expect(
+      deckPages(d, DECK_THEMES.qixu, { markers: 'symbol', insights: true, sections: ['scenes'] }),
     ).toHaveLength(0)
   })
   const emptyDocs = () =>
