@@ -733,9 +733,35 @@ html:has([data-landing]) {
   }
 }
 
-/* 工作区页面入场：页面主体逐块淡入上移 6px（指数缓出），全屏画布与项目顶栏不参与 */
+/*
+ * 工作区页面入场：页面主体逐块淡入上移 6px（指数缓出），全屏画布与项目顶栏不参与。
+ *
+ * ⚠️ 关键帧名字必须**避开 tw-animate-css 的 `enter`**。那个库（styles.css 第 6 行
+ * `@import 'tw-animate-css'`）也定义了 `@keyframes enter`，而且它的 from 帧里显式写了
+ * `transform` 和 `filter: blur(...)`；两条同名 @keyframes 在层叠里后者胜出，
+ * 于是本该「只在 from 帧有 transform」的入场动画，结束帧也留下了
+ * `transform: matrix(...)` + `filter: blur(0px)`（`fill-mode: both` 会让结束帧样式持续生效）。
+ *
+ * 这不只是多算一点合成层：非 none 的 transform/filter 会让该元素成为 **fixed 后代的
+ * 包含块**。名片页（capabilities/business-card）在页面里放了一个
+ * `fixed top-0 left-[-20000px]` 的离屏导出节点（html-to-image 截图用），
+ * 包含块一旦变成页面 section，它就被定位到 section 内、并把文档撑到 5260px，
+ * 而右侧 AI 栏的包含块（sidebar-wrapper）只有 2318px —— sticky 到 2318 就跟着滚走，
+ * 长页面上 AI 栏整列滚出视口。实测：scrollY 1500 时 panelY = -82，2600 时 -1182。
+ *
+ * 两处一起改才成立：
+ * 1. 独立名字 workspace-enter —— 不再被 tw-animate-css 的同名关键帧覆盖；
+ * 2. fill-mode 从 `both` 改成 `backwards` —— 入场只应该「开始前套用 from 状态」，
+ *    结束后回到元素的自然样式。`both` 会让结束帧（即使只是隐式的恒等变换）持续生效，
+ *    浏览器把它算成 `transform: matrix(1,0,0,1,0,0)`，仍然构成 fixed 后代的包含块。
+ *    用 `backwards` 后动画结束后 transform / filter 都回到 none，延迟期间仍保持弱化初态。
+ *
+ * 改前实测（1440×900，名片页）：docH 5260 / sidebar-wrapper 2318，scrollY 1500 时
+ * AI 栏 y=-82，2600 时 -1182；改后 docH 与 wrapper 一致，0/1000/1500/2600/5000 四档
+ * AI 栏都贴在视口顶（y=0）。
+ */
 [data-slot='workspace-page'] > :not(.full-bleed-page):not(.project-header) {
-  animation: enter 420ms cubic-bezier(0.25, 1, 0.5, 1) both;
+  animation: workspace-enter 420ms cubic-bezier(0.25, 1, 0.5, 1) backwards;
 }
 [data-slot='workspace-page'] > :nth-child(2) {
   animation-delay: 40ms;
@@ -749,7 +775,7 @@ html:has([data-landing]) {
 [data-slot='workspace-page'] > :nth-child(n + 5) {
   animation-delay: 160ms;
 }
-@keyframes enter {
+@keyframes workspace-enter {
   from {
     opacity: 0;
     transform: translateY(6px);
