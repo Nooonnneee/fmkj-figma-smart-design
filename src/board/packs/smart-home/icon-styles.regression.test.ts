@@ -14,6 +14,7 @@ import { lookOptionsFor, productIdForPoint, symbolGeom } from '@/board/core/symb
 import type { SymbolObj, ViewSettings } from '@/board/core/types'
 import { DEVICE_TYPES } from '@/lib/device-types'
 
+import { cadProportionedBody } from './cad-symbols'
 import { smartHomePack } from './index'
 import { LIGHTING, lookOf, type LightingVariant } from './look'
 
@@ -209,31 +210,179 @@ describe('A2. 共享符号键的灯具按「这个点位」选 CAD 画面（回�
     }
   })
 
+  /**
+   * 圆弧断言不能拿 viewBox 比自己（旧写法 `vh/vw ≈ art.gh/art.gw` 里的 art 就是从
+   * viewBox 算出来的，把 circle 改成三次贝塞尔椭圆、或把 viewBox 强制成方形都会全绿）。
+   *
+   * 这里两条独立口径：
+   * 1. 期望画幅来自 sizeCm（两维已知时 = 深/宽）或默认图标的比例 —— 测试侧自己的真值；
+   * 2. 圆 / 弧的数量与半径直接和几何应有值比对：少一个 circle、把 A 改成 C 都会红。
+   */
+  const arcCases = [
+    {
+      name: '弧形落地灯 192×48',
+      o: point('other-light', 'lt-floor-arc-lamp-192x48cm-76x19', [192, 48], true),
+      circles: 1,
+      arcs: 0,
+      radius: (W: number, H: number) => Math.min(W, H) * 0.26,
+    },
+    {
+      name: '细杆壁灯 13×28',
+      o: point('wall-light', 'lt-wall-light-13x28cm-5x11', [13, 28], true),
+      circles: 0,
+      arcs: 1,
+      radius: (W: number, H: number) => Math.min(W * 0.3, H * 0.12),
+    },
+    {
+      name: '半圆壁灯 20×10',
+      o: point('wall-light', 'lt-wall-light-20x10cm-8x4', [20, 10], true),
+      circles: 0,
+      arcs: 1,
+      radius: (W: number, H: number) => Math.min(W, H) * 0.46,
+    },
+    {
+      name: '轨道射灯头',
+      o: point('track-light', 'lt-track-light'),
+      circles: 1,
+      arcs: 0,
+      radius: (W: number, H: number) => Math.min(W, H) * 0.26,
+    },
+    // 本轮补登记：嵌入式 / 明装射灯（圆款 + 方款）、圆壁灯、嵌入式壁灯
+    {
+      name: '嵌入式射灯（圆）',
+      o: point('spotlight', 'lt-recessed-mount-directional-light-20cm-8', [5, null], true),
+      circles: 1,
+      arcs: 0,
+      radius: (W: number, H: number) => Math.min(W, H) * 0.26,
+    },
+    {
+      name: '嵌入式射灯（方）',
+      o: point('spotlight', 'lt-recessed-mount-directional-light-20cm-8-2', [5, null], true),
+      circles: 1,
+      arcs: 0,
+      radius: (W: number, H: number) => Math.min(W, H) * 0.26,
+    },
+    {
+      name: '明装射灯（圆）',
+      o: point('spotlight', 'lt-surface-mount-directional-light-20cm-8', [5, null], true),
+      circles: 1,
+      arcs: 0,
+      radius: (W: number, H: number) => Math.min(W, H) * 0.26,
+    },
+    {
+      name: '明装射灯（方）',
+      o: point('spotlight', 'lt-surface-mount-directional-light-20cm-8-2', [5, null], true),
+      circles: 1,
+      arcs: 0,
+      radius: (W: number, H: number) => Math.min(W, H) * 0.26,
+    },
+    {
+      name: '圆壁灯 20cm',
+      o: point('wall-light', 'lt-wall-light-30cm-12', [20, null], true),
+      circles: 0,
+      arcs: 1,
+      radius: (W: number, H: number) => Math.min(W, H) * 0.46,
+    },
+    {
+      name: '嵌入式壁灯 16cm',
+      o: point('wall-light', 'lt-recessed-wall-light-16cm-6', [16, null], true),
+      circles: 0,
+      arcs: 1,
+      radius: (W: number, H: number) => Math.min(W, H) * 0.46,
+    },
+  ]
+
   it('CAD 矢量按目标画幅画：圆灯罩在非方形框里仍是正圆', () => {
-    // 回归：32×32 的方图例用 preserveAspectRatio="none" 拉进 4:1 / 1:2.15 的框后，
-    // 圆灯罩变成椭圆、半圆变成蛋形。修复方式是按形状族出一套画幅本就等于目标比例的图例。
-    const cases = [
-      {
-        o: point('other-light', 'lt-floor-arc-lamp-192x48cm-76x19', [192, 48], true),
-        family: 'floor-arc-lamp',
-      },
-      { o: point('wall-light', 'lt-wall-light-13x28cm-5x11', [13, 28], true), family: 'wall-slim' },
-      { o: point('wall-light', 'lt-wall-light-20x10cm-8x4', [20, 10], true), family: 'wall-half' },
-      { o: point('track-light', 'lt-track-light'), family: 'track-head' },
-    ]
-    for (const c of cases) {
+    for (const c of arcCases) {
       const art = lookOf(c.o, { iconStyle: 'cad' }).art!
       const svg = decodeURIComponent(art.src)
       const vb = svg.match(/viewBox="([^"]+)"/)?.[1]
-      expect(vb, c.family).toBeTruthy()
+      expect(vb, c.name).toBeTruthy()
       const [, , vw, vh] = vb!.split(/\s+/).map(Number)
-      // 画幅本身就是目标比例（不是 32×32 的方图例）
-      expect(vh / vw, `${c.family} 画幅应与几何同比`).toBeCloseTo(art.gh / art.gw, 3)
-      // 所有圆弧的横竖半径相等（circle 或 A 指令），所以落图后不会被拉成椭圆
-      for (const m of svg.matchAll(/<circle[^>]*r="([\d.]+)"/g)) expect(+m[1]).toBeGreaterThan(0)
-      for (const m of svg.matchAll(/A([\d.]+) ([\d.]+) /g))
-        expect(+m[1], `${c.family} 圆弧半径必须横竖相等`).toBeCloseTo(+m[2], 6)
-      expect(svg, c.family).not.toContain('viewBox="0 0 32 32"')
+
+      // 口径 1：画幅比例 == sizeCm / 默认图标算出的期望比例（不是 art.gh/art.gw）
+      const want = expectedCadGeom(c.o.sizeCm, lookOf(c.o).art!)
+      expect(vw / vh, `${c.name} 画幅应与几何同比`).toBeCloseTo(want.gw / want.gh, 2)
+      expect(svg, c.name).not.toContain('viewBox="0 0 32 32"')
+
+      // 口径 2：正圆数量精确、半径 == 几何应有值（circle 改成 C 椭圆会少一个 → 红）
+      const circles = [...svg.matchAll(/<circle [^>]*r="([\d.]+)"/g)].map((m) => +m[1])
+      expect(circles.length, `${c.name} 正圆数量`).toBe(c.circles)
+      for (const r of circles) expect(r, `${c.name} 圆半径`).toBeCloseTo(c.radius(vw, vh), 2)
+
+      // 口径 3：A 指令数量精确、rx === ry 且等于应有半径（A 改成 C 椭圆同样会少 → 红）
+      const arcs = [...svg.matchAll(/A([\d.]+) ([\d.]+) /g)].map((m) => [+m[1], +m[2]])
+      expect(arcs.length, `${c.name} 圆弧数量`).toBe(c.arcs)
+      for (const [rx, ry] of arcs) {
+        expect(rx, `${c.name} 圆弧半径必须横竖相等`).toBeCloseTo(ry, 6)
+        expect(rx, `${c.name} 圆弧半径`).toBeCloseTo(c.radius(vw, vh), 2)
+      }
+      expect(svg, c.name).not.toContain('<ellipse')
+    }
+  })
+
+  it('全量守卫：含圆弧且落图框偏离画幅 >10% 的图例都已按画幅重画（157 variant + 34 设备类型）', () => {
+    // 判定门槛与 cad-symbols.ts 的 SHAPE_FAMILY 注释一致：
+    // 图例含 circle / A 圆弧，且「落图框比例 ÷ 画幅比例」偏离超过 10% —— 这种图例
+    // 用 preserveAspectRatio="none" 落图后一定变成椭圆。矩形 / 直线图例不在此列。
+    const misses: string[] = []
+    const inspect = (label: string, o: SymbolObj) => {
+      const art = lookOf(o, { iconStyle: 'cad' }).art!
+      const svg = decodeURIComponent(art.src)
+      if (!svg.includes('<circle') && !/ A[\d.-]/.test(svg)) return
+      const vb = svg.match(/viewBox="([^"]+)"/)?.[1]
+      expect(vb, label).toBeTruthy()
+      const [, , vw, vh] = vb!.split(/\s+/).map(Number)
+      const geom = art.geom ?? { gw: art.gw, gh: art.gh }
+      const deform = Math.abs(geom.gw / geom.gh / (vw / vh) - 1)
+      if (deform > 0.1)
+        misses.push(
+          `${label}：落图框 ${geom.gw}×${geom.gh}，画幅 ${vw}×${vh}，` +
+            `椭圆化 ${(deform * 100).toFixed(1)}%`,
+        )
+    }
+    for (const f of LIGHTING)
+      for (const v of f.variants) inspect(`${v.id}（${f.id}）`, point(f.deviceType, v.id))
+    for (const t of DEVICE_TYPES) inspect(t.value, point(t.value, t.value))
+    expect(misses, misses.join('\n')).toEqual([])
+  })
+
+  it('已登记族的描边落图后与 32×32 图例同宽：symbolSize=28 时都是 1.75px', () => {
+    // 旧写法 CAD_STROKE_WIDTH=2 是模板单位：32×32 图例落图 1.75px，100 宽的按画幅
+    // 图例只有 0.17–0.56px。新写法按 max(W,H)/16 反推，落图后与普通图标同宽。
+    for (const c of arcCases) {
+      const art = lookOf(c.o, { iconStyle: 'cad' }).art!
+      const svg = decodeURIComponent(art.src)
+      const [, , vw, vh] = svg
+        .match(/viewBox="([^"]+)"/)![1]
+        .split(/\s+/)
+        .map(Number)
+      const stroke = +svg.match(/stroke-width="([\d.]+)"/)![1]
+      expect(stroke * (28 / Math.max(vw, vh)), `${c.name} 落图线宽`).toBeCloseTo(1.75, 2)
+    }
+    // 对照：普通 32×32 图例
+    const generic = decodeURIComponent(
+      lookOf(point('camera', 'camera'), { iconStyle: 'cad' }).art!.src,
+    )
+    const stroke = +generic.match(/stroke-width="([\d.]+)"/)![1]
+    expect(stroke * (28 / 32)).toBeCloseTo(1.75, 2)
+  })
+
+  it('极端比例描边夹在上下限：gh/gw = 20 / 0.05 时不消失、也不糊成实心', () => {
+    for (const [gw, gh] of [
+      [1, 20],
+      [1, 0.05],
+    ] as const) {
+      const art = cadProportionedBody('floor-arc-lamp', gw, gh)!
+      expect(art, `gh/gw=${gh / gw}`).toBeTruthy()
+      const [, , vw, vh] = art.viewBox.split(/\s+/).map(Number)
+      const scale = 28 / Math.max(vw, vh)
+      const landing = +art.body.match(/stroke-width="([\d.]+)"/)![1] * scale
+      const shortSide = Math.min(vw, vh) * scale
+      // 看得见（远高于修复前 gh/gw=20 时的 0.028px）……
+      expect(landing, `gh/gw=${gh / gw} 落图线宽`).toBeGreaterThan(0.5)
+      // ……但不超过短边的一半，不会把 1.4px 高的框糊成实心块
+      expect(landing, `gh/gw=${gh / gw} 不得超过短边一半`).toBeLessThanOrEqual(shortSide / 2 + 1e-6)
     }
   })
 
