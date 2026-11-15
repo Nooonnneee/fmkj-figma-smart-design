@@ -5,7 +5,7 @@
   "description": "繁梦空间桌面客户端：智能家居设计报价（Windows / macOS）",
   "author": "繁梦空间智能信息技术",
   "homepage": "https://fmkj.top",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "private": true,
   "main": "src/main.js",
   "scripts": {
