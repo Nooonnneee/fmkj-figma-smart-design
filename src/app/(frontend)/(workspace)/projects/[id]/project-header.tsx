@@ -3,6 +3,7 @@
 import { useSelectedLayoutSegment } from 'next/navigation'
 import { Archive, ChevronRight } from 'lucide-react'
 
+import { AiPanelToggle } from '@/components/ai/ai-panel'
 import { GuardedLink } from '@/components/guarded-link'
 import { ThemeMenu } from '@/components/site-header'
 import { Badge } from '@astryxdesign/core/Badge'
@@ -98,6 +99,7 @@ export function ProjectHeader({
             initialRole={role}
             initialCollaboratorCount={collaboratorCount}
           />
+          <AiPanelToggle />
           <ThemeMenu />
         </div>
         <nav
