@@ -36,14 +36,14 @@ import {
   type AiToolCall,
 } from '@/components/ai/ai-elements'
 import {
-  acceptedClearResult,
   aiDraftKey,
   draftOnKeyChange,
   getDraftStorage,
-  isDraftAcceptedEvent,
   readAiDraft,
   resolveDraftOnFailure,
+  useDraftAcceptedClear,
   writeAiDraft,
+  type AiDraftState,
 } from '@/lib/ai-draft'
 import { cn } from '@/lib/utils'
 import { AI_MODELS, DEFAULT_AI_TEMPLATES, fillPromptTemplate } from '@/plugins/ai-copilot/templates'
@@ -209,6 +209,20 @@ export function AiSidebarDock({
     },
     [draftKey],
   )
+
+  // 首个业务事件（meta / delta / tool）到达 = 服务端已受理这一轮（用户消息已落库、
+  // 开始产出），此刻才清空草稿。status / reasoning 之前失败都不算送出。收敛成
+  // useDraftAcceptedClear 这个可挂载 hook：它只在首次受理时调用一次 onClear，
+  // 测试能对「首次受理真的清空输入与附件」做行为级断言，不再盯源码字符串。
+  const handleAcceptedClear = useCallback(
+    (t: AiDraftState<AiAttachment>) => {
+      setInput(t.input)
+      setAttachments(t.attachments)
+    },
+    [setInput],
+  )
+  const { acceptedRef, onEvent: emitAcceptedClear } =
+    useDraftAcceptedClear<AiAttachment>(handleAcceptedClear)
   // 会话切换时必须**换成目标会话的草稿**（没有就空），不能因为当前输入框非空
   // 就把旧会话内容带过去（实测：A 输入 → 切 B，B 显示 A 的内容）。
   // 用「上一次的键」比较，只在键真正变化时同步一次；键没变（用户正在打字）
@@ -563,7 +577,7 @@ export function AiSidebarDock({
     ])
     // 输入框与附件不在这里清空 —— 只有服务端确认受理（收到首个业务事件）后才清。
     // 否则 500 / 网络中断会让用户的正文与附件凭空消失（实测 FAIL-500-DRAFT 复现）。
-    let accepted = false
+    acceptedRef.current = false
     setStreaming(true)
     setThinking(true)
     setStatusText(readyAtts.some((a) => a.kind === 'image') ? '正在由视觉模型看图…' : '')
@@ -605,16 +619,14 @@ export function AiSidebarDock({
         for (const line of lines) {
           if (!line.trim()) continue
           const ev = JSON.parse(line) as { type: string; [k: string]: unknown }
-          // 首个业务事件到达 = 服务端已受理这一轮（用户消息已落库、开始产出），
-          // 此刻才可以清空草稿。status / reasoning 之前失败都不算送出。
-          // acceptedClearResult 传入 accepted 与「是否受理事件」，返回首次受理时
-          // 要清成的值（纯函数，dock 拿到后再落地副作用）。
-          const clear = acceptedClearResult<AiAttachment>(accepted, isDraftAcceptedEvent(ev.type))
-          if (clear.newlyAccepted) accepted = true
-          if (clear.clearTo) {
-            setInput(clear.clearTo.input)
-            setAttachments(clear.clearTo.attachments)
+          if (ev.type === 'error') {
+            const err = new Error(String(ev.error)) as Error & { code?: string }
+            err.code = typeof ev.code === 'string' ? ev.code : undefined
+            throw err
           }
+          // 首个业务事件时才触发第一次清空；类型不重要，事件类型判断在 hook 内。
+          // status/reasoning/done 等非受理事件不会把 accepted 置真，也不会清空。
+          emitAcceptedClear(ev.type)
           if (ev.type === 'meta' && typeof ev.conversationId === 'string') {
             const cid = ev.conversationId
             if (!activeId) {
@@ -697,7 +709,7 @@ export function AiSidebarDock({
       // 受理前失败：这一轮什么都没发生，把草稿（内存 + sessionStorage）还回去。
       // 受理后失败：用户消息已落库，草稿已在受理时清空，再还回去会重复发送。
       const decision = resolveDraftOnFailure(
-        accepted,
+        acceptedRef.current,
         getDraftStorage(),
         draftKey,
         draftSnapshot,

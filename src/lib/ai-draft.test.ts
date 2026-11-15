@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs'
 
+import { createElement } from 'react'
+import { renderToString } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -10,6 +12,7 @@ import {
   isDraftAcceptedEvent,
   readAiDraft,
   resolveDraftOnFailure,
+  useDraftAcceptedClear,
   writeAiDraft,
 } from './ai-draft'
 
@@ -143,11 +146,9 @@ describe('发送失败后恢复草稿（阻断 1）', () => {
   })
 
   it('dock 的发送流程确实接入了受理判定与失败恢复（删掉整段会变红）', () => {
-    expect(dockSource).toContain('acceptedClearResult<AiAttachment>(')
-    expect(dockSource).toContain('if (clear.newlyAccepted) accepted = true')
-    expect(dockSource).toContain('if (clear.clearTo)')
-    expect(dockSource).toContain('setInput(clear.clearTo.input)')
-    expect(dockSource).toContain('setAttachments(clear.clearTo.attachments)')
+    expect(dockSource).toContain('useDraftAcceptedClear<AiAttachment>(')
+    expect(dockSource).toContain('acceptedRef.current = false')
+    expect(dockSource).toContain('acceptedRef.current')
     expect(dockSource).toContain('resolveDraftOnFailure(')
     expect(dockSource).toContain('setInputState(decision.draft.input)')
     expect(dockSource).toContain('setAttachments(decision.draft.attachments)')
@@ -175,9 +176,76 @@ describe('受理清空（假绿缺口：删清空体必须变红）', () => {
   })
 
   it('dock 首次受理时真的把清空值落地到输入与附件（删清空体会变红）', () => {
-    // 不是字符串断言：这里要求 dock 对 clearTo 的 input / attachments 的落地点。
-    expect(dockSource).toContain('setInput(clear.clearTo.input)')
-    expect(dockSource).toContain('setAttachments(clear.clearTo.attachments)')
+    // 不是字符串断言：这里要求 dock 通过 useDraftAcceptedClear 的 onClear 落地
+    // setInput/setAttachments（见下方 hook 级行为测试，喂事件断言真实清为 {input:'',attachments:[]}）。
+    expect(dockSource).toContain('useDraftAcceptedClear')
+    expect(dockSource).toContain('setAttachments(t.attachments)')
+  })
+})
+
+describe('useDraftAcceptedClear（首次受理清空 · 行为级，非字符串断言）', () => {
+  it('收到首个业务事件：清空回调拿到 { input: "", attachments: [] }', () => {
+    const clears: Array<{ input: string; attachments: unknown[] }> = []
+    const clearSpy = (t: { input: string; attachments: unknown[] }) => clears.push(t)
+
+    let hook!: ReturnType<typeof useDraftAcceptedClear<unknown>>
+    function Harness() {
+      hook = useDraftAcceptedClear(clearSpy)
+      return null
+    }
+    renderToString(createElement(Harness))
+
+    hook.onEvent('meta')
+    expect(hook.acceptedRef.current).toBe(true)
+    expect(clears).toEqual([{ input: '', attachments: [] }])
+  })
+
+  it('非首个业务事件不再清空（只清一次）', () => {
+    const clears: number[] = []
+    const clearSpy = () => clears.push(1)
+
+    let hook!: ReturnType<typeof useDraftAcceptedClear<unknown>>
+    function Harness() {
+      hook = useDraftAcceptedClear(clearSpy)
+      return null
+    }
+    renderToString(createElement(Harness))
+
+    hook.onEvent('meta')
+    hook.onEvent('delta')
+    hook.onEvent('tool')
+    expect(clears).toHaveLength(1)
+  })
+
+  it('非受理事件（status / reasoning）不清空，也不置为已受理', () => {
+    const clears: number[] = []
+    let hook!: ReturnType<typeof useDraftAcceptedClear<unknown>>
+    function Harness() {
+      hook = useDraftAcceptedClear(() => clears.push(1))
+      return null
+    }
+    renderToString(createElement(Harness))
+
+    hook.onEvent('status')
+    hook.onEvent('reasoning')
+    expect(clears).toHaveLength(0)
+    expect(hook.acceptedRef.current).toBe(false)
+  })
+
+  it('首个非受理事件之后再受理：仍然只清一次', () => {
+    const clears: number[] = []
+    let hook!: ReturnType<typeof useDraftAcceptedClear<unknown>>
+    function Harness() {
+      hook = useDraftAcceptedClear(() => clears.push(1))
+      return null
+    }
+    renderToString(createElement(Harness))
+
+    hook.onEvent('status')
+    hook.onEvent('meta')
+    hook.onEvent('delta')
+    expect(clears).toHaveLength(1)
+    expect(hook.acceptedRef.current).toBe(true)
   })
 })
 

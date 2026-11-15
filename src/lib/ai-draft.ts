@@ -15,6 +15,8 @@
  * 新对话（还没拿到服务端 conversationId）用固定后缀 `new`。
  */
 
+import { useCallback, useEffect, useRef } from 'react'
+
 const PREFIX = 'fmkj:ai-draft'
 
 /** 草稿存储只需要这三个方法（方便测试注入替身）。 */
@@ -104,6 +106,42 @@ export function acceptedClearResult<T>(
 }
 
 export type AiDraftState<T> = { input: string; attachments: T[] }
+
+/**
+ * 「首次受理清空」的钩子版：把 dock 里那条 `acceptedClearResult(...) + setInput +
+ * setAttachments` 的接线收敛成一个可挂载的 hook，测试能对「收到首个业务事件 →
+ * 输入框与附件真的被清空」做行为级断言（挂载 hook、喂 meta 事件、断言清空回调
+ * 真正拿到 { input: '', attachments: [] }），不再用源码字符串断言。
+ *
+ * `onClear` 由调用方（dock）注入 `setInput` / `setAttachments` 的落地实现；hook
+ * 在其中**首次**收到业务类事件（meta / delta / tool）时只调用一次。之后的同轮
+ * 事件（status / reasoning，或已受理后的后续业务事件）不再触发，保证「只清一次」。
+ *
+ * `acceptedRef` 暴露给调用方，用于失败恢复判定：受理后才失败（accepted 已为 true）
+ * 不还原草稿；受理前失败走 resolveDraftOnFailure 还回去。ref 在事件处理器里读取
+ * 时是实时值，与 dock 现状的 `let accepted` 闭包语义一致。
+ */
+export function useDraftAcceptedClear<T>(onClear: (clearTo: AiDraftState<T>) => void): {
+  acceptedRef: { current: boolean }
+  onEvent: (type: string) => void
+} {
+  const acceptedRef = useRef(false)
+  // onClear 可能是组件每次渲染重建的新闭包（引用了 setInput/setAttachments 的最新
+  // state），用 ref 始终拿最新，避免事件处理器捕获到过时的清空落地点。
+  const onClearRef = useRef(onClear)
+  useEffect(() => {
+    onClearRef.current = onClear
+  })
+
+  const onEvent = useCallback((type: string) => {
+    if (acceptedRef.current) return
+    if (!acceptedClearResult<T>(false, isDraftAcceptedEvent(type)).clearTo) return
+    acceptedRef.current = true
+    onClearRef.current({ input: '', attachments: [] })
+  }, [])
+
+  return { acceptedRef, onEvent }
+}
 
 /**
  * 发送失败时要还回去的草稿。用户在这期间已经重新输入/添加了内容时，
