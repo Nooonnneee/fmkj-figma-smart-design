@@ -173,6 +173,17 @@ export const Users: CollectionConfig = {
            * 成员维护渠道只走 `/api/ai/channels`：那条路径是服务层 `overrideAccess: true`，
            * 字段级 access 对它不生效（Payload 的设计），所以白名单、条数上限、baseUrl
            * 校验、加密全部由 `src/lib/ai-channels.ts` 负责。
+           *
+           * **已知的 GraphQL 行为（2026-11-15 复核，未改）**：成员调 `updateUser` 带
+           * `aiChannels` 会返回 200、`errors` 为空，但字段被这里的 access 静默丢弃 ——
+           * 既没写进去也没报错。安全上没问题（写不进、伪造不了），只是客户端会以为成功。
+           * 没有改成硬报错的原因：
+           * - 正常「设置 → 公司抬头」保存为了不抹掉同层其它字段，会把整个 companyProfile
+           *   读出来再写回（`(workspace)/settings/company/route.ts`），里面就含 aiChannels；
+           *   「见到 aiChannels 就 400」会误伤这条合法路径；
+           * - 要区分「值没变」还是「想改」，只能依赖 Payload 内部 access 过滤与钩子的执行
+           *   顺序（钩子能否看到被过滤掉的值没有稳定契约），属于会牵动框架行为的改动。
+           * 成员渠道的唯一受支持入口仍是 `/api/ai/channels`，文档与客户端都按这个口径。
            */
           access: {
             create: ({ req }) => isCmsAdmin(req),

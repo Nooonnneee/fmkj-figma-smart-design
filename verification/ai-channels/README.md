@@ -37,6 +37,16 @@ PUBLIC_URL=http://localhost:3000 NODE_ENV=production \
 一律走 `/api/ai/channels`，那条路径是服务层 `overrideAccess: true`，字段级 access
 对它不生效。
 
+## GraphQL 写 `aiChannels` 会被静默忽略（已知，不报错）
+
+成员用 GraphQL `updateUser` 带上 `aiChannels` 时，返回 `200` 且 `errors` 为空，但字段
+实际被集合层的 `access.update = false` 丢弃。**安全上成立**（写不进、伪造不了），只是
+客户端会误以为成功。成员渠道的唯一受支持入口是 REST `/api/ai/channels`。
+
+没有改成硬报错：正常「公司抬头」保存会把整个 `companyProfile`（含 `aiChannels`）读出来
+再写回，硬报错会误伤；要区分「没改」和「想改」又依赖 Payload access 过滤与钩子的执行顺序。
+判断依据与取舍写在 `src/collections/Users.ts` 的 `aiChannels` 注释里。
+
 ## 迁移回滚
 
 `src/migrations/20261115_094654_ai_member_channels.ts` 的 `down` 曾在

@@ -135,13 +135,13 @@ export type NormalizedChannelInput = {
  * 白名单化入参。只认这几个字段，其余（包括 userId、lastCheckedAt、apiKeyHint 等）
  * 全部丢弃 —— 防止客户端自己伪造检查结果或往别的账号写数据。
  *
- * `opts.partial` 为 true 时表示「没传的字段保持原值」：
- * 不传 models 不再被当成「清空模型列表」（那是个静默丢数据的 bug），
- * 由调用方用 `undefined` 判断是否要覆盖。
+ * 局部更新的语义**不在这里**：`updateChannel` 会先把「没传」的字段回补成原值再调用本函数，
+ * 所以这里始终按「完整输入」校验（label / baseUrl 必须非空）。`models` 是否清空也由
+ * 调用方按 `undefined` 判断，不传不会走到这里。
  */
 export function normalizeChannelInput(
   body: ChannelInputBody,
-  opts: { requireApiKey: boolean; partial?: boolean },
+  opts: { requireApiKey: boolean },
 ): NormalizedChannelInput {
   // 传了但类型不对 → 直接拒绝。以前是静默回退到默认值：`enabled: "false"`（字符串）
   // 会被当成「未传」而落成 true，`models: "m1"` 会被当成空数组清空列表。
@@ -173,7 +173,7 @@ export function normalizeChannelInput(
     throw new AiChannelInputError(`渠道显示名最多 ${MAX_LABEL_LEN} 字`)
   }
   const label = cleanText(body.label, MAX_LABEL_LEN)
-  if (!label && !opts.partial) throw new AiChannelInputError('请填写渠道显示名')
+  if (!label) throw new AiChannelInputError('请填写渠道显示名')
 
   // baseUrl：服务层以前不做长度校验；schema 的 maxLength 在 overrideAccess 写库时不生效，
   // 曾经能落 427 字。这里显式限制到与 schema 相同的 300 字。
@@ -187,7 +187,7 @@ export function normalizeChannelInput(
     } catch (error) {
       throw new AiChannelInputError((error as Error).message || '接口地址无效')
     }
-  } else if (!opts.partial) {
+  } else {
     throw new AiChannelInputError('请填写渠道接口地址')
   }
 
@@ -332,7 +332,9 @@ export async function createChannel(
  *
  * **局部更新语义**：没传（undefined / null）的字段保持原值。特别是 `models` —— 只改
  * label 时以前会把 `["m1","m2","m3"]` 静默清成 `[]`。显式传 `models: []` 才是「清空」。
- * 传空串给 label / baseUrl 同样按「没传」处理（旧前端会这么发）。
+ * 只有 `baseUrl: ""` 额外按「没传」处理（沿用原值，兼容旧前端这么发）；`label: ""`
+ * **不**按没传处理，会走校验返回 400「请填写渠道显示名」——显示名不允许被清空，
+ * 这个行为更安全，保持不动。
  * 类型不对的字段（例如 `enabled: "false"`）直接 400，不静默回退。
  *
  * 注意：检查结果（lastCheck*）不允许通过这个接口写 —— 只能由 /test 写，避免伪造「已验证」。
@@ -352,7 +354,8 @@ export async function updateChannel(
   if (index === -1) throw new AiChannelInputError('找不到这个渠道', 404)
   const prev = rows[index]
 
-  // 只有「字段缺席」（undefined / null，label / baseUrl 额外把空串算缺席）才回补原值。
+  // 只有「字段缺席」（undefined / null；baseUrl 额外把空串算缺席）才回补原值。
+  // label 的空串**不**回补：会继续走到 normalizeChannelInput，按 400 拒绝（不允许清空显示名）。
   // **类型不对的字段原样透传**，让 normalizeChannelInput 的类型闸报错 ——
   // 否则 `enabled: "false"` 会被这里替换成原值，静默吞掉，客户端还以为改成功了。
   const absent = (value: unknown) => value === undefined || value === null
