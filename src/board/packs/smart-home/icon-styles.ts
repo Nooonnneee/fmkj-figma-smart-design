@@ -92,7 +92,7 @@ export type IconArtInput = {
   /** 当前点位所选产品的照片地址 */
   productImage?: string | null
   /**
-   * 这个点位是不是真线形灯具（由 lookOf 按默认风格的比例算好）。
+   * 这个点位落图后是不是一条线（由 lookOf 按 CAD 比例算好）。
    * 不能只看符号键：track-light / light-strip / other-light 也被落地灯、轨道射灯头、
    * LED 灯带共用，按键选细长矢量会把它们画成一条线。
    */

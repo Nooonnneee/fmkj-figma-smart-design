@@ -124,38 +124,86 @@ describe('A. 线形灯具在 CAD / 实拍下保持细长比例', () => {
 describe('A2. 共享符号键的灯具按「这个点位」选 CAD 画面（回归：落地灯被画成一条线）', () => {
   /**
    * track-light / light-strip / other-light 三个符号键同时被真线形灯具和非线形灯具共用。
-   * 9c31acf 按符号键选 160×6 的细长画面，落地灯从 1:1 变成 1:0.0375（26.7:1）。
+   * 9c31acf 按符号键选 160×6 的细长画面，落地灯从 1:1 变成 1:0.0375（26.7:1）；
+   * 533a657 把它们统一钉成 1:1 方块，又让真实尺寸明显不是方形的设备失真。
+   * owner 2026-11-15 的口径：CAD 用真实尺寸的比例，没有两维尺寸才用默认图标比例。
    */
-  const square = [
-    { name: '落地灯', o: point('other-light', 'lt-floor-lamp-42cmdi-17di') },
-    { name: '弧形落地灯', o: point('other-light', 'lt-floor-arc-lamp-192x48cm-76x19') },
-    { name: '轨道射灯头', o: point('track-light', 'lt-track-light') },
-    { name: 'LED 灯带', o: point('light-strip', 'lt-led-light') },
+  const realRatio = [
+    {
+      name: '弧形落地灯 192×48',
+      o: point('other-light', 'lt-floor-arc-lamp-192x48cm-76x19', [192, 48], true),
+      exact: { w: 1920, h: 480 },
+    },
+    {
+      name: '矩形面板灯 122×31',
+      o: point('panel-light', 'lt-surface-mount-ceiling-light-122x31cm-48x12', [122, 31], true),
+      exact: { w: 1220, h: 310 },
+    },
+    {
+      name: '半圆壁灯 20×10',
+      o: point('wall-light', 'lt-wall-light-20x10cm-8x4', [20, 10], true),
+      exact: { w: 200, h: 100 },
+    },
+    {
+      name: '细杆壁灯 13×28',
+      o: point('wall-light', 'lt-wall-light-13x28cm-5x11', [13, 28], true),
+      exact: { w: 130, h: 280 },
+    },
   ]
 
-  for (const c of square) {
-    it(`${c.name}：CAD 下回到 1:1（不再画成细长条）`, () => {
-      const cad = wh(c.o, 'cad')
-      // 修复前实测：1×0.0375（28×1.05），其它非线形灯具同样是 28×1.05
-      expect(cad.h, `${c.name} 被画成 ${cad.w}×${cad.h}`).toBe(cad.w)
-      expect(cad).toEqual({ w: 28, h: 28 })
+  for (const c of realRatio) {
+    it(`${c.name}：CAD 按真实比例落图，不是 1:1 方块`, () => {
+      const g = geomOf(c.o, 'cad')
+      expect(+g.w.toFixed(1), c.name).toBe(c.exact.w)
+      expect(+g.h.toFixed(1), c.name).toBe(c.exact.h)
+      const [wc, hc] = c.o.sizeCm as [number, number]
+      expect(g.h / g.w, c.name).toBeCloseTo(hc / wc, 9)
+      expect(g.h, c.name).not.toBe(g.w)
     })
   }
 
-  it('落地灯在 CAD 下与默认风格逐像素一致（默认图形本来就是方的）', () => {
-    const o = point('other-light', 'lt-floor-lamp-42cmdi-17di')
+  it('落地灯 42×42：真实尺寸就是正方形，CAD 仍然 1:1（不能变回细条）', () => {
+    const o = point('other-light', 'lt-floor-lamp-42cmdi-17di', [42, 42], true)
+    const cad = wh(o, 'cad')
+    expect(cad).toEqual({ w: 420, h: 420 })
     expect(wh(o, 'cad')).toEqual(wh(o, 'default'))
   })
 
-  it('轨道射灯头 / LED 灯带用回 32×32 的方形矢量，而不是 160×6 的线性画面', () => {
-    for (const o of [
-      point('track-light', 'lt-track-light'),
-      point('light-strip', 'lt-led-light'),
-    ]) {
-      const art = lookOf(o, { iconStyle: 'cad' }).art!
+  it('没有真实尺寸的灯具：CAD 跟随默认图标比例（轨道射灯头 / LED 灯带）', () => {
+    const cases = [
+      {
+        name: '轨道射灯头',
+        o: point('track-light', 'lt-track-light'),
+        // 默认图标 8.666 × 28（0.3095:1）
+        exact: { w: 8.7, h: 28 },
+      },
+      {
+        name: 'LED 灯带',
+        o: point('light-strip', 'lt-led-light'),
+        // 默认图标 28 × 9.78（1:0.3492）
+        exact: { w: 28, h: 9.8 },
+      },
+    ]
+    for (const c of cases) {
+      const cad = wh(c.o, 'cad')
+      expect(cad, c.name).toEqual(c.exact)
+      const plain = wh(c.o, 'default')
+      expect(cad.w / cad.h, c.name).toBeCloseTo(plain.w / plain.h, 1)
+    }
+  })
+
+  it('轨道射灯头 / LED 灯带仍用 32×32 的方形矢量画面，只是几何按默认比例落图', () => {
+    const cases = [
+      { o: point('track-light', 'lt-track-light'), ratio: 0.3095 / 1 },
+      { o: point('light-strip', 'lt-led-light'), ratio: 1 / 0.3492 },
+    ]
+    for (const c of cases) {
+      const art = lookOf(c.o, { iconStyle: 'cad' }).art!
       // applyIconArt 写入的矢量画面比例：方形 32×32 → 1×1；线性 160×6 → 1×0.0375
-      expect({ gw: art.gw, gh: art.gh }, o.symbolId).toEqual({ gw: 1, gh: 1 })
-      expect(art.geom, o.symbolId).toBeUndefined()
+      expect({ gw: art.gw, gh: art.gh }, c.o.symbolId).toEqual({ gw: 1, gh: 1 })
+      expect(decodeURIComponent(art.src), c.o.symbolId).toContain('viewBox="0 0 32 32"')
+      const g = art.geom!
+      expect(g.gw / g.gh, c.o.symbolId).toBeCloseTo(c.ratio, 2)
     }
   })
 
@@ -201,7 +249,7 @@ describe('A2. 共享符号键的灯具按「这个点位」选 CAD 画面（回�
     }
   })
 
-  it('全量守卫：所有灯光款式在 CAD 下 1:1 ⇔ 非线形且默认比例在 5 倍以内', () => {
+  it('全量守卫：CAD 比例 == 真实比例（sizeCm 两维已知）或默认图标比例（全部 variant）', () => {
     const variants: { variant: LightingVariant; deviceType: string }[] = LIGHTING.flatMap((f) =>
       f.variants.map((variant) => ({ variant, deviceType: f.deviceType })),
     )
@@ -210,42 +258,56 @@ describe('A2. 共享符号键的灯具按「这个点位」选 CAD 画面（回�
     for (const { variant, deviceType } of variants) {
       const o = point(deviceType, variant.id)
       const plain = lookOf(o).art!
-      const aspect = plain.gh / plain.gw
-      const elongated = variant.family.linear || aspect < 1 / 5 || aspect > 5
-      const cad = wh(o, 'cad')
-      const isSquare = cad.w === cad.h
-      if (isSquare === elongated)
+      // 期望比例：sizeCm [宽, 深] 两维都已知时用真实比例，否则用默认平面图标的比例
+      const size = variant.sizeCm
+      const want =
+        size && size[1] != null ? { gw: 1, gh: size[1] / size[0] } : { gw: plain.gw, gh: plain.gh }
+      const cadArt = lookOf(o, { iconStyle: 'cad' }).art!
+      const geom = cadArt.geom ?? { gw: cadArt.gw, gh: cadArt.gh }
+      if (Math.abs(geom.gw - want.gw) > 1e-9 || Math.abs(geom.gh - want.gh) > 1e-9)
         mismatch.push(
-          `${variant.id}（${deviceType}，linear=${variant.family.linear}，默认 ${plain.gw}×${plain.gh}，CAD ${cad.w}×${cad.h}）`,
+          `${variant.id}（${deviceType}，sizeCm=${JSON.stringify(size)}，默认 ${plain.gw}×${plain.gh}，` +
+            `期望 ${want.gw}×${want.gh}，实际 ${geom.gw}×${geom.gh}）`,
         )
     }
     expect(mismatch, mismatch.join('\n')).toEqual([])
   })
 
-  it('守卫与后置的 isElongated 不会出现两套真值：CAD 方框比例要么是 1:1，要么等于默认比例', () => {
+  it('全量守卫：CAD 落图宽高比 == 期望比例的宽高比（不是另一种口径）', () => {
+    const mismatch: string[] = []
     for (const f of LIGHTING)
       for (const v of f.variants) {
-        const o = point(f.deviceType, v.id)
+        const o = point(f.deviceType, v.id, v.sizeCm, true)
         const plain = lookOf(o).art!
-        const cad = lookOf(o, { iconStyle: 'cad' }).art!
-        const geom = cad.geom ?? { gw: cad.gw, gh: cad.gh }
-        if (geom.gw === geom.gh)
-          expect({ gw: geom.gw, gh: geom.gh }, v.id).toEqual({ gw: 1, gh: 1 })
-        else expect({ gw: geom.gw, gh: geom.gh }, v.id).toEqual({ gw: plain.gw, gh: plain.gh })
+        const size = v.sizeCm
+        const want =
+          size && size[1] != null
+            ? { gw: 1, gh: size[1] / size[0] }
+            : { gw: plain.gw, gh: plain.gh }
+        const g = geomOf(o, 'cad')
+        const got = g.h / g.w
+        const expected = want.gh / want.gw
+        if (Math.abs(got - expected) > 1e-6)
+          mismatch.push(
+            `${v.id}（${f.deviceType}，期望 ${expected.toFixed(6)}，实际 ${got.toFixed(6)}）`,
+          )
       }
+    expect(mismatch, mismatch.join('\n')).toEqual([])
   })
 
-  it('每个 DEVICE_TYPES 都满足同一规则：CAD 1:1 ⇔ 默认比例在 5 倍以内（不是只看方的那几个）', () => {
+  it('每个 DEVICE_TYPES 都满足同一规则：没有真实尺寸的普通设备保持方形', () => {
     for (const t of DEVICE_TYPES) {
       const o = point(t.value, t.value)
       const plain = lookOf(o).art!
       const aspect = plain.gh / plain.gw
-      const elongated = aspect < 1 / 5 || aspect > 5 // 真线形灯具的默认图标本身就是一条线
-      const cad = wh(o, 'cad')
+      // 默认图标本身就是一条线的（轨道灯 / 其他灯具）CAD 也按默认比例落图，
+      // 其余设备没有真实尺寸、默认图标不是线，CAD 仍然是方形。
+      const want = aspect < 1 / 5 || aspect > 5 ? { gw: plain.gw, gh: plain.gh } : { gw: 1, gh: 1 }
+      const cadArt = lookOf(o, { iconStyle: 'cad' }).art!
       expect(
-        cad.w === cad.h,
-        `${t.value}：默认 ${plain.gw}×${plain.gh}，CAD ${cad.w}×${cad.h}`,
-      ).toBe(!elongated)
+        { gw: cadArt.geom?.gw ?? cadArt.gw, gh: cadArt.geom?.gh ?? cadArt.gh },
+        `${t.value}：默认 ${plain.gw}×${plain.gh}`,
+      ).toEqual({ gw: want.gw, gh: want.gh })
     }
   })
 })

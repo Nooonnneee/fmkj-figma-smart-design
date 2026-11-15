@@ -239,9 +239,9 @@ export function cadLinearBody(key: SymbolKey | string): string {
 /**
  * 图元 + 它自己的 viewBox：普通符号 32×32，线性灯具 160×6。
  *
- * `linear` 必须由调用方按「这个点位」决定，不能只看符号键：track-light / light-strip /
- * other-light 三个键同时被真线形灯具和落地灯、弧形落地灯、轨道射灯头、LED 灯带共用，
- * 按键选细长画面会把落地灯画成 26:1 的一条线（见 look.ts 的 isElongated）。
+ * `linear` 必须由调用方按「这个点位落图后的比例」决定（look.ts 的 isLineGeom），不能只看
+ * 符号键：track-light / light-strip / other-light 三个键同时被真线形灯具和落地灯、弧形落地灯、
+ * 轨道射灯头、LED 灯带共用，按键选细长画面会把落地灯画成 26:1 的一条线。
  */
 export function cadArtFor(
   key: SymbolKey | string,
