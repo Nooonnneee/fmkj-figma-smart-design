@@ -30,8 +30,14 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(bin)
 }
 
+/**
+ * 导出时的取图缓存：成功存 data URL，失败存 null（负面缓存）。
+ * 一张坏图（产品照片 404 / 跨域）只取一次，不会让 N 个点位各请求一次。
+ */
+export type ExportImageCache = Map<string, string | null>
+
 /** 取一张图并内联成 data URL；取不到（404 / 跨域 / 网络错误）直接抛错，由调用方决定回退。 */
-async function toDataUrl(url: string, cache: Map<string, string>): Promise<string> {
+async function toDataUrl(url: string, cache: ExportImageCache): Promise<string> {
   if (url.startsWith('data:')) return url
   const hit = cache.get(url)
   if (hit) return hit
@@ -44,14 +50,16 @@ async function toDataUrl(url: string, cache: Map<string, string>): Promise<strin
   return data
 }
 
-/** 取图失败返回 null，让调用方回退到默认图标而不是把整张图纸导出弄挂 */
-export async function toDataUrlSafe(
-  url: string,
-  cache: Map<string, string>,
-): Promise<string | null> {
+/**
+ * 取图失败返回 null，让调用方回退到默认图标而不是把整张图纸导出弄挂。
+ * 失败也写进缓存（null），同一个坏地址只请求一次。
+ */
+export async function toDataUrlSafe(url: string, cache: ExportImageCache): Promise<string | null> {
+  if (cache.has(url)) return cache.get(url) ?? null
   try {
     return await toDataUrl(url, cache)
   } catch {
+    cache.set(url, null)
     return null
   }
 }
@@ -70,7 +78,7 @@ export async function resolveExportIcon(
     defaults?: DeviceDefaults | null
     mmPerUnit?: number | null
   },
-  cache: Map<string, string>,
+  cache: ExportImageCache,
 ): Promise<
   | { kind: 'art'; href: string; art: SymbolArt; geom: ReturnType<typeof symbolGeom> }
   | { kind: 'marker'; href: string; geom: ReturnType<typeof symbolGeom> }
@@ -143,7 +151,7 @@ export async function exportSheetPng(opts: {
   const u = mmPerUnitPaper * k // 像素 / 场景单位
   const ox = margin * k + (availW * k - sheet.w * u) / 2
   const oy = margin * k + (availH * k - sheet.h * u) / 2
-  const cache = new Map<string, string>()
+  const cache: ExportImageCache = new Map()
   const parts: string[] = []
   const inside = (x: number, y: number) =>
     x >= sheet.x && x <= sheet.x + sheet.w && y >= sheet.y && y <= sheet.y + sheet.h

@@ -20,7 +20,7 @@ import type { SymbolArt, SymbolLook } from '@/board/core/symbols'
 import type { IconStyle } from '@/board/core/types'
 import type { SymbolKey } from '@/lib/device-types'
 
-import { cadArtFor, cadSymbolBodyForKey } from './cad-symbols'
+import { cadArtFor } from './cad-symbols'
 import { SYMBOL_ASSET_PAD, SYMBOL_ASSET_VERSION, SYMBOL_ASSETS } from './symbols.generated'
 
 export type { IconStyle }
@@ -91,6 +91,12 @@ export type IconArtInput = {
   sketch?: SymbolArt | null
   /** 当前点位所选产品的照片地址 */
   productImage?: string | null
+  /**
+   * 这个点位是不是真线形灯具（由 lookOf 按默认风格的比例算好）。
+   * 不能只看符号键：track-light / light-strip / other-light 也被落地灯、轨道射灯头、
+   * LED 灯带共用，按键选细长矢量会把它们画成一条线。
+   */
+  linear?: boolean
 }
 
 /**
@@ -104,7 +110,7 @@ export function resolveIconArt(style: IconStyle | undefined, input: IconArtInput
       return art ? { kind: 'image', art } : imageOrNull(input.fallback)
     }
     case 'cad': {
-      const art = cadArtFor(input.symbol, input.switchKeys)
+      const art = cadArtFor(input.symbol, input.switchKeys, input.linear)
       if (!art) return imageOrNull(input.fallback)
       return {
         kind: 'vector',

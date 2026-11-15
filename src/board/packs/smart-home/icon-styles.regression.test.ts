@@ -9,12 +9,13 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { resolveExportIcon, toDataUrlSafe } from '@/board/canvas/export'
+import { resolveExportIcon, toDataUrlSafe, type ExportImageCache } from '@/board/canvas/export'
 import { lookOptionsFor, productIdForPoint, symbolGeom } from '@/board/core/symbols'
 import type { SymbolObj, ViewSettings } from '@/board/core/types'
+import { DEVICE_TYPES } from '@/lib/device-types'
 
 import { smartHomePack } from './index'
-import { lookOf } from './look'
+import { LIGHTING, lookOf, type LightingVariant } from './look'
 
 const view = (iconStyle?: ViewSettings['iconStyle']): ViewSettings => ({
   grid: false,
@@ -120,6 +121,135 @@ describe('A. 线形灯具在 CAD / 实拍下保持细长比例', () => {
   })
 })
 
+describe('A2. 共享符号键的灯具按「这个点位」选 CAD 画面（回归：落地灯被画成一条线）', () => {
+  /**
+   * track-light / light-strip / other-light 三个符号键同时被真线形灯具和非线形灯具共用。
+   * 9c31acf 按符号键选 160×6 的细长画面，落地灯从 1:1 变成 1:0.0375（26.7:1）。
+   */
+  const square = [
+    { name: '落地灯', o: point('other-light', 'lt-floor-lamp-42cmdi-17di') },
+    { name: '弧形落地灯', o: point('other-light', 'lt-floor-arc-lamp-192x48cm-76x19') },
+    { name: '轨道射灯头', o: point('track-light', 'lt-track-light') },
+    { name: 'LED 灯带', o: point('light-strip', 'lt-led-light') },
+  ]
+
+  for (const c of square) {
+    it(`${c.name}：CAD 下回到 1:1（不再画成细长条）`, () => {
+      const cad = wh(c.o, 'cad')
+      // 修复前实测：1×0.0375（28×1.05），其它非线形灯具同样是 28×1.05
+      expect(cad.h, `${c.name} 被画成 ${cad.w}×${cad.h}`).toBe(cad.w)
+      expect(cad).toEqual({ w: 28, h: 28 })
+    })
+  }
+
+  it('落地灯在 CAD 下与默认风格逐像素一致（默认图形本来就是方的）', () => {
+    const o = point('other-light', 'lt-floor-lamp-42cmdi-17di')
+    expect(wh(o, 'cad')).toEqual(wh(o, 'default'))
+  })
+
+  it('轨道射灯头 / LED 灯带用回 32×32 的方形矢量，而不是 160×6 的线性画面', () => {
+    for (const o of [
+      point('track-light', 'lt-track-light'),
+      point('light-strip', 'lt-led-light'),
+    ]) {
+      const art = lookOf(o, { iconStyle: 'cad' }).art!
+      // applyIconArt 写入的矢量画面比例：方形 32×32 → 1×1；线性 160×6 → 1×0.0375
+      expect({ gw: art.gw, gh: art.gh }, o.symbolId).toEqual({ gw: 1, gh: 1 })
+      expect(art.geom, o.symbolId).toBeUndefined()
+    }
+  })
+
+  it('真线形灯具在 CAD 下保持 9c31acf 验证过的细长数字（不受本次修复影响）', () => {
+    const exactWh = (o: SymbolObj) => {
+      const g = geomOf(o, 'cad')
+      return { w: +g.w.toFixed(4), h: +g.h.toFixed(4) }
+    }
+    const cases = [
+      { o: point('track-light', 'lt-track-light-100cm-40'), exact: { w: 28, h: 1.162 } },
+      {
+        o: point('track-light', 'lt-recessed-magnetic-track-light-200cm-79'),
+        exact: { w: 28, h: 0.8232 },
+      },
+      { o: point('other-light', 'lt-t5-light-120cm-48'), exact: { w: 28, h: 1.176 } },
+    ]
+    for (const c of cases) {
+      expect(exactWh(c.o), c.o.symbolId).toEqual(c.exact)
+      expect(wh(c.o, 'cad'), c.o.symbolId).toEqual(wh(c.o, 'default'))
+    }
+    // NTS（未标定、按固定尺寸示意）同样是细长的一条
+    const nts = point('track-light', 'lt-track-light-100cm-40')
+    const g = geomOf(nts, 'cad')
+    expect(g.h).toBeLessThan(g.w)
+  })
+
+  it('真线形灯具用 160×6 的细长画面（per-point 标志必须真的传进 CAD 分支）', () => {
+    const cases = [
+      point('track-light', 'lt-track-light-100cm-40'),
+      point('track-light', 'lt-recessed-magnetic-track-light-200cm-79'),
+      point('other-light', 'lt-t5-light-120cm-48'),
+    ]
+    for (const o of cases) {
+      const art = lookOf(o, { iconStyle: 'cad' }).art!
+      // 矢量自己的画面是 160×6，几何覆盖是默认风格的细长比例
+      expect({ gw: art.gw, gh: art.gh }, o.symbolId).toEqual({ gw: 1, gh: 0.0375 })
+      const plain = lookOf(o).art!
+      expect(art.geom, o.symbolId).toEqual({ gw: plain.gw, gh: plain.gh })
+      // 图元本身确实画到 160 的宽度（不是缩在 32×32 里的方形图例）
+      const svg = decodeURIComponent(art.src)
+      expect(svg, o.symbolId).toContain('viewBox="0 0 160 6"')
+      expect(svg, o.symbolId).toContain('x2="158"')
+    }
+  })
+
+  it('全量守卫：所有灯光款式在 CAD 下 1:1 ⇔ 非线形且默认比例在 5 倍以内', () => {
+    const variants: { variant: LightingVariant; deviceType: string }[] = LIGHTING.flatMap((f) =>
+      f.variants.map((variant) => ({ variant, deviceType: f.deviceType })),
+    )
+    expect(variants.length).toBeGreaterThan(100)
+    const mismatch: string[] = []
+    for (const { variant, deviceType } of variants) {
+      const o = point(deviceType, variant.id)
+      const plain = lookOf(o).art!
+      const aspect = plain.gh / plain.gw
+      const elongated = variant.family.linear || aspect < 1 / 5 || aspect > 5
+      const cad = wh(o, 'cad')
+      const isSquare = cad.w === cad.h
+      if (isSquare === elongated)
+        mismatch.push(
+          `${variant.id}（${deviceType}，linear=${variant.family.linear}，默认 ${plain.gw}×${plain.gh}，CAD ${cad.w}×${cad.h}）`,
+        )
+    }
+    expect(mismatch, mismatch.join('\n')).toEqual([])
+  })
+
+  it('守卫与后置的 isElongated 不会出现两套真值：CAD 方框比例要么是 1:1，要么等于默认比例', () => {
+    for (const f of LIGHTING)
+      for (const v of f.variants) {
+        const o = point(f.deviceType, v.id)
+        const plain = lookOf(o).art!
+        const cad = lookOf(o, { iconStyle: 'cad' }).art!
+        const geom = cad.geom ?? { gw: cad.gw, gh: cad.gh }
+        if (geom.gw === geom.gh)
+          expect({ gw: geom.gw, gh: geom.gh }, v.id).toEqual({ gw: 1, gh: 1 })
+        else expect({ gw: geom.gw, gh: geom.gh }, v.id).toEqual({ gw: plain.gw, gh: plain.gh })
+      }
+  })
+
+  it('每个 DEVICE_TYPES 都满足同一规则：CAD 1:1 ⇔ 默认比例在 5 倍以内（不是只看方的那几个）', () => {
+    for (const t of DEVICE_TYPES) {
+      const o = point(t.value, t.value)
+      const plain = lookOf(o).art!
+      const aspect = plain.gh / plain.gw
+      const elongated = aspect < 1 / 5 || aspect > 5 // 真线形灯具的默认图标本身就是一条线
+      const cad = wh(o, 'cad')
+      expect(
+        cad.w === cad.h,
+        `${t.value}：默认 ${plain.gw}×${plain.gh}，CAD ${cad.w}×${cad.h}`,
+      ).toBe(!elongated)
+    }
+  })
+})
+
 describe('B. 实拍的产品查表优先级', () => {
   const defaults = { camera: 'prod-default', downlight: 'prod-down' }
   const products: Record<string, string> = {
@@ -173,7 +303,7 @@ describe('B. 实拍的产品查表优先级', () => {
 })
 
 describe('C. 导出取不到图时回退，而不是整张图纸失败', () => {
-  const cache = () => new Map<string, string>()
+  const cache = (): ExportImageCache => new Map()
   const okImage = (type = 'image/png') => ({
     ok: true,
     status: 200,
@@ -262,6 +392,58 @@ describe('C. 导出取不到图时回退，而不是整张图纸失败', () => {
         cache(),
       ),
     ).resolves.toBeNull()
+  })
+
+  it('坏图只请求一次：N 个点位共用同一个失败地址不重复 fetch', async () => {
+    const fetchMock = vi.fn(async (url: string) =>
+      String(url).includes('missing.jpg') ? failImage : okImage(),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const shared = cache()
+    const points = Array.from({ length: 5 }, (_, i) => ({
+      ...point('camera', 'camera', null, false, { productId: `p${i}` }),
+      id: `p${i}`,
+    }))
+    // 5 个点位的产品照片都是同一个坏地址；默认图标正常
+    for (const o of points)
+      await resolveExportIcon(
+        o,
+        view('photo'),
+        smartHomePack,
+        { productImage: () => '/media/missing.jpg' },
+        shared,
+      )
+    // 修复前：5 个点位各取一次坏照片 + 各取一次默认图标 = 10 次（一个点位 2 次）
+    const badCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes('missing.jpg'))
+    expect(badCalls).toHaveLength(1)
+  })
+
+  it('坏图连默认图标也坏：每个 URL 仍然只请求一次（不是每个点位 3 次）', async () => {
+    const fetchMock = vi.fn(async (_url: string) => failImage)
+    vi.stubGlobal('fetch', fetchMock)
+    const shared = cache()
+    for (let i = 0; i < 5; i++)
+      await resolveExportIcon(
+        { ...point('camera', 'camera', null, false, { productId: `p${i}` }), id: `p${i}` },
+        view('photo'),
+        smartHomePack,
+        { productImage: () => '/media/missing.jpg' },
+        shared,
+      )
+    const urls = fetchMock.mock.calls.map(([url]) => String(url))
+    // 默认图标 + 产品照片 + 实心标记，三个地址各一次
+    expect(new Set(urls).size).toBe(urls.length)
+    expect(urls.length).toBeLessThanOrEqual(3)
+  })
+
+  it('toDataUrlSafe 的失败也被缓存：同一个地址第二次不再 fetch', async () => {
+    const fetchMock = vi.fn(async () => failImage)
+    vi.stubGlobal('fetch', fetchMock)
+    const shared = cache()
+    await toDataUrlSafe('/media/404.jpg', shared)
+    await toDataUrlSafe('/media/404.jpg', shared)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(shared.get('/media/404.jpg')).toBeNull()
   })
 
   it('CAD 矢量是内联 data URL，不进网络：导出不因网络失败而丢图', async () => {

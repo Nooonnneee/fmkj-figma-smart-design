@@ -230,24 +230,26 @@ export function cadSymbolBodyForKey(key: SymbolKey | string, switchKeys?: number
   return cadSymbolBody(key)
 }
 
-/** 线性灯具是否有专门的细长矢量（有就优先用，几何也随之按线性画面算） */
-export function isLinearCadKey(key: SymbolKey | string): boolean {
-  return Boolean(LINEAR_TABLE[key])
-}
-
 /** 线性灯具的细长矢量图元（没有就返回空串） */
 export function cadLinearBody(key: SymbolKey | string): string {
   const shapes = LINEAR_TABLE[key]
   return shapes ? renderShapes(shapes) : ''
 }
 
-/** 图元 + 它自己的 viewBox：普通符号 32×32，线性灯具 160×6 */
+/**
+ * 图元 + 它自己的 viewBox：普通符号 32×32，线性灯具 160×6。
+ *
+ * `linear` 必须由调用方按「这个点位」决定，不能只看符号键：track-light / light-strip /
+ * other-light 三个键同时被真线形灯具和落地灯、弧形落地灯、轨道射灯头、LED 灯带共用，
+ * 按键选细长画面会把落地灯画成 26:1 的一条线（见 look.ts 的 isElongated）。
+ */
 export function cadArtFor(
   key: SymbolKey | string,
   switchKeys?: number,
+  linear = false,
 ): { body: string; viewBox: string } | null {
-  const linear = cadLinearBody(key)
-  if (linear) return { body: linear, viewBox: LINEAR_VIEW_BOX }
+  const slender = linear ? cadLinearBody(key) : ''
+  if (slender) return { body: slender, viewBox: LINEAR_VIEW_BOX }
   const body = cadSymbolBodyForKey(key, switchKeys)
   return body ? { body, viewBox: CAD_VIEW_BOX } : null
 }
@@ -260,12 +262,6 @@ export function cadSymbolSvg(key: SymbolKey | string, switchKeys?: number): stri
   const art = cadArtFor(key, switchKeys)
   if (!art) return null
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${art.viewBox}">${art.body}</svg>`
-}
-
-/** CAD 符号的 data URL（导出时内联用；encodeURIComponent 而不是 base64，避免中文环境下的编码问题） */
-export function cadSymbolDataUrl(key: SymbolKey | string, switchKeys?: number): string | null {
-  const svg = cadSymbolSvg(key, switchKeys)
-  return svg ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` : null
 }
 
 /** 全部 CAD 符号的键（测试用：必须覆盖 SymbolKey 全集） */

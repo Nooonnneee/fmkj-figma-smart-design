@@ -148,6 +148,17 @@ export function lookOf(o: Pick<SymbolObj, 'symbolId' | 'data'>, opts?: LookOptio
   const isVariant = !!v && v.family.deviceType === dt
   // 默认风格的图形：灯光款式用款式图，其余用 look 里的那张（同为回退链的终点）
   const fallback = isVariant ? (artOf(v!.art) ?? base.art) : base.art
+  // 线形灯具（轨道、线性吊灯、T5……）：CAD 线稿和产品照片本身是 1:1 方框，
+  // 直接按方框落图会把 2 米轨道画成 2 米见方。几何一律钉在默认风格的细长比例上，
+  // 图形本身按自己的画面画满这个框（见 SymbolArt.geom），其他设备保持方形。
+  //
+  // 这个判断必须按「点位」算，而且在 resolveIconArt 之前算：track-light / light-strip /
+  // other-light 三个符号键被真线形灯具和落地灯、弧形落地灯、轨道射灯头、LED 灯带共用，
+  // 只看键会给后者选 160×6 的细长 CAD 画面（26.7:1）。这里用的是同一条 isElongated，
+  // 下面的 geom 覆盖复用它，保证只有一个真值来源。
+  const keepAspect = defaultGeomOf(base.art, fallback)
+  const elongated =
+    !!keepAspect && isElongated(isVariant ? v!.family.linear : undefined, keepAspect)
   const input: IconArtInput = {
     symbol: t.symbol,
     switchKeys: 'keys' in t ? t.keys : undefined,
@@ -158,16 +169,13 @@ export function lookOf(o: Pick<SymbolObj, 'symbolId' | 'data'>, opts?: LookOptio
       ? (artOf(v!.art) ?? sketchArt(t.value) ?? sketchArt(t.symbol))
       : (sketchArt(t.value) ?? sketchArt(t.symbol)),
     productImage: opts?.productImage ?? null,
+    linear: elongated,
   }
   const styled = applyIconArt(base, resolveIconArt(style, input))
   // 灯光款式在 CAD / 手绘 / 照片下也保留线形灯具的长度示意
   const look = isVariant ? { ...styled, linear: v!.family.linear } : styled
-  // 线形灯具（轨道、线性吊灯、T5……）：CAD 线稿和产品照片本身是 1:1 方框，
-  // 直接按方框落图会把 2 米轨道画成 2 米见方。几何一律钉在默认风格的细长比例上，
-  // 图形本身按自己的画面画满这个框（见 SymbolArt.geom），其他设备保持方形。
-  const keepAspect = defaultGeomOf(base.art, fallback)
-  if (look.art && keepAspect && isElongated(look.linear, keepAspect))
-    look.art = { ...look.art, geom: keepAspect }
+  // 真线形灯具：CAD / 照片的方框按默认风格的细长比例落图（上面的 elongated 已经算过）
+  if (look.art && keepAspect && elongated) look.art = { ...look.art, geom: keepAspect }
   if (styledCache.size < STYLED_CACHE_MAX) styledCache.set(k, look)
   return look
 }
