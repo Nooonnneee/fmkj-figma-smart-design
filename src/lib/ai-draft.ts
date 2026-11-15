@@ -59,6 +59,17 @@ export function readAiDraft(storage: Pick<Storage, 'getItem'> | null, key: strin
   }
 }
 
+/** 会话切换时该显示哪条草稿：键没变就保持现状（用户正在打字），变了才读目标键。 */
+export function draftOnKeyChange(
+  previousKey: string,
+  nextKey: string,
+  storage: Pick<Storage, 'getItem'> | null,
+  currentInput: string,
+): { changed: boolean; value: string } {
+  if (previousKey === nextKey) return { changed: false, value: currentInput }
+  return { changed: true, value: readAiDraft(storage, nextKey) ?? '' }
+}
+
 /** 写草稿；空串等价于删除，避免留下无意义的键。存储异常一律忽略。 */
 export function writeAiDraft(
   storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null,

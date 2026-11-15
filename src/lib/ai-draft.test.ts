@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
 
-import { aiDraftKey, getDraftStorage, readAiDraft, writeAiDraft } from './ai-draft'
+import {
+  aiDraftKey,
+  draftOnKeyChange,
+  getDraftStorage,
+  readAiDraft,
+  writeAiDraft,
+} from './ai-draft'
 
 /**
  * 接线断言：下面测的是纯函数语义，这里确保 dock 真的调用了它。
@@ -107,5 +113,38 @@ describe('storage 被禁用时降级为无草稿（应修 3）', () => {
   it('dock 不直接访问 window.sessionStorage（否则禁用时整页白屏）', () => {
     expect(dockSource).not.toContain('window.sessionStorage')
     expect(dockSource).toContain('getDraftStorage()')
+  })
+})
+
+describe('换会话不串草稿（阻断 2）', () => {
+  const keyA = aiDraftKey('u1', 'conv-a')
+  const keyB = aiDraftKey('u1', 'conv-b')
+
+  it('键变化时加载目标会话的草稿，而不是保留旧会话内容', () => {
+    const s = fakeStorage()
+    writeAiDraft(s, keyB, 'B-草稿')
+    expect(draftOnKeyChange(keyA, keyB, s, 'A-草稿')).toEqual({
+      changed: true,
+      value: 'B-草稿',
+    })
+  })
+
+  it('目标会话没有草稿时清空输入框', () => {
+    expect(draftOnKeyChange(keyA, keyB, fakeStorage(), 'A-草稿')).toEqual({
+      changed: true,
+      value: '',
+    })
+  })
+
+  it('键没变时不覆盖用户正在输入的内容', () => {
+    expect(draftOnKeyChange(keyA, keyA, fakeStorage(), '正在打字')).toEqual({
+      changed: false,
+      value: '正在打字',
+    })
+  })
+
+  it('dock 用上一次的键判断，只在键真正变化时同步', () => {
+    expect(dockSource).toContain('draftOnKeyChange(draftKeyRef.current, draftKey')
+    expect(dockSource).toContain('if (!sync.changed) return')
   })
 })

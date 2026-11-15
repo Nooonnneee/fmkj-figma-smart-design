@@ -35,7 +35,13 @@ import {
   type AiProjectContext,
   type AiToolCall,
 } from '@/components/ai/ai-elements'
-import { aiDraftKey, getDraftStorage, readAiDraft, writeAiDraft } from '@/lib/ai-draft'
+import {
+  aiDraftKey,
+  draftOnKeyChange,
+  getDraftStorage,
+  readAiDraft,
+  writeAiDraft,
+} from '@/lib/ai-draft'
 import { cn } from '@/lib/utils'
 import { AI_MODELS, DEFAULT_AI_TEMPLATES, fillPromptTemplate } from '@/plugins/ai-copilot/templates'
 
@@ -200,8 +206,11 @@ export function AiSidebarDock({
     },
     [draftKey],
   )
-  // 会话切换时把对应会话的草稿读回来（key 变了但组件没卸载的情况，例如新建对话拿到会话 id）。
-  // 已经打了字就不覆盖 —— 发送后 activeId 变化时用户可能又敲了内容。
+  // 会话切换时必须**换成目标会话的草稿**（没有就空），不能因为当前输入框非空
+  // 就把旧会话内容带过去（实测：A 输入 → 切 B，B 显示 A 的内容）。
+  // 用「上一次的键」比较，只在键真正变化时同步一次；键没变（用户正在打字）
+  // 时绝不覆盖。
+  const draftKeyRef = useRef(draftKey)
   const draftInitRef = useRef(false)
   useEffect(() => {
     const storage = getDraftStorage()
@@ -213,8 +222,11 @@ export function AiSidebarDock({
         return
       }
     }
-    setInputState((current) => current || (readAiDraft(storage, draftKey) ?? ''))
-  }, [draftKey, initialInput])
+    const sync = draftOnKeyChange(draftKeyRef.current, draftKey, storage, input)
+    if (!sync.changed) return
+    draftKeyRef.current = draftKey
+    setInputState(sync.value)
+  }, [draftKey, initialInput, input])
 
   const loadConversations = useCallback(async () => {
     const res = await fetch('/ai/conversations').catch(() => null)
