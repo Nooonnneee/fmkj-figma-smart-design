@@ -21,9 +21,10 @@ describe('unconfiguredData 未配置分支', () => {
     expect(d.configured).toBe(false)
   })
 
-  it('提示文案里点名 HA_MCP_ENDPOINT（引导用户去设置），不是空话', () => {
-    expect(NOT_CONFIGURED_HINT).toContain('HA_MCP_ENDPOINT')
-    expect(NOT_CONFIGURED_HINT).toContain('设置')
+  it('提示文案面向普通成员，不含环境变量名/地址/token，并指向管理员', () => {
+    expect(NOT_CONFIGURED_HINT).toContain('Home Assistant')
+    expect(NOT_CONFIGURED_HINT).toContain('联系管理员')
+    expect(NOT_CONFIGURED_HINT).not.toMatch(/HA_MCP_|https?:\/\/|webhook|token/i)
   })
 
   it('assembleOverview 在未配置源上直接走未配置分支，不做统计', () => {

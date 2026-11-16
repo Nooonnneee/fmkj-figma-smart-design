@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   AI_PANEL_DEFAULT_WIDTH,
@@ -86,5 +86,29 @@ describe('持久化写入 / 读出（拖宽刷新保持的真实行为）', () =
     expect(() => writeAiPanelWidth(320, throwing)).not.toThrow()
     expect(readStoredAiPanelCollapsed(throwing)).toBe(false)
     expect(() => writeAiPanelCollapsed(true, throwing)).not.toThrow()
+  })
+
+  it('显式传 null 存储：读回落默认值，写静默忽略', () => {
+    expect(readStoredAiPanelWidth(null)).toBe(AI_PANEL_DEFAULT_WIDTH)
+    expect(readStoredAiPanelCollapsed(null)).toBe(false)
+    expect(() => writeAiPanelWidth(420, null)).not.toThrow()
+    expect(() => writeAiPanelCollapsed(true, null)).not.toThrow()
+  })
+})
+
+describe('无 window 环境（服务端渲染）', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('无参调用四个函数都不求值 window、不抛错', () => {
+    vi.stubGlobal('window', undefined)
+
+    expect(() => readStoredAiPanelWidth()).not.toThrow()
+    expect(readStoredAiPanelWidth()).toBe(AI_PANEL_DEFAULT_WIDTH)
+    expect(() => readStoredAiPanelCollapsed()).not.toThrow()
+    expect(readStoredAiPanelCollapsed()).toBe(false)
+    expect(() => writeAiPanelWidth(400)).not.toThrow()
+    expect(() => writeAiPanelCollapsed(true)).not.toThrow()
   })
 })

@@ -11,10 +11,8 @@ import type { AiToolHandler, ToolRunResult } from '@/plugins/ai-copilot/tools/co
 
 import { callTool, type HaMcpConfig } from './mcp-client'
 
-const NOT_CONFIGURED =
-  '还没有连接客户现场的 Home Assistant。请先在环境变量里配置 HA_MCP_ENDPOINT' +
-  '（形如 https://<你的 HA 域名>/api/webhook/<webhook-id> 或 http://<ha-ip>:9584/private_xxx），' +
-  '必要时再加 HA_MCP_TOKEN。'
+/** 面向普通成员的提示：不暴露环境变量名、地址形态或 token；运维细节见 README.md。 */
+const NOT_CONFIGURED = '当前还没有连接 Home Assistant。请联系管理员完成连接配置后再查看。'
 
 function readConfig(): HaMcpConfig | null {
   const endpoint = process.env.HA_MCP_ENDPOINT?.trim()

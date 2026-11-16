@@ -70,9 +70,12 @@ export type OverviewSource = {
   health?: { version?: string; errors?: number; offline?: number }
 }
 
-/** 未配置引导文案：与 ai-handlers.ts 的 NOT_CONFIGURED 措辞一致，告诉用户去哪配。 */
+/**
+ * 未配置引导文案：与 ai-handlers.ts 的 NOT_CONFIGURED 措辞一致。
+ * 面向普通成员，不暴露环境变量名、地址形态或 token；运维细节见 README.md。
+ */
 export const NOT_CONFIGURED_HINT =
-  '还没有连接客户现场的 Home Assistant。请在设置里配置 HA_MCP_ENDPOINT（形如 https://<你的 HA 域名>/api/webhook/<webhook-id> 或 http://<ha-ip>:9584/private_xxx），必要时再加 HA_MCP_TOKEN。'
+  '当前还没有连接 Home Assistant。请联系管理员完成连接配置后再查看。'
 
 /** 未配置分支：不聚合任何统计，直接给空态数据。 */
 export function unconfiguredData(): SmartHomeUnconfigured {
