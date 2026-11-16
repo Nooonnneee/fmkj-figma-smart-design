@@ -1,6 +1,6 @@
-import Link from 'next/link'
 import { ArrowUpRight } from 'lucide-react'
 
+import { HoverPrefetchLink } from '@/components/hover-prefetch-link'
 import type { PickerTemplate } from '@/plugins/proposal/picker-data'
 import { Swatches } from '@/plugins/proposal/template-picker'
 import { cn } from '@/lib/utils'
@@ -16,7 +16,7 @@ export function TemplateCard({
   className?: string
 }) {
   return (
-    <Link
+    <HoverPrefetchLink
       href={`/templates/${t.value}`}
       className={cn(
         'group flex flex-col overflow-hidden rounded-[var(--radius-container)] border bg-card transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
@@ -64,6 +64,6 @@ export function TemplateCard({
           </span>
         </div>
       </div>
-    </Link>
+    </HoverPrefetchLink>
   )
 }

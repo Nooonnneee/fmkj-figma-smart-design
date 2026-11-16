@@ -70,7 +70,9 @@ function usesBuiltinPhoto(scene: ManagedScene) {
   return BUILTIN_SCENES.some(
     (builtin) =>
       path === builtin.image?.url ||
+      path === `/proposal/photos/scenes/${builtin.slug}.webp` ||
       path === `/proposal/photos/scenes/${builtin.slug}.jpg` ||
+      file === `scene-${builtin.slug}.webp` ||
       file === `scene-${builtin.slug}.jpg` ||
       file === `scene-${builtin.slug}.png`,
   )
@@ -171,7 +173,7 @@ export function ScenesPage({
                     src={
                       night?.url ??
                       scene.image?.url ??
-                      `/proposal/photos/${CHAPTER_PHOTO[scene.chapter] ?? 'home'}.jpg`
+                      `/proposal/photos/${CHAPTER_PHOTO[scene.chapter] ?? 'home'}.webp`
                     }
                     alt={night?.alt ?? scene.image?.alt ?? scene.name}
                     {...imgLoading(ctx)}

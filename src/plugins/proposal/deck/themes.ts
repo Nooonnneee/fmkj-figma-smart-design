@@ -304,7 +304,7 @@ export const DECK_THEMES: Record<DeckThemeId, DeckTheme> = {
     headline: '让家，懂你的生活。',
     tagline: 'RESIDENTIAL INTELLIGENCE',
     coverTagline: 'A HOME THAT UNDERSTANDS YOU',
-    coverPhoto: '/proposal/photos/cover-qixu.jpg',
+    coverPhoto: '/proposal/photos/cover-qixu.webp',
     photoNote: '氛围意向图 · 生活场景示意，非项目实景',
   },
   noir: {
@@ -344,7 +344,7 @@ export const DECK_THEMES: Record<DeckThemeId, DeckTheme> = {
     headline: '静享不凡，智在无声。',
     tagline: 'PRIVATE RESIDENCE',
     coverTagline: 'PRIVATE RESIDENCE · SMART LIVING',
-    coverPhoto: '/proposal/photos/cover-noir.jpg',
+    coverPhoto: '/proposal/photos/cover-noir.webp',
     photoNote: '氛围意向图 · 非项目实景',
   },
   grove: {
@@ -384,7 +384,7 @@ export const DECK_THEMES: Record<DeckThemeId, DeckTheme> = {
     headline: '让家，回到自然的节奏。',
     tagline: 'NATURAL LIVING',
     coverTagline: 'LIVING WITH NATURE',
-    coverPhoto: '/proposal/photos/cover-grove.jpg',
+    coverPhoto: '/proposal/photos/cover-grove.webp',
     photoNote: '氛围意向图 · 非项目实景',
   },
   azure: {
@@ -424,7 +424,7 @@ export const DECK_THEMES: Record<DeckThemeId, DeckTheme> = {
     headline: '清爽有序，一切刚刚好。',
     tagline: 'MODERN LIVING',
     coverTagline: 'CLEAR · CALM · CONNECTED',
-    coverPhoto: '/proposal/photos/cover-azure.jpg',
+    coverPhoto: '/proposal/photos/cover-azure.webp',
     photoNote: '氛围意向图 · 非项目实景',
   },
   terra: {
@@ -445,7 +445,7 @@ export const DECK_THEMES: Record<DeckThemeId, DeckTheme> = {
     headline: '把时光的温度，留在家里。',
     tagline: 'TIMELESS LIVING',
     coverTagline: 'A HOME WITH CHARACTER',
-    coverPhoto: '/proposal/photos/dining.jpg',
+    coverPhoto: '/proposal/photos/dining.webp',
     photoNote: '氛围意向图 · 非项目实景',
   },
   mono: {
@@ -485,7 +485,7 @@ export const DECK_THEMES: Record<DeckThemeId, DeckTheme> = {
     headline: '少即是多，智能本应安静。',
     tagline: 'ESSENTIAL',
     coverTagline: 'LESS BUT BETTER',
-    coverPhoto: '/proposal/photos/study.jpg',
+    coverPhoto: '/proposal/photos/study.webp',
     photoNote: '氛围意向图 · 非项目实景',
   },
   dawn: {
@@ -525,7 +525,7 @@ export const DECK_THEMES: Record<DeckThemeId, DeckTheme> = {
     headline: '每一个清晨，都被温柔唤醒。',
     tagline: 'WARM HOME',
     coverTagline: 'GOOD MORNING, HOME',
-    coverPhoto: '/proposal/photos/cover-dawn.jpg',
+    coverPhoto: '/proposal/photos/cover-dawn.webp',
     photoNote: '氛围意向图 · 非项目实景',
   },
   jade: {
@@ -577,7 +577,7 @@ export const DECK_THEMES: Record<DeckThemeId, DeckTheme> = {
     headline: '雅致如瓷，静享东方。',
     tagline: 'ORIENTAL LIVING',
     coverTagline: 'ORIENTAL SERENITY',
-    coverPhoto: '/proposal/photos/cover-jade.jpg',
+    coverPhoto: '/proposal/photos/cover-jade.webp',
     photoNote: '氛围意向图 · 非项目实景',
   },
   linen: {
@@ -599,7 +599,7 @@ export const DECK_THEMES: Record<DeckThemeId, DeckTheme> = {
     tagline: 'QUIET EVERYDAY',
     coverTagline: 'LIGHT, SPACE AND EVERYDAY LIFE',
     // 原来复用了 cover-qixu.jpg，和海盐蓝灰的拱窗封面对不上，也和「栖序雅致」撞图。
-    coverPhoto: '/proposal/photos/living.jpg',
+    coverPhoto: '/proposal/photos/living.webp',
     photoNote: '氛围意向图 · 非项目实景',
   },
   slate: {
@@ -621,7 +621,7 @@ export const DECK_THEMES: Record<DeckThemeId, DeckTheme> = {
     tagline: 'SPACES IN ORDER',
     coverTagline: 'RESIDENTIAL DESIGN STUDY',
     // 原来复用了 study.jpg，和「素白极简」撞图；岩灰建筑需要更建筑感的画面。
-    coverPhoto: '/proposal/photos/stairs.jpg',
+    coverPhoto: '/proposal/photos/stairs.webp',
     photoNote: '氛围意向图 · 非项目实景',
   },
 }

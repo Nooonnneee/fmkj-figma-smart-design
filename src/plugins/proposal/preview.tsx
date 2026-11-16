@@ -4,6 +4,9 @@
  * 缩略图就是真实方案的封面（同一套页面组件、同一份主题），模板代码或后台模板一改，缩略图自动跟着变，
  * 不需要人工截图；需要静态图片（小程序、分享卡片）时运行 scripts/generate-template-thumbnails.mjs 批量生成。
  */
+import fs from 'node:fs'
+import path from 'node:path'
+
 import { ScaledFrame } from '@/components/scaled-frame'
 import { ensureDemoTemplateProject } from '@/lib/demo-project'
 import { memoize } from '@/lib/memo-cache'
@@ -67,6 +70,17 @@ const today = () =>
     day: 'numeric',
   })
 
+/**
+ * 模板卡只用到约 300px 宽，没必要为它拉 1400px 的 deck 封面。
+ * 有同名的 720px 缩略图就用缩略图，没有（后台自定义封面等）仍用原图。
+ */
+function galleryPhoto(src: string) {
+  const match = /^\/proposal\/photos\/([^/]+)\.webp$/.exec(src)
+  if (!match) return src
+  const rel = `proposal/photos/thumbs/${match[1]}.webp`
+  return fs.existsSync(path.join(process.cwd(), 'public', rel)) ? `/${rel}` : src
+}
+
 /** 没有示例项目时的兜底缩略图：主题色板 + 封面照片 + 标语 */
 function SwatchThumb({ template }: { template: ProposalTemplateDef }) {
   const theme = templateTheme(template)
@@ -77,7 +91,12 @@ function SwatchThumb({ template }: { template: ProposalTemplateDef }) {
       style={{ background: c.paper, color: c.ink }}
     >
       {theme.cover !== 'type' && template.kind === 'owner' ? (
-        <img src={theme.coverPhoto} alt="" loading="lazy" className="h-3/5 w-full object-cover" />
+        <img
+          src={galleryPhoto(theme.coverPhoto)}
+          alt=""
+          loading="lazy"
+          className="h-3/5 w-full object-cover"
+        />
       ) : null}
       <div className="flex flex-1 flex-col justify-center gap-1 px-[6%]">
         <span className="text-[clamp(10px,2.2vw,18px)] font-semibold">

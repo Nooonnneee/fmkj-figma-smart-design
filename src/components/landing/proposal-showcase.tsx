@@ -1380,7 +1380,7 @@ function ZoneSlide({ data, theme, no }: { data: LandingShowcase; theme: DeckThem
       <div className="grid min-h-0 flex-1 grid-cols-12 gap-[28px] overflow-hidden">
         <div className="col-span-7 flex flex-col gap-[16px]">
           <div className="relative h-[440px] shrink-0 overflow-hidden rounded-(--deck-radius)">
-            <img src="/proposal/photos/living.jpg" alt="" className="size-full object-cover" />
+            <img src="/proposal/photos/living.webp" alt="" className="size-full object-cover" />
             <span className="doc-body absolute bottom-4 left-4 bg-white/90 px-3 py-1 text-[11px] text-[#252523]">
               {theme.photoNote}
             </span>

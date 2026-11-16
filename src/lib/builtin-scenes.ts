@@ -274,7 +274,7 @@ export const BUILTIN_SCENES: BuiltinScene[] = INPUTS.map(({ alt, ...s }) => {
     id: `builtin-${s.slug}`,
     image: night
       ? { url: night.url, alt: night.alt }
-      : { url: `/proposal/photos/scenes/${s.slug}.jpg`, alt },
+      : { url: `/proposal/photos/scenes/${s.slug}.webp`, alt },
   }
 })
 

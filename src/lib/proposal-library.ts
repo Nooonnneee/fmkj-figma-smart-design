@@ -10,7 +10,7 @@ import { BUILTIN_PROPOSAL_TEMPLATES } from '@/plugins/proposal/templates'
  * 方案素材库（方案模板 + 场景库）的初始化：把代码里的内置模板与内置场景写入后台，变成可编辑的数据。
  * - 后台「方案模板」「场景库」列表页的「补齐内置…」按钮与 scripts/seed-proposal-library.ts 共用；
  * - 按标识（slug）判断，已存在的记录不会被覆盖；fill = true 时只补「适合客户 / 使用时机 / 外观特点」这类空字段；
- * - 场景图片从 public/proposal/photos/scenes/<slug>.jpg 上传到媒体库（读不到文件时用 origin 下载，再不行就不带图片，方案改用章节默认照片）。
+ * - 场景图片从 public/proposal/photos/scenes/<slug>.webp 上传到媒体库（读不到文件时用 origin 下载，再不行就不带图片，方案改用章节默认照片）。
  */
 
 export type LibraryStatus = {
@@ -182,8 +182,9 @@ async function sceneImage(
 ): Promise<string | null> {
   const rel = builtinUrl?.startsWith('/proposal/')
     ? builtinUrl.slice(1)
-    : `proposal/photos/scenes/${slug}.jpg`
-  const png = rel.endsWith('.png')
+    : `proposal/photos/scenes/${slug}.webp`
+  const ext = path.extname(rel).slice(1).toLowerCase()
+  const mimetype = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg'
   let data: Buffer | null = await fs
     .readFile(path.join(process.cwd(), 'public', rel))
     .catch(() => null)
@@ -197,8 +198,8 @@ async function sceneImage(
     data: { alt },
     file: {
       data,
-      mimetype: png ? 'image/png' : 'image/jpeg',
-      name: `scene-${slug}.${png ? 'png' : 'jpg'}`,
+      mimetype,
+      name: `scene-${slug}.${ext}`,
       size: data.length,
     },
     overrideAccess: true,

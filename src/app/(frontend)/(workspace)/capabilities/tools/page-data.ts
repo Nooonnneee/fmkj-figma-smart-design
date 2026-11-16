@@ -19,7 +19,7 @@ export const FEATURED_TOOL_IDS = ['business-card', 'floor-plan-style'] as const
  * 而不是图标或色块；输出结果由底部标签与说明补足。
  */
 export type ToolCardMeta = {
-  /** 封面图路径：静态 public 资源，形如 `/tool-covers/xxx.jpg` */
+  /** 封面图路径：静态 public 资源，形如 `/tool-covers/xxx.webp` */
   cover: string
   /** 封面替代文本：中文描述画面内容，不作为文件名重复 */
   coverAlt: string
@@ -31,13 +31,13 @@ export type ToolCardMeta = {
 
 export const TOOL_CARD_META: Record<(typeof FEATURED_TOOL_IDS)[number], ToolCardMeta> = {
   'business-card': {
-    cover: '/tool-covers/business-card.jpg',
+    cover: '/tool-covers/business-card.webp',
     coverAlt: '繁梦空间名片正面成品示例，米白纸版上的工具名与版式排版',
     chip: '4 套版式 · 正反面',
     footer: 'PNG · 300dpi 导出',
   },
   'floor-plan-style': {
-    cover: '/tool-covers/floor-plan.jpg',
+    cover: '/tool-covers/floor-plan.webp',
     coverAlt: '平台自带的智能家居点位户型图示例：住宅平面上标注了灯具、AP、电动窗帘等点位',
     chip: '示例：智能家居点位户型图 · 10 套风格',
     footer: '上传户型图 → 家具彩平',

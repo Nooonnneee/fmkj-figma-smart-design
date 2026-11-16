@@ -1,8 +1,8 @@
 import Image from 'next/image'
-import Link from 'next/link'
 import { ArrowLeft, ArrowUpRight, Blocks } from 'lucide-react'
 
 import { EmptyState } from '@/components/empty-state'
+import { HoverPrefetchLink } from '@/components/hover-prefetch-link'
 import { PageHeader } from '@/components/page-header'
 import { Button } from '@astryxdesign/core/Button'
 import { appAuth } from '@/lib/app-auth'
@@ -36,7 +36,7 @@ export default async function PluginToolsPage() {
         {tools.map((tool) => {
           const meta = TOOL_CARD_META[tool.id as keyof typeof TOOL_CARD_META]
           return (
-            <Link
+            <HoverPrefetchLink
               key={tool.id}
               href={tool.href}
               className="group flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-xs transition duration-200 hover:border-border hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-safe:hover:-translate-y-0.5"
@@ -73,7 +73,7 @@ export default async function PluginToolsPage() {
                   </span>
                 </div>
               </div>
-            </Link>
+            </HoverPrefetchLink>
           )
         })}
       </div>

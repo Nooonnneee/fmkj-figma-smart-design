@@ -118,7 +118,7 @@ const PHOTO_OF: Record<string, string> = {
   other: 'home',
 }
 /** 空间照片：氛围意向图（Unsplash 授权图片，存放在 public/proposal/photos），按房间类型选择 */
-export const photoOf = (areaType: string) => `/proposal/photos/${PHOTO_OF[areaType] ?? 'home'}.jpg`
+export const photoOf = (areaType: string) => `/proposal/photos/${PHOTO_OF[areaType] ?? 'home'}.webp`
 
 /** 房间类型 → 场景章节：进门（玄关客餐厅）、休息（卧室）、看护（厨卫阳台）、专注（书房影音） */
 const ZONE_OF: Record<string, ZoneKey> = {
