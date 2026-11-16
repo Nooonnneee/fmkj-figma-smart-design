@@ -50,6 +50,13 @@ describe('activeNavUrl', () => {
     expect(activeNavUrl('/', NAV)).toBeNull()
   })
 
+  it('父级与子级同时在夹具里时，最长匹配优先', () => {
+    const urls = ['/capabilities', '/capabilities/tools']
+    expect(activeNavUrl('/capabilities/tools', urls)).toBe('/capabilities/tools')
+    expect(activeNavUrl('/capabilities', urls)).toBe('/capabilities')
+    expect(activeNavUrl('/capabilities/unknown', urls)).toBe('/capabilities')
+  })
+
   it('边界按 / 切，不做裸前缀匹配', () => {
     // `/knx` 不能匹配 `/knxx`；`/capabilities/business-card` 不能匹配其后的裸字符
     expect(activeNavUrl('/knxx', ['/knx'])).toBeNull()
