@@ -32,7 +32,6 @@ import {
   RotateCcw,
   RotateCw,
   Ruler,
-  ScanSearch,
   Sparkles,
   Trash2,
   Undo2,
@@ -1714,20 +1713,6 @@ export function PointMapEditor({
                               </span>
                             ),
                             onClick: () => dwgInput.current?.click(),
-                          },
-                        ]
-                      : []),
-                    ...(plugins.aiImport
-                      ? [
-                          {
-                            id: 'ai-import',
-                            label: (
-                              <span className="flex items-center gap-2">
-                                <ScanSearch className="size-4" />
-                                AI 识别图纸（打开 AI 对话）
-                              </span>
-                            ),
-                            onClick: () => void openLinkedPage('/ai?plugin=ai-import'),
                           },
                         ]
                       : []),
