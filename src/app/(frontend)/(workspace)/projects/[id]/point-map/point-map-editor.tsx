@@ -32,7 +32,6 @@ import {
   RotateCcw,
   RotateCw,
   Ruler,
-  ScanSearch,
   Sparkles,
   Trash2,
   Undo2,
@@ -204,7 +203,6 @@ const pack = smartHomePack
 type ProjectQuoteSummary = { id: string; title: string; status: string; total: number }
 /** 点位图里由插件提供的功能是否可用（服务端按「设置 → 插件」计算后传入）。 */
 export type PointMapPlugins = {
-  aiImport: boolean
   smartSelect: boolean
   dwg: boolean
   roomInsights: boolean
@@ -282,8 +280,8 @@ export function PointMapEditor({
   aiCopilot?: boolean
 }) {
   const dwgEnabled = plugins.dwg
-  // 上传按钮右侧的下拉菜单：DWG 导入或 AI 识图任一启用就显示
-  const uploadMenuEnabled = dwgEnabled || plugins.aiImport
+  // 上传按钮右侧的下拉菜单：DWG 导入启用时显示
+  const uploadMenuEnabled = dwgEnabled
   const router = useRouter()
   const { resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -1714,20 +1712,6 @@ export function PointMapEditor({
                               </span>
                             ),
                             onClick: () => dwgInput.current?.click(),
-                          },
-                        ]
-                      : []),
-                    ...(plugins.aiImport
-                      ? [
-                          {
-                            id: 'ai-import',
-                            label: (
-                              <span className="flex items-center gap-2">
-                                <ScanSearch className="size-4" />
-                                AI 识别图纸（打开 AI 对话）
-                              </span>
-                            ),
-                            onClick: () => void openLinkedPage('/ai?plugin=ai-import'),
                           },
                         ]
                       : []),

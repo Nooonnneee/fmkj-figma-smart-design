@@ -5,9 +5,11 @@ import { usePathname } from 'next/navigation'
 import {
   Activity,
   BookOpen,
+  Cable,
   Crown,
   FolderKanban,
   Home,
+  IdCard,
   LayoutTemplate,
   LogOut,
   PackageSearch,
@@ -60,14 +62,20 @@ export type SidebarPlugin = {
   provides: string[]
 }
 
-/** 日常工作：项目 → 产品 → AI */
+/** 空间设计工作台：项目 + 产品库 */
 const workNav = [
   { icon: FolderKanban, label: '项目', url: '/projects' },
   { icon: PackageSearch, label: '产品库', url: '/products' },
 ] as const
 
-/** 智能家居：只读查看已连接现场 Home Assistant（第一期只读模组） */
+/** HA 助手：只读查看已连接现场 Home Assistant（第一期只读模组） */
 const homeNav = [{ icon: Home, label: '智能家居', url: '/smart-home' }] as const
+
+/** KNX / ETS：第一期只留模块位，点进去是空态页 */
+const knxNav = [{ icon: Cable, label: 'KNX 工程', url: '/knx' }] as const
+
+/** 营销工具：第一期只放名片（页面与 URL 沿用现有的能力页） */
+const marketingNav = [{ icon: IdCard, label: '名片', url: '/capabilities/business-card' }] as const
 
 /** 低频入口不占侧栏：收在左下角齿轮的「设置」菜单里 */
 const settingsNav = [
@@ -93,6 +101,8 @@ const toolNav = [
 const ALL_NAV_URLS = [
   ...workNav.map((i) => i.url),
   ...homeNav.map((i) => i.url),
+  ...knxNav.map((i) => i.url),
+  ...marketingNav.map((i) => i.url),
   ...settingsNav.map((i) => i.url),
   ...toolNav.map((i) => i.url),
 ] as const
@@ -215,7 +225,7 @@ export function AppSidebar({
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>工作台</SidebarGroupLabel>
+          <SidebarGroupLabel>空间设计工作台</SidebarGroupLabel>
           <SidebarMenu>
             {workNav.map((item) => (
               <NavItem
@@ -227,11 +237,31 @@ export function AppSidebar({
           </SidebarMenu>
         </SidebarGroup>
 
-        {/* 智能家居：只读查看已连接现场 Home Assistant（第一期只读模组） */}
+        {/* HA 助手：只读查看已连接现场 Home Assistant（第一期只读模组） */}
         <SidebarGroup>
-          <SidebarGroupLabel>智能家居</SidebarGroupLabel>
+          <SidebarGroupLabel>HA 助手</SidebarGroupLabel>
           <SidebarMenu className="gap-0.5">
             {homeNav.map((item) => (
+              <NavItem key={item.url} {...item} active={isActive(item.url)} />
+            ))}
+          </SidebarMenu>
+        </SidebarGroup>
+
+        {/* KNX / ETS：第一期只留模块位，点进去是「建设中」空态页 */}
+        <SidebarGroup>
+          <SidebarGroupLabel>KNX / ETS</SidebarGroupLabel>
+          <SidebarMenu className="gap-0.5">
+            {knxNav.map((item) => (
+              <NavItem key={item.url} {...item} active={isActive(item.url)} />
+            ))}
+          </SidebarMenu>
+        </SidebarGroup>
+
+        {/* 营销工具：第一期只放名片，页面与 URL 不动 */}
+        <SidebarGroup>
+          <SidebarGroupLabel>营销工具</SidebarGroupLabel>
+          <SidebarMenu className="gap-0.5">
+            {marketingNav.map((item) => (
               <NavItem key={item.url} {...item} active={isActive(item.url)} />
             ))}
           </SidebarMenu>

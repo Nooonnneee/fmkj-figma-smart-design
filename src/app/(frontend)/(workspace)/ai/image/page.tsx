@@ -1,7 +1,6 @@
 import { EmptyState } from '@/components/empty-state'
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowLeft, Palette, Sparkles } from 'lucide-react'
+import { Palette, Sparkles } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
 import { PageHeader, PageShell } from '@/components/page-header'
@@ -46,22 +45,13 @@ export default async function AiImagePage() {
         title="AI 生图"
         description="用文字描述生成智能家居场景图、方案配图、材质意向图。"
         actions={
-          <>
-            <Button
-              variant="secondary"
-              size="sm"
-              href="/ai/image/style"
-              icon={<Palette />}
-              label="户型图风格化"
-            />
-            <Button
-              variant="ghost"
-              size="sm"
-              href="/ai"
-              icon={<ArrowLeft />}
-              label="返回 AI 对话"
-            />
-          </>
+          <Button
+            variant="secondary"
+            size="sm"
+            href="/ai/image/style"
+            icon={<Palette />}
+            label="户型图风格化"
+          />
         }
       />
       <ImageGenerator

@@ -98,7 +98,6 @@ export default async function PointMapPage({
       }}
       readOnly={readOnly}
       plugins={{
-        aiImport: flags['ai-import'],
         smartSelect: flags['smart-select'],
         dwg: flags['dwg-import'] && Boolean(getDwgSettings(payload.config)),
         roomInsights: flags['room-insights'],

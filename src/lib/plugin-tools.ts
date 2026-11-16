@@ -13,14 +13,6 @@ export type PluginTool = {
 
 export const PLUGIN_TOOLS: PluginTool[] = [
   {
-    id: 'ai-chat',
-    pluginId: 'ai-copilot',
-    category: 'ai',
-    name: 'AI 对话',
-    description: '用自然语言完成项目、点位、报价、合同和生图任务',
-    href: '/ai',
-  },
-  {
     id: 'ai-image',
     pluginId: 'ai-copilot',
     category: 'ai',

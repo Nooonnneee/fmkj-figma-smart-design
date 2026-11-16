@@ -29,12 +29,11 @@ const RAW_PLUGINS: AppPlugin[] = [
     id: 'ai-copilot',
     category: 'ai', // AI 能力：会话里做户型识别、风格化与智能布点
     stage: 'global',
-    entry: { label: '打开 AI 对话', href: () => '/ai' },
     tagline: '在任何页面直接问 AI，让它帮你识图、选型、写说明',
     name: 'AI 对话侧栏（高级）',
     description: '侧边栏常驻 AI 助手，支持户型图识别、技能模板与跨插件自动执行。',
     status: 'ready',
-    where: '左侧边栏「对话」模式、独立页 /ai',
+    where: '任何页面右侧常驻栏',
     provides: ['侧边栏常驻对话', '对话技能模板', '多模型与积分', '跨插件联动'],
   },
   {
