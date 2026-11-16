@@ -14,9 +14,9 @@
 export const FEATURED_TOOL_IDS = ['business-card', 'floor-plan-style'] as const
 
 /**
- * 每张卡片的视觉元数据：真实成品封面 + 封面标签 + 底部规格。
- * 封面图是工具真实导出的成品（名片成品 / 平台示例户型图），
- * 而不是图标或色块，用户能直接看出打开后能得到什么。
+ * 每张卡片的视觉元数据：真实封面 + 封面标签 + 底部规格。
+ * 封面图直接展示工具用到的画面（名片成品 / 智能家居点位户型图输入示例），
+ * 而不是图标或色块；输出结果由底部标签与说明补足。
  */
 export type ToolCardMeta = {
   /** 封面图路径：静态 public 资源，形如 `/tool-covers/xxx.jpg` */
@@ -38,8 +38,8 @@ export const TOOL_CARD_META: Record<(typeof FEATURED_TOOL_IDS)[number], ToolCard
   },
   'floor-plan-style': {
     cover: '/tool-covers/floor-plan.jpg',
-    coverAlt: '户型图风格化后的家具彩平示例，保留墙体结构并铺上家具与配色',
-    chip: '10 套风格 · 保留户型结构',
+    coverAlt: '平台自带的智能家居点位户型图示例：住宅平面上标注了灯具、AP、电动窗帘等点位',
+    chip: '示例：智能家居点位户型图 · 10 套风格',
     footer: '上传户型图 → 家具彩平',
   },
 }

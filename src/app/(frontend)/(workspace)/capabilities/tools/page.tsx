@@ -46,7 +46,7 @@ export default async function PluginToolsPage() {
                   src={meta.cover}
                   alt={meta.coverAlt}
                   fill
-                  sizes="(min-width: 640px) 50vw, 100vw"
+                  sizes="(min-width: 1024px) 480px, (min-width: 640px) 50vw, 100vw"
                   className="object-cover transition-transform duration-300 motion-safe:group-hover:scale-[1.03]"
                 />
                 <span className="absolute top-3 left-3 rounded-full bg-background/90 px-2.5 py-1 text-xs font-medium text-foreground shadow-xs backdrop-blur-sm">
@@ -60,7 +60,7 @@ export default async function PluginToolsPage() {
               </div>
               <div className="flex flex-1 flex-col gap-2 p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <h3 className="text-base font-semibold tracking-tight">{tool.name}</h3>
+                  <h2 className="text-base font-semibold tracking-tight">{tool.name}</h2>
                   <ArrowUpRight
                     aria-hidden="true"
                     className="mt-0.5 size-4 shrink-0 text-muted-foreground transition group-hover:text-foreground motion-safe:group-hover:translate-x-0.5 motion-safe:group-hover:-translate-y-0.5"
