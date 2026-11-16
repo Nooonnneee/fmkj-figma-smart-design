@@ -2,7 +2,7 @@
 # Windows：NSIS 安装包（x64）  macOS：DMG + ZIP（Apple 芯片 arm64 / Intel x64）
 # 用法见 desktop/README.md
 appId: top.fmkj.desktop
-productName: 繁梦空间
+productName: Eevee
 copyright: Copyright © 2026 繁梦空间智能信息技术
 artifactName: FanmengSpace-${version}-${os}-${arch}.${ext}
 
@@ -20,7 +20,7 @@ asar: true
 npmRebuild: false
 
 protocols:
-  - name: 繁梦空间
+  - name: Eevee
     schemes:
       - fanmeng
 
@@ -50,7 +50,7 @@ mac:
 
 dmg:
   artifactName: FanmengSpace-${version}-mac-${arch}.${ext}
-  title: 繁梦空间 ${version}
+  title: Eevee ${version}
   window:
     width: 540
     height: 380
@@ -77,8 +77,8 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
   createStartMenuShortcut: true
-  shortcutName: 繁梦空间
-  uninstallDisplayName: 繁梦空间
+  shortcutName: Eevee
+  uninstallDisplayName: Eevee
   installerLanguages:
     - zh_CN
   language: "2052"
