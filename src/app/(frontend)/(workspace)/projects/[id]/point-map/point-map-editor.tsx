@@ -282,7 +282,7 @@ export function PointMapEditor({
 }) {
   const dwgEnabled = plugins.dwg
   // 上传按钮右侧的下拉菜单：DWG 导入或 AI 识图任一启用就显示
-  const uploadMenuEnabled = dwgEnabled || plugins.aiImport
+  const uploadMenuEnabled = dwgEnabled
   const router = useRouter()
   const { resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
