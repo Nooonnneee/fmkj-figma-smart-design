@@ -14,28 +14,33 @@
 export const FEATURED_TOOL_IDS = ['business-card', 'floor-plan-style'] as const
 
 /**
- * 每张卡片的视觉元数据：图标与彩色渐变背景。
- * 渐变 stop 全部走 Astryx 品牌 token（styles.css 的 `--color-brand-*`，
- * Tailwind v4 自动生成 from/to 工具类），不写 raw hex。
+ * 每张卡片的视觉元数据：真实封面 + 封面标签 + 底部规格。
+ * 封面图直接展示工具用到的画面（名片成品 / 智能家居点位户型图输入示例），
+ * 而不是图标或色块；输出结果由底部标签与说明补足。
  */
 export type ToolCardMeta = {
-  gradient: string
-  /** 图标落在渐变块上的前景色（对应当张卡的渐变明暗） */
-  iconOnGradient: string
-  /** 标题主色 */
-  tintText: string
+  /** 封面图路径：静态 public 资源，形如 `/tool-covers/xxx.jpg` */
+  cover: string
+  /** 封面替代文本：中文描述画面内容，不作为文件名重复 */
+  coverAlt: string
+  /** 封面左上角标签：说明工具能做什么、有多少套可选 */
+  chip: string
+  /** 卡片底部一行小标签：导出规格或使用路径 */
+  footer: string
 }
 
 export const TOOL_CARD_META: Record<(typeof FEATURED_TOOL_IDS)[number], ToolCardMeta> = {
   'business-card': {
-    gradient: 'from-brand-gold-deep to-brand-gold-light',
-    iconOnGradient: 'text-brand-ink',
-    tintText: 'text-brand-gold-deep',
+    cover: '/tool-covers/business-card.jpg',
+    coverAlt: '繁梦空间名片正面成品示例，米白纸版上的工具名与版式排版',
+    chip: '4 套版式 · 正反面',
+    footer: 'PNG · 300dpi 导出',
   },
   'floor-plan-style': {
-    gradient: 'from-brand-moon via-brand-indigo to-brand-violet',
-    iconOnGradient: 'text-card',
-    tintText: 'text-brand-indigo',
+    cover: '/tool-covers/floor-plan.jpg',
+    coverAlt: '平台自带的智能家居点位户型图示例：住宅平面上标注了灯具、AP、电动窗帘等点位',
+    chip: '示例：智能家居点位户型图 · 10 套风格',
+    footer: '上传户型图 → 家具彩平',
   },
 }
 

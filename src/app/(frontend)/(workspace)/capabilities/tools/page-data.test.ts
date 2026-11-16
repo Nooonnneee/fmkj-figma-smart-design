@@ -1,5 +1,10 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
+import { CARD_VARIANTS } from '@/lib/business-card'
+import { STYLE_TEMPLATES } from '@/lib/style-templates'
 import { FEATURED_TOOL_IDS, filterFeaturedTools, TOOL_CARD_META } from './page-data'
 
 type FakeTool = { id: string; name: string }
@@ -53,11 +58,47 @@ describe('展示范围静态约束', () => {
     expect(FEATURED_TOOL_IDS).toEqual(['business-card', 'floor-plan-style'])
   })
 
-  it('每张卡都有渐变与主色元数据', () => {
+  it('两张 featured 工具都指向 public 下的真实封面图', () => {
     for (const id of FEATURED_TOOL_IDS) {
-      const meta = TOOL_CARD_META[id]
-      expect(meta.gradient).toBeTruthy()
-      expect(meta.tintText).toBeTruthy()
+      expect(TOOL_CARD_META[id].cover.startsWith('/tool-covers/')).toBe(true)
+    }
+  })
+
+  it('封面文件在磁盘上真实存在', () => {
+    for (const id of FEATURED_TOOL_IDS) {
+      const file = join(process.cwd(), 'public', TOOL_CARD_META[id].cover.replace(/^\//, ''))
+      expect(existsSync(file)).toBe(true)
+    }
+  })
+
+  it('封面 alt 非空且用中文描述画面', () => {
+    const expectedAltKeyword = {
+      'business-card': '名片',
+      'floor-plan-style': '点位',
+    } as const
+
+    for (const id of FEATURED_TOOL_IDS) {
+      const { coverAlt } = TOOL_CARD_META[id]
+      expect(coverAlt.trim().length).toBeGreaterThan(0)
+      expect(coverAlt).toContain(expectedAltKeyword[id])
+    }
+  })
+
+  it('封面 chip 的数量与对应 lib 常量一致', () => {
+    const chipNumber = (chip: string) => {
+      const matched = chip.match(/\d+/)
+      expect(matched).not.toBeNull()
+      return Number(matched![0])
+    }
+
+    expect(chipNumber(TOOL_CARD_META['business-card'].chip)).toBe(CARD_VARIANTS.length)
+    expect(chipNumber(TOOL_CARD_META['floor-plan-style'].chip)).toBe(STYLE_TEMPLATES.length)
+  })
+
+  it('每张卡的封面标签和底部规格都非空', () => {
+    for (const id of FEATURED_TOOL_IDS) {
+      expect(TOOL_CARD_META[id].chip.trim().length).toBeGreaterThan(0)
+      expect(TOOL_CARD_META[id].footer.trim().length).toBeGreaterThan(0)
     }
   })
 })
