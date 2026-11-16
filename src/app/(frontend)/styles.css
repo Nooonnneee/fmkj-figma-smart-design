@@ -500,23 +500,19 @@
   --sidebar-ring: oklch(0.62 0.1 180);
 }
 
-/* 主题风格色块与品牌色（品牌规范页、Logo 底色使用，不随主题变化） */
+/* 主题风格色块与经典品牌点缀色（不随主题变化；不与下方「繁梦空间品牌色」重复定义）。
+   品牌主紫/蓝/夜/墨/晨雾等统一收敛到下方 Block B（品牌规范页色卡为准），此处不再重复。 */
 @theme {
   --color-swatch-fanmeng: oklch(0.55 0.22 280);
   --color-swatch-jade: oklch(0.56 0.11 180);
   --color-swatch-classic: oklch(0.205 0 0);
   --color-swatch-official: oklch(0.205 0.012 265);
-  --color-brand-violet: #8b6dff;
-  --color-brand-indigo: #3f3bdb;
   --color-brand-gold: #ffc24b;
   --color-brand-gold-light: #ffdb7e;
   --color-brand-gold-deep: #ffb536;
   --color-brand-dusk: #1d1856;
-  --color-brand-night: #0b0a24;
-  --color-brand-ink: #16123a;
   --color-brand-slate: #5f5a86;
   --color-brand-lavender: #b7b0ff;
-  --color-brand-mist: #f4f3ff;
 }
 
 @layer base {
