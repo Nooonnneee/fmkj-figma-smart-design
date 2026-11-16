@@ -5,14 +5,11 @@ import { usePathname } from 'next/navigation'
 import {
   Activity,
   BookOpen,
-  Bot,
   Crown,
   FolderKanban,
-  Image as ImageIcon,
   LayoutTemplate,
   LogOut,
   PackageSearch,
-  Palette,
   Plus,
   Settings,
   Wrench,
@@ -76,37 +73,23 @@ const settingsNav = [
 ] as const
 
 /**
- * 能力中心的三类入口（PROJECT-ARCHITECTURE §7.1）：AI 能力 / 模板 / 工具。
+ * 模板与工具入口：留在侧栏的两个能力功能（模板中心 / 全部工具）。
+ * 原「能力中心」分组标题和「AI 能力」组都已从侧栏移除——
+ * AI 对话挪到了右侧常驻一列（components/ai/ai-panel.tsx），
+ * 能力中心总览页 /capabilities 保留、可直接 URL 访问（帮助手册里已说明），
+ * 但不再占侧栏：只把这两个高频能力功能作为独立组挂在侧栏主体。
  * 普通用户不安装、不启停：点条目直接进对应页面按积分使用。
  */
-const capabilityNav = [
-  {
-    key: 'ai',
-    label: 'AI 能力',
-    items: [
-      { icon: Bot, label: 'AI 对话', url: '/ai' },
-      { icon: ImageIcon, label: 'AI 生图', url: '/ai/image' },
-      { icon: Palette, label: '户型图风格化', url: '/ai/image/style' },
-    ],
-  },
-  {
-    // 模板与工具原来分成两个分组，每组只有 1 项——侧边栏出现「模板」「工具」
-    // 两个只有一行内容的小标题，层级显得很碎。合并成「模板与工具」。
-    key: 'library',
-    label: '模板与工具',
-    items: [
-      { icon: LayoutTemplate, label: '模板中心', url: '/capabilities/templates' },
-      { icon: Wrench, label: '全部工具', url: '/capabilities/tools' },
-    ],
-  },
+const toolNav = [
+  { icon: LayoutTemplate, label: '模板中心', url: '/capabilities/templates' },
+  { icon: Wrench, label: '全部工具', url: '/capabilities/tools' },
 ] as const
 
-/** 侧边栏所有可点入口（含分组标题「能力中心」）—— 判定当前页要看全集，见 activeNavUrl */
+/** 侧边栏所有可点入口 —— 判定当前页要看全集，见 activeNavUrl */
 const ALL_NAV_URLS = [
   ...workNav.map((i) => i.url),
   ...settingsNav.map((i) => i.url),
-  ...capabilityNav.flatMap((g) => g.items.map((i) => i.url)),
-  '/capabilities',
+  ...toolNav.map((i) => i.url),
 ] as const
 
 /** 左下角两个按钮共用的样式：图标模式下都收成 32px 的方块 */
@@ -157,12 +140,6 @@ export function AppSidebar({
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [membershipOpen, setMembershipOpen] = useState(false)
 
-  // AI 对话已从左侧栏挪到右侧独立一列（见 components/ai/ai-panel.tsx）。
-  // 这里只保留「插件是否启用」用于能力中心导航项的显示判断；
-  // 侧栏不再有「导航 / AI 对话」标签切换，导航常驻。
-  const aiCopilotEnabled = plugins.some(
-    (p) => p.id === 'ai-copilot' && p.status === 'ready' && p.enabled,
-  )
   // ⚠️ 只让**最长匹配**的那条亮，否则父级入口会跟子路由一起亮
   //（`/ai` 是 `/ai/image` 的前缀、`/capabilities` 是 `/capabilities/templates` 的前缀）。
   // 2026-11-14 用户报「点了能力中心的选项一直是点击状态，切换也还是」就是这个。
@@ -245,37 +222,15 @@ export function AppSidebar({
           </SidebarMenu>
         </SidebarGroup>
 
-        {/* 能力中心：AI 能力 / 模板 / 工具；三类都点开即用，没有启停开关。
-                分组标题本身就是入口，指向能力中心总览页（/plugins）。 */}
+        {/* 模板与工具：独立成组挂在侧栏主体。原「能力中心」分组标题入口
+            与「AI 能力」组都已移除；/capabilities 总览页保留、可直接 URL 访问。 */}
         <SidebarGroup>
-          <SidebarGroupLabel
-            asChild
-            className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:pointer-events-none"
-          >
-            <GuardedLink
-              href="/capabilities"
-              aria-current={isActive('/capabilities') ? 'page' : undefined}
-            >
-              <span>能力中心</span>
-              <LinkPending className="ml-auto size-3.5" />
-            </GuardedLink>
-          </SidebarGroupLabel>
-          <div className="flex flex-col gap-1">
-            {capabilityNav.map((group) => (
-              <div key={group.key}>
-                <div className="px-3 pt-2 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground group-data-[collapsible=icon]:hidden">
-                  {group.label}
-                </div>
-                <SidebarMenu className="gap-0.5">
-                  {group.key !== 'ai' || aiCopilotEnabled
-                    ? group.items.map((item) => (
-                        <NavItem key={item.url} {...item} active={isActive(item.url)} />
-                      ))
-                    : null}
-                </SidebarMenu>
-              </div>
+          <SidebarGroupLabel>模板与工具</SidebarGroupLabel>
+          <SidebarMenu className="gap-0.5">
+            {toolNav.map((item) => (
+              <NavItem key={item.url} {...item} active={isActive(item.url)} />
             ))}
-          </div>
+          </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
 
