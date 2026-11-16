@@ -234,6 +234,8 @@ function measure(html: string, code: string) {
   return {
     opacity: opacity ? Number(Number(opacity).toFixed(4)) : null,
     effects: /data-point-display-effects/.test(plan),
+    // 网格只认 PlanView 子树里 SVG 实际画出的那层，配置栏不印网格，可整页无歧义
+    grid: /data-deck-plan-grid/.test(plan),
     // 编号只认 SVG 里 <text> 画出来的那个，不认配置栏 / title 里的同名字符串
     codes: new RegExp(`>${code}</text>`).test(plan),
   }
@@ -333,6 +335,9 @@ describe('显示方案：三个画平面图的页', () => {
       expect(r.zone.effects, `${p.id} zone effects`).toBe(p.displayEffects)
       expect(r.plan.codes, `${p.id} plan 编号`).toBe(p.coverage)
       expect(r.zone.codes, `${p.id} zone 编号`).toBe(p.coverage)
+      // 建网格开关必须真正在平面图上画出网格
+      expect(r.plan.grid, `${p.id} plan 网格`).toBe(p.grid)
+      expect(r.zone.grid, `${p.id} zone 网格`).toBe(p.grid)
     }
   })
 
@@ -370,6 +375,9 @@ describe('显示方案：三个画平面图的页', () => {
       expect(r.zone.effects, `${p.id} zone effects`).toBe(p.displayEffects)
       expect(r.plan.codes, `${p.id} plan 编号`).toBe(p.coverage)
       expect(r.zone.codes, `${p.id} zone 编号`).toBe(p.coverage)
+      // 网格经装配层一路落到两个页面
+      expect(r.plan.grid, `${p.id} plan 网格`).toBe(p.grid)
+      expect(r.zone.grid, `${p.id} zone 网格`).toBe(p.grid)
       // network 是覆盖展示页：波形恒开，底图仍跟方案
       expect(r.network.effects, `${p.id} network effects`).toBe(true)
       expect(r.network.codes, `${p.id} network 编号`).toBe(true)

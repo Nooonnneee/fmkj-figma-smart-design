@@ -10,6 +10,7 @@ import { brandInitials } from '@/lib/brand'
 import type { DisplayProfile } from '@/lib/display-profile'
 import { markerSrc } from '@/lib/point-marker-data'
 import { buildPointDisplayEffects, type PointDisplayEffect } from '@/lib/point-display-effects'
+import { gridSpec } from '@/board/core/paper'
 import { areaLabelAnchor, areaOutline, type AreaInfo, type SheetInfo } from '@/lib/point-scene'
 import { MARKER } from '@/lib/sheet-spec'
 import { cn } from '@/lib/utils'
@@ -596,6 +597,7 @@ export function PlanView({
         aria-hidden
       >
         {effectsEnabled ? <PointDisplayEffects effects={effects} idPrefix="proposal-plan" /> : null}
+        {grid ? <PlanGrid x0={vx} y0={vy} x1={vx + vw} y1={vy + vh} /> : null}
         {areas.map((a) => {
           const px = (x: number) => ((x - sheet.x) / sheet.width) * SW
           const py = (y: number) => ((y - sheet.y) / sheet.height) * SH
@@ -660,6 +662,48 @@ export function PlanView({
         })}
       </svg>
     </div>
+  )
+}
+
+/**
+ * 方案平面图上的网格（坐标参考网）：与点位图工作台上的网格同风格——
+ * 未标定的中性 20 单位细线 + 100 单位粗线，色板用不刺眼的 slate。
+ * 只在本页可见范围内画（x0..x1 / y0..y1），不计入命中、不写业务数据。
+ */
+function PlanGrid({ x0, y0, x1, y1 }: { x0: number; y0: number; x1: number; y1: number }) {
+  const spec = gridSpec(null, 1)
+  const path = (step: number | null) => {
+    if (!step || step <= 0) return ''
+    let d = ''
+    // 可显示范围按步长对齐到图纸原点，避免网格随视口偏移。
+    for (let x = Math.ceil(x0 / step) * step; x <= x1; x += step) d += `M${x} ${y0}V${y1}`
+    for (let y = Math.ceil(y0 / step) * step; y <= y1; y += step) d += `M${x0} ${y}H${x1}`
+    return d
+  }
+  const stroke = '#64748b'
+  return (
+    <g pointerEvents="none" data-deck-plan-grid="true">
+      {spec.major ? (
+        <path
+          d={path(spec.major)}
+          fill="none"
+          stroke={stroke}
+          strokeOpacity={0.28}
+          strokeWidth={0.8}
+          vectorEffect="non-scaling-stroke"
+        />
+      ) : null}
+      {spec.minor ? (
+        <path
+          d={path(spec.minor)}
+          fill="none"
+          stroke={stroke}
+          strokeOpacity={0.14}
+          strokeWidth={0.6}
+          vectorEffect="non-scaling-stroke"
+        />
+      ) : null}
+    </g>
   )
 }
 
