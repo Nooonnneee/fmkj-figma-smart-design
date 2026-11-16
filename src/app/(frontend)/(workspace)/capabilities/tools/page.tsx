@@ -1,5 +1,6 @@
+import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowLeft, ArrowUpRight, Blocks, Contact, Palette } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Blocks } from 'lucide-react'
 
 import { EmptyState } from '@/components/empty-state'
 import { PageHeader } from '@/components/page-header'
@@ -12,11 +13,6 @@ import { redirectToLogin } from '@/lib/login-redirect'
 import { filterFeaturedTools, TOOL_CARD_META } from './page-data'
 
 export const metadata = { title: pageTitle('工具') }
-
-const ICONS = {
-  'floor-plan-style': Palette,
-  'business-card': Contact,
-} as const
 
 export default async function PluginToolsPage() {
   const user = await appAuth.getCurrentUser()
@@ -38,26 +34,45 @@ export default async function PluginToolsPage() {
       <PageHeader title="工具" description="点开即用的工具，无需项目上下文，直接打开就能用。" />
       <div className="grid gap-4 sm:grid-cols-2">
         {tools.map((tool) => {
-          const Icon = ICONS[tool.id as keyof typeof ICONS] ?? Blocks
           const meta = TOOL_CARD_META[tool.id as keyof typeof TOOL_CARD_META]
           return (
             <Link
               key={tool.id}
               href={tool.href}
-              className="group relative overflow-hidden rounded-2xl border border-border/70 bg-card p-5 shadow-xs transition duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-md"
+              className="group flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-xs transition duration-200 hover:border-border hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-safe:hover:-translate-y-0.5"
             >
-              <div className="flex items-start justify-between gap-3">
-                <span
-                  className={`flex size-11 items-center justify-center rounded-xl bg-linear-to-br ${meta.gradient} ${meta.iconOnGradient} shadow-sm`}
-                >
-                  <Icon className="size-5" />
+              <div className="relative aspect-[16/10] overflow-hidden border-b bg-muted/40">
+                <Image
+                  src={meta.cover}
+                  alt={meta.coverAlt}
+                  fill
+                  sizes="(min-width: 640px) 50vw, 100vw"
+                  className="object-cover transition-transform duration-300 motion-safe:group-hover:scale-[1.03]"
+                />
+                <span className="absolute top-3 left-3 rounded-full bg-background/90 px-2.5 py-1 text-xs font-medium text-foreground shadow-xs backdrop-blur-sm">
+                  {meta.chip}
                 </span>
-                <ArrowUpRight className="size-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary" />
+                {/* 封面与内容区之间只留一层很轻的渐隐，避免图片边界抢戏 */}
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-linear-to-t from-background/60 to-transparent"
+                />
               </div>
-              <div className={`mt-4 text-lg font-semibold ${meta.tintText}`}>{tool.name}</div>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                {tool.description}
-              </p>
+              <div className="flex flex-1 flex-col gap-2 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="text-base font-semibold tracking-tight">{tool.name}</h3>
+                  <ArrowUpRight
+                    aria-hidden="true"
+                    className="mt-0.5 size-4 shrink-0 text-muted-foreground transition group-hover:text-foreground motion-safe:group-hover:translate-x-0.5 motion-safe:group-hover:-translate-y-0.5"
+                  />
+                </div>
+                <p className="text-sm leading-relaxed text-muted-foreground">{tool.description}</p>
+                <div className="mt-auto pt-2">
+                  <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                    {meta.footer}
+                  </span>
+                </div>
+              </div>
             </Link>
           )
         })}

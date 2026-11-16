@@ -53,11 +53,29 @@ describe('展示范围静态约束', () => {
     expect(FEATURED_TOOL_IDS).toEqual(['business-card', 'floor-plan-style'])
   })
 
-  it('每张卡都有渐变与主色元数据', () => {
+  it('两张 featured 工具都指向 public 下的真实封面图', () => {
     for (const id of FEATURED_TOOL_IDS) {
-      const meta = TOOL_CARD_META[id]
-      expect(meta.gradient).toBeTruthy()
-      expect(meta.tintText).toBeTruthy()
+      expect(TOOL_CARD_META[id].cover.startsWith('/tool-covers/')).toBe(true)
+    }
+  })
+
+  it('封面 alt 非空且用中文描述工具成品', () => {
+    const expectedAltKeyword = {
+      'business-card': '名片',
+      'floor-plan-style': '户型',
+    } as const
+
+    for (const id of FEATURED_TOOL_IDS) {
+      const { coverAlt } = TOOL_CARD_META[id]
+      expect(coverAlt.trim().length).toBeGreaterThan(0)
+      expect(coverAlt).toContain(expectedAltKeyword[id])
+    }
+  })
+
+  it('每张卡的封面标签和底部规格都非空', () => {
+    for (const id of FEATURED_TOOL_IDS) {
+      expect(TOOL_CARD_META[id].chip.trim().length).toBeGreaterThan(0)
+      expect(TOOL_CARD_META[id].footer.trim().length).toBeGreaterThan(0)
     }
   })
 })
