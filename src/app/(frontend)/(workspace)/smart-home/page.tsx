@@ -1,5 +1,6 @@
 import { Home } from 'lucide-react'
 
+import { BetaBadge } from '@/components/beta-badge'
 import { EmptyState } from '@/components/empty-state'
 import { PageHeader, PageShell } from '@/components/page-header'
 import { loadOverview } from '@/plugins/ha-mcp/overview-loader'
@@ -34,6 +35,7 @@ export default async function SmartHomePage() {
       <PageHeader
         title="智能家居"
         description="只读查看已连接现场 Home Assistant 的总览、实体列表与系统健康。"
+        badge={<BetaBadge />}
       />
       {data.configured ? (
         <SmartHomeClient data={data} />
