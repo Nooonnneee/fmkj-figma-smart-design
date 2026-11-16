@@ -11,6 +11,7 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { useViewportWidth } from '@/hooks/use-viewport-width'
 import { aiPanelMode, shouldShowAiPanel } from '@/lib/ai-panel'
 import {
+  AI_PANEL_COLLAPSED_WIDTH,
   AI_PANEL_DEFAULT_WIDTH,
   clampAiPanelWidth,
   readStoredAiPanelCollapsed,
@@ -18,6 +19,7 @@ import {
   writeAiPanelCollapsed,
   writeAiPanelWidth,
 } from '@/lib/ai-panel-width'
+import { cn } from '@/lib/utils'
 import type { PluginId } from '@/plugins/types'
 
 // 与左侧栏一致：AI 对话面板按需加载，不拖慢其他页面首屏
@@ -166,6 +168,8 @@ export type AiPanelProps = {
  */
 export function AiPanel({ plugins, projects, credits, configured, models, userId }: AiPanelProps) {
   const { enabled, mode, setOpen, open, collapsed, setCollapsed, width, setWidth } = useAiPanel()
+  // 拖拽调宽期间禁用宽度过渡，否则每帧 setWidth 都会被 200ms 缓动追着跑，像是拖不动。
+  const [isDragging, setIsDragging] = React.useState(false)
   if (!enabled || mode === 'pending') return null
 
   const dock = (
@@ -188,6 +192,7 @@ export function AiPanel({ plugins, projects, credits, configured, models, userId
       e.preventDefault()
       const startX = e.clientX
       let latest = width
+      setIsDragging(true)
 
       const onMove = (ev: PointerEvent) => {
         // 右缘贴视口右，拖左缘时本列右缘不动：Δ = 起始左缘 - 当前左缘。
@@ -204,6 +209,7 @@ export function AiPanel({ plugins, projects, credits, configured, models, userId
         window.removeEventListener('pointercancel', onUp)
         document.body.style.userSelect = ''
         document.body.style.cursor = ''
+        setIsDragging(false)
       }
       window.addEventListener('pointermove', onMove)
       window.addEventListener('pointerup', onUp)
@@ -214,62 +220,69 @@ export function AiPanel({ plugins, projects, credits, configured, models, userId
       setWidth(AI_PANEL_DEFAULT_WIDTH)
     }
 
-    // 收起态：只留一条竖着的窄触发条，点它（或中间那个胶囊按钮）再展开，不挤压主体。
-    if (collapsed) {
-      return (
-        <aside
-          data-slot="ai-panel"
-          data-collapsed="true"
-          aria-label="AI 对话（已收起）"
-          className="sticky top-0 flex h-svh w-10 shrink-0 flex-col items-center border-l border-border bg-sidebar"
-        >
-          <IconButton
-            type="button"
-            variant="ghost"
-            size="sm"
-            label="展开 AI 对话"
-            icon={<PanelLeftOpen />}
-            aria-expanded={false}
-            onClick={() => setCollapsed(false)}
-            className="my-2"
-          />
-          <div className="flex-1" data-slot="ai-panel-collapsed-spacer" />
-        </aside>
-      )
-    }
-
+    // 展开/收起共用同一棵 DOM：只改内联宽度，dock 始终挂载。内容外层 overflow-hidden，
+    // 内层保持「展开宽度」不跟着缩，避免动画过程中文字重排；收起时整块淡出并禁用交互。
     return (
       <>
-        {/* 拖拽分隔线：贴右栏左缘，横向调宽；双击恢复默认宽度 */}
+        {/* 拖拽分隔线：贴右栏左缘，横向调宽；双击恢复默认宽度。收起时宽度归零、
+            淡出、移出 Tab 序，不留 4px 残留线。 */}
         <button
           data-slot="ai-panel-resizer"
           type="button"
           aria-label="拖拽调整 AI 对话栏宽度，双击恢复默认宽度"
-          onPointerDown={handleResizePointerDown}
-          onDoubleClick={handleDoubleClick}
-          className="group w-1 shrink-0 cursor-col-resize border-l border-border bg-transparent transition-colors hover:bg-primary/40 focus-visible:bg-primary/40 focus-visible:outline-none"
+          aria-hidden={collapsed || undefined}
+          tabIndex={collapsed ? -1 : undefined}
+          onPointerDown={collapsed ? undefined : handleResizePointerDown}
+          onDoubleClick={collapsed ? undefined : handleDoubleClick}
+          className={cn(
+            'group w-1 shrink-0 cursor-col-resize border-l border-border bg-transparent transition-[width,opacity,background-color] duration-200 ease-linear motion-reduce:transition-none hover:bg-primary/40 focus-visible:bg-primary/40 focus-visible:outline-none',
+            collapsed && 'pointer-events-none w-0 opacity-0',
+          )}
         />
         <aside
           data-slot="ai-panel"
-          aria-label="AI 对话"
-          className="sticky top-0 flex h-svh shrink-0 flex-col border-l-0 bg-sidebar"
-          style={{ width }}
+          data-collapsed={collapsed ? 'true' : undefined}
+          data-dragging={isDragging ? 'true' : undefined}
+          aria-label={collapsed ? 'AI 对话（已收起）' : 'AI 对话'}
+          style={{ width: collapsed ? AI_PANEL_COLLAPSED_WIDTH : width }}
+          className={cn(
+            'sticky top-0 flex h-svh shrink-0 flex-col overflow-hidden bg-sidebar transition-[width] duration-200 ease-linear motion-reduce:transition-none data-[dragging=true]:transition-none',
+            collapsed ? 'border-l border-border' : 'border-l-0',
+          )}
         >
           <div
             data-slot="ai-panel-header"
-            className="flex h-12 shrink-0 items-center justify-end gap-1 border-b border-border px-2"
+            className={cn(
+              'flex h-12 shrink-0 items-center gap-1 px-2',
+              collapsed ? 'justify-center' : 'justify-end border-b border-border',
+            )}
           >
+            {/* 同一个按钮节点，切换 icon / label，点击后焦点不会丢。 */}
             <IconButton
               type="button"
               variant="ghost"
               size="sm"
-              label="收起 AI 对话"
-              icon={<PanelLeftClose />}
+              label={collapsed ? '展开 AI 对话' : '收起 AI 对话'}
+              icon={collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
               aria-expanded={!collapsed}
-              onClick={() => setCollapsed(true)}
+              onClick={() => setCollapsed(!collapsed)}
             />
           </div>
-          <div className="flex min-h-0 flex-1 flex-col">{dock}</div>
+          <div
+            data-slot="ai-panel-content"
+            className="min-h-0 flex-1 overflow-hidden"
+            inert={collapsed}
+          >
+            <div
+              className={cn(
+                'flex h-full flex-col transition-opacity duration-200 ease-linear motion-reduce:transition-none',
+                collapsed && 'pointer-events-none opacity-0',
+              )}
+              style={{ width }}
+            >
+              {dock}
+            </div>
+          </div>
         </aside>
       </>
     )
