@@ -6,7 +6,7 @@
  *                                        + thumbs/<同名>.webp（最长边 720，模板卡用）
  *   public/proposal/photos/scenes/*.jpg → 同名 .webp（最长边 1600、q80）
  *   public/tool-covers/*.jpg            → 同名 .webp（最长边 1600、q80）
- *   public/doc-styles/*.png             → 同名 .webp（宽 720、q80，模板中心卡片 2x 屏用）
+ *   public/doc-styles/*.png             → 同名 .webp（裁成卡片可见的 4:3 顶部、宽 720、q80）
  *
  * 可重复执行：源文件未更新且目标已存在时跳过；`--force` 强制全部重转。
  *
@@ -24,13 +24,14 @@ const JOBS = [
   { dir: 'public/proposal/photos', ext: /\.jpe?g$/i, edge: 1600, thumbs: true },
   { dir: 'public/proposal/photos/scenes', ext: /\.jpe?g$/i, edge: 1600 },
   { dir: 'public/tool-covers', ext: /\.jpe?g$/i, edge: 1600 },
-  // 文档样张在模板中心卡片最宽约 331px；按 720px 宽出图，2x 屏不放大。
-  { dir: 'public/doc-styles', ext: /\.png$/i, edge: 720, resizeBy: 'width' },
+  // 文档样张在模板中心卡片里是 4:3 + object-top，只显示顶部；按 720 宽出图后
+  // 裁到 720×540，既满足 2x 屏，也不把永远看不见的下半页传下去。
+  { dir: 'public/doc-styles', ext: /\.png$/i, edge: 720, resizeBy: 'width', crop: 'top-4:3' },
 ]
 
 const webpPath = (file) => file.replace(/\.(jpe?g|png)$/i, '.webp')
 
-async function render(file, out, maxEdge, resizeBy = 'edge') {
+async function render(file, out, maxEdge, resizeBy = 'edge', crop) {
   const [srcStat, outStat] = await Promise.all([
     fs.stat(file),
     fs.stat(out).catch(() => null),
@@ -42,7 +43,17 @@ async function render(file, out, maxEdge, resizeBy = 'edge') {
       ? { width: maxEdge }
       : { width: maxEdge, height: maxEdge, fit: 'inside', withoutEnlargement: true }
 
-  await sharp(file).rotate().resize(resize).webp({ quality: QUALITY, effort: 6 }).toFile(out)
+  let pipeline = sharp(file).rotate().resize(resize)
+  if (crop === 'top-4:3') {
+    pipeline = pipeline.extract({
+      left: 0,
+      top: 0,
+      width: maxEdge,
+      height: Math.round((maxEdge * 3) / 4),
+    })
+  }
+
+  await pipeline.webp({ quality: QUALITY, effort: 6 }).toFile(out)
   return 'converted'
 }
 
@@ -65,7 +76,7 @@ for (const job of JOBS) {
     results.push({
       out: full,
       src: file,
-      status: await render(file, full, job.edge, job.resizeBy),
+      status: await render(file, full, job.edge, job.resizeBy, job.crop),
     })
 
     if (thumbDir) {
