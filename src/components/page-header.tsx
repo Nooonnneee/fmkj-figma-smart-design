@@ -67,13 +67,22 @@ export function PageHeader({
   title,
   description,
   actions,
+  badge,
   className,
 }: {
   title: React.ReactNode
   description?: React.ReactNode
   actions?: React.ReactNode
+  /** 标题右侧的状态标签（如 Beta）。不传时标题渲染与原来完全一致。 */
+  badge?: React.ReactNode
   className?: string
 }) {
+  const heading = (
+    <Heading level={WORKBENCH_HEADING_LEVEL} maxLines={2}>
+      {title}
+    </Heading>
+  )
+
   return (
     <header
       className={cn(
@@ -82,9 +91,14 @@ export function PageHeader({
       )}
     >
       <VStack gap={1} className="min-w-0">
-        <Heading level={WORKBENCH_HEADING_LEVEL} maxLines={2}>
-          {title}
-        </Heading>
+        {badge ? (
+          <HStack gap={2} vAlign="center" className="min-w-0">
+            {heading}
+            {badge}
+          </HStack>
+        ) : (
+          heading
+        )}
         {description ? (
           <Text type="supporting" maxLines={3} className="max-w-2xl text-pretty text-sm">
             {description}

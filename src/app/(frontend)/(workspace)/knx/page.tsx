@@ -1,5 +1,6 @@
 import { Cable } from 'lucide-react'
 
+import { BetaBadge } from '@/components/beta-badge'
 import { EmptyState } from '@/components/empty-state'
 import { PageHeader, PageShell } from '@/components/page-header'
 import { pageTitle } from '@/lib/brand'
@@ -17,6 +18,7 @@ export default function KnxPage() {
       <PageHeader
         title="KNX / ETS"
         description="面向使用 KNX 总线的现场：工程配置、设备清单与调试入口。"
+        badge={<BetaBadge />}
       />
       <EmptyState
         icon={<Cable className="size-5" />}
