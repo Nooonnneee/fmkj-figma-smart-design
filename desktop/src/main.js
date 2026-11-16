@@ -6,6 +6,12 @@ const path = require('node:path')
 const { fileURLToPath, pathToFileURL } = require('node:url')
 const { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, net, session } = require('electron')
 
+// 客户端显示名从「繁梦空间」改成 Eevee 后，Electron 的默认 userData 目录也会跟着变。
+// 必须在 app.whenReady() 之前、任何 config/store 读写之前迁移，否则新版会先在新目录
+// 写入空设置，老用户会掉登录、重置窗口位置，私有部署地址也会丢。
+const { migrateLegacyUserData } = require('./migrate-user-data')
+migrateLegacyUserData({ appDataPath: app.getPath('appData'), userDataPath: app.getPath('userData') })
+
 const config = require('./config')
 const { readJson, writeJson } = require('./store')
 const { MIN_SIZE, loadWindowState, trackWindowState } = require('./window-state')
