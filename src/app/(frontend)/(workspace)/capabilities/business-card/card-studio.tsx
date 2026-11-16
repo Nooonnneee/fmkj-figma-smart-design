@@ -7,7 +7,6 @@ import { ArrowLeft, Box, Check, Download, Info, Phone, QrCode, RotateCcw, User }
 import { BusinessCard } from '@/components/business-card'
 import { PageHeader } from '@/components/page-header'
 import { ScaledFrame } from '@/components/scaled-frame'
-import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
 import { Card } from '@astryxdesign/core/Card'
 import { CheckboxInput } from '@astryxdesign/core/CheckboxInput'
@@ -350,10 +349,10 @@ export function CardStudio({
           </p>
         </Card>
 
-        {/* 右栏：预览区 */}
-        <div className="flex min-w-0 flex-1 flex-col gap-4">
+        {/* 右栏：预览区（容器查询，按自身宽度决定正反面并排） */}
+        <div className="@container flex min-w-0 flex-1 flex-col gap-4">
           <Card className="gap-3">
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               {/* 版式缩略图切换器：每张显示该版式正面 */}
               <div className="grid min-w-0 flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
                 {CARD_VARIANTS.map((variant) => {
@@ -464,9 +463,9 @@ export function CardStudio({
               <>
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-sm font-semibold">{previewVariant.name}</h2>
-                  <Badge variant="neutral" className="text-xs" label={previewVariant.note} />
+                  <span className="text-xs text-muted-foreground">{previewVariant.note}</span>
                 </div>
-                <div className="grid gap-4 xl:grid-cols-2">
+                <div className="grid gap-4 @[600px]:grid-cols-2">
                   {(['front', 'back'] as CardSide[]).map((side) => (
                     <div key={side} className="flex min-w-0 flex-col gap-1.5">
                       <div className="flex items-center justify-between">
