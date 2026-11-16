@@ -19,6 +19,12 @@ function writeSentinel(dir, log) {
 function cleanupPartialCopy(legacyPath, currentPath, targetExisted, log) {
   try {
     if (!targetExisted) {
+      // 并发启动时，另一个实例可能已经赢了 rename：旧目录消失说明目标目录现在是
+      // 它迁好的数据，绝不能整目录删掉。
+      if (!fs.existsSync(legacyPath)) {
+        log('[desktop] 旧数据目录已被另一个实例迁移，跳过清理目标目录')
+        return
+      }
       fs.rmSync(currentPath, { recursive: true, force: true })
       return
     }

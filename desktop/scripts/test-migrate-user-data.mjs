@@ -143,6 +143,38 @@ test('rename 失败（跨设备）时退化为复制', (appDataPath) => {
   assert.equal(fs.existsSync(legacy), false)
 })
 
+test('并发：旧目录在复制前被另一实例移走时不得清理目标目录', (appDataPath) => {
+  const legacy = createLegacy(appDataPath, { 'settings.json': '{"serverUrl":"https://winner.example"}' })
+  const target = targetPath(appDataPath)
+
+  const originalRename = fs.renameSync
+  const originalCp = fs.cpSync
+  fs.renameSync = () => {
+    const error = new Error('EXDEV: cross-device link not permitted')
+    error.code = 'EXDEV'
+    throw error
+  }
+  fs.cpSync = () => {
+    // 模拟另一个实例在本次 cpSync 之前赢下了 rename
+    originalRename(legacy, target)
+    fs.writeFileSync(path.join(target, 'winner.txt'), 'winner')
+    throw new Error('ENOENT: no such file or directory')
+  }
+  let result
+  try {
+    result = migrateLegacyUserData({ appDataPath, userDataPath: target, log: () => {} })
+  } finally {
+    fs.renameSync = originalRename
+    fs.cpSync = originalCp
+  }
+
+  assert.equal(result, 'failed')
+  assert.equal(fs.existsSync(target), true, '不能删掉另一个实例迁好的目标目录')
+  assert.equal(read(path.join(target, 'settings.json')), '{"serverUrl":"https://winner.example"}')
+  assert.equal(read(path.join(target, 'winner.txt')), 'winner')
+  assert.equal(fs.existsSync(legacy), false)
+})
+
 fs.rmSync(tempRoot, { recursive: true, force: true })
 if (failures) {
   console.error(`\n${failures} 项迁移测试未通过`)
