@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils'
  * 不要把 `max-w-*` 加在含标题的外层容器上 —— 那会让这条竖线重新错位。
  *
  * 营销页（`/templates` 的 72px 主视觉、首页）不在本规格内。
+ * （点位图编辑器页 `/projects/[id]/point-map` 是全宽画布工作区，无页面标题，属编辑器例外，不在本竖线规格内——见 point-map-editor.tsx 的 full-bleed 布局。）
  */
 export const WORKBENCH_HEADING_LEVEL = 1
 
