@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Wrench } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
+import { WORKBENCH_PAGE_CLASS, WORKBENCH_SECTION_HEADING_CLASS } from '@/components/page-header'
 import { relId } from '@/lib/access'
 import { loadAfterSales } from '@/lib/services/after-sales-service'
 import { PLUGINS } from '@/plugins'
@@ -24,17 +25,19 @@ export default async function ProjectAfterSalesPage({
 
   if (!flags['after-sales'] || !plugin) {
     return (
-      <section className="mx-auto flex w-full max-w-3xl flex-col items-center gap-4 rounded-xl border border-dashed px-6 py-16 text-center">
-        <span className="flex size-12 items-center justify-center rounded-full bg-muted">
-          <Wrench className="size-5 text-muted-foreground" />
-        </span>
-        <div className="space-y-1.5">
-          <h2 className="text-lg font-semibold">售后维保记录</h2>
-          <p className="max-w-md text-sm text-muted-foreground">
-            这项能力目前不可用。可用时可以按合同质保期追踪检修、设备更换与配置备份。
-          </p>
+      <section className={WORKBENCH_PAGE_CLASS}>
+        <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed px-6 py-16 text-center">
+          <span className="flex size-12 items-center justify-center rounded-full bg-muted">
+            <Wrench className="size-5 text-muted-foreground" />
+          </span>
+          <div className="space-y-1.5">
+            <h2 className={WORKBENCH_SECTION_HEADING_CLASS}>售后维保记录</h2>
+            <p className="max-w-md text-sm text-muted-foreground">
+              这项能力目前不可用。可用时可以按合同质保期追踪检修、设备更换与配置备份。
+            </p>
+          </div>
+          <Button size="sm" href="/capabilities/after-sales" label="去能力中心查看" />
         </div>
-        <Button size="sm" href="/capabilities/after-sales" label="去能力中心查看" />
       </section>
     )
   }
