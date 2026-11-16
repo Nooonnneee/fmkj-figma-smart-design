@@ -8,7 +8,7 @@
 export const AI_PANEL_MIN_WIDTH = 240
 export const AI_PANEL_DEFAULT_WIDTH = 320
 export const AI_PANEL_MAX_WIDTH = 480
-/** 收起后的竖条宽度，与左栏 icon 态同宽（原来的 w-10）。 */
+/** 收起后的竖条宽度，与旧收起态 w-10 一致。 */
 export const AI_PANEL_COLLAPSED_WIDTH = 40
 /** localStorage 键名，与 sidebar.tsx 的 `fmkj:sidebar-width` 一致命名空间。 */
 export const AI_PANEL_WIDTH_STORAGE_KEY = 'fmkj:ai-panel-width'

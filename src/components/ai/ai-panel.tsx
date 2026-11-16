@@ -170,6 +170,19 @@ export function AiPanel({ plugins, projects, credits, configured, models, userId
   const { enabled, mode, setOpen, open, collapsed, setCollapsed, width, setWidth } = useAiPanel()
   // 拖拽调宽期间禁用宽度过渡，否则每帧 setWidth 都会被 200ms 缓动追着跑，像是拖不动。
   const [isDragging, setIsDragging] = React.useState(false)
+  // 持久化的收起态/宽度是挂载后从 localStorage 读回来的。首帧先不开过渡，等浏览器
+  // 至少画过一帧、存储状态落定后再启用；否则刷新时能看到 320→40 的收缩动画。
+  const [transitionsEnabled, setTransitionsEnabled] = React.useState(false)
+  React.useEffect(() => {
+    let inner = 0
+    const outer = window.requestAnimationFrame(() => {
+      inner = window.requestAnimationFrame(() => setTransitionsEnabled(true))
+    })
+    return () => {
+      window.cancelAnimationFrame(outer)
+      if (inner) window.cancelAnimationFrame(inner)
+    }
+  }, [])
   if (!enabled || mode === 'pending') return null
 
   const dock = (
@@ -224,20 +237,16 @@ export function AiPanel({ plugins, projects, credits, configured, models, userId
     // 内层保持「展开宽度」不跟着缩，避免动画过程中文字重排；收起时整块淡出并禁用交互。
     return (
       <>
-        {/* 拖拽分隔线：贴右栏左缘，横向调宽；双击恢复默认宽度。收起时宽度归零、
-            淡出、移出 Tab 序，不留 4px 残留线。 */}
+        {/* 拖拽分隔线：贴右栏左缘，横向调宽；双击恢复默认宽度。
+            收起时直接 hidden，既不留 4px 残留线，也自然退出焦点序。 */}
         <button
           data-slot="ai-panel-resizer"
           type="button"
           aria-label="拖拽调整 AI 对话栏宽度，双击恢复默认宽度"
-          aria-hidden={collapsed || undefined}
-          tabIndex={collapsed ? -1 : undefined}
-          onPointerDown={collapsed ? undefined : handleResizePointerDown}
-          onDoubleClick={collapsed ? undefined : handleDoubleClick}
-          className={cn(
-            'group w-1 shrink-0 cursor-col-resize border-l border-border bg-transparent transition-[width,opacity,background-color] duration-200 ease-linear motion-reduce:transition-none hover:bg-primary/40 focus-visible:bg-primary/40 focus-visible:outline-none',
-            collapsed && 'pointer-events-none w-0 opacity-0',
-          )}
+          hidden={collapsed}
+          onPointerDown={handleResizePointerDown}
+          onDoubleClick={handleDoubleClick}
+          className="group w-1 shrink-0 cursor-col-resize border-l border-border bg-transparent transition-colors hover:bg-primary/40 focus-visible:bg-primary/40 focus-visible:outline-none"
         />
         <aside
           data-slot="ai-panel"
@@ -246,15 +255,19 @@ export function AiPanel({ plugins, projects, credits, configured, models, userId
           aria-label={collapsed ? 'AI 对话（已收起）' : 'AI 对话'}
           style={{ width: collapsed ? AI_PANEL_COLLAPSED_WIDTH : width }}
           className={cn(
-            'sticky top-0 flex h-svh shrink-0 flex-col overflow-hidden bg-sidebar transition-[width] duration-200 ease-linear motion-reduce:transition-none data-[dragging=true]:transition-none',
+            'sticky top-0 flex h-svh shrink-0 flex-col overflow-hidden bg-sidebar data-[dragging=true]:transition-none',
+            transitionsEnabled &&
+              'transition-[width] duration-200 ease-linear motion-reduce:transition-none',
             collapsed ? 'border-l border-border' : 'border-l-0',
           )}
         >
+          {/* 始终 justify-end：按钮贴着右缘随宽度收拢，避免收起瞬间横向跳到面板中间。
+              收起时 40px 内右留 6px，28px 按钮正好居中（6 / 28 / 6）。 */}
           <div
             data-slot="ai-panel-header"
             className={cn(
-              'flex h-12 shrink-0 items-center gap-1 px-2',
-              collapsed ? 'justify-center' : 'justify-end border-b border-border',
+              'flex h-12 shrink-0 items-center justify-end gap-1',
+              collapsed ? 'pe-1.5' : 'px-2 border-b border-border',
             )}
           >
             {/* 同一个按钮节点，切换 icon / label，点击后焦点不会丢。 */}
@@ -275,7 +288,9 @@ export function AiPanel({ plugins, projects, credits, configured, models, userId
           >
             <div
               className={cn(
-                'flex h-full flex-col transition-opacity duration-200 ease-linear motion-reduce:transition-none',
+                'flex h-full flex-col',
+                transitionsEnabled &&
+                  'transition-opacity duration-200 ease-linear motion-reduce:transition-none',
                 collapsed && 'pointer-events-none opacity-0',
               )}
               style={{ width }}
