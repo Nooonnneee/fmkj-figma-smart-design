@@ -171,6 +171,24 @@ export function CardStudio({
   const togglePick = (key: string) =>
     setPicked((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]))
 
+  /**
+   * 截图前确保离屏舞台用的是内联好的素材。
+   *
+   * `setAssets` 只排队重渲染，React 不保证它在下一行截图之前提交；
+   * 极端场景（刚挂载 / 跳走再回来立刻导出）会截到还是 URL 素材的那一版，
+   * 导出的 PNG 就少 logo 和二维码。所以 setAssets 之后等两帧，
+   * 让 React 提交、浏览器完成一次绘制，再让调用方去读舞台节点。
+   */
+  const ensureAssets = async () => {
+    if (assets) return assets
+    const loaded = await inlineAssets()
+    setAssets(loaded)
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    )
+    return loaded
+  }
+
   const nodeFor = (variantKey: string, side: CardSide) => {
     const node = exportNodes.current.get(`${variantKey}-${side}`)
     if (!node) throw new Error('画布还没准备好，稍后重试')
@@ -183,7 +201,7 @@ export function CardStudio({
     const id = `${variantKey}-${side}`
     setExporting(id)
     try {
-      if (!assets) setAssets(await inlineAssets())
+      await ensureAssets()
       const bytes = await renderCardPng(nodeFor(variantKey, side))
       const name = cardFileName(variant, side)
       downloadBlob(new Blob([bytes as BlobPart], { type: 'image/png' }), name)
@@ -205,7 +223,7 @@ export function CardStudio({
     }
     setExporting('all')
     try {
-      if (!assets) setAssets(await inlineAssets())
+      await ensureAssets()
       const entries: { name: string; data: Uint8Array }[] = []
       for (const variant of CARD_VARIANTS.filter((v) => picked.includes(v.key))) {
         for (const side of ['front', 'back'] as CardSide[]) {
@@ -327,7 +345,9 @@ export function CardStudio({
               </button>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground">公司抬头与二维码来自「设置 → 公司资料」。</p>
+          <p className="text-xs text-muted-foreground">
+            公司抬头与二维码来自「设置 → 公司资料」，这里只临时改姓名、头衔、电话、网站。
+          </p>
         </Card>
 
         {/* 右栏：预览区 */}
