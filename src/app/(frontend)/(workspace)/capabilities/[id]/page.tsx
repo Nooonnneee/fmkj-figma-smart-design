@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Bot, Clock, ExternalLink, FolderKanban, Settings } from 'lucide-react'
+import { ArrowLeft, Clock, ExternalLink, FolderKanban, Settings } from 'lucide-react'
 
 import { PageHeader } from '@/components/page-header'
 import { Badge } from '@astryxdesign/core/Badge'
@@ -78,13 +78,6 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
           icon={<ArrowLeft />}
           label="返回能力中心"
         />
-        <Button
-          variant="secondary"
-          size="sm"
-          href={`/ai?plugin=${plugin.id}`}
-          icon={<Bot />}
-          label="在 AI 对话中连接"
-        />
       </div>
 
       <PageHeader
@@ -134,18 +127,9 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
                 {plugin.id === 'ai-copilot' ? (
                   <div className="space-y-4 border-t pt-4">
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          内置对话技能模板（{DEFAULT_AI_TEMPLATES.length} 套）
-                        </span>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          href="/ai"
-                          icon={<Bot />}
-                          label="打开 AI 对话工作台"
-                        />
-                      </div>
+                      <span className="text-xs font-medium text-muted-foreground">
+                        内置对话技能模板（{DEFAULT_AI_TEMPLATES.length} 套）
+                      </span>
                       <div className="grid gap-2 sm:grid-cols-2">
                         {DEFAULT_AI_TEMPLATES.map((tpl) => {
                           const m =
@@ -329,10 +313,7 @@ export default async function PluginDetailPage({ params }: { params: Promise<{ i
           title={`「${plugin.name}」尚在待开发阶段`}
           description={`规划能力：${plugin.provides.join('、')}`}
           action={
-            <>
-              <Button variant="secondary" size="sm" href="/capabilities" label="返回能力中心" />
-              <Button size="sm" href={`/ai?plugin=${plugin.id}`} label="去 AI 对话推演需求" />
-            </>
+            <Button variant="secondary" size="sm" href="/capabilities" label="返回能力中心" />
           }
         />
       ) : (

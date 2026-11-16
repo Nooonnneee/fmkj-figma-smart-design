@@ -7,7 +7,6 @@ import {
   ArrowRight,
   ChevronDown,
   Loader2,
-  Maximize2,
   MoreHorizontal,
   Sparkles,
   SquarePen,
@@ -848,19 +847,7 @@ export function AiSidebarDock({
               />
             )}
           >
-            <DropdownMenuGroup title={<span className="tabular-nums">剩余 {credits} 积分</span>}>
-              {/* 本仓没有挂 LinkProvider，href 会整页跳转；
-                  用 preventDefault + router.push 保持原来的客户端导航。 */}
-              <DropdownMenuItem
-                label="全屏打开"
-                icon={<Maximize2 className="size-4" />}
-                href="/ai"
-                onClick={(e) => {
-                  e.preventDefault()
-                  router.push('/ai')
-                }}
-              />
-            </DropdownMenuGroup>
+            <DropdownMenuGroup title={<span className="tabular-nums">剩余 {credits} 积分</span>} />
             <DropdownMenuDivider />
             {/* 官方的菜单行是唯一可交互目标（不允许在行内再嵌按钮），
                 所以删除从「每行悬浮按钮」改为在这里删除当前打开的对话。 */}
