@@ -261,7 +261,7 @@ export function AfterSalesBoard({
   const backups = data.records.filter((r) => r.type === 'backup')
 
   return (
-    <section className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
           <div className="flex items-center gap-2">

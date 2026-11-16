@@ -91,7 +91,7 @@ export function ProjectOverview({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -131,7 +131,7 @@ export function ProjectOverview({
               {/* 现场勘测：目前只有一份勘测确认单（Beta），入口放在基础资料区 */}
               <BetaDocLink label="现场勘测" href={`/print/projects/${data.id}/survey`} />
             </div>
-            <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 px-5 pt-5 pb-4">
+            <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 px-5 py-4">
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">客户</p>
                 <p

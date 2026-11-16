@@ -317,7 +317,7 @@ export default async function ProjectArchivePage({ params }: { params: Promise<{
   )
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <h2 className={WORKBENCH_SECTION_HEADING_CLASS}>归档</h2>

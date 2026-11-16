@@ -93,7 +93,7 @@ export default async function AiPage({
     : undefined
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
       <PageHeader
         title="AI 对话"
         description="在本页直接向 AI 提问、拖入户型图或点开一个常用任务。"

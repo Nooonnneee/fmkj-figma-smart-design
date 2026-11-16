@@ -32,7 +32,7 @@ export default function TemplateCenterPage() {
   const docStyles = allStyles()
 
   return (
-    <section className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+    <section className="mx-auto flex w-full max-w-5xl flex-col gap-5">
       <PageHeader
         title="模板中心"
         description="方案模板、点位图显示方案与文档风格，集中在这里查看。"

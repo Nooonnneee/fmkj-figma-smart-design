@@ -857,7 +857,7 @@ export function QuoteEditor({
       >
         {/* IBM Carbon 数据表格工具条（当勾选行时切换为品牌蓝紫批量操作条） */}
         {activeSelectedKeys.size > 0 && viewMode === 'summary' && !readOnly ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary bg-primary px-4 py-2.5 text-primary-foreground sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary bg-primary px-4 py-2.5 text-primary-foreground sm:px-5">
             <div className="flex items-center gap-3 text-xs font-medium">
               <span className="inline-flex items-center gap-1.5 font-semibold">
                 <CheckSquare className="size-4" />
@@ -916,7 +916,7 @@ export function QuoteEditor({
           </div>
         ) : null}
 
-        <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-border bg-subtle/40 px-4 py-3 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-border bg-subtle/40 px-4 py-3 sm:px-5">
           <div className="flex flex-wrap items-center gap-2.5">
             <div className="shrink-0 font-heading text-sm font-semibold whitespace-nowrap text-foreground">
               设备明细清单
@@ -1230,7 +1230,7 @@ export function QuoteEditor({
                                     </div>
                                   </div>
                                 </div>
-                                <div className="flex flex-wrap items-center justify-between gap-2 pl-12 text-xs tabular-nums sm:shrink-0 sm:flex-col sm:items-end sm:justify-center sm:gap-0 sm:pl-0 sm:text-right">
+                                <div className="flex flex-wrap items-center justify-between gap-2 pl-[calc(var(--spacing)*10+var(--spacing)*2.5)] text-xs tabular-nums sm:shrink-0 sm:flex-col sm:items-end sm:justify-center sm:gap-0 sm:pl-0 sm:text-right">
                                   <div className="flex items-center gap-1 text-muted-foreground sm:order-2 sm:mt-1 sm:justify-end">
                                     <span>¥</span>
                                     <EditableNumber
@@ -1344,7 +1344,7 @@ export function QuoteEditor({
                         />
                       )}
                     </div>
-                    <div className="flex flex-wrap items-center justify-between gap-2 pl-12 text-xs tabular-nums">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pl-[calc(var(--spacing)*10+var(--spacing)*2.5)] text-xs tabular-nums">
                       <div className="flex items-center gap-1.5">
                         <span className="text-muted-foreground">单价</span>
                         {numInput(
@@ -1370,7 +1370,7 @@ export function QuoteEditor({
                       if (originPrice === undefined || Math.abs(originPrice - l.price) <= 0.001)
                         return null
                       return (
-                        <div className="flex items-center justify-end gap-1 pl-12 text-xs text-warning tabular-nums">
+                        <div className="flex items-center justify-end gap-1 pl-[calc(var(--spacing)*10+var(--spacing)*2.5)] text-xs text-warning tabular-nums">
                           <span>原价 {yuan(originPrice)}</span>
                           {!readOnly ? (
                             <Button
@@ -1737,18 +1737,25 @@ export function QuoteEditor({
         </AstryxCard>
       </div>
 
-      <Field label="报价备注" inputID="notes">
-        <TextArea
-          id="notes"
-          label="报价备注"
-          isLabelHidden
-          rows={3}
-          value={quote.notes}
-          isDisabled={readOnly}
-          placeholder="例如：报价有效期 30 天；含一年免费上门维护"
-          onChange={(v) => update({ notes: v })}
-        />
-      </Field>
+      <AstryxCard
+        padding={0}
+        className="border-0 bg-card text-sm text-card-foreground shadow-xs ring-1 ring-border"
+      >
+        <div className="px-5 pb-5 pt-4">
+          <Field label="报价备注" inputID="notes">
+            <TextArea
+              id="notes"
+              label="报价备注"
+              isLabelHidden
+              rows={3}
+              value={quote.notes}
+              isDisabled={readOnly}
+              placeholder="例如：报价有效期 30 天；含一年免费上门维护"
+              onChange={(v) => update({ notes: v })}
+            />
+          </Field>
+        </div>
+      </AstryxCard>
 
       {margin ? (
         <MarginCapsule
