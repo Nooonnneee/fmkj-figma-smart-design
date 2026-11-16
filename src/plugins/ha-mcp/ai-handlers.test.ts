@@ -12,11 +12,12 @@ describe('ha-mcp handlers', () => {
     vi.restoreAllMocks()
   })
 
-  it('未配置时给出明确提示，不抛错', async () => {
+  it('未配置时给出明确提示，不抛错，且不向用户暴露环境变量名', async () => {
     delete process.env.HA_MCP_ENDPOINT
     const r = await haMcpHandlers.ha_get_overview({}, {} as never)
     expect(r.summary).toBe('未配置 HA 连接')
-    expect(JSON.stringify(r.result)).toContain('HA_MCP_ENDPOINT')
+    expect(JSON.stringify(r.result)).toContain('联系管理员')
+    expect(JSON.stringify(r.result)).not.toContain('HA_MCP_ENDPOINT')
   })
 
   it('缺参数时直接拒绝，不走网络', async () => {

@@ -19,8 +19,25 @@ export function clampAiPanelWidth(value: number): number {
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
-/** 从持久存储读出已保存的宽度；无有效值/越界时回落到默认。 */
-export function readStoredAiPanelWidth(storage: StorageLike = window.localStorage): number {
+/**
+ * 取默认存储；SSR（无 window）或 localStorage 不可用时返回 null。
+ *
+ * 注意别把 `window.localStorage` 写回默认参数：默认参数在**调用时**求值，
+ * 服务端渲染没有 window，会在调用处直接抛 ReferenceError。这里用
+ * `typeof window` 判断，未定义时也不抛错。
+ */
+function getDefaultStorage(): StorageLike | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return window.localStorage
+  } catch {
+    return null
+  }
+}
+
+/** 从持久存储读出已保存的宽度；无存储/无有效值/越界时回落到默认。 */
+export function readStoredAiPanelWidth(storage: StorageLike | null = getDefaultStorage()): number {
+  if (!storage) return AI_PANEL_DEFAULT_WIDTH
   try {
     const saved = storage.getItem(AI_PANEL_WIDTH_STORAGE_KEY)
     const parsed = saved ? Number(saved) : NaN
@@ -31,8 +48,12 @@ export function readStoredAiPanelWidth(storage: StorageLike = window.localStorag
   return AI_PANEL_DEFAULT_WIDTH
 }
 
-/** 把宽度写回持久存储；写失败静默忽略（隐私模式等场景）。 */
-export function writeAiPanelWidth(value: number, storage: StorageLike = window.localStorage): void {
+/** 把宽度写回持久存储；无存储/写失败静默忽略（SSR、隐私模式等场景）。 */
+export function writeAiPanelWidth(
+  value: number,
+  storage: StorageLike | null = getDefaultStorage(),
+): void {
+  if (!storage) return
   try {
     storage.setItem(AI_PANEL_WIDTH_STORAGE_KEY, String(clampAiPanelWidth(value)))
   } catch {
@@ -40,8 +61,11 @@ export function writeAiPanelWidth(value: number, storage: StorageLike = window.l
   }
 }
 
-/** 读出收起态；默认展开。 */
-export function readStoredAiPanelCollapsed(storage: StorageLike = window.localStorage): boolean {
+/** 读出收起态；无存储时默认展开。 */
+export function readStoredAiPanelCollapsed(
+  storage: StorageLike | null = getDefaultStorage(),
+): boolean {
+  if (!storage) return false
   try {
     return storage.getItem(AI_PANEL_COLLAPSED_STORAGE_KEY) === '1'
   } catch {
@@ -49,11 +73,12 @@ export function readStoredAiPanelCollapsed(storage: StorageLike = window.localSt
   }
 }
 
-/** 写入收起态。 */
+/** 写入收起态；无存储时静默忽略。 */
 export function writeAiPanelCollapsed(
   collapsed: boolean,
-  storage: StorageLike = window.localStorage,
+  storage: StorageLike | null = getDefaultStorage(),
 ): void {
+  if (!storage) return
   try {
     storage.setItem(AI_PANEL_COLLAPSED_STORAGE_KEY, collapsed ? '1' : '0')
   } catch {

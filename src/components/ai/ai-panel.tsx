@@ -85,10 +85,16 @@ export function AiPanelProvider({
   const [open, setOpen] = React.useState(false)
   const show = enabled && shouldShowAiPanel(pathname)
 
-  // 宽屏常驻列：宽度与收起态。首帧读 localStorage（刷新保持），默认 320 / 展开。
-  // 只在 inline 模式有意义；drawer 抽屉有自己的宽度，不参与。
-  const [collapsed, setCollapsed] = React.useState<boolean>(() => readStoredAiPanelCollapsed())
-  const [panelWidth, setPanelWidth] = React.useState<number>(() => readStoredAiPanelWidth())
+  // 宽屏常驻列：宽度与收起态。初始值固定为默认（320 / 展开），SSR 与首次
+  // 客户端渲染一致，避免 hydration 不匹配；挂载后再从 localStorage 读回并
+  // setState（刷新保持）。只在 inline 模式有意义；drawer 抽屉有自己的宽度，不参与。
+  const [collapsed, setCollapsed] = React.useState<boolean>(false)
+  const [panelWidth, setPanelWidth] = React.useState<number>(AI_PANEL_DEFAULT_WIDTH)
+
+  React.useEffect(() => {
+    setCollapsed(readStoredAiPanelCollapsed())
+    setPanelWidth(readStoredAiPanelWidth())
+  }, [])
 
   const value = React.useMemo<AiPanelContextValue>(
     () => ({

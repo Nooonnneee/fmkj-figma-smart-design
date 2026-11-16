@@ -18,9 +18,12 @@ const TITLES: [RegExp, string][] = [
   [/^\/projects/, '项目'],
   [/^\/quotes/, '报价'],
   [/^\/products/, '产品库'],
+  [/^\/knx/, 'KNX / ETS'],
+  [/^\/smart-home/, '智能家居'],
   // 2026-11-09 起 URL 从 /plugins 改名 /capabilities（旧路径 301）。
   // 细分路由必须排在通配前面：/capabilities/templates 的顶栏应显示「模板中心」，
   // 不是父级「能力中心」——否则面包屑与页面标题对不上。
+  [/^\/capabilities\/business-card/, '名片'],
   [/^\/capabilities\/templates/, '模板中心'],
   [/^\/capabilities\/tools/, '全部工具'],
   [/^\/capabilities/, '能力中心'],
