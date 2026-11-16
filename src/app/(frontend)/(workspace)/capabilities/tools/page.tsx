@@ -1,13 +1,5 @@
 import Link from 'next/link'
-import {
-  ArrowLeft,
-  ArrowUpRight,
-  Blocks,
-  Contact,
-  Image as ImageIcon,
-  Palette,
-  Sparkles,
-} from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Blocks, Contact, Palette } from 'lucide-react'
 
 import { EmptyState } from '@/components/empty-state'
 import { PageHeader } from '@/components/page-header'
@@ -17,16 +9,12 @@ import { pageTitle } from '@/lib/brand'
 import { PLUGIN_TOOLS } from '@/lib/plugin-tools'
 import { getPluginFlags } from '@/plugins/state'
 import { redirectToLogin } from '@/lib/login-redirect'
+import { filterFeaturedTools, TOOL_CARD_META } from './page-data'
 
 export const metadata = { title: pageTitle('工具') }
 
 const ICONS = {
-  'ai-chat': Sparkles,
-  'ai-image': ImageIcon,
   'floor-plan-style': Palette,
-  'proposal-templates': Blocks,
-  'doc-styles': Blocks,
-  'usage-reports': Blocks,
   'business-card': Contact,
 } as const
 
@@ -34,7 +22,9 @@ export default async function PluginToolsPage() {
   const user = await appAuth.getCurrentUser()
   if (!user) return redirectToLogin()
   const flags = await getPluginFlags(user.id)
-  const tools = PLUGIN_TOOLS.filter((tool) => flags[tool.pluginId])
+  const available = PLUGIN_TOOLS.filter((tool) => flags[tool.pluginId])
+  const tools = filterFeaturedTools(available)
+
   return (
     <section className="mx-auto flex w-full max-w-5xl flex-col gap-5">
       <Button
@@ -45,27 +35,27 @@ export default async function PluginToolsPage() {
         icon={<ArrowLeft />}
         label="返回能力中心"
       />
-      <PageHeader
-        title="工具"
-        description="可以独立打开的功能页面，点开即用、按 AI 积分计费；需要项目上下文的入口仍从项目内进入。"
-      />
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <PageHeader title="工具" description="点开即用的工具，无需项目上下文，直接打开就能用。" />
+      <div className="grid gap-4 sm:grid-cols-2">
         {tools.map((tool) => {
           const Icon = ICONS[tool.id as keyof typeof ICONS] ?? Blocks
+          const meta = TOOL_CARD_META[tool.id as keyof typeof TOOL_CARD_META]
           return (
             <Link
               key={tool.id}
               href={tool.href}
-              className="group rounded-2xl border bg-card p-4 shadow-xs transition hover:border-primary/40 hover:bg-muted/20"
+              className="group relative overflow-hidden rounded-2xl border border-border/70 bg-card p-5 shadow-xs transition duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-md"
             >
               <div className="flex items-start justify-between gap-3">
-                <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <Icon className="size-4" />
+                <span
+                  className={`flex size-11 items-center justify-center rounded-xl bg-linear-to-br ${meta.gradient} ${meta.iconOnGradient} shadow-sm`}
+                >
+                  <Icon className="size-5" />
                 </span>
-                <ArrowUpRight className="size-4 text-muted-foreground transition group-hover:text-primary" />
+                <ArrowUpRight className="size-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary" />
               </div>
-              <div className="mt-3 text-sm font-medium">{tool.name}</div>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              <div className={`mt-4 text-lg font-semibold ${meta.tintText}`}>{tool.name}</div>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                 {tool.description}
               </p>
             </Link>
