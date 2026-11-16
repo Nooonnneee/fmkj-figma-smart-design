@@ -3,13 +3,21 @@
 import * as React from 'react'
 import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
-import { MessageSquareText, X } from 'lucide-react'
+import { MessageSquareText, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
 import { IconButton } from '@astryxdesign/core/IconButton'
 
 import type { AiModelOption, AiProjectContext } from '@/components/ai/ai-elements'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { useViewportWidth } from '@/hooks/use-viewport-width'
 import { aiPanelMode, shouldShowAiPanel } from '@/lib/ai-panel'
+import {
+  AI_PANEL_DEFAULT_WIDTH,
+  clampAiPanelWidth,
+  readStoredAiPanelCollapsed,
+  readStoredAiPanelWidth,
+  writeAiPanelCollapsed,
+  writeAiPanelWidth,
+} from '@/lib/ai-panel-width'
 import type { PluginId } from '@/plugins/types'
 
 // 与左侧栏一致：AI 对话面板按需加载，不拖慢其他页面首屏
@@ -39,6 +47,12 @@ type AiPanelContextValue = {
   mode: 'inline' | 'drawer' | 'pending'
   open: boolean
   setOpen: (open: boolean) => void
+  /** 宽屏常驻列：收起后只留一条窄触发条；窄屏抽屉不参与 */
+  collapsed: boolean
+  setCollapsed: (collapsed: boolean) => void
+  /** 宽屏常驻列的当前宽度（px），未拖宽时为默认 320 */
+  width: number
+  setWidth: (width: number) => void
 }
 
 const AiPanelContext = React.createContext<AiPanelContextValue | null>(null)
@@ -71,10 +85,33 @@ export function AiPanelProvider({
   const [open, setOpen] = React.useState(false)
   const show = enabled && shouldShowAiPanel(pathname)
 
+  // 宽屏常驻列：宽度与收起态。首帧读 localStorage（刷新保持），默认 320 / 展开。
+  // 只在 inline 模式有意义；drawer 抽屉有自己的宽度，不参与。
+  const [collapsed, setCollapsed] = React.useState<boolean>(() => readStoredAiPanelCollapsed())
+  const [panelWidth, setPanelWidth] = React.useState<number>(() => readStoredAiPanelWidth())
+
   const value = React.useMemo<AiPanelContextValue>(
-    () => ({ enabled: show, mode, open, setOpen }),
-    [show, mode, open],
+    () => ({
+      enabled: show,
+      mode,
+      open,
+      setOpen,
+      collapsed,
+      setCollapsed,
+      width: panelWidth,
+      setWidth: setPanelWidth,
+    }),
+    [show, mode, open, collapsed, panelWidth],
   )
+
+  // 拖宽 / 收起后写回 localStorage，刷新保持（与 sidebar.tsx 的做法一致，忽略写失败）。
+  React.useEffect(() => {
+    writeAiPanelWidth(panelWidth)
+  }, [panelWidth])
+
+  React.useEffect(() => {
+    writeAiPanelCollapsed(collapsed)
+  }, [collapsed])
 
   return <AiPanelContext.Provider value={value}>{children}</AiPanelContext.Provider>
 }
@@ -122,7 +159,7 @@ export type AiPanelProps = {
  * （如报价单右下的毛利胶囊，z-30）浮到本栏上面；流式列没有这个问题。
  */
 export function AiPanel({ plugins, projects, credits, configured, models, userId }: AiPanelProps) {
-  const { enabled, mode, setOpen, open } = useAiPanel()
+  const { enabled, mode, setOpen, open, collapsed, setCollapsed, width, setWidth } = useAiPanel()
   if (!enabled || mode === 'pending') return null
 
   const dock = (
@@ -137,14 +174,98 @@ export function AiPanel({ plugins, projects, credits, configured, models, userId
   )
 
   if (mode === 'inline') {
+    // 拖左缘调宽（右缘贴视口右，拖左侧即改本列宽度）。抄 sidebar.tsx 的 SidebarRail：
+    // pointermove 夹紧到 [MIN,MAX]，拖完把最终宽度交给 setWidth 持久化。这里不需要
+    // setWidthPx 那种「点击收起」逻辑——收起走专门的折叠按钮，拖拽只调宽。
+    const handleResizePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+      if (e.button !== 0) return
+      e.preventDefault()
+      const startX = e.clientX
+      let latest = width
+
+      const onMove = (ev: PointerEvent) => {
+        // 右缘贴视口右，拖左缘时本列右缘不动：Δ = 起始左缘 - 当前左缘。
+        // startX 是左缘的 x，向左拖（clientX 变小）会让列变宽。
+        const delta = startX - ev.clientX
+        latest = clampAiPanelWidth(width + delta)
+        setWidth(latest)
+        document.body.style.userSelect = 'none'
+        document.body.style.cursor = 'col-resize'
+      }
+      const onUp = () => {
+        window.removeEventListener('pointermove', onMove)
+        window.removeEventListener('pointerup', onUp)
+        window.removeEventListener('pointercancel', onUp)
+        document.body.style.userSelect = ''
+        document.body.style.cursor = ''
+      }
+      window.addEventListener('pointermove', onMove)
+      window.addEventListener('pointerup', onUp)
+      window.addEventListener('pointercancel', onUp)
+    }
+
+    const handleDoubleClick = () => {
+      setWidth(AI_PANEL_DEFAULT_WIDTH)
+    }
+
+    // 收起态：只留一条竖着的窄触发条，点它（或中间那个胶囊按钮）再展开，不挤压主体。
+    if (collapsed) {
+      return (
+        <aside
+          data-slot="ai-panel"
+          data-collapsed="true"
+          aria-label="AI 对话（已收起）"
+          className="sticky top-0 flex h-svh w-10 shrink-0 flex-col items-center border-l border-border bg-sidebar"
+        >
+          <IconButton
+            type="button"
+            variant="ghost"
+            size="sm"
+            label="展开 AI 对话"
+            icon={<PanelLeftOpen />}
+            aria-expanded={false}
+            onClick={() => setCollapsed(false)}
+            className="my-2"
+          />
+          <div className="flex-1" data-slot="ai-panel-collapsed-spacer" />
+        </aside>
+      )
+    }
+
     return (
-      <aside
-        data-slot="ai-panel"
-        aria-label="AI 对话"
-        className="sticky top-0 flex h-svh w-80 shrink-0 flex-col border-l border-border bg-sidebar"
-      >
-        {dock}
-      </aside>
+      <>
+        {/* 拖拽分隔线：贴右栏左缘，横向调宽；双击恢复默认宽度 */}
+        <button
+          data-slot="ai-panel-resizer"
+          type="button"
+          aria-label="拖拽调整 AI 对话栏宽度，双击恢复默认宽度"
+          onPointerDown={handleResizePointerDown}
+          onDoubleClick={handleDoubleClick}
+          className="group w-1 shrink-0 cursor-col-resize border-l border-border bg-transparent transition-colors hover:bg-primary/40 focus-visible:bg-primary/40 focus-visible:outline-none"
+        />
+        <aside
+          data-slot="ai-panel"
+          aria-label="AI 对话"
+          className="sticky top-0 flex h-svh shrink-0 flex-col border-l-0 bg-sidebar"
+          style={{ width }}
+        >
+          <div
+            data-slot="ai-panel-header"
+            className="flex h-12 shrink-0 items-center justify-end gap-1 border-b border-border px-2"
+          >
+            <IconButton
+              type="button"
+              variant="ghost"
+              size="sm"
+              label="收起 AI 对话"
+              icon={<PanelLeftClose />}
+              aria-expanded={!collapsed}
+              onClick={() => setCollapsed(true)}
+            />
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col">{dock}</div>
+        </aside>
+      </>
     )
   }
 
