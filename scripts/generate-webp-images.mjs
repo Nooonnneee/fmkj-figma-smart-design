@@ -6,7 +6,7 @@
  *                                        + thumbs/<同名>.webp（最长边 720，模板卡用）
  *   public/proposal/photos/scenes/*.jpg → 同名 .webp（最长边 1600、q80）
  *   public/tool-covers/*.jpg            → 同名 .webp（最长边 1600、q80）
- *   public/doc-styles/*.png             → 同名 .webp（宽 600、q80，模板中心卡片用）
+ *   public/doc-styles/*.png             → 同名 .webp（宽 720、q80，模板中心卡片 2x 屏用）
  *
  * 可重复执行：源文件未更新且目标已存在时跳过；`--force` 强制全部重转。
  *
@@ -24,8 +24,8 @@ const JOBS = [
   { dir: 'public/proposal/photos', ext: /\.jpe?g$/i, edge: 1600, thumbs: true },
   { dir: 'public/proposal/photos/scenes', ext: /\.jpe?g$/i, edge: 1600 },
   { dir: 'public/tool-covers', ext: /\.jpe?g$/i, edge: 1600 },
-  // 文档样张在模板中心只显示约 360px 宽；600px 够 1.5x 屏，整页能压到 500KB 内。
-  { dir: 'public/doc-styles', ext: /\.png$/i, edge: 600 },
+  // 文档样张在模板中心卡片最宽约 331px；按 720px 宽出图，2x 屏不放大。
+  { dir: 'public/doc-styles', ext: /\.png$/i, edge: 720, resizeBy: 'width' },
 ]
 
 const webpPath = (file) => file.replace(/\.(jpe?g|png)$/i, '.webp')
@@ -62,7 +62,11 @@ for (const job of JOBS) {
   for (const name of entries.filter((n) => job.ext.test(n)).sort()) {
     const file = path.join(dir, name)
     const full = webpPath(file)
-    results.push({ out: full, src: file, status: await render(file, full, job.edge) })
+    results.push({
+      out: full,
+      src: file,
+      status: await render(file, full, job.edge, job.resizeBy),
+    })
 
     if (thumbDir) {
       const thumb = path.join(thumbDir, path.basename(webpPath(file)))
