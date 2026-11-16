@@ -109,9 +109,7 @@ export function readableEntityId(entityId: string): string {
 }
 
 /** 归一化一条实体源记录 → EntityRow。纯函数，直接喂进测试。 */
-export function toEntityRow(
-  e: NonNullable<OverviewSource['entities']>[number],
-): EntityRow {
+export function toEntityRow(e: NonNullable<OverviewSource['entities']>[number]): EntityRow {
   const entityId = (e.entityId ?? '').trim()
   return {
     entityId,

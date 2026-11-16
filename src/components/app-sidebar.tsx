@@ -7,6 +7,7 @@ import {
   BookOpen,
   Crown,
   FolderKanban,
+  Home,
   LayoutTemplate,
   LogOut,
   PackageSearch,
@@ -65,6 +66,9 @@ const workNav = [
   { icon: PackageSearch, label: '产品库', url: '/products' },
 ] as const
 
+/** 智能家居：只读查看已连接现场 Home Assistant（第一期只读模组） */
+const homeNav = [{ icon: Home, label: '智能家居', url: '/smart-home' }] as const
+
 /** 低频入口不占侧栏：收在左下角齿轮的「设置」菜单里 */
 const settingsNav = [
   { icon: Settings, label: '公司与报价设置', url: '/settings' },
@@ -88,6 +92,7 @@ const toolNav = [
 /** 侧边栏所有可点入口 —— 判定当前页要看全集，见 activeNavUrl */
 const ALL_NAV_URLS = [
   ...workNav.map((i) => i.url),
+  ...homeNav.map((i) => i.url),
   ...settingsNav.map((i) => i.url),
   ...toolNav.map((i) => i.url),
 ] as const
@@ -218,6 +223,16 @@ export function AppSidebar({
                 {...item}
                 active={isActive(item.url) && pathname !== '/projects/new'}
               />
+            ))}
+          </SidebarMenu>
+        </SidebarGroup>
+
+        {/* 智能家居：只读查看已连接现场 Home Assistant（第一期只读模组） */}
+        <SidebarGroup>
+          <SidebarGroupLabel>智能家居</SidebarGroupLabel>
+          <SidebarMenu className="gap-0.5">
+            {homeNav.map((item) => (
+              <NavItem key={item.url} {...item} active={isActive(item.url)} />
             ))}
           </SidebarMenu>
         </SidebarGroup>

@@ -34,9 +34,7 @@ export function readPageConfig(): HaMcpConfig | null {
 type RawToolContent = unknown
 
 function asRecord(x: unknown): Record<string, unknown> | null {
-  return x && typeof x === 'object' && !Array.isArray(x)
-    ? (x as Record<string, unknown>)
-    : null
+  return x && typeof x === 'object' && !Array.isArray(x) ? (x as Record<string, unknown>) : null
 }
 
 const pick = (rec: Record<string, unknown>, keys: string[]): unknown => {
