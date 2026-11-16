@@ -113,7 +113,7 @@ export default function TemplateCenterPage() {
                     只有色块看不出差别——原来那样用户选不出来。 */}
                 <div className="relative aspect-[4/3] overflow-hidden border-b bg-muted/40">
                   <Image
-                    src={`/doc-styles/style-${s.id}.png`}
+                    src={`/doc-styles/style-${s.id}.webp`}
                     alt={`${s.name} 文档风格样张`}
                     fill
                     sizes="(min-width: 1024px) 360px, (min-width: 640px) 45vw, 92vw"
