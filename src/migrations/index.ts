@@ -13,6 +13,7 @@ import * as migration_20261104_032108_after_sales_feedback_costs from './2026110
 import * as migration_20261108_012324_20261108_remove_membership_tiers from './20261108_012324_20261108_remove_membership_tiers'
 import * as migration_20261109_101917_display_profile from './20261109_101917_display_profile'
 import * as migration_20261115_094654_ai_member_channels from './20261115_094654_ai_member_channels'
+import * as migration_20261117_154448_product_short_name from './20261117_154448_product_short_name'
 
 export const migrations = [
   {
@@ -89,5 +90,10 @@ export const migrations = [
     up: migration_20261115_094654_ai_member_channels.up,
     down: migration_20261115_094654_ai_member_channels.down,
     name: '20261115_094654_ai_member_channels',
+  },
+  {
+    up: migration_20261117_154448_product_short_name.up,
+    down: migration_20261117_154448_product_short_name.down,
+    name: '20261117_154448_product_short_name',
   },
 ]

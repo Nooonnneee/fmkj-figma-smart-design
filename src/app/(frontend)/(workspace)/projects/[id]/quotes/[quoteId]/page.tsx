@@ -52,6 +52,7 @@ export default async function QuotePage({
   const options: ProductOption[] = catalog.map((p) => ({
     id: p.id,
     name: p.name,
+    shortName: p.shortName?.trim() ?? '',
     sku: p.sku,
     unit: p.unit,
     price: p.price,
@@ -95,6 +96,8 @@ export default async function QuotePage({
             deviceType: i.deviceType ?? live?.deviceType ?? null,
             image: snapshot ?? live?.image?.url ?? null,
             name: i.name,
+            // 老报价没有短名快照时不回填：列表按「无短名 → 显示完整名称」处理
+            shortName: i.shortName?.trim() ?? '',
             sku: i.sku ?? '',
             unit: i.unit ?? '',
             price: i.price,

@@ -146,7 +146,7 @@ Page({
       url: '/pages/picker/index?deviceType=' + line.type.value + '&title=' + encodeURIComponent('更换型号'),
       events: {
         picked: (p) => {
-          const item = Object.assign({}, line, { product: p.id, name: p.name, sku: p.sku, unit: p.unit, price: p.price, priceText: String(p.price), image: p.image, type: p.type })
+          const item = Object.assign({}, line, { product: p.id, name: p.name, shortName: p.shortName || '', sku: p.sku, unit: p.unit, price: p.price, priceText: String(p.price), image: p.image, type: p.type })
           this.setData({ ['items[' + i + ']']: this.decorateItem(item) })
           this.markDirty(true)
           toast('已更换，记得保存')
@@ -164,7 +164,7 @@ Page({
             const q = this.data.items[idx].quantity + 1
             this.setData({ ['items[' + idx + ']']: this.decorateItem(Object.assign({}, this.data.items[idx], { quantity: q, qtyText: String(q) })) })
           } else {
-            const item = { key: key(), id: null, product: p.id, type: p.type, image: p.image, name: p.name, sku: p.sku, unit: p.unit, price: p.price, quantity: 1 }
+            const item = { key: key(), id: null, product: p.id, type: p.type, image: p.image, name: p.name, shortName: p.shortName || '', sku: p.sku, unit: p.unit, price: p.price, quantity: 1 }
             this.setData({ items: this.data.items.concat(this.decorateItem(item)) })
           }
           this.markDirty(true)
@@ -210,7 +210,7 @@ Page({
       status: this.data.status,
       discount: num(this.data.discountText),
       notes: this.data.notes,
-      items: this.data.items.map((i) => ({ id: i.id, product: i.product, name: i.name, sku: i.sku, unit: i.unit, price: i.price, quantity: i.quantity })),
+      items: this.data.items.map((i) => ({ id: i.id, product: i.product, name: i.name, shortName: i.shortName || null, sku: i.sku, unit: i.unit, price: i.price, quantity: i.quantity })),
       fees: this.data.fees.map((f) => ({ name: f.name, amount: Number(f.amount) || 0 })),
     }
     this.setData({ saving: true })

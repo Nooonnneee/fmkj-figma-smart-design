@@ -34,6 +34,7 @@ export type QuoteItemRow = {
   deviceType?: string | null
   image?: string | null
   name?: string | null
+  shortName?: string | null
   sku?: string | null
   unit?: string | null
   price?: number | null
@@ -48,6 +49,7 @@ export type QuoteItemEdit = {
   id?: string | null
   productId?: string | null
   name?: string | null
+  shortName?: string | null
   sku?: string | null
   unit?: string | null
   price?: number | null
@@ -81,6 +83,7 @@ export function applyQuoteItemEdits(
       const row = items[i]!
       if (edit.productId !== undefined) row.product = edit.productId
       if (edit.name !== undefined) row.name = edit.name
+      if (edit.shortName !== undefined) row.shortName = edit.shortName
       if (edit.sku !== undefined) row.sku = edit.sku
       if (edit.unit !== undefined) row.unit = edit.unit
       if (edit.price !== undefined) row.price = edit.price
@@ -91,6 +94,7 @@ export function applyQuoteItemEdits(
     items.push({
       product: edit?.productId ?? null,
       name: edit?.name ?? null,
+      shortName: edit?.shortName ?? null,
       sku: edit?.sku ?? null,
       unit: edit?.unit ?? null,
       price: edit?.price ?? null,

@@ -32,6 +32,8 @@ export function resolveMediaUrl(m: Partial<Media> | null | undefined): string | 
 export type CatalogProduct = {
   id: string
   name: string
+  /** 报价列表用的可选短名；为空时列表回退显示 name */
+  shortName?: string | null
   sku: string
   price: number
   cost: number | null
@@ -52,7 +54,7 @@ export type CatalogProduct = {
 }
 
 export const getCatalog = memoize(
-  'catalog-products-v4',
+  'catalog-products-v5',
   [CACHE_TAGS.catalog],
   TTL,
   async (): Promise<CatalogProduct[]> => {
@@ -65,6 +67,7 @@ export const getCatalog = memoize(
       overrideAccess: true,
       select: {
         name: true,
+        shortName: true,
         sku: true,
         price: true,
         cost: true,
@@ -97,6 +100,7 @@ export const getCatalog = memoize(
       return {
         id: String(p.id),
         name: p.name,
+        shortName: p.shortName?.trim() || null,
         sku: p.sku,
         price: p.price,
         cost: typeof p.cost === 'number' ? p.cost : null,

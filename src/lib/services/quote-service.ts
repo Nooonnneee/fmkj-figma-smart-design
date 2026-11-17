@@ -113,6 +113,7 @@ export async function createQuoteForProject(
       deviceType: (p.deviceType ?? row.deviceType) as never,
       image: p.image?.id ?? null,
       name: p.name,
+      shortName: p.shortName ?? null,
       sku: p.sku,
       unit: p.unit,
       price: p.price,
@@ -215,6 +216,8 @@ export async function syncQuoteWithPointMap(
         deviceType: (keep.deviceType ?? p.deviceType ?? row.deviceType) as never,
         image: mediaId(keep.image) ?? p.image?.id ?? null,
         name: keep.name || p.name,
+        // 已有行的短名快照优先；老报价没有快照时用产品库当前短名补上
+        shortName: keep.shortName ?? p.shortName ?? null,
         sku: keep.sku ?? p.sku,
         unit: keep.unit ?? p.unit,
         price: typeof keep.price === 'number' ? keep.price : p.price,
@@ -226,6 +229,7 @@ export async function syncQuoteWithPointMap(
       deviceType: (p.deviceType ?? row.deviceType) as never,
       image: p.image?.id ?? null,
       name: p.name,
+      shortName: p.shortName ?? null,
       sku: p.sku,
       unit: p.unit,
       price: p.price,
@@ -259,6 +263,7 @@ export type QuoteInput = {
     id?: string | null
     product?: string | null
     name: string
+    shortName?: string | null
     sku?: string | null
     unit?: string | null
     price: number
@@ -335,12 +340,19 @@ export async function saveQuoteInput(
       deviceType = (product.deviceType ?? null) as typeof deviceType
     }
     if (product && !image) image = product.image?.id ?? null
+    // 短名是快照：显式提交优先；新增 / 换型号时从产品库复制；只改价格等字段时保留原快照。
+    const shortName =
+      text(raw.shortName, 24) ||
+      (product && productId !== beforeProduct ? text(product.shortName ?? '', 24) : '') ||
+      before?.shortName ||
+      null
     items.push({
       ...(rowId ? { id: rowId } : {}),
       product: productId,
       deviceType,
       image,
       name,
+      shortName,
       sku: text(raw.sku, 100) || null,
       unit: text(raw.unit, 10) || null,
       price,

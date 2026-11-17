@@ -59,6 +59,16 @@ export const Products: CollectionConfig = {
   },
   fields: [
     { name: 'name', label: '产品名称', type: 'text', required: true },
+    {
+      name: 'shortName',
+      label: '短名',
+      type: 'text',
+      maxLength: 24,
+      admin: {
+        description:
+          '选填，只用于报价列表、手机端等空间有限的地方（如「易来 T2 开关」）。产品名称仍是正式名称，会出现在打印报价单、合同和导出文件里；留空则列表直接显示产品名称。',
+      },
+    },
     { name: 'sku', label: '型号 / SKU', type: 'text', required: true, unique: true, index: true },
     {
       name: 'deviceType',

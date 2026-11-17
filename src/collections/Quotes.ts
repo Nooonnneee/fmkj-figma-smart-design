@@ -146,6 +146,8 @@ export const Quotes: CollectionConfig = {
           type: 'row',
           fields: [
             { name: 'name', label: '名称', type: 'text', required: true, maxLength: 200 },
+            // 产品短名的快照；只用于报价台列表显示，打印 / 合同 / 导出仍用 name
+            { name: 'shortName', label: '短名', type: 'text', maxLength: 24 },
             { name: 'sku', label: '型号', type: 'text', maxLength: 100 },
             { name: 'unit', label: '单位', type: 'text', maxLength: 10 },
           ],

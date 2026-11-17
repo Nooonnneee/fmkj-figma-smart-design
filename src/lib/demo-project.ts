@@ -229,6 +229,7 @@ export async function ensureDemoTemplateProject(): Promise<Project | null> {
         // 兜底名称必须走中文映射：直接把内部枚举名（switch-2）拼进产品名，
         // 会在首页方案演示、合同附件里把「智能switch-2设备」暴露给客户。
         name: prod?.name ?? deviceTypeLabel(dtype),
+        shortName: prod?.shortName ?? null,
         // 型号同理：DEMO-SWITCH-2 这种内部编号会直接印在客户合同附件上。
         // 没有真实产品时留空，让渲染层决定怎么显示（而不是编一个假型号）。
         sku: prod?.sku ?? '',
@@ -368,6 +369,7 @@ export async function cloneDemoProjectForUser(
         deviceType: item.deviceType ?? null,
         image: coerceRelId(item.image, template.id),
         name: item.name,
+        shortName: item.shortName ?? null,
         sku: item.sku ?? null,
         unit: item.unit ?? '个',
         price: item.price,
