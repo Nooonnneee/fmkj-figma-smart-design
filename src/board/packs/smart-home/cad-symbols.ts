@@ -37,10 +37,14 @@ const line = (x1: number, y1: number, x2: number, y2: number): CadShape => ({
 })
 const path = (d: string, fill = 'none'): CadShape => ({ t: 'path', d, fill })
 
-/** 开关按键：方框里的一根斜杠，键数决定斜杠根数（电气图里的单极 / 多极画法） */
+/**
+ * 开关按键：方框里的一根斜杠，键数决定斜杠根数（电气图里的单极 / 多极画法）。
+ * 多键时最后一根斜杠必须落在 6..26 的方框内：旧写法跨度 14、末根到 x=28，
+ * 会捅出面板右边（单色图标按外接框居中时整块面板还会被带偏）。
+ */
 const keyMarks = (n: number): CadShape[] => {
   if (n <= 1) return [path('M9 22 L23 10')]
-  const step = 14 / (n - 1)
+  const step = 12 / (n - 1)
   return Array.from({ length: n }, (_, i) => {
     const x = 9 + i * step
     return path(`M${x} 22 L${x + 5} 17`)
@@ -253,6 +257,16 @@ export function cadSymbol(key: SymbolKey | string): CadShape[] | null {
   return TABLE[key] ?? null
 }
 
+/**
+ * 取符号的原始图元（含开关按「键数」生成的变体），不渲染成字符串。
+ * 给导出脚本复用同一份几何：换描边颜色、重新居中时不必另抄一套图标。
+ */
+export function cadShapes(key: SymbolKey | string, switchKeys?: number): CadShape[] | null {
+  if (key === 'switch' && switchKeys && switchKeys > 1)
+    return [path('M6 6 H26 V26 H6 Z'), ...keyMarks(switchKeys)]
+  return cadSymbol(key)
+}
+
 const esc = (s: string) =>
   s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 
@@ -287,9 +301,8 @@ export function cadSymbolBody(key: SymbolKey | string): string {
  * 这样 switch-1 / switch-2 在 CAD 风格下也能分辨。
  */
 export function cadSymbolBodyForKey(key: SymbolKey | string, switchKeys?: number): string {
-  if (key === 'switch' && switchKeys && switchKeys > 1)
-    return renderShapes([path('M6 6 H26 V26 H6 Z'), ...keyMarks(switchKeys)])
-  return cadSymbolBody(key)
+  const shapes = cadShapes(key, switchKeys)
+  return shapes ? renderShapes(shapes) : ''
 }
 
 /** 线性灯具的细长矢量图元（没有就返回空串） */
