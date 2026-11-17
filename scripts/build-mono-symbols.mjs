@@ -21,6 +21,8 @@
  *    不再保留源文件里的白色 / 彩色。
  * 4. 金色不写死：从 src/app/(frontend)/styles.css 的 --color-brand-gold 读取，
  *    令牌改名 / 改值后重跑本脚本即可；找不到时直接报错。
+ * 5. 少数脱离圆盘后语义会丢的字形在 CUSTOM_GLYPHS 里补画（灯带 / 射灯 /
+ *    双开-四开墙板外框），index.json 用 custom: true + note 标明来源。
  *
  * 文件名与 point-markers 完全同名，index.json 的 key 也用它，视频侧可以直接查表。
  * 点名要的 16 类在 index 里标 required: true；其余字形一并输出，方便后续扩展。
@@ -359,6 +361,67 @@ function readGlyph(file) {
   }
 }
 
+/* ------------------------------ 自定义补画 ------------------------------ */
+
+/**
+ * 少数字形脱离彩色圆盘后语义会丢，这里在同一个 24×24 坐标系里补画：
+ * - light-strip：5:1 圆角灯条 + 内部发光缝（原「胶囊三点」像更多菜单）
+ * - spotlight：灯体圆 + 下方光锥（原「圆 + 四向射线」像准星）
+ * - switch-2/3/4：在 point-markers 按键块外加单色墙板外框（只描边不填充）
+ * 自定义图元同样走 renderSvg 的归一化，最终墨迹 24、描边 2。
+ */
+const PLATE = {
+  tag: 'rect',
+  attrs: { x: '-1', y: '-1', width: '26', height: '26', rx: '4.5' },
+}
+
+const withPlate = (glyph) => ({ ...glyph, shapes: [PLATE, ...glyph.shapes] })
+
+const CUSTOM_GLYPHS = {
+  'light-strip': () => ({
+    shapes: [
+      { tag: 'rect', attrs: { x: '2', y: '10', width: '20', height: '4', rx: '2' } },
+      {
+        tag: 'rect',
+        attrs: {
+          x: '6',
+          y: '11.4',
+          width: '12',
+          height: '1.2',
+          rx: '0.6',
+          fill: '#fff',
+          stroke: 'none',
+        },
+      },
+    ],
+    linecap: 'round',
+    linejoin: 'round',
+  }),
+  spotlight: () => ({
+    shapes: [
+      // 灯体：上方小圆 + 短颈；灯口：一条宽横线；光锥：从灯口两端向下张开的两条斜线
+      { tag: 'circle', attrs: { cx: '12', cy: '4.2', r: '2.3' } },
+      { tag: 'line', attrs: { x1: '12', y1: '6.5', x2: '12', y2: '7.2' } },
+      { tag: 'line', attrs: { x1: '7', y1: '7.2', x2: '17', y2: '7.2' } },
+      { tag: 'path', attrs: { d: 'M7 7.2 L2.5 21' } },
+      { tag: 'path', attrs: { d: 'M17 7.2 L21.5 21' } },
+    ],
+    linecap: 'round',
+    linejoin: 'round',
+  }),
+  'switch-2': () => withPlate(readGlyph('switch-2.svg')),
+  'switch-3': () => withPlate(readGlyph('switch-3.svg')),
+  'switch-4': () => withPlate(readGlyph('switch-4.svg')),
+}
+
+const CUSTOM_NOTES = {
+  'light-strip': '自定义补画：5:1 圆角灯条 + 内部发光缝（原「胶囊三点」易读成更多）',
+  spotlight: '自定义补画：上方灯体圆 + 下方光锥（原「圆 + 四向射线」像准星）',
+  'switch-2': '自定义补画：在 point-markers 按键块外加单色墙板外框（只描边不填充）',
+  'switch-3': '自定义补画：在 point-markers 按键块外加单色墙板外框（只描边不填充）',
+  'switch-4': '自定义补画：在 point-markers 按键块外加单色墙板外框（只描边不填充）',
+}
+
 function shapePoints({ tag, attrs }) {
   const n = (k, fallback = 0) => (attrs[k] === undefined ? fallback : Number(attrs[k]))
   if (tag === 'path') return pathBBox(attrs.d)
@@ -497,7 +560,8 @@ function main() {
   const devices = {}
   for (const name of ordered) {
     const glyphName = GLYPH_OVERRIDES[name] ?? name
-    const glyph = readGlyph(`${glyphName}.svg`)
+    const isCustom = name in CUSTOM_GLYPHS
+    const glyph = isCustom ? CUSTOM_GLYPHS[name]() : readGlyph(`${glyphName}.svg`)
     const type = deviceTypeOf(name)
     const label = REQUIRED[name] ?? type.name
     for (const [colorName, color] of Object.entries(colors)) {
@@ -514,6 +578,13 @@ function main() {
       required: name in REQUIRED,
       ...(glyphName !== name
         ? { glyph: glyphName, note: '圆叉字形易读成禁止符号，改用同灯类的吊灯字形' }
+        : {}),
+      ...(isCustom
+        ? {
+            custom: true,
+            glyph: name.startsWith('switch-') ? `${name}.svg + 墙板外框` : 'custom',
+            note: CUSTOM_NOTES[name],
+          }
         : {}),
       ...(!(name in REQUIRED) ? { category: type.category } : {}),
     }

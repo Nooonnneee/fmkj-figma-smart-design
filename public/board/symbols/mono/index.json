@@ -55,28 +55,40 @@
       "gold": "gold/switch-2.svg",
       "label": "双开",
       "group": "开关",
-      "required": true
+      "required": true,
+      "custom": true,
+      "glyph": "switch-2.svg + 墙板外框",
+      "note": "自定义补画：在 point-markers 按键块外加单色墙板外框（只描边不填充）"
     },
     "switch-3": {
       "white": "white/switch-3.svg",
       "gold": "gold/switch-3.svg",
       "label": "三开",
       "group": "开关",
-      "required": true
+      "required": true,
+      "custom": true,
+      "glyph": "switch-3.svg + 墙板外框",
+      "note": "自定义补画：在 point-markers 按键块外加单色墙板外框（只描边不填充）"
     },
     "switch-4": {
       "white": "white/switch-4.svg",
       "gold": "gold/switch-4.svg",
       "label": "四开",
       "group": "开关",
-      "required": true
+      "required": true,
+      "custom": true,
+      "glyph": "switch-4.svg + 墙板外框",
+      "note": "自定义补画：在 point-markers 按键块外加单色墙板外框（只描边不填充）"
     },
     "spotlight": {
       "white": "white/spotlight.svg",
       "gold": "gold/spotlight.svg",
       "label": "射灯",
       "group": "灯光",
-      "required": true
+      "required": true,
+      "custom": true,
+      "glyph": "custom",
+      "note": "自定义补画：上方灯体圆 + 下方光锥（原「圆 + 四向射线」像准星）"
     },
     "downlight": {
       "white": "white/downlight.svg",
@@ -99,7 +111,10 @@
       "gold": "gold/light-strip.svg",
       "label": "灯带",
       "group": "灯光",
-      "required": true
+      "required": true,
+      "custom": true,
+      "glyph": "custom",
+      "note": "自定义补画：5:1 圆角灯条 + 内部发光缝（原「胶囊三点」易读成更多）"
     },
     "curtain-track": {
       "white": "white/curtain-track.svg",
