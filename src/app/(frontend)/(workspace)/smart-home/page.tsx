@@ -11,7 +11,7 @@ import { SmartHomeClient } from './smart-home-client'
 export const metadata = { title: pageTitle('智能家居') }
 
 /**
- * 智能家居独立页（SM-2，第一期只读）。
+ * 智能家居独立页（服务器总览 + 桌面客户端直连 / 控制）。
  *
  * Server Component 职责：
  *   1. 校验登录（工作台页统一入口）；
@@ -33,7 +33,7 @@ export default async function SmartHomePage() {
     <PageShell className="gap-5">
       <PageHeader
         title="智能家居"
-        description="只读查看已连接现场 Home Assistant 的总览、实体列表与系统健康。"
+        description="查看已连接现场 Home Assistant 的状态；桌面客户端内可直接控制设备。"
         badge={<BetaBadge />}
       />
       <SmartHomeClient data={data} />

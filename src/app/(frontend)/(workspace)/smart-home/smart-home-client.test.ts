@@ -12,7 +12,12 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { HaCallServiceInput, HaEntityState, HaStatus } from '@/lib/desktop-ha'
+import {
+  getDesktopHa,
+  type HaCallServiceInput,
+  type HaEntityState,
+  type HaStatus,
+} from '@/lib/desktop-ha'
 import type { SmartHomeData } from '@/plugins/ha-mcp/overview'
 
 import { SmartHomeClient } from './smart-home-client'
@@ -179,6 +184,23 @@ describe('SmartHomeClient 桌面桥分支', () => {
     expect(container.textContent).toContain('温度传感器')
     expect(container.textContent).toContain('桌面客户端直连')
     expect(container.textContent).not.toContain('服务器灯')
+    // 有区域字段时才显示区域统计
+    expect(container.querySelector('[data-testid="ha-stat-areas"]')).not.toBeNull()
+  })
+
+  it('实时数据没有区域字段时不显示伪造的区域统计', async () => {
+    installBridge({
+      status: async () => configuredStatus,
+      getStates: async () => [state('light.no_area', 'on', { friendly_name: '无区域灯' })],
+    })
+
+    await render(serverData)
+
+    expect(container.textContent).toContain('无区域灯')
+    // /api/states 默认不带区域字段：不显示「未分配区域」折算出的 1 个区域
+    expect(container.querySelector('[data-testid="ha-stat-areas"]')).toBeNull()
+    expect(container.querySelector('[data-testid="ha-stat-total"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="ha-stat-active"]')).not.toBeNull()
   })
 
   it('灯的开/关按钮调用正确参数，成功后重新 getStates', async () => {
@@ -197,6 +219,40 @@ describe('SmartHomeClient 桌面桥分支', () => {
     })
     // 初次挂载一次 + 操作成功后刷新一次
     expect(ha.getStates).toHaveBeenCalledTimes(2)
+  })
+
+  it('操作 pending 时按钮禁用，重复点击不会重复 callService', async () => {
+    let resolveAction!: (value: { ok: boolean }) => void
+    const pendingAction = new Promise<{ ok: boolean }>((resolve) => {
+      resolveAction = resolve
+    })
+    const { ha } = installBridge({
+      status: async () => configuredStatus,
+      getStates: vi.fn(async () => [livingLight]),
+      callService: vi.fn(() => pendingAction),
+    })
+
+    await render(serverData)
+    const button = container.querySelector<HTMLButtonElement>(
+      '[data-testid="ha-control-light.living_room-toggle"]',
+    )
+    expect(button).not.toBeNull()
+
+    await act(async () => {
+      button!.click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(button!.disabled).toBe(true)
+    button!.click()
+    await settle()
+    expect(ha.callService).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolveAction({ ok: true })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    await settle()
   })
 
   it('窗帘位置和空调温度/模式调用正确参数', async () => {
@@ -277,6 +333,30 @@ describe('SmartHomeClient 桌面桥分支', () => {
     expect(controlIds).toContain('ha-control-light.living_room-toggle')
   })
 
+  it('桥对象缺方法（老客户端）时守卫返回 null，页面回退服务器数据', async () => {
+    const ha = {
+      available: vi.fn(async () => true),
+      status: vi.fn(async () => configuredStatus),
+      discover: vi.fn(async () => []),
+      configure: vi.fn(async () => ({ ok: true })),
+      clear: vi.fn(async () => ({ ok: true as const })),
+      getStates: vi.fn(async () => [livingLight]),
+      // 故意缺 callService
+    }
+    ;(window as unknown as { fanmengDesktop?: unknown }).fanmengDesktop = {
+      isDesktop: true,
+      ha,
+      openSettings: vi.fn(async () => {}),
+    }
+
+    expect(getDesktopHa()).toBeNull()
+
+    await render(serverData)
+    expect(container.textContent).toContain('服务器灯')
+    expect(container.textContent).not.toContain('客厅灯')
+    expect(ha.available).not.toHaveBeenCalled()
+  })
+
   it('桥调用抛错时回退服务器数据，不打崩页面', async () => {
     installBridge({
       available: async () => {
@@ -302,6 +382,28 @@ describe('SmartHomeClient 桌面桥分支', () => {
     expect(container.textContent).toContain('无法读取 Home Assistant 数据')
     expect(container.textContent).not.toContain('服务器灯')
     expect(container.querySelector('[data-testid="ha-open-settings"]')).not.toBeNull()
+  })
+
+  it('错误态的「重试」会重新拉取 states 并恢复实时视图', async () => {
+    let calls = 0
+    const getStates = vi.fn(async () => {
+      calls += 1
+      if (calls === 1) throw new Error('unauthorized')
+      return [livingLight]
+    })
+    const { ha } = installBridge({
+      status: async () => configuredStatus,
+      getStates,
+    })
+
+    await render(serverData)
+    expect(container.textContent).toContain('无法读取 Home Assistant 数据')
+
+    await click('ha-retry')
+
+    expect(ha.getStates).toHaveBeenCalledTimes(2)
+    expect(container.textContent).toContain('客厅灯')
+    expect(container.textContent).not.toContain('无法读取 Home Assistant 数据')
   })
 
   it('服务器未配置且无桥时保持服务器空态', async () => {

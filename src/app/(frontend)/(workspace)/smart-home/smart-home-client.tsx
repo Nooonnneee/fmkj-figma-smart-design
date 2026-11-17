@@ -121,14 +121,19 @@ function StatCard({
   label,
   value,
   icon,
+  testId,
 }: {
   label: string
   value: number
   icon: React.ElementType
+  testId?: string
 }) {
   const Icon = icon
   return (
-    <div className="rounded-[var(--radius-container)] border border-border bg-card px-5 py-4 shadow-xs">
+    <div
+      data-testid={testId}
+      className="rounded-[var(--radius-container)] border border-border bg-card px-5 py-4 shadow-xs"
+    >
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>{label}</span>
         <Icon className="size-4 text-muted-foreground" />
@@ -140,12 +145,26 @@ function StatCard({
   )
 }
 
-function OverviewStats({ data }: { data: SmartHomeOverview }) {
+function OverviewStats({
+  data,
+  showArea = true,
+}: {
+  data: SmartHomeOverview
+  /** 实时数据没有区域字段时不显示区域数，避免把「未分配区域」当成 1 个区域。 */
+  showArea?: boolean
+}) {
   return (
     <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-      <StatCard label="区域" value={data.areas.length} icon={Home} />
-      <StatCard label="实体总数" value={data.totalEntities} icon={Cpu} />
-      <StatCard label="在线状态下" value={data.activeEntities} icon={Search} />
+      {showArea ? (
+        <StatCard label="区域" value={data.areas.length} icon={Home} testId="ha-stat-areas" />
+      ) : null}
+      <StatCard label="实体总数" value={data.totalEntities} icon={Cpu} testId="ha-stat-total" />
+      <StatCard
+        label="在线状态下"
+        value={data.activeEntities}
+        icon={Search}
+        testId="ha-stat-active"
+      />
     </div>
   )
 }
@@ -362,7 +381,7 @@ function ConfiguredOverview({ data }: { data: SmartHomeOverview }) {
 function UnconfiguredView({ hint }: { hint: string }) {
   return (
     <EmptyState
-      icon={<PanelLeft className="size-5" />}
+      icon={<Home className="size-5" />}
       title="还没有连接 Home Assistant"
       description={hint}
     />
@@ -443,6 +462,15 @@ function LiveView({
   const overview = useMemo(() => liveOverview(states), [states])
   const attributesById = useMemo(
     () => new Map(states.map((state) => [state.entityId, state.attributes])),
+    [states],
+  )
+  // HA 的 /api/states 默认不带区域字段；没有区域信息时不展示区域统计，
+  // 否则所有实体会落进「未分配区域」，显示成恒定的 1 个区域。
+  const hasAreaInfo = useMemo(
+    () =>
+      states.some((state) =>
+        Boolean(stringAttr(state.attributes, 'area_name') ?? stringAttr(state.attributes, 'area')),
+      ),
     [states],
   )
 
@@ -632,7 +660,7 @@ function LiveView({
   return (
     <div className="flex flex-col gap-6">
       <LiveStatusCard status={status} />
-      <OverviewStats data={overview} />
+      <OverviewStats data={overview} showArea={hasAreaInfo} />
       <div className="flex flex-col gap-2">
         <h2 className="text-base font-semibold text-foreground">实体列表</h2>
         <EntityTable data={overview} renderControl={renderControl} />
