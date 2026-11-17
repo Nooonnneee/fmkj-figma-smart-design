@@ -18,7 +18,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     // 说明文件：这些用例是源码行为的回归网，覆盖率门槛是附加门禁
     reporters: ['default'],
     coverage: {

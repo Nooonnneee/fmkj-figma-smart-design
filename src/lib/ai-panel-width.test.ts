@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  AI_PANEL_COLLAPSED_WIDTH,
   AI_PANEL_DEFAULT_WIDTH,
   AI_PANEL_MAX_WIDTH,
   AI_PANEL_MIN_WIDTH,
@@ -30,6 +31,10 @@ function memoryStorage(): Storage & { store: Map<string, string> } {
 }
 
 describe('clampAiPanelWidth', () => {
+  it('收起宽度与左侧栏图标栏一致（48px / 3rem）', () => {
+    expect(AI_PANEL_COLLAPSED_WIDTH).toBe(48)
+  })
+
   it('上下夹紧到 [MIN, MAX] 并取整', () => {
     expect(clampAiPanelWidth(100)).toBe(AI_PANEL_MIN_WIDTH)
     expect(clampAiPanelWidth(900)).toBe(AI_PANEL_MAX_WIDTH)

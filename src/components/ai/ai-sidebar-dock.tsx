@@ -6,8 +6,16 @@ import {
   AlertCircle,
   ArrowRight,
   ChevronDown,
+  Coins,
+  FileText,
+  History,
   Loader2,
+  MessageSquareText,
   MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Ruler,
+  Settings,
   Sparkles,
   SquarePen,
   Trash2,
@@ -23,7 +31,6 @@ import {
 } from '@astryxdesign/core/DropdownMenu'
 import { IconButton } from '@astryxdesign/core/IconButton'
 import { useToast } from '@astryxdesign/core/Toast'
-import { ClickableCard } from '@astryxdesign/core/ClickableCard'
 import {
   AiMessageBubble,
   AiPromptComposer,
@@ -34,6 +41,13 @@ import {
   type AiProjectContext,
   type AiToolCall,
 } from '@/components/ai/ai-elements'
+import { GuardedLink } from '@/components/guarded-link'
+import {
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from '@/components/ui/sidebar'
 import {
   aiDraftKey,
   draftOnKeyChange,
@@ -46,6 +60,9 @@ import {
 } from '@/lib/ai-draft'
 import { cn } from '@/lib/utils'
 import { AI_MODELS, DEFAULT_AI_TEMPLATES, fillPromptTemplate } from '@/plugins/ai-copilot/templates'
+
+/** 空态「常用任务」三行的图标，顺序与 DEFAULT_AI_TEMPLATES.slice(0, 3) 对齐。 */
+const TASK_ICONS = [Sparkles, Ruler, FileText] as const
 
 type ConvSummary = { id: string; title: string }
 type StoredMessage = {
@@ -132,6 +149,9 @@ export function AiSidebarDock({
   models: customModels,
   initialInput,
   userId,
+  collapsed = false,
+  onToggleCollapsed,
+  transitionsEnabled = true,
 }: {
   plugins: AiConnectablePlugin[]
   projects: AiProjectContext[]
@@ -142,6 +162,15 @@ export function AiSidebarDock({
   initialInput?: string
   /** 当前登录用户：草稿按「用户 + 会话」隔离存储，换账号不会看到别人的草稿 */
   userId: string
+  /** 宽屏常驻列是否收起成图标栏；抽屉模式始终为 false */
+  collapsed?: boolean
+  /** 宽屏常驻列的收起/展开回调；抽屉模式不传（不显示收起按钮） */
+  onToggleCollapsed?: () => void
+  /**
+   * 首帧先不开宽度/淡出过渡，等存储里的收起态落定后再启用，避免刷新时闪一下动画。
+   * 与 ai-panel.tsx 的 transitionsEnabled 同源。
+   */
+  transitionsEnabled?: boolean
 }) {
   const availableModels = customModels?.length ? customModels : AI_MODELS
   const pathname = usePathname()
@@ -780,34 +809,98 @@ export function AiSidebarDock({
         setDockDragging(false)
         void handleAddFiles(e.dataTransfer.files)
       }}
-      className="relative flex min-h-0 flex-1 flex-col"
+      className="relative flex h-full min-h-0 flex-col text-sidebar-foreground"
     >
-      {dockDragging ? (
-        <div className="pointer-events-none absolute inset-2 z-30 flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-primary bg-background/95 p-6 text-center shadow-sm">
-          <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <Upload className="size-5" />
-          </div>
-          <p className="text-sm font-medium text-foreground">松开上传文件</p>
-          <p className="text-xs text-muted-foreground">支持户型图、点位 JSON、CSV / TXT 清单</p>
-        </div>
-      ) : null}
+      {/*
+        顶部固定行：展开时是「标题 + 会话下拉 / 新对话 / 更多 / 收起」，
+        收起时同一批按钮在右侧排成一列图标（收起按钮仍是最先点到的那个节点）。
+        抽屉模式不传 onToggleCollapsed，因此不出现收起按钮与图标栏。
+      */}
+      <div
+        data-slot="ai-panel-header"
+        className={cn(
+          'shrink-0',
+          collapsed
+            ? 'ml-auto flex w-12 flex-col items-center gap-1 px-1.5 pt-4 pb-2'
+            : onToggleCollapsed
+              ? 'flex h-16 items-center gap-1 border-b border-sidebar-border px-2'
+              : 'flex h-12 items-center gap-1 border-b border-sidebar-border px-2',
+        )}
+      >
+        {/* DOM 顺序与收起态视觉/Tab 顺序一致：展开 → 新对话 → 会话历史 → 更多。
+            展开态用 order 把这几个按钮排回「标题 / 新对话 / 更多 / 收起」。 */}
+        {onToggleCollapsed ? (
+          <IconButton
+            type="button"
+            variant="ghost"
+            size="sm"
+            label={collapsed ? '展开 AI 对话' : '收起 AI 对话'}
+            tooltip={collapsed ? '展开 AI 对话' : '收起 AI 对话'}
+            icon={collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+            aria-expanded={!collapsed}
+            onClick={onToggleCollapsed}
+            className={cn(!collapsed && 'order-4')}
+          />
+        ) : null}
 
-      <div className="flex h-11 items-center justify-between gap-1 px-2">
+        <IconButton
+          type="button"
+          variant="ghost"
+          size="sm"
+          label="新对话"
+          tooltip="新对话"
+          onClick={startNew}
+          icon={<SquarePen />}
+          className={cn(!collapsed && 'order-2')}
+        />
+
         <DropdownMenu
           menuWidth="16rem"
-          renderTrigger={(props) => (
-            <Button
-              {...props}
-              type="button"
-              variant="ghost"
-              size="sm"
-              label={`对话：${activeTitle}`}
-              className="max-w-52 justify-start font-medium"
-            >
-              <span className="truncate">{activeTitle}</span>
-              <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
-            </Button>
-          )}
+          // 收起时从图标栏向外展开（右侧没空间时浏览器会自动翻到左侧）。
+          placement={collapsed ? 'end' : 'below'}
+          renderTrigger={(props) =>
+            collapsed ? (
+              <IconButton
+                {...props}
+                type="button"
+                variant="ghost"
+                size="sm"
+                label="会话历史"
+                tooltip="会话历史"
+                icon={<History />}
+              />
+            ) : (
+              // 与左侧栏 header 的菜单行同一套尺寸/圆角/hover；renderTrigger 的
+              // ARIA 与 ref 原样透传，保证下拉的锚点和键盘行为不变。
+              <SidebarMenuButton
+                {...props}
+                type="button"
+                size="lg"
+                aria-label={`AI 对话：${activeTitle}`}
+                className="order-1 min-w-0 flex-1 justify-start gap-2.5 px-2 text-left"
+              >
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground">
+                  <MessageSquareText className="size-4" />
+                </span>
+                <span className="grid min-w-0 flex-1 leading-tight">
+                  {onToggleCollapsed ? (
+                    <span className="truncate text-sm font-semibold tracking-wide">AI 对话</span>
+                  ) : null}
+                  <span
+                    className={cn(
+                      'truncate',
+                      onToggleCollapsed
+                        ? 'text-xs font-normal text-muted-foreground'
+                        : 'text-sm font-medium',
+                    )}
+                  >
+                    {activeTitle}
+                  </span>
+                </span>
+                <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+              </SidebarMenuButton>
+            )
+          }
         >
           <DropdownMenuGroup title="最近对话">
             {conversations.length === 0 ? <DropdownMenuItem label="还没有对话" isDisabled /> : null}
@@ -824,208 +917,254 @@ export function AiSidebarDock({
             ))}
           </DropdownMenuGroup>
         </DropdownMenu>
-        <div className="flex items-center">
-          <IconButton
-            type="button"
-            variant="ghost"
-            size="sm"
-            label="新对话"
-            onClick={startNew}
-            icon={<SquarePen />}
-          />
-          <DropdownMenu
-            alignment="end"
-            menuWidth="12rem"
-            renderTrigger={(props) => (
-              <IconButton
-                {...props}
-                type="button"
-                variant="ghost"
-                size="sm"
-                label="更多"
-                icon={<MoreHorizontal />}
-              />
-            )}
-          >
-            <DropdownMenuGroup title={<span className="tabular-nums">剩余 {credits} 积分</span>} />
-            <DropdownMenuDivider />
-            {/* 官方的菜单行是唯一可交互目标（不允许在行内再嵌按钮），
-                所以删除从「每行悬浮按钮」改为在这里删除当前打开的对话。 */}
-            <DropdownMenuItem
-              label="删除当前对话"
-              icon={<Trash2 className="size-4" />}
-              variant="destructive"
-              isDisabled={!activeId}
-              onClick={() => {
-                if (activeId) void deleteConversation(activeId)
-              }}
+
+        <DropdownMenu
+          placement={collapsed ? 'end' : 'below'}
+          alignment="end"
+          menuWidth="12rem"
+          renderTrigger={(props) => (
+            <IconButton
+              {...props}
+              type="button"
+              variant="ghost"
+              size="sm"
+              label="更多"
+              tooltip="更多"
+              icon={<MoreHorizontal />}
+              className={cn(!collapsed && 'order-3')}
             />
-          </DropdownMenu>
-        </div>
+          )}
+        >
+          <DropdownMenuGroup title={<span className="tabular-nums">剩余 {credits} 积分</span>} />
+          <DropdownMenuDivider />
+          {/* 官方的菜单行是唯一可交互目标（不允许在行内再嵌按钮），
+              所以删除从「每行悬浮按钮」改为在这里删除当前打开的对话。 */}
+          <DropdownMenuItem
+            label="删除当前对话"
+            icon={<Trash2 className="size-4" />}
+            variant="destructive"
+            isDisabled={!activeId}
+            onClick={() => {
+              if (activeId) void deleteConversation(activeId)
+            }}
+          />
+        </DropdownMenu>
       </div>
 
-      <div ref={scroller} className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-2">
-        {!configured ? (
-          <div className="flex items-start gap-2 rounded-xl border border-dashed p-3 text-xs text-muted-foreground">
-            <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
-            <span>尚未配置 AI 密钥，请联系管理员在后台配置。</span>
+      <div
+        data-slot="ai-panel-content"
+        inert={collapsed}
+        className={cn(
+          'flex min-h-0 flex-1 flex-col',
+          transitionsEnabled &&
+            'transition-opacity duration-200 ease-linear motion-reduce:transition-none',
+          collapsed && 'pointer-events-none opacity-0',
+        )}
+      >
+        {dockDragging ? (
+          <div className="pointer-events-none absolute inset-2 z-30 flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-primary bg-background/95 p-6 text-center shadow-sm">
+            <div className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Upload className="size-5" />
+            </div>
+            <p className="text-sm font-medium text-foreground">松开上传文件</p>
+            <p className="text-xs text-muted-foreground">支持户型图、点位 JSON、CSV / TXT 清单</p>
           </div>
         ) : null}
-        {loadingHistory ? (
-          <Loader2 className="m-auto size-4 animate-spin text-muted-foreground" />
-        ) : messages.length === 0 ? (
-          <div className="m-auto w-full max-w-xl animate-enter space-y-6">
-            <div className="flex flex-col items-center gap-3 text-center">
-              <span
-                aria-hidden
-                className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20 ring-inset"
-              >
-                <Sparkles className="size-5" />
-              </span>
-              <div className="space-y-1">
-                <p className="text-lg font-semibold tracking-tight text-foreground">
-                  {project ? `关于「${project.name}」，想做点什么？` : '有什么可以帮你？'}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  选择一个常用任务，或直接描述需求、拖入户型图与清单
-                </p>
+
+        <div
+          ref={scroller}
+          className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-2"
+        >
+          {!configured ? (
+            <div className="flex items-start gap-2 rounded-xl border border-dashed p-3 text-xs text-muted-foreground">
+              <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
+              <span>尚未配置 AI 密钥，请联系管理员在后台配置。</span>
+            </div>
+          ) : null}
+          {loadingHistory ? (
+            <Loader2 className="m-auto size-4 animate-spin text-muted-foreground" />
+          ) : messages.length === 0 ? (
+            <div className="w-full py-2 animate-enter">
+              <p className="px-3 pb-2 text-sm text-muted-foreground">
+                {project ? `关于「${project.name}」，` : ''}
+                选择一个常用任务，或直接描述需求、拖入户型图与清单。
+              </p>
+              <div className="px-2">
+                <SidebarGroupLabel>常用任务</SidebarGroupLabel>
+                <SidebarMenu className="gap-1">
+                  {DEFAULT_AI_TEMPLATES.slice(0, 3).map((t, index) => {
+                    const Icon = TASK_ICONS[index] ?? Sparkles
+                    return (
+                      <SidebarMenuItem key={t.id}>
+                        <SidebarMenuButton
+                          type="button"
+                          onClick={() => pickTemplate(t.id)}
+                          className="h-auto min-h-12 items-start gap-2.5 py-2"
+                        >
+                          <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center text-sidebar-foreground/70">
+                            <Icon />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium">{t.name}</span>
+                            {t.description ? (
+                              <span className="mt-0.5 line-clamp-1 block text-xs font-normal text-muted-foreground">
+                                {t.description}
+                              </span>
+                            ) : null}
+                          </span>
+                          <ArrowRight className="mt-0.5 shrink-0 text-muted-foreground opacity-0 transition-[opacity,transform] duration-150 ease-out-quart group-hover/menu-button:translate-x-0.5 group-hover/menu-button:opacity-100 group-focus-visible/menu-button:opacity-100" />
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    )
+                  })}
+                </SidebarMenu>
               </div>
             </div>
-            <div className="grid gap-2">
-              {DEFAULT_AI_TEMPLATES.slice(0, 3).map((t) => (
-                <ClickableCard
-                  key={t.id}
-                  label={t.name}
-                  onClick={() => pickTemplate(t.id)}
-                  padding={3}
-                  elevation="low"
-                  className="group flex items-center gap-3 text-left"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium text-foreground">{t.name}</span>
-                    {t.description ? (
-                      <span className="mt-0.5 line-clamp-1 block text-xs text-muted-foreground">
-                        {t.description}
+          ) : (
+            messages.map((m, idx) => {
+              const isLastReply = m.role === 'assistant' && idx === messages.length - 1
+              if (m.role === 'assistant' && !m.content && !m.reasoning && thinking) {
+                return (
+                  <div key={m.id} className="flex flex-col gap-1.5">
+                    {m.toolCalls?.map((c, i) => (
+                      <span key={i} className="text-xs text-muted-foreground">
+                        {c.summary ? `${c.pluginName}：${c.summary}` : `已使用 ${c.pluginName}`}
                       </span>
-                    ) : null}
-                  </span>
-                  <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-out-quart group-hover:translate-x-0.5 group-hover:text-foreground" />
-                </ClickableCard>
-              ))}
-            </div>
-          </div>
-        ) : (
-          messages.map((m, idx) => {
-            const isLastReply = m.role === 'assistant' && idx === messages.length - 1
-            if (m.role === 'assistant' && !m.content && !m.reasoning && thinking) {
+                    ))}
+                    <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <Loader2 className="size-3.5 animate-spin" />
+                      {statusText || (model.reasoning ? '思考中…' : '正在回复…')}
+                    </span>
+                  </div>
+                )
+              }
               return (
                 <div key={m.id} className="flex flex-col gap-1.5">
-                  {m.toolCalls?.map((c, i) => (
-                    <span key={i} className="text-xs text-muted-foreground">
-                      {c.summary ? `${c.pluginName}：${c.summary}` : `已使用 ${c.pluginName}`}
+                  <AiMessageBubble
+                    message={m}
+                    isLast={isLastReply && !streaming}
+                    onRegenerate={
+                      !streaming && m.role === 'assistant' ? () => regenerate(m.id) : undefined
+                    }
+                    onQuickAction={!streaming ? (prompt) => void send(prompt) : undefined}
+                  />
+                  {isLastReply && streaming && statusText ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Loader2 className="size-3 animate-spin" />
+                      {statusText}
                     </span>
-                  ))}
-                  <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <Loader2 className="size-3.5 animate-spin" />
-                    {statusText || (model.reasoning ? '思考中…' : '正在回复…')}
-                  </span>
+                  ) : null}
                 </div>
               )
-            }
-            return (
-              <div key={m.id} className="flex flex-col gap-1.5">
-                <AiMessageBubble
-                  message={m}
-                  isLast={isLastReply && !streaming}
-                  onRegenerate={
-                    !streaming && m.role === 'assistant' ? () => regenerate(m.id) : undefined
-                  }
-                  onQuickAction={!streaming ? (prompt) => void send(prompt) : undefined}
-                />
-                {isLastReply && streaming && statusText ? (
-                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Loader2 className="size-3 animate-spin" />
-                    {statusText}
-                  </span>
-                ) : null}
-              </div>
-            )
-          })
-        )}
-      </div>
+            })
+          )}
+        </div>
 
-      <div className="p-3 pt-1.5 pb-3.5">
-        {attachments.some(
-          (a) =>
-            a.status === 'ready' &&
-            a.kind === 'image' &&
-            (a.imageKind ?? 'floor-plan') === 'floor-plan',
-        ) && !streaming ? (
-          <div className="mb-2 flex flex-wrap items-center gap-1.5 px-1">
-            <span className="text-[11px] text-muted-foreground">一键导入：</span>
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              label="仅导入开关"
-              className="rounded-full text-xs"
-              onClick={() =>
-                void send(
-                  '请将上传的户型图添加到当前项目点位图，仅导入识别到的开关点位（importMode=switches）',
-                )
-              }
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              label="导入全部（开关+灯具）"
-              className="rounded-full text-xs text-muted-foreground"
-              onClick={() =>
-                void send(
-                  '请将上传的户型图添加到当前项目点位图，导入识别到的全部开关与灯具点位（importMode=all）',
-                )
-              }
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              label="仅添加干净底图"
-              className="rounded-full text-xs text-muted-foreground"
-              onClick={() =>
-                void send(
-                  '请只将上传的户型图作为干净底图添加到点位图，不自动生成任何点位（importMode=none）',
-                )
-              }
-            />
-          </div>
-        ) : null}
-        <AiPromptComposer
-          value={input}
-          onChange={setInput}
-          onSubmit={() => void send(input)}
-          streaming={streaming}
-          onStop={() => abortRef.current?.abort()}
-          models={availableModels}
-          selectedModel={model}
-          onSelectModel={setModelId}
-          plugins={plugins}
-          connectedPluginIds={connected}
-          onTogglePlugin={(id) =>
-            setConnected((prev) =>
-              prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-            )
-          }
-          projects={projectList}
-          selectedProjectId={projectId}
-          onSelectProject={setProjectId}
-          templates={DEFAULT_AI_TEMPLATES.map((t) => ({ id: t.id, name: t.name }))}
-          onPickTemplate={pickTemplate}
-          attachments={attachments}
-          onAddFiles={(files) => void handleAddFiles(files)}
-          onRemoveAttachment={(id) => setAttachments((prev) => prev.filter((a) => a.id !== id))}
-        />
+        <div className="p-3 pt-1.5 pb-3.5">
+          {attachments.some(
+            (a) =>
+              a.status === 'ready' &&
+              a.kind === 'image' &&
+              (a.imageKind ?? 'floor-plan') === 'floor-plan',
+          ) && !streaming ? (
+            <div className="mb-2 flex flex-wrap items-center gap-1.5 px-1">
+              <span className="text-[11px] text-muted-foreground">一键导入：</span>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                label="仅导入开关"
+                className="rounded-full text-xs"
+                onClick={() =>
+                  void send(
+                    '请将上传的户型图添加到当前项目点位图，仅导入识别到的开关点位（importMode=switches）',
+                  )
+                }
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                label="导入全部（开关+灯具）"
+                className="rounded-full text-xs text-muted-foreground"
+                onClick={() =>
+                  void send(
+                    '请将上传的户型图添加到当前项目点位图，导入识别到的全部开关与灯具点位（importMode=all）',
+                  )
+                }
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                label="仅添加干净底图"
+                className="rounded-full text-xs text-muted-foreground"
+                onClick={() =>
+                  void send(
+                    '请只将上传的户型图作为干净底图添加到点位图，不自动生成任何点位（importMode=none）',
+                  )
+                }
+              />
+            </div>
+          ) : null}
+          <AiPromptComposer
+            value={input}
+            onChange={setInput}
+            onSubmit={() => void send(input)}
+            streaming={streaming}
+            onStop={() => abortRef.current?.abort()}
+            models={availableModels}
+            selectedModel={model}
+            onSelectModel={setModelId}
+            plugins={plugins}
+            connectedPluginIds={connected}
+            onTogglePlugin={(id) =>
+              setConnected((prev) =>
+                prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+              )
+            }
+            projects={projectList}
+            selectedProjectId={projectId}
+            onSelectProject={setProjectId}
+            templates={DEFAULT_AI_TEMPLATES.map((t) => ({ id: t.id, name: t.name }))}
+            onPickTemplate={pickTemplate}
+            attachments={attachments}
+            onAddFiles={(files) => void handleAddFiles(files)}
+            onRemoveAttachment={(id) => setAttachments((prev) => prev.filter((a) => a.id !== id))}
+          />
+        </div>
+
+        {/* 与左侧栏 footer 同款的状态行：积分来源与「更多」菜单里的数字一致；
+          账户菜单仍只在左侧栏，这里不重复。 */}
+        <footer
+          data-slot="ai-panel-footer"
+          className="flex shrink-0 items-center gap-1 border-t border-sidebar-border p-2 text-xs text-sidebar-foreground/70"
+        >
+          <span className="flex min-w-0 flex-1 items-center gap-1.5 px-1">
+            <Coins className="size-3.5 shrink-0" />
+            <span className="truncate">
+              剩余{' '}
+              <span className="font-medium text-sidebar-foreground tabular-nums">
+                {credits.toLocaleString('zh-CN')}
+              </span>{' '}
+              积分
+            </span>
+          </span>
+          <GuardedLink
+            href="/membership"
+            className="rounded-md px-2 py-1 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          >
+            会员
+          </GuardedLink>
+          <GuardedLink
+            href="/settings"
+            aria-label="设置"
+            title="设置"
+            className="flex size-7 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          >
+            <Settings className="size-4" />
+          </GuardedLink>
+        </footer>
       </div>
     </div>
   )
