@@ -31,7 +31,7 @@ import {
   Settings,
   Star,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { EmptyState } from '@/components/empty-state'
 import { StatTile } from '@/components/stat-tile'
@@ -534,7 +534,9 @@ function ConnectionBar({
             }
           />
           <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
-            <span className="text-sm font-medium text-foreground">已连接</span>
+            <span className="text-sm font-medium text-foreground">
+              {warning ? '连接异常' : '已连接'}
+            </span>
             {baseUrl ? (
               <span className="truncate text-xs text-muted-foreground">{baseUrl}</span>
             ) : null}
@@ -931,6 +933,7 @@ function AllDevicesPanel({ entities }: { entities: EntityRow[] }) {
                 variant="ghost"
                 size="sm"
                 label={`显示更多（剩余 ${remaining}）`}
+                data-testid="ha-rows-more"
                 onClick={() => setVisibleCount((value) => value + ROWS_PER_PAGE)}
               />
             </div>
@@ -992,6 +995,7 @@ function LiveView({
   refreshWarning,
   onStates,
   onRefresh,
+  readStates,
 }: {
   ha: DesktopHaBridge
   status: HaStatus
@@ -1001,6 +1005,8 @@ function LiveView({
   refreshWarning: string | null
   onStates: (states: HaEntityState[]) => void
   onRefresh: () => void
+  /** 带请求代次的读状态：只有最新一次读取的结果会返回 `ok`。 */
+  readStates: () => Promise<StatesReadResult>
 }) {
   const [pending, setPending] = useState<Record<string, HaControlService>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -1072,10 +1078,11 @@ function LiveView({
     }
 
     // 成功不做乐观更新：重新读一遍主进程聚合后的真实状态。
-    const nextStates = await readHaStates(ha)
-    if (nextStates) {
-      onStates(nextStates)
-    } else {
+    // 和刷新共用代次保护：后发起的读取才能落 UI，旧快照直接丢弃。
+    const statesResult = await readStates()
+    if (statesResult.kind === 'ok') {
+      onStates(statesResult.states)
+    } else if (statesResult.kind === 'error') {
       setErrors((prev) => ({
         ...prev,
         [entity.entityId]: '操作已提交，但刷新状态失败，请重试。',
@@ -1139,7 +1146,7 @@ function LiveView({
             size="sm"
             variant="ghost"
             label="位置 +10%"
-            isDisabled={busy}
+            isDisabled={busy || position === null}
             data-testid={testId('position-up')}
             onClick={() =>
               void runAction(entity, 'set_cover_position', {
@@ -1151,7 +1158,7 @@ function LiveView({
             size="sm"
             variant="ghost"
             label="位置 −10%"
-            isDisabled={busy}
+            isDisabled={busy || position === null}
             data-testid={testId('position-down')}
             onClick={() =>
               void runAction(entity, 'set_cover_position', {
@@ -1289,6 +1296,12 @@ function LiveView({
   )
 }
 
+/** 一次 `getStates` 的结果：`stale` 表示已有更晚发起的读取，旧快照不能落 UI。 */
+type StatesReadResult =
+  | { kind: 'ok'; states: HaEntityState[] }
+  | { kind: 'stale' }
+  | { kind: 'error' }
+
 type BridgeView =
   | { kind: 'server' }
   | { kind: 'loading' }
@@ -1345,6 +1358,8 @@ export function SmartHomeClient({ data }: { data: SmartHomeData }) {
   const [updatedAt, setUpdatedAt] = useState<number | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshWarning, setRefreshWarning] = useState<string | null>(null)
+  // 刷新与单设备操作都会读 states；只允许最后发起的那次读取落 UI。
+  const statesReadSeq = useRef(0)
 
   useEffect(() => {
     let cancelled = false
@@ -1404,6 +1419,19 @@ export function SmartHomeClient({ data }: { data: SmartHomeData }) {
   }, [attempt])
 
   /**
+   * 读一次 states 并打上代次。并发读取时，只有最后发起的那次能返回 `ok`；
+   * 先发后到的旧快照返回 `stale`，调用方必须丢弃。
+   */
+  async function readLatestStates(ha: DesktopHaBridge): Promise<StatesReadResult> {
+    statesReadSeq.current += 1
+    const sequence = statesReadSeq.current
+    const states = await readHaStates(ha)
+    if (sequence !== statesReadSeq.current) return { kind: 'stale' }
+    if (!states) return { kind: 'error' }
+    return { kind: 'ok', states }
+  }
+
+  /**
    * 原地刷新：保持 `kind:'live'`，只替换 states。这样搜索词、类型筛选、
    * 分页、分组展开和滚动位置都不会被卸载重置；失败也保留上一份数据，
    * 只在连接条里就地提示。
@@ -1422,15 +1450,22 @@ export function SmartHomeClient({ data }: { data: SmartHomeData }) {
       return
     }
 
-    const states = await readHaStates(ha)
-    if (!states) {
+    const result = await readLatestStates(ha)
+    if (result.kind === 'stale') {
+      setRefreshing(false)
+      return
+    }
+    if (result.kind === 'error') {
       setRefreshWarning(status.error ?? '无法读取 Home Assistant 实体状态，请检查连接或令牌。')
       setRefreshing(false)
       return
     }
 
     setUpdatedAt(Date.now())
-    setView((current) => (current.kind === 'live' ? { ...current, status, states } : current))
+    setRefreshWarning(null)
+    setView((current) =>
+      current.kind === 'live' ? { ...current, status, states: result.states } : current,
+    )
     setRefreshing(false)
   }
 
@@ -1450,9 +1485,12 @@ export function SmartHomeClient({ data }: { data: SmartHomeData }) {
         refreshWarning={refreshWarning}
         onStates={(states) => {
           setUpdatedAt(Date.now())
+          // 有更新的真实状态进来，旧的「刷新失败」提示就不成立了。
+          setRefreshWarning(null)
           setView((current) => (current.kind === 'live' ? { ...current, states } : current))
         }}
         onRefresh={() => void refreshLive()}
+        readStates={() => readLatestStates(view.ha)}
       />
     )
   }
