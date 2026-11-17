@@ -101,7 +101,15 @@ const livingLight = state('light.living_room', 'on', { friendly_name: '客厅灯
 const temperatureSensor = state('sensor.temperature', '23.5', {
   friendly_name: '温度传感器',
   area_name: '客厅',
+  device_class: 'temperature',
+  unit_of_measurement: '°C',
 })
+const humiditySensor = state('sensor.humidity', '48', {
+  friendly_name: '湿度传感器',
+  device_class: 'humidity',
+  unit_of_measurement: '%',
+})
+const offlineLight = state('light.broken', 'unavailable', { friendly_name: '坏掉的灯' })
 
 let container: HTMLDivElement
 let root: Root
@@ -110,6 +118,7 @@ beforeEach(() => {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
+  window.localStorage.clear()
 })
 
 afterEach(async () => {
@@ -118,6 +127,7 @@ afterEach(async () => {
   })
   container.remove()
   delete (window as unknown as { fanmengDesktop?: unknown }).fanmengDesktop
+  window.localStorage.clear()
 })
 
 async function settle() {
@@ -142,6 +152,12 @@ async function click(testId: string) {
     await new Promise((resolve) => setTimeout(resolve, 0))
   })
   await settle()
+}
+
+function testIds(prefix: string): (string | null)[] {
+  return [...container.querySelectorAll(`[data-testid^="${prefix}"]`)].map((element) =>
+    element.getAttribute('data-testid'),
+  )
 }
 
 describe('SmartHomeClient 桌面桥分支', () => {
@@ -172,7 +188,7 @@ describe('SmartHomeClient 桌面桥分支', () => {
     expect(openSettings).toHaveBeenCalledTimes(1)
   })
 
-  it('已配置时渲染 getStates 的实时实体，替掉服务器数据', async () => {
+  it('已配置时渲染 getStates 的实时实体与连接信息', async () => {
     installBridge({
       status: async () => configuredStatus,
       getStates: async () => [livingLight, temperatureSensor],
@@ -182,25 +198,167 @@ describe('SmartHomeClient 桌面桥分支', () => {
 
     expect(container.textContent).toContain('客厅灯')
     expect(container.textContent).toContain('温度传感器')
-    expect(container.textContent).toContain('桌面客户端直连')
+    expect(container.textContent).toContain('已连接')
+    expect(container.textContent).toContain('HA 2025.1.0')
+    expect(container.textContent).toContain('最后更新')
+    expect(container.querySelector('[data-testid="ha-refresh"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="ha-open-settings"]')).not.toBeNull()
     expect(container.textContent).not.toContain('服务器灯')
-    // 有区域字段时才显示区域统计
-    expect(container.querySelector('[data-testid="ha-stat-areas"]')).not.toBeNull()
   })
 
-  it('实时数据没有区域字段时不显示伪造的区域统计', async () => {
+  it('汇总按可控设备 / 离线 / 环境读数统计，不再显示区域或实体总数', async () => {
     installBridge({
       status: async () => configuredStatus,
-      getStates: async () => [state('light.no_area', 'on', { friendly_name: '无区域灯' })],
+      getStates: async () => [livingLight, temperatureSensor, humiditySensor, offlineLight],
     })
 
     await render(serverData)
 
-    expect(container.textContent).toContain('无区域灯')
-    // /api/states 默认不带区域字段：不显示「未分配区域」折算出的 1 个区域
     expect(container.querySelector('[data-testid="ha-stat-areas"]')).toBeNull()
-    expect(container.querySelector('[data-testid="ha-stat-total"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="ha-stat-active"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="ha-stat-total"]')).toBeNull()
+    expect(container.querySelector('[data-testid="ha-stat-active"]')).toBeNull()
+
+    const controllable = container.querySelector('[data-testid="ha-stat-controllable"]')
+    expect(controllable?.textContent).toContain('可控设备')
+    expect(controllable?.textContent).toContain('开启 1')
+
+    const offline = container.querySelector('[data-testid="ha-stat-offline"]')
+    expect(offline?.textContent).toContain('1')
+    expect(offline?.textContent).toContain('不可用或未知')
+
+    const sensors = container.querySelector('[data-testid="ha-stat-sensors"]')
+    expect(sensors?.textContent).toContain('2')
+    expect(sensors?.textContent).toContain('温度 · 湿度')
+  })
+
+  it('connected=false 时直接错误态，不再调用 getStates，错误原因可见', async () => {
+    const { ha } = installBridge({
+      status: async () => ({
+        configured: true,
+        baseUrl: 'http://10.0.0.110:8123',
+        connected: false,
+        error: '令牌无效或已过期，请重新生成长期访问令牌',
+      }),
+    })
+
+    await render(serverData)
+
+    expect(ha.getStates).not.toHaveBeenCalled()
+    expect(container.textContent).toContain('连接失败')
+    expect(container.textContent).toContain('令牌无效或已过期')
+    expect(container.querySelector('[data-testid="ha-retry"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="ha-open-settings"]')).not.toBeNull()
+    expect(container.textContent).not.toContain('服务器灯')
+  })
+
+  it('connected=false 且没有 error 时给出默认检查提示', async () => {
+    const { ha } = installBridge({
+      status: async () => ({
+        configured: true,
+        baseUrl: 'http://10.0.0.110:8123',
+        connected: false,
+      }),
+    })
+
+    await render(serverData)
+
+    expect(ha.getStates).not.toHaveBeenCalled()
+    expect(container.textContent).toContain('无法连接 Home Assistant，请检查地址或令牌。')
+  })
+
+  it('3000 个实体时首屏有界，展开全部设备后每次最多 30 行', async () => {
+    const entities: HaEntityState[] = []
+    const domains = ['light', 'switch', 'cover', 'climate', 'sensor']
+    for (let index = 0; index < 3000; index += 1) {
+      const domain = domains[index % domains.length]
+      entities.push(
+        state(`${domain}.bulk_${index}`, domain === 'sensor' ? '21' : 'on', {
+          friendly_name: `设备${index}`,
+        }),
+      )
+    }
+
+    installBridge({
+      status: async () => configuredStatus,
+      getStates: async () => entities,
+    })
+
+    await render(serverData)
+
+    expect(testIds('ha-device-').length).toBeGreaterThan(0)
+    expect(testIds('ha-device-').length).toBeLessThanOrEqual(24)
+    expect(testIds('ha-row-')).toHaveLength(0)
+    expect(container.textContent).toContain('全部设备（3000）')
+
+    await click('ha-all-devices-toggle')
+
+    const rows = testIds('ha-row-')
+    expect(rows.length).toBeGreaterThan(0)
+    expect(rows.length).toBeLessThanOrEqual(30)
+    expect(container.textContent).toContain('显示更多（剩余 2970）')
+  })
+
+  it('温湿度 sensor 出现在环境读数，且没有控制按钮', async () => {
+    installBridge({
+      status: async () => configuredStatus,
+      getStates: async () => [livingLight, temperatureSensor, humiditySensor],
+    })
+
+    await render(serverData)
+
+    const temperature = container.querySelector('[data-testid="ha-reading-sensor.temperature"]')
+    const humidity = container.querySelector('[data-testid="ha-reading-sensor.humidity"]')
+    expect(temperature?.textContent).toContain('温度传感器')
+    expect(temperature?.textContent).toContain('23.5')
+    expect(temperature?.textContent).toContain('°C')
+    expect(humidity?.textContent).toContain('湿度传感器')
+    expect(humidity?.textContent).toContain('48')
+    expect(humidity?.textContent).toContain('%')
+    expect(temperature?.querySelector('button')).toBeNull()
+    expect(
+      container.querySelector('[data-testid="ha-control-sensor.temperature-toggle"]'),
+    ).toBeNull()
+  })
+
+  it('unavailable / unknown 实体出现在「需要处理」', async () => {
+    installBridge({
+      status: async () => configuredStatus,
+      getStates: async () => [
+        livingLight,
+        offlineLight,
+        state('switch.ghost', 'unknown', { friendly_name: '未知开关' }),
+      ],
+    })
+
+    await render(serverData)
+
+    const offline = container.querySelector('[data-testid="ha-attention-light.broken"]')
+    const unknown = container.querySelector('[data-testid="ha-attention-switch.ghost"]')
+    expect(offline?.textContent).toContain('坏掉的灯')
+    expect(offline?.textContent).toContain('不可用')
+    expect(unknown?.textContent).toContain('未知开关')
+    expect(unknown?.textContent).toContain('未知')
+    expect(container.textContent).toContain('需要处理')
+  })
+
+  it('「显示其余 N 个」能展开被截断的设备', async () => {
+    const lights = Array.from({ length: 8 }, (_, index) =>
+      state(`light.room_${index}`, 'on', { friendly_name: `灯${index}` }),
+    )
+    installBridge({
+      status: async () => configuredStatus,
+      getStates: async () => lights,
+    })
+
+    await render(serverData)
+
+    expect(testIds('ha-device-').length).toBe(6)
+    expect(container.textContent).toContain('显示其余 2 个')
+
+    await click('ha-group-more-light')
+
+    expect(testIds('ha-device-').length).toBe(8)
+    expect(container.textContent).not.toContain('显示其余 2 个')
   })
 
   it('灯的开/关按钮调用正确参数，成功后重新 getStates', async () => {
@@ -273,6 +431,8 @@ describe('SmartHomeClient 桌面桥分支', () => {
 
     await render(serverData)
 
+    expect(container.textContent).toContain('当前温度 22°C')
+
     await click('ha-control-cover.bedroom_curtain-position-up')
     expect(ha.callService).toHaveBeenCalledWith({
       domain: 'cover',
@@ -311,8 +471,9 @@ describe('SmartHomeClient 桌面桥分支', () => {
     const alert = container.querySelector('[role="alert"]')
     expect(alert?.textContent).toContain('设备离线')
     expect(ha.getStates).toHaveBeenCalledTimes(1)
-    // 仍然是主进程返回的旧状态，没有乐观更新成 off
-    expect(container.textContent).toContain('on')
+    // 仍然是主进程返回的旧状态，没有乐观更新成关闭
+    const card = container.querySelector('[data-testid="ha-device-light.living_room"]')
+    expect(card?.textContent).toContain('开')
   })
 
   it('非白名单实体没有控制按钮', async () => {
@@ -326,9 +487,7 @@ describe('SmartHomeClient 桌面桥分支', () => {
     expect(
       container.querySelector('[data-testid="ha-control-sensor.temperature-toggle"]'),
     ).toBeNull()
-    const controlIds = [...container.querySelectorAll('[data-testid^="ha-control-"]')].map((el) =>
-      el.getAttribute('data-testid'),
-    )
+    const controlIds = testIds('ha-control-')
     expect(controlIds).not.toContain('ha-control-sensor.temperature-toggle')
     expect(controlIds).toContain('ha-control-light.living_room-toggle')
   })

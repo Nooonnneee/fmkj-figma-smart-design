@@ -9,17 +9,32 @@
  *      这里只做客户端裁剪：实体搜索 + 类型筛选 + 空态兜底。
  *   2. 桌面客户端实时数据（HC-3/HC-4）——
  *      挂载后检测 `window.fanmengDesktop.ha`。有桥且已配置时用 `getStates()`
- *      渲染，并只对 light / switch / cover / climate 白名单实体显示控制按钮。
+ *      渲染现场调试视图，并只对 light / switch / cover / climate 白名单实体显示控制按钮。
  *      有桥但未配置 → 明确的「去设置」空态；无桥 → 完全保持服务器数据。
+ *
+ * 实时视图按「现场验收 / 调试」组织：连接状态 → 汇总 → 快捷控制 →
+ * 环境读数 → 需要处理 → 全部设备（默认折叠 + 分页）。默认不渲染全部实体，
+ * 避免实体多时首屏卡死。
  *
  * 控制行为：调用 `callService`，pending 时禁用，失败就地提示，成功后重新
  * `getStates()`。不做乐观更新 —— 界面只反映主进程真正读回来的状态。
  */
 
-import { Cpu, Home, PanelLeft, Search, Settings } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronUp,
+  Cpu,
+  Home,
+  PanelLeft,
+  RefreshCw,
+  Search,
+  Settings,
+  Star,
+} from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import { EmptyState } from '@/components/empty-state'
+import { StatTile } from '@/components/stat-tile'
 import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
 import { TextInput } from '@astryxdesign/core/TextInput'
@@ -39,6 +54,7 @@ import {
   readHaStates,
   readHaStatus,
   type DesktopHaBridge,
+  type HaControlDomain,
   type HaControlService,
   type HaEntityState,
   type HaStatus,
@@ -115,6 +131,64 @@ const HVAC_MODE_LABELS: Record<string, string> = {
 
 function hvacModeLabel(mode: string): string {
   return HVAC_MODE_LABELS[mode] ?? mode
+}
+
+const OFFLINE_STATES = new Set(['unavailable', 'unknown'])
+
+function isOfflineState(value: string): boolean {
+  return OFFLINE_STATES.has(value)
+}
+
+const COVER_STATE_LABELS: Record<string, string> = {
+  open: '已打开',
+  opened: '已打开',
+  closed: '已关闭',
+  opening: '正在打开',
+  closing: '正在关闭',
+}
+
+/** 实时视图里的状态中文。未知状态原样显示，避免把 HA 的枚举藏起来。 */
+function stateLabel(entity: EntityRow): string {
+  if (entity.state === 'unavailable') return '不可用'
+  if (entity.state === 'unknown') return '未知'
+  if (entity.domain === 'light' || entity.domain === 'switch') {
+    return entity.state === 'on' ? '开' : entity.state === 'off' ? '关' : entity.state
+  }
+  if (entity.domain === 'cover') return COVER_STATE_LABELS[entity.state] ?? entity.state
+  if (entity.domain === 'climate') return hvacModeLabel(entity.state)
+  return entity.state
+}
+
+/** 空调卡额外显示当前温度。 */
+function deviceStatus(entity: EntityRow, attributes: Record<string, unknown>): string {
+  if (entity.domain !== 'climate') return stateLabel(entity)
+  const temperature = numberAttr(attributes, 'temperature')
+  const mode = stateLabel(entity)
+  return temperature === null ? mode : `当前温度 ${temperature}°C · ${mode}`
+}
+
+function isOnEntity(entity: EntityRow): boolean {
+  if (entity.state === 'on' || entity.state === 'open' || entity.state === 'opening') return true
+  if (entity.domain === 'climate') {
+    return !isOfflineState(entity.state) && entity.state !== 'off' && entity.state !== ''
+  }
+  return false
+}
+
+/** 环境读数：sensor 里的温度 / 湿度（按 device_class 或单位识别）。 */
+function readingUnit(attributes: Record<string, unknown>): string | null {
+  const deviceClass = stringAttr(attributes, 'device_class')
+  const unit = stringAttr(attributes, 'unit_of_measurement')
+  if (deviceClass === 'temperature' || unit === '°C' || unit === '℃') return unit ?? '°C'
+  if (deviceClass === 'humidity' || unit === '%') return unit ?? '%'
+  return null
+}
+
+function formatClock(timestamp: number): string {
+  const date = new Date(timestamp)
+  return [date.getHours(), date.getMinutes(), date.getSeconds()]
+    .map((part) => String(part).padStart(2, '0'))
+    .join(':')
 }
 
 function StatCard({
@@ -208,47 +282,11 @@ function HealthCard({ health }: { health: SmartHomeOverview['health'] }) {
   )
 }
 
-/** 桌面客户端连接卡：只展示主进程真实返回的连接态，不伪造健康数据。 */
-function LiveStatusCard({ status }: { status: HaStatus }) {
-  return (
-    <div className="rounded-[var(--radius-container)] border border-border bg-card px-5 py-4 shadow-xs">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-foreground">桌面客户端直连</span>
-        <Badge
-          variant={status.connected ? 'success' : 'warning'}
-          label={status.connected ? '已连接' : '未连接'}
-        />
-      </div>
-      <div className="mt-2 text-xs text-muted-foreground">
-        {status.version ? (
-          <div className="flex justify-between gap-4">
-            <span>Home Assistant 版本</span>
-            <span className="font-medium text-foreground tabular-nums">{status.version}</span>
-          </div>
-        ) : null}
-        {status.baseUrl ? (
-          <div className="mt-1 flex justify-between gap-4">
-            <span>地址</span>
-            <span className="truncate font-medium text-foreground">{status.baseUrl}</span>
-          </div>
-        ) : null}
-        {status.error ? <p className="mt-2 text-destructive">{status.error}</p> : null}
-      </div>
-    </div>
-  )
-}
-
 /**
- * 实体表。`renderControl` 只在桌面实时分支传入 —— 服务器回退分支
- * 不渲染「控制」列，行为与改造前一致。
+ * 实体表（服务器回退分支）。服务器数据没有控制能力，因此不渲染「控制」列，
+ * 行为与改造前一致。
  */
-function EntityTable({
-  data,
-  renderControl,
-}: {
-  data: SmartHomeOverview
-  renderControl?: (entity: EntityRow) => React.ReactNode
-}) {
+function EntityTable({ data }: { data: SmartHomeOverview }) {
   const [query, setQuery] = useState('')
   const [domain, setDomain] = useState('all')
 
@@ -317,9 +355,6 @@ function EntityTable({
               <TableHeaderCell className="hidden sm:table-cell">类型</TableHeaderCell>
               <TableHeaderCell className="hidden sm:table-cell">区域</TableHeaderCell>
               <TableHeaderCell className="pr-6 text-right">状态</TableHeaderCell>
-              {renderControl ? (
-                <TableHeaderCell className="pr-6 text-right">控制</TableHeaderCell>
-              ) : null}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -355,9 +390,6 @@ function EntityTable({
                     {e.state}
                   </span>
                 </TableCell>
-                {renderControl ? (
-                  <TableCell className="pr-6 text-right">{renderControl(e)}</TableCell>
-                ) : null}
               </TableRow>
             ))}
           </TableBody>
@@ -367,7 +399,7 @@ function EntityTable({
   )
 }
 
-/** 已配置：总览区 + 实体列表 + 健康卡 */
+/** 已配置（服务器回退）：总览区 + 实体列表 + 健康卡 */
 function ConfiguredOverview({ data }: { data: SmartHomeOverview }) {
   return (
     <div className="flex flex-col gap-6">
@@ -415,67 +447,556 @@ function DesktopUnconfiguredView({ status }: { status: HaStatus }) {
   )
 }
 
-/** 桥在、但读不到数据（HA 不在线 / 令牌失效等）：明确状态 + 去设置。 */
-function DesktopErrorView({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <EmptyState
-      icon={<PanelLeft className="size-5" />}
-      title="无法读取 Home Assistant 数据"
-      description={message}
-      action={
-        <>
-          <Button label="重试" variant="secondary" data-testid="ha-retry" onClick={onRetry} />
+/**
+ * 连接状态条。连接成功时显示地址 / HA 版本 / 最后更新与刷新；
+ * 失败时换成警示色点 + 错误原因 + 重试 / 去设置。
+ */
+function ConnectionBar({
+  status,
+  updatedAt,
+  error,
+  onRefresh,
+  onRetry,
+}: {
+  status?: HaStatus
+  updatedAt?: number | null
+  error?: string
+  onRefresh?: () => void
+  onRetry?: () => void
+}) {
+  if (error !== undefined) {
+    return (
+      <div className="flex flex-col gap-3 rounded-[var(--radius-container)] border border-border bg-card px-4 py-3 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <span className="mt-1.5 size-2.5 shrink-0 rounded-full bg-warning" />
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-foreground">连接失败</div>
+            <p className="mt-1 text-xs text-pretty text-warning">{error}</p>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
           <Button
-            label="去设置"
+            label="重试"
+            variant="secondary"
+            size="sm"
+            data-testid="ha-retry"
+            onClick={onRetry}
+          />
+          <Button
+            label="设置"
             variant="ghost"
+            size="sm"
             icon={<Settings className="size-4" />}
             data-testid="ha-open-settings"
             onClick={() => void openDesktopSettings()}
           />
-        </>
-      }
-    />
-  )
-}
+        </div>
+      </div>
+    )
+  }
 
-function LoadingView() {
+  const baseUrl = status?.baseUrl ?? null
+  const version = status?.version ?? null
   return (
-    <EmptyState
-      compact
-      title="正在读取客户端数据"
-      description="正在从桌面客户端获取 Home Assistant 实时状态。"
-    />
+    <div className="flex flex-col gap-3 rounded-[var(--radius-container)] border border-border bg-card px-4 py-3 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span className="size-2.5 shrink-0 rounded-full bg-emerald-500" />
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span className="text-sm font-medium text-foreground">已连接</span>
+          {baseUrl ? (
+            <span className="truncate text-xs text-muted-foreground">{baseUrl}</span>
+          ) : null}
+          {version ? <Badge variant="neutral" label={`HA ${version}`} /> : null}
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {updatedAt ? `最后更新 ${formatClock(updatedAt)}` : '最后更新 —'}
+        </span>
+        <Button
+          label="刷新"
+          variant="ghost"
+          size="sm"
+          icon={<RefreshCw className="size-4" />}
+          data-testid="ha-refresh"
+          onClick={onRefresh}
+        />
+        <Button
+          label="设置"
+          variant="ghost"
+          size="sm"
+          icon={<Settings className="size-4" />}
+          data-testid="ha-open-settings"
+          onClick={() => void openDesktopSettings()}
+        />
+      </div>
+    </div>
   )
 }
 
-/** 桌面实时视图：白名单实体的控制按钮都在这里生成，非白名单一律不渲染按钮。 */
+/** 汇总条：3 个指标，发丝线分隔。 */
+function SummaryStrip({
+  entities,
+  sensorCount,
+}: {
+  entities: EntityRow[]
+  /** 温度 / 湿度传感器数量（不是全部 sensor，否则会把电量、信号类实体算进来） */
+  sensorCount: number
+}) {
+  const controllable = useMemo(
+    () => entities.filter((e) => isHaControlDomain(e.domain)),
+    [entities],
+  )
+  const onCount = controllable.filter(isOnEntity).length
+  const offlineCount = entities.filter((e) => isOfflineState(e.state)).length
+
+  return (
+    <div className="grid grid-cols-1 divide-y divide-border overflow-hidden rounded-[var(--radius-container)] border bg-card sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+      <div data-testid="ha-stat-controllable">
+        <StatTile
+          size="inline"
+          label="可控设备"
+          value={controllable.length}
+          hint={`开启 ${onCount}`}
+        />
+      </div>
+      <div data-testid="ha-stat-offline">
+        <StatTile
+          size="inline"
+          label="离线"
+          value={offlineCount}
+          tone={offlineCount > 0 ? 'warning' : undefined}
+          hint="不可用或未知"
+        />
+      </div>
+      <div data-testid="ha-stat-sensors">
+        <StatTile size="inline" label="环境读数" value={sensorCount} hint="温度 · 湿度" />
+      </div>
+    </div>
+  )
+}
+
+const CONTROL_GROUPS: ReadonlyArray<{ domain: HaControlDomain; label: string }> = [
+  { domain: 'light', label: '灯' },
+  { domain: 'switch', label: '开关' },
+  { domain: 'cover', label: '窗帘' },
+  { domain: 'climate', label: '空调' },
+]
+
+const GROUP_LIMIT = 6
+
+function compareEntities(a: EntityRow, b: EntityRow, pinned: ReadonlySet<string>): number {
+  const aPinned = pinned.has(a.entityId)
+  const bPinned = pinned.has(b.entityId)
+  if (aPinned !== bPinned) return aPinned ? -1 : 1
+
+  const aOffline = isOfflineState(a.state)
+  const bOffline = isOfflineState(b.state)
+  if (aOffline !== bOffline) return aOffline ? 1 : -1
+
+  return a.name.localeCompare(b.name, 'zh-Hans-CN')
+}
+
+/** 单台设备卡：名称 + 状态 + 主操作 + 置顶。 */
+function DeviceCard({
+  entity,
+  attributes,
+  pinned,
+  onTogglePin,
+  controls,
+}: {
+  entity: EntityRow
+  attributes: Record<string, unknown>
+  pinned: boolean
+  onTogglePin: () => void
+  controls: React.ReactNode
+}) {
+  return (
+    <div
+      data-testid={`ha-device-${entity.entityId}`}
+      className="flex flex-col gap-3 rounded-[var(--radius-container)] border border-border bg-card px-4 py-3 shadow-xs"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-medium text-foreground">{entity.name}</div>
+          <div className="mt-0.5 truncate text-xs text-muted-foreground">
+            {deviceStatus(entity, attributes)}
+          </div>
+        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          isIconOnly
+          label={pinned ? `取消置顶 ${entity.name}` : `置顶 ${entity.name}`}
+          icon={<Star className={pinned ? 'size-4 fill-current text-warning' : 'size-4'} />}
+          data-testid={`ha-pin-${entity.entityId}`}
+          onClick={onTogglePin}
+        />
+      </div>
+      {controls}
+    </div>
+  )
+}
+
+/** 一组同类型设备：默认 6 台，置顶的始终显示。 */
+function DeviceGroup({
+  domain,
+  label,
+  entities,
+  attributesById,
+  pinned,
+  onTogglePin,
+  renderControls,
+}: {
+  domain: HaControlDomain
+  label: string
+  entities: EntityRow[]
+  attributesById: ReadonlyMap<string, Record<string, unknown>>
+  pinned: ReadonlySet<string>
+  onTogglePin: (entityId: string) => void
+  renderControls: (entity: EntityRow) => React.ReactNode
+}) {
+  const [expanded, setExpanded] = useState(false)
+
+  const ordered = useMemo(
+    () => [...entities].sort((a, b) => compareEntities(a, b, pinned)),
+    [entities, pinned],
+  )
+
+  const { visible, hidden } = useMemo(() => {
+    if (expanded) return { visible: ordered, hidden: 0 }
+    const first = ordered.slice(0, GROUP_LIMIT)
+    const pinnedBeyond = ordered.slice(GROUP_LIMIT).filter((entity) => pinned.has(entity.entityId))
+    const visibleIds = new Set([...first, ...pinnedBeyond].map((entity) => entity.entityId))
+    return {
+      visible: ordered.filter((entity) => visibleIds.has(entity.entityId)),
+      hidden: ordered.length - visibleIds.size,
+    }
+  }, [ordered, pinned, expanded])
+
+  return (
+    <section className="flex flex-col gap-3">
+      <h3 className="text-sm font-semibold text-foreground">
+        {label}{' '}
+        <span className="font-normal text-muted-foreground tabular-nums">({entities.length})</span>
+      </h3>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {visible.map((entity) => (
+          <DeviceCard
+            key={entity.entityId}
+            entity={entity}
+            attributes={attributesById.get(entity.entityId) ?? {}}
+            pinned={pinned.has(entity.entityId)}
+            onTogglePin={() => onTogglePin(entity.entityId)}
+            controls={renderControls(entity)}
+          />
+        ))}
+      </div>
+      {hidden > 0 ? (
+        <div>
+          <Button
+            variant="ghost"
+            size="sm"
+            label={`显示其余 ${hidden} 个`}
+            data-testid={`ha-group-more-${domain}`}
+            onClick={() => setExpanded(true)}
+          />
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
+/** 环境读数卡：只读，不吃控制按钮。 */
+function ReadingCard({ entity, unit }: { entity: EntityRow; unit: string }) {
+  return (
+    <div
+      data-testid={`ha-reading-${entity.entityId}`}
+      className="rounded-[var(--radius-container)] border border-border bg-card px-4 py-3 shadow-xs"
+    >
+      <div className="truncate text-xs text-muted-foreground">{entity.name}</div>
+      <div className="mt-1 flex items-baseline gap-1">
+        <span className="text-xl font-semibold tracking-tight text-foreground tabular-nums">
+          {entity.state}
+        </span>
+        <span className="text-xs text-muted-foreground">{unit}</span>
+      </div>
+    </div>
+  )
+}
+
+/** 「需要处理」清单：只看不可用 / 未知，最多 20 条。 */
+function AttentionList({ entities }: { entities: EntityRow[] }) {
+  if (entities.length === 0) return null
+  return (
+    <section className="flex flex-col gap-2">
+      <h2 className="text-base font-semibold text-foreground">
+        需要处理{' '}
+        <span className="font-normal text-muted-foreground tabular-nums">({entities.length})</span>
+      </h2>
+      <div className="overflow-hidden rounded-[var(--radius-container)] border bg-card">
+        {entities.slice(0, 20).map((entity, index) => (
+          <div
+            key={entity.entityId}
+            data-testid={`ha-attention-${entity.entityId}`}
+            className={
+              index === 0
+                ? 'flex items-center justify-between gap-3 px-4 py-2.5'
+                : 'flex items-center justify-between gap-3 border-t border-border px-4 py-2.5'
+            }
+          >
+            <div className="min-w-0">
+              <div className="truncate text-sm font-medium text-foreground">{entity.name}</div>
+              <div className="truncate text-xs text-muted-foreground">{entity.entityId}</div>
+            </div>
+            <div className="flex shrink-0 items-center gap-3 text-xs">
+              <Badge variant="neutral" label={entity.domain} />
+              <span className="text-warning">{stateLabel(entity)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+const ROWS_PER_PAGE = 30
+
+/** 全部设备：默认折叠；展开后搜索 + 类型筛选 + 分页（30 行/次）。 */
+function AllDevicesPanel({ entities }: { entities: EntityRow[] }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [domain, setDomain] = useState('all')
+  const [visibleCount, setVisibleCount] = useState(ROWS_PER_PAGE)
+
+  const domains = useMemo(() => domainOptions(entities), [entities])
+
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return entities.filter((entity) => {
+      if (domain !== 'all' && entity.domain !== domain) return false
+      if (!q) return true
+      return entity.name.toLowerCase().includes(q) || entity.entityId.toLowerCase().includes(q)
+    })
+  }, [entities, query, domain])
+
+  const visible = rows.slice(0, visibleCount)
+  const remaining = rows.length - visible.length
+
+  return (
+    <section className="flex flex-col gap-3">
+      <div>
+        <Button
+          variant="ghost"
+          size="sm"
+          label={`全部设备（${entities.length}）`}
+          icon={open ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+          data-testid="ha-all-devices-toggle"
+          onClick={() => setOpen((value) => !value)}
+        />
+      </div>
+
+      {open ? (
+        <>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <TextInput
+              label="搜索全部设备"
+              isLabelHidden
+              value={query}
+              onChange={(value) => {
+                setQuery(value)
+                setVisibleCount(ROWS_PER_PAGE)
+              }}
+              placeholder="搜索设备名称 / ID"
+              hasClear
+              width="100%"
+              controlClassName="w-full sm:max-w-xs"
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={domain === 'all' ? 'secondary' : 'ghost'}
+                size="sm"
+                label="全部类型"
+                onClick={() => {
+                  setDomain('all')
+                  setVisibleCount(ROWS_PER_PAGE)
+                }}
+              />
+              {domains.map((item) => (
+                <Button
+                  key={item}
+                  variant={domain === item ? 'secondary' : 'ghost'}
+                  size="sm"
+                  label={item}
+                  onClick={() => {
+                    setDomain(item)
+                    setVisibleCount(ROWS_PER_PAGE)
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {rows.length === 0 ? (
+            <EmptyState
+              compact
+              title={entities.length === 0 ? '暂无可显示的设备' : '没有匹配的设备'}
+              description={
+                entities.length === 0
+                  ? '现场 Home Assistant 还没读到任何实体。'
+                  : '换个关键词试试。'
+              }
+            />
+          ) : (
+            <Table hasHover>
+              <TableHeader>
+                <TableRow isHeaderRow>
+                  <TableHeaderCell className="pl-4 sm:pl-6">名称 / ID</TableHeaderCell>
+                  <TableHeaderCell className="hidden sm:table-cell">类型</TableHeaderCell>
+                  <TableHeaderCell className="pr-6 text-right">状态</TableHeaderCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visible.map((entity) => (
+                  <TableRow key={entity.entityId} data-testid={`ha-row-${entity.entityId}`}>
+                    <TableCell className="max-w-0 py-3 pl-4 sm:pl-6">
+                      <div className="truncate text-sm font-medium text-foreground">
+                        {entity.name}
+                      </div>
+                      <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                        {entity.entityId}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      <Badge variant="neutral" className="rounded-md" label={entity.domain} />
+                    </TableCell>
+                    <TableCell className="pr-6 text-right">
+                      <span
+                        className={
+                          isOfflineState(entity.state)
+                            ? 'text-sm text-muted-foreground'
+                            : 'text-sm text-foreground'
+                        }
+                      >
+                        {stateLabel(entity)}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+
+          {remaining > 0 ? (
+            <div>
+              <Button
+                variant="ghost"
+                size="sm"
+                label={`显示更多（剩余 ${remaining}）`}
+                onClick={() => setVisibleCount((value) => value + ROWS_PER_PAGE)}
+              />
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </section>
+  )
+}
+
+/** 置顶集合存在 localStorage，key 含 baseUrl，换服务器不会串数据。 */
+function usePinnedEntities(baseUrl: string | null) {
+  const storageKey = `fmkj:ha:pins:${baseUrl ?? 'unconfigured'}`
+  const [pinned, setPinned] = useState<ReadonlySet<string>>(() => new Set())
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(storageKey)
+      if (!raw) {
+        setPinned(new Set())
+        return
+      }
+      const parsed: unknown = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        setPinned(new Set(parsed.filter((value): value is string => typeof value === 'string')))
+      }
+    } catch {
+      setPinned(new Set())
+    }
+  }, [storageKey])
+
+  function toggle(entityId: string) {
+    setPinned((previous) => {
+      const next = new Set(previous)
+      if (next.has(entityId)) next.delete(entityId)
+      else next.add(entityId)
+      try {
+        window.localStorage.setItem(storageKey, JSON.stringify([...next]))
+      } catch {
+        // 隐私模式 / 配额满：置顶只在本次会话生效，不影响控制。
+      }
+      return next
+    })
+  }
+
+  return [pinned, toggle] as const
+}
+
+/**
+ * 桌面实时视图：连接条 → 汇总 → 快捷控制 → 环境读数 → 需要处理 → 全部设备。
+ * 白名单实体的控制按钮都在这里生成，非白名单一律不渲染按钮。
+ */
 function LiveView({
   ha,
   status,
   states,
+  updatedAt,
   onStates,
+  onRefresh,
 }: {
   ha: DesktopHaBridge
   status: HaStatus
   states: HaEntityState[]
+  updatedAt: number | null
   onStates: (states: HaEntityState[]) => void
+  onRefresh: () => void
 }) {
   const [pending, setPending] = useState<Record<string, HaControlService>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [pinned, togglePin] = usePinnedEntities(status.baseUrl)
 
-  const overview = useMemo(() => liveOverview(states), [states])
+  const entities = useMemo(() => liveOverview(states).entities, [states])
   const attributesById = useMemo(
     () => new Map(states.map((state) => [state.entityId, state.attributes])),
     [states],
   )
-  // HA 的 /api/states 默认不带区域字段；没有区域信息时不展示区域统计，
-  // 否则所有实体会落进「未分配区域」，显示成恒定的 1 个区域。
-  const hasAreaInfo = useMemo(
-    () =>
-      states.some((state) =>
-        Boolean(stringAttr(state.attributes, 'area_name') ?? stringAttr(state.attributes, 'area')),
-      ),
-    [states],
+
+  const controlEntities = useMemo(
+    () => entities.filter((entity) => isHaControlDomain(entity.domain)),
+    [entities],
+  )
+
+  const grouped = useMemo(() => {
+    const groups = new Map<HaControlDomain, EntityRow[]>()
+    for (const group of CONTROL_GROUPS) groups.set(group.domain, [])
+    for (const entity of controlEntities) {
+      if (isHaControlDomain(entity.domain)) groups.get(entity.domain)?.push(entity)
+    }
+    return groups
+  }, [controlEntities])
+
+  const readings = useMemo(() => {
+    return entities
+      .filter((entity) => entity.domain === 'sensor')
+      .map((entity) => {
+        const unit = readingUnit(attributesById.get(entity.entityId) ?? {})
+        return unit ? { entity, unit } : null
+      })
+      .filter((reading): reading is { entity: EntityRow; unit: string } => reading !== null)
+  }, [entities, attributesById])
+
+  const offlineEntities = useMemo(
+    () => entities.filter((entity) => isOfflineState(entity.state)),
+    [entities],
   )
 
   async function runAction(
@@ -525,7 +1046,7 @@ function LiveView({
     })
   }
 
-  function renderControl(entity: EntityRow): React.ReactNode {
+  function renderControls(entity: EntityRow): React.ReactNode {
     if (!isHaControlDomain(entity.domain)) return null
 
     const busy = Boolean(pending[entity.entityId])
@@ -650,10 +1171,10 @@ function LiveView({
     }
 
     return (
-      <div className="flex flex-col items-end gap-1">
-        <div className="flex flex-wrap items-center justify-end gap-1">{controls}</div>
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-1">{controls}</div>
         {error ? (
-          <span role="alert" className="max-w-56 text-xs text-destructive">
+          <span role="alert" className="text-xs text-destructive">
             {error}
           </span>
         ) : null}
@@ -663,12 +1184,52 @@ function LiveView({
 
   return (
     <div className="flex flex-col gap-6">
-      <LiveStatusCard status={status} />
-      <OverviewStats data={overview} showArea={hasAreaInfo} />
-      <div className="flex flex-col gap-2">
-        <h2 className="text-base font-semibold text-foreground">实体列表</h2>
-        <EntityTable data={overview} renderControl={renderControl} />
-      </div>
+      <ConnectionBar status={status} updatedAt={updatedAt} onRefresh={onRefresh} />
+      <SummaryStrip entities={entities} sensorCount={readings.length} />
+
+      <section className="flex flex-col gap-4">
+        <h2 className="text-base font-semibold text-foreground">快捷控制</h2>
+        {controlEntities.length === 0 ? (
+          <p className="text-sm text-muted-foreground">还没有读到灯光、开关、窗帘或空调设备。</p>
+        ) : (
+          CONTROL_GROUPS.map((group) => {
+            const groupEntities = grouped.get(group.domain) ?? []
+            if (groupEntities.length === 0) return null
+            return (
+              <DeviceGroup
+                key={group.domain}
+                domain={group.domain}
+                label={group.label}
+                entities={groupEntities}
+                attributesById={attributesById}
+                pinned={pinned}
+                onTogglePin={togglePin}
+                renderControls={renderControls}
+              />
+            )
+          })
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-base font-semibold text-foreground">环境读数</h2>
+        {readings.length === 0 ? (
+          <p className="text-sm text-muted-foreground">没有读到温度或湿度传感器。</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {readings.slice(0, 8).map((reading) => (
+              <ReadingCard
+                key={reading.entity.entityId}
+                entity={reading.entity}
+                unit={reading.unit}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <AttentionList entities={offlineEntities} />
+      <AllDevicesPanel entities={entities} />
     </div>
   )
 }
@@ -680,6 +1241,45 @@ type BridgeView =
   | { kind: 'live'; ha: DesktopHaBridge; status: HaStatus; states: HaEntityState[] }
   | { kind: 'error'; message: string }
 
+function LoadingView() {
+  const [elapsed, setElapsed] = useState(0)
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setElapsed((value) => value + 1), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  return (
+    <EmptyState
+      compact
+      title="正在连接 Home Assistant…"
+      description={
+        <span className="flex flex-col gap-1">
+          <span>
+            正在从桌面客户端获取实时状态。
+            {elapsed >= 3 ? `已等待 ${elapsed} 秒` : ''}
+          </span>
+          <span className="text-xs">令牌填写有误时，Home Assistant 需要约 10 秒才会返回结果。</span>
+        </span>
+      }
+    />
+  )
+}
+
+/** 错误态：连接条本身显示原因与重试 / 去设置；下方不再重复按钮。 */
+function DesktopErrorView({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="flex flex-col gap-6">
+      <ConnectionBar error={message} onRetry={onRetry} />
+      <EmptyState
+        icon={<PanelLeft className="size-5" />}
+        title="无法读取 Home Assistant 数据"
+        description={message}
+      />
+    </div>
+  )
+}
+
 /**
  * 入口：先按服务器数据渲染（SSR / 浏览器与改造前完全一致），
  * 挂载后再探测桌面桥；有桥才切换到实时分支。
@@ -687,6 +1287,7 @@ type BridgeView =
 export function SmartHomeClient({ data }: { data: SmartHomeData }) {
   const [view, setView] = useState<BridgeView>({ kind: 'server' })
   const [attempt, setAttempt] = useState(0)
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -715,6 +1316,16 @@ export function SmartHomeClient({ data }: { data: SmartHomeData }) {
         return
       }
 
+      // 已配置但未连接：直接进入错误态，不再发 getStates 白等超时。
+      // HA 在令牌错误时约 10 秒才回 401，多一次调用就是多等一轮。
+      if (!status.connected) {
+        setView({
+          kind: 'error',
+          message: status.error ?? '无法连接 Home Assistant，请检查地址或令牌。',
+        })
+        return
+      }
+
       const states = await readHaStates(ha)
       if (cancelled) return
       if (!states) {
@@ -725,6 +1336,7 @@ export function SmartHomeClient({ data }: { data: SmartHomeData }) {
         return
       }
 
+      setUpdatedAt(Date.now())
       setView({ kind: 'live', ha, status, states })
     })()
 
@@ -744,9 +1356,12 @@ export function SmartHomeClient({ data }: { data: SmartHomeData }) {
         ha={view.ha}
         status={view.status}
         states={view.states}
-        onStates={(states) =>
+        updatedAt={updatedAt}
+        onStates={(states) => {
+          setUpdatedAt(Date.now())
           setView((current) => (current.kind === 'live' ? { ...current, states } : current))
-        }
+        }}
+        onRefresh={() => setAttempt((n) => n + 1)}
       />
     )
   }
