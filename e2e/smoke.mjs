@@ -82,6 +82,68 @@ const fail = (page, kind, detail) => {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
+// Next.js 16.4.6 起，Node 运行时的 route handler 响应会在
+// node_modules/next/dist/server/send-response.js 的 FORBIDDEN_HEADERS 里
+// 主动删掉 content-length / content-encoding / transfer-encoding —— 所以
+// 安装包响应即使 200 也不再带 content-length，不能再拿它判断文件是否为空。
+// 这里用 1KB Range 探测：206 + content-range 会给出真实总大小；读完第一个
+// chunk 立刻取消 body，120MB 的文件不会整个下进内存 / 占满出口带宽。
+async function probeInstaller(path, headType) {
+  const ctrl = new AbortController()
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      headers: { Range: 'bytes=0-1023' },
+      redirect: 'follow',
+      signal: ctrl.signal,
+    })
+    const type = res.headers.get('content-type') || headType || ''
+    if (type.includes('text/html')) return `${path} 回跳到了网页，不是安装包`
+
+    // 只读第一个 chunk（最多约 1KB），然后取消，剩下的字节永远不下载。
+    const reader = res.body?.getReader()
+    let first = null
+    if (reader) {
+      try {
+        const { value } = await reader.read()
+        first = value || null
+      } catch (e) {
+        return `${path} Range 探测读取失败（${e?.message || e}）`
+      } finally {
+        try {
+          await reader.cancel()
+        } catch {
+          // 取消本身失败无所谓，finally 里的 abort 会关掉 socket
+        }
+      }
+    }
+
+    if (res.status === 206) {
+      const range = res.headers.get('content-range') || ''
+      const m = /^bytes 0-1023\/(\d+)$/.exec(range)
+      if (!m) return `${path} Range 响应没有合法的 content-range（${range || '无'}）`
+      const total = Number(m[1])
+      if (!(total >= 50 * 1024 * 1024)) {
+        return `${path} 安装包只有 ${total} 字节，可能是空文件`
+      }
+      if (!first?.byteLength) return `${path} Range 响应没有返回任何字节`
+      return null
+    }
+
+    // 服务器不认 Range 时退回读 200 响应的第一个 chunk：只接受二进制、
+    // 且至少收到 1KB，避免把回跳的网页或空响应当成安装包。
+    if (res.status === 200) {
+      if (first?.byteLength >= 1024) return null
+      return `${path} 忽略 Range 后只读到 ${first?.byteLength || 0} 字节，无法确认安装包非空`
+    }
+
+    return `${path} Range 探测返回 ${res.status}，期望 206`
+  } catch (e) {
+    return `${path} Range 探测失败（${e?.message || e}）`
+  } finally {
+    ctrl.abort()
+  }
+}
+
 async function main() {
   mkdirSync(OUT, { recursive: true })
   const browser = await chromium.launch({ headless: true })
@@ -307,25 +369,33 @@ async function main() {
       // 必须用 HEAD：GET 会把 120MB 的安装包整个下进内存，生产冒烟直接卡死在这里。
       // HEAD 一样会 302 到安装包，所以「回跳网页」和「文件不存在」都还测得出来。
       for (const target of ['windows', 'mac-arm64', 'mac-x64']) {
+        const path = `/downloads/desktop/latest/${target}`
         const res = await ctx.request
-          .head(`${BASE}/downloads/desktop/latest/${target}`, { timeout: 20000, maxRedirects: 5 })
+          .head(`${BASE}${path}`, { timeout: 20000, maxRedirects: 5 })
           .catch(() => null)
         if (!res) {
-          problems.push(`/downloads/desktop/latest/${target} 请求失败`)
+          problems.push(`${path} 请求失败`)
           continue
         }
         if (res.status() !== 200) {
-          problems.push(`/downloads/desktop/latest/${target} 下载不到（${res.status()}）`)
+          problems.push(`${path} 下载不到（${res.status()}）`)
           continue
         }
         const type = res.headers()['content-type'] || ''
         if (type.includes('text/html')) {
-          problems.push(`/downloads/desktop/latest/${target} 回跳到了网页，不是安装包`)
+          problems.push(`${path} 回跳到了网页，不是安装包`)
+          continue
         }
-        if (!Number(res.headers()['content-length'] || 0)) {
-          problems.push(
-            `/downloads/desktop/latest/${target} 没有 content-length，安装包可能是空文件`,
-          )
+        const lenHeader = res.headers()['content-length']
+        if (lenHeader !== undefined) {
+          // 旧行为：有 content-length 就直接看它（0 / 非法值都算空文件）。
+          if (!Number(lenHeader || 0)) {
+            problems.push(`${path} 没有 content-length，安装包可能是空文件`)
+          }
+        } else {
+          // Next 16.4.6 的 send-response.js 删掉了 content-length，改走 Range 探测。
+          const problem = await probeInstaller(path, type)
+          if (problem) problems.push(problem)
         }
       }
     }
