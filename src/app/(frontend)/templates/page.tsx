@@ -150,11 +150,10 @@ export default async function TemplatesPage() {
 
         <Section id="rules" labelledBy="rules-title" className="pt-24 sm:pt-32">
           <details className="group rounded-2xl border bg-card">
-            <summary
-              id="rules-title"
-              className="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 [&::-webkit-details-marker]:hidden sm:px-8"
-            >
-              <span className="text-lg font-medium">编排规范</span>
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 [&::-webkit-details-marker]:hidden sm:px-8">
+              <h2 id="rules-title" className="text-lg font-medium">
+                编排规范
+              </h2>
               <ChevronDown
                 aria-hidden
                 className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"

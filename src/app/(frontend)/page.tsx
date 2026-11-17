@@ -1,6 +1,5 @@
 import Image from 'next/image'
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { ArrowRight, Gift, MessageCircle, Sparkles } from 'lucide-react'
 
 import { CapabilityBand } from '@/components/landing/capability-band'
@@ -155,9 +154,7 @@ export default async function HomePage() {
         ) : null}
 
         <DeliverySection total={data?.quote?.total ?? null} styles={DOC_STYLES} />
-        {data ? (
-          <CapabilityBand products={data.library.products} brands={data.library.brands} />
-        ) : null}
+        <CapabilityBand products={data?.library.products ?? 0} brands={data?.library.brands ?? 0} />
 
         <section
           aria-labelledby="closing-title"
@@ -172,11 +169,11 @@ export default async function HomePage() {
               <h2 id="closing-title" className="text-headline font-medium">
                 下一个项目，从一张户型图开始
               </h2>
-              <p className="max-w-xl text-base leading-relaxed text-muted-foreground">
+              <p className="max-w-2xl text-base leading-relaxed text-muted-foreground">
                 免费注册即送 <strong className="font-semibold text-foreground">20 AI 积分</strong>
-                ；添加微信可领{' '}
+                与完整三层别墅示例项目；加微信领{' '}
                 <strong className="font-semibold text-foreground">7 天专业版体验兑换码</strong>
-                ，或咨询团队私有化部署。
+                （解锁全套高定提案模板、施工水电布线表、一键交付包），或咨询团队私有化部署。
               </p>
               <div className="flex flex-wrap items-center gap-3 pt-1">
                 <Button
