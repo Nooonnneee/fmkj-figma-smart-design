@@ -1,9 +1,21 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowRight, Monitor, Package, Smartphone } from 'lucide-react'
+import { ArrowRight, type LucideIcon, Monitor, Package, Smartphone } from 'lucide-react'
+
+import { DesktopInlineDownload } from '@/components/download/desktop-downloads'
 
 import { brandSrc, LANDING_BRANDS } from './brand-logos'
 import { Section } from './section'
+
+type BandItem = {
+  icon: LucideIcon
+  title: string
+  text: string
+  id?: string
+  links?: { href: string; label: string }[]
+  /** 桌面端入口按访客系统直连对应安装包 */
+  desktopDownload?: boolean
+}
 
 /**
  * 能力带：把原来的产品库、桌面端、多端入口三段收成一条，
@@ -16,12 +28,11 @@ export function CapabilityBand({ products, brands }: { products: number; brands:
     ? `${products} 款在售产品、${brands} 个品牌，按平台和档次一键选好型号。`
     : '品牌产品库按平台和档次一键选好型号。'
 
-  const items = [
+  const items: BandItem[] = [
     {
       icon: Package,
       title: '产品库',
       text: libraryText,
-      id: undefined,
       links: [{ href: '/catalog', label: '浏览产品库' }],
     },
     {
@@ -29,7 +40,7 @@ export function CapabilityBand({ products, brands }: { products: number; brands:
       title: '桌面端',
       text: 'Windows 与 macOS 独立窗口，快捷键直达项目与打印。',
       id: 'desktop',
-      links: [{ href: '/download', label: '下载客户端' }],
+      desktopDownload: true,
     },
     {
       icon: Smartphone,
@@ -58,19 +69,23 @@ export function CapabilityBand({ products, brands }: { products: number; brands:
               {item.text}
             </p>
             <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
-              {item.links.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="group inline-flex w-fit items-center gap-1 rounded-sm text-sm font-medium"
-                >
-                  {link.label}
-                  <ArrowRight
-                    aria-hidden
-                    className="size-3.5 transition-transform group-hover:translate-x-0.5"
-                  />
-                </Link>
-              ))}
+              {item.desktopDownload ? (
+                <DesktopInlineDownload />
+              ) : (
+                item.links?.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="group inline-flex w-fit items-center gap-1 rounded-sm text-sm font-medium"
+                  >
+                    {link.label}
+                    <ArrowRight
+                      aria-hidden
+                      className="size-3.5 transition-transform group-hover:translate-x-0.5"
+                    />
+                  </Link>
+                ))
+              )}
             </div>
           </li>
         ))}
