@@ -32,7 +32,7 @@ export function AppsSection() {
   return (
     <Section id="apps" labelledBy="apps-title" className="sm:pt-16">
       <SectionHeader id="apps-title" title="办公室用电脑，现场用手机">
-        网页、桌面客户端和微信小程序用的是同一份数据，在哪改都实时同步。
+        三个端共一份数据，在哪改都实时同步。
       </SectionHeader>
       <ul className="mt-14 grid gap-px overflow-hidden rounded-2xl border border-border bg-border md:grid-cols-3">
         {APPS.map((app) => (

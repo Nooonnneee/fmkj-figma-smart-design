@@ -70,8 +70,8 @@ export default async function TemplatesPage() {
 
         <Section id="owner" labelledBy="owner-title" className="pt-16 sm:pt-20">
           <SectionHeader id="owner-title" title="业主方案">
-            给业主看的横版提案。按版式分为{frameworks.map((f) => `「${f.label}」`).join('')}
-            ，样张使用平台内置的三层别墅示例项目生成。
+            因为章编排为{frameworks.map((f) => `「${f.label}」`).join('')}
+            ，样张用内置示例项目生成。
           </SectionHeader>
           {frameworks.map((f) => (
             <div key={f.value} className="mt-12">
@@ -93,8 +93,7 @@ export default async function TemplatesPage() {
         {construction.length ? (
           <Section id="construction" labelledBy="construction-title" className="pt-0 sm:pt-0">
             <SectionHeader id="construction-title" title="施工交底">
-              给安装团队的 A4
-              横版资料：点位代号、安装位置、房间配置与逐点核对表，不含任何价格，和业主方案分开生成。
+              给安装团队的 A4 横版资料：点位代号、安装位置、房间配置与逐点核对表，不含价格。
             </SectionHeader>
             <div className="mt-8 grid gap-6 lg:grid-cols-2">
               {construction.map((t) => (
@@ -106,7 +105,7 @@ export default async function TemplatesPage() {
 
         <Section id="compare" labelledBy="compare-title" className="pt-0 sm:pt-0">
           <SectionHeader id="compare-title" title="怎么选">
-            按客户和场合挑模板：第一次沟通用场景故事打动人，比价阶段用预算速览，正式汇报用完整提案。
+            按客户和场合挑：沟通用场景故事，比价用预算速览，正式汇报用完整提案。
           </SectionHeader>
           <div className="mt-8 overflow-x-auto rounded-2xl border">
             <table className="w-full min-w-[960px] text-left text-sm">

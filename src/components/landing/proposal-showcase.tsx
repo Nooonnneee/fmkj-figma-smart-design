@@ -680,7 +680,7 @@ function ShowcaseSlide({
               <div className="flex flex-col gap-[6px] rounded-(--deck-radius-sm) border border-(--deck-panel-border) bg-(--deck-panel) px-[20px] py-[14px]">
                 <p className="doc-strong text-[14px]">本地执行 ≠ 无条件断网可用</p>
                 <p className="doc-body text-[12.5px] leading-[1.6] text-doc-muted">
-                  本地场景能否执行取决于网关、设备及规则支持，须在现场断网实测后写入验收记录。远程访问与推送依赖可用网络；不作绝对离线承诺。
+                  具体是否可用，以现场断网实测为准。
                 </p>
               </div>
             </div>

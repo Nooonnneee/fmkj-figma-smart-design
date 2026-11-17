@@ -160,7 +160,7 @@ export default function DownloadPage() {
               id="platforms-title"
               eyebrow="选择你的平台"
               title="一个账号，所有电脑通用"
-              description="客户端连接同一个繁梦空间服务器，项目、报价和合同实时同步，网页版和小程序里的数据也一样。"
+              description="一个账号，客户端、网页版和小程序的项目与报价实时同步。"
             />
             <DesktopPlatformCards />
           </div>
@@ -203,7 +203,7 @@ export default function DownloadPage() {
               id="install-title"
               eyebrow="安装说明"
               title="三步装好，马上开工"
-              description="客户端暂未购买系统代码签名证书，首次安装时系统可能会提示风险，按下面的步骤确认即可。"
+              description="客户端暂未购买代码签名证书，首次安装可能提示风险，按下面步骤确认即可。"
             />
             <div className="mt-12 grid gap-4 md:grid-cols-3">
               {INSTALL_STEPS.map((group) => (

@@ -42,7 +42,7 @@ export function DeliverySection({ total, styles }: { total: number | null; style
   return (
     <Section id="delivery" labelledBy="delivery-title">
       <SectionHeader id="delivery-title" title="合同和交付文档，跟着报价走">
-        客户确认报价后一键生成合同，金额、付款节点、工期和质保自动带入。
+        报价确认后一键生成合同，金额、付款节点、工期和质保自动带入。
       </SectionHeader>
       <div className="mt-14 grid gap-6 lg:grid-cols-5">
         {total != null ? <PaymentSchedule total={total} /> : null}

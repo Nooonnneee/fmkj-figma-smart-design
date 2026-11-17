@@ -21,8 +21,7 @@ export function DesktopSection() {
       <div className="grid items-center gap-14 lg:grid-cols-[1fr_auto]">
         <div>
           <SectionHeader id="desktop-title" title="把工作台装进电脑">
-            同一个账号、同一份项目，Windows 和 macOS 都能用。客户端只是个更顺手的窗口，
-            网站发布的新功能在客户端里立即可用。
+            同一账号、同一份项目，Windows 和 macOS 都能用；新功能也会同步进来。
           </SectionHeader>
 
           <ul className="mt-10 grid gap-3 sm:grid-cols-2">
