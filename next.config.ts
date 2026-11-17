@@ -159,6 +159,8 @@ const nextConfig: NextConfig = {
   // Prerender source maps add ~100 MB per static build worker
   enablePrerenderSourceMaps: false,
   experimental: {
+    // Track security-only Next.js upgrades (`next upgrade --agent=security`).
+    agentUpgrade: 'security',
     // 前台与 Payload 后台是两套根布局：未匹配的网址用 app/global-not-found.tsx 返回中文 404
     globalNotFound: true,
     optimizePackageImports: ['lucide-react', 'radix-ui'],
