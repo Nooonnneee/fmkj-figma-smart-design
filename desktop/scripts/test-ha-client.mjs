@@ -138,7 +138,7 @@ test('断网/连接失败映射为网络错误', async () => {
   assert.ok(!result.error.includes(TOKEN))
 })
 
-test('超时在 5s 以内可配置，并映射为超时错误', async () => {
+test('超时时间可配置，并映射为超时错误', async () => {
   const client = createHaClient({
     baseUrl: 'http://ha.local:8123',
     token: TOKEN,
@@ -159,6 +159,77 @@ test('超时在 5s 以内可配置，并映射为超时错误', async () => {
   assert.equal(result.ok, false)
   assert.match(result.error, /超时/)
   assert.ok(elapsed >= 20 && elapsed < 1000, `超时用时异常：${elapsed}ms`)
+})
+
+// 用挂起的 fetch + 被注入的 AbortSignal 观察每个方法真正的超时时间。
+// 不用真实等待 12/15/8 秒：node:test 的假时钟推进到边界毫秒。
+function hangingFetch(seen) {
+  return (_url, init) => {
+    seen.signal = init.signal
+    return new Promise((_resolve, reject) => {
+      init.signal.addEventListener('abort', () => {
+        const error = new Error('aborted')
+        error.name = 'AbortError'
+        reject(error)
+      })
+    })
+  }
+}
+
+test('getApi 12s / getStates 15s / callService 8s 各自使用对应超时', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+
+  async function assertTimeout(label, invoke, expected) {
+    const seen = {}
+    const client = createHaClient({
+      baseUrl: 'http://ha.local:8123',
+      token: TOKEN,
+      fetchImpl: hangingFetch(seen),
+    })
+
+    const resultPromise = invoke(client)
+    assert.ok(seen.signal, `${label} 没有发出请求`)
+
+    t.mock.timers.tick(expected - 1)
+    assert.equal(seen.signal.aborted, false, `${label} 在 ${expected - 1}ms 时不应超时`)
+    t.mock.timers.tick(1)
+    assert.equal(seen.signal.aborted, true, `${label} 应在 ${expected}ms 超时`)
+
+    const result = await resultPromise
+    assert.equal(result.ok, false)
+    assert.match(result.error, /超时/)
+  }
+
+  await assertTimeout('getApi', (client) => client.getApi(), 12000)
+  await assertTimeout('getStates', (client) => client.getStates(), 15000)
+  await assertTimeout(
+    'callService',
+    (client) =>
+      client.callService({ domain: 'light', service: 'turn_on', entityId: 'light.kitchen' }),
+    8000,
+  )
+})
+
+test('显式 timeoutMs 覆盖所有方法的默认超时', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+
+  const seen = {}
+  const client = createHaClient({
+    baseUrl: 'http://ha.local:8123',
+    token: TOKEN,
+    timeoutMs: 50,
+    fetchImpl: hangingFetch(seen),
+  })
+
+  const resultPromise = client.getStates()
+  t.mock.timers.tick(49)
+  assert.equal(seen.signal.aborted, false)
+  t.mock.timers.tick(1)
+  assert.equal(seen.signal.aborted, true)
+
+  const result = await resultPromise
+  assert.equal(result.ok, false)
+  assert.match(result.error, /超时/)
 })
 
 test('地址无效时不发请求', async () => {

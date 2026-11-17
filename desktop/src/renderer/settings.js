@@ -200,7 +200,7 @@
 
     $('ha-save').addEventListener('click', async () => {
       setHaBusy(true)
-      setHaStatus('正在保存…')
+      setHaStatus('正在连接…（令牌有误时 Home Assistant 约 10 秒才返回）')
       try {
         const result = await saveConfig()
         if (!result.ok) {
@@ -219,7 +219,7 @@
 
     $('ha-test').addEventListener('click', async () => {
       setHaBusy(true)
-      setHaStatus('正在测试连接…')
+      setHaStatus('正在连接…（令牌有误时 Home Assistant 约 10 秒才返回）')
       try {
         const current = await ha.status()
         const edited =

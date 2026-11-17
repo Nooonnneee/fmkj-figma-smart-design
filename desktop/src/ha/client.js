@@ -5,9 +5,14 @@
 // 设计要点：
 // - 任何网络/HTTP 错误都映射成 { ok: false, error }，不把异常抛到 IPC 外面；
 // - 令牌只放在 Authorization 头里，本文件不打印任何日志，避免令牌进日志文件；
-// - 超时默认 5 秒；所有请求都带 AbortController，避免卡片一多把主进程挂住。
+// - 超时默认 12 秒，每个方法可单独设置（令牌错误时 HA 约 10 秒才返回 401，
+//   5 秒会把令牌问题误报成网络超时）；所有请求都带 AbortController，
+//   避免卡片一多把主进程挂住。
 
-const DEFAULT_TIMEOUT_MS = 5000
+const DEFAULT_TIMEOUT_MS = 12000
+const API_TIMEOUT_MS = 12000
+const STATES_TIMEOUT_MS = 15000
+const SERVICE_TIMEOUT_MS = 8000
 const NAME_PATTERN = /^[a-z0-9_]+$/
 
 /**
@@ -40,13 +45,16 @@ function isPlainObject(value) {
  * @param {object} options
  * @param {string} options.baseUrl  例如 http://homeassistant.local:8123
  * @param {string} options.token    Home Assistant 长期访问令牌
- * @param {number} [options.timeoutMs]
+ * @param {number} [options.timeoutMs] 全局覆盖所有方法的超时（测试 / 特殊部署用）
  * @param {Function} [options.fetchImpl] 测试时注入
  */
-function createHaClient({ baseUrl, token, timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl = globalThis.fetch } = {}) {
-  const timeout = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS
+function createHaClient({ baseUrl, token, timeoutMs, fetchImpl = globalThis.fetch } = {}) {
+  // 调用方显式传了 timeoutMs 就统一用它，否则各方法用各自默认值。
+  const overrideTimeout = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : null
+  const timeoutFor = (methodTimeout) => overrideTimeout ?? methodTimeout
 
-  async function request(pathname, { method = 'GET', body } = {}) {
+  async function request(pathname, { method = 'GET', body, timeoutMs: requestTimeout } = {}) {
+    const timeout = timeoutFor(requestTimeout ?? DEFAULT_TIMEOUT_MS)
     const base = normalizeHaBaseUrl(baseUrl)
     if (!base) return { ok: false, error: 'Home Assistant 地址无效' }
     if (typeof fetchImpl !== 'function') return { ok: false, error: '当前环境不支持网络请求' }
@@ -118,11 +126,11 @@ function createHaClient({ baseUrl, token, timeoutMs = DEFAULT_TIMEOUT_MS, fetchI
 
   return {
     /** GET /api/ —— 连通性与版本 */
-    getApi: () => request('/api/'),
+    getApi: () => request('/api/', { timeoutMs: API_TIMEOUT_MS }),
 
-    /** GET /api/states —— 全部实体状态 */
+    /** GET /api/states —— 全部实体状态（实体多，给更长的读取时间） */
     async getStates() {
-      const result = await request('/api/states')
+      const result = await request('/api/states', { timeoutMs: STATES_TIMEOUT_MS })
       if (!result.ok) return result
       if (!Array.isArray(result.data)) return { ok: false, error: 'Home Assistant 返回的实体列表格式不正确' }
       return result
@@ -137,6 +145,7 @@ function createHaClient({ baseUrl, token, timeoutMs = DEFAULT_TIMEOUT_MS, fetchI
       return request(`/api/services/${encodeURIComponent(domain)}/${encodeURIComponent(service)}`, {
         method: 'POST',
         body: payload,
+        timeoutMs: SERVICE_TIMEOUT_MS,
       })
     },
   }
