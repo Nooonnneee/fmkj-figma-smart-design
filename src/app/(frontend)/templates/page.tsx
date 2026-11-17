@@ -70,7 +70,7 @@ export default async function TemplatesPage() {
 
         <Section id="owner" labelledBy="owner-title" className="pt-16 sm:pt-20">
           <SectionHeader id="owner-title" title="业主方案">
-            因为章编排为{frameworks.map((f) => `「${f.label}」`).join('')}
+            按版式分为{frameworks.map((f) => `「${f.label}」`).join('')}
             ，样张用内置示例项目生成。
           </SectionHeader>
           {frameworks.map((f) => (
