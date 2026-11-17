@@ -361,23 +361,28 @@ export function DocsClient({ manual }: { manual: ManualData }) {
             </button>
             <Badge
               variant="neutral"
-              className="hidden font-mono text-[10px] sm:inline-flex"
+              className="hidden font-mono text-[10px] lg:inline-flex"
               label={`${manual.lastUpdated} · 实时同步`}
             />
           </div>
 
           {/* 全局文档搜索框（⌘K） */}
-          <div className="ml-auto flex flex-1 items-center justify-end gap-2 sm:max-w-xs md:max-w-sm">
+          <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 lg:max-w-xs">
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
-              className="flex h-8 w-full items-center justify-between rounded-lg border bg-muted/40 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+              aria-label="搜索文档（⌘K）"
+              className="flex h-8 w-full min-w-0 items-center justify-between rounded-lg border bg-muted/40 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
             >
-              <span className="flex items-center gap-2 truncate">
+              <span className="flex min-w-0 items-center gap-2">
                 <Search className="size-3.5 shrink-0" />
-                <span>搜索功能、用法、计费或快捷键…</span>
+                {/* 文字提示在 md~lg 区间收起为图标（与右端导航共用 768 宽度），
+                    窄屏(<md)与宽屏(≥lg)都显示完整文案 */}
+                <span className="max-lg:hidden truncate lg:inline">
+                  搜索功能、用法、计费或快捷键…
+                </span>
               </span>
-              <kbd className="hidden rounded border bg-background px-1.5 py-0.5 font-mono text-[10px] sm:inline-block">
+              <kbd className="ml-2 hidden shrink-0 rounded border bg-background px-1.5 py-0.5 font-mono text-[10px] sm:inline-block">
                 ⌘K
               </kbd>
             </button>

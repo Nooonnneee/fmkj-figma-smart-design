@@ -27,14 +27,20 @@ export function FilterTabs({
   return (
     <nav
       aria-label={label}
-      className={cn('-mx-1 max-w-full overflow-x-auto px-1 [scrollbar-width:none]', className)}
+      role="tablist"
+      className={cn(
+        'flex max-w-full min-w-0 items-center overflow-x-auto [scrollbar-width:none]',
+        className,
+      )}
     >
-      <div className="inline-flex h-8 items-center gap-0.5 rounded-lg bg-muted p-0.5">
+      <div className="flex h-8 min-w-max items-center gap-0.5 rounded-lg bg-muted p-0.5">
         {items.map((it, i) => (
           <Link
             key={it.key ?? i}
             href={it.href}
             scroll={false}
+            role="tab"
+            aria-selected={it.active ? 'true' : undefined}
             aria-current={it.active ? 'true' : undefined}
             className={cn(
               'relative inline-flex h-full shrink-0 items-center gap-1.5 rounded-md px-2.5 text-[13px] font-medium whitespace-nowrap transition-[color,background-color,box-shadow] duration-150 ease-out-quart',

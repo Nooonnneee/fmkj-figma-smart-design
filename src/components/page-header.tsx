@@ -106,7 +106,7 @@ export function PageHeader({
         ) : null}
       </VStack>
       {actions ? (
-        <HStack gap={2} wrap="wrap" vAlign="center">
+        <HStack gap={2} wrap="wrap" vAlign="center" className="min-w-0 max-w-full">
           {actions}
         </HStack>
       ) : null}
