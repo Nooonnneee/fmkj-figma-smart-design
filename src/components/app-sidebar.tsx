@@ -285,7 +285,7 @@ export function AppSidebar({
       </SidebarContent>
 
       {/* 左下角：头像（账户菜单）+ 齿轮（设置菜单）；外观切换在顶栏右侧，这里不重复 */}
-      <SidebarFooter className="border-t border-sidebar-border">
+      <SidebarFooter className="h-13 border-t border-sidebar-border">
         <div className="flex items-center gap-1 group-data-[collapsible=icon]:flex-col">
           <DropdownMenu>
             <Tooltip content={user.name} placement="end" isEnabled={collapsed}>

@@ -827,7 +827,7 @@ export function AiSidebarDock({
           collapsed
             ? 'ml-auto flex w-12 flex-col items-center gap-1 px-1.5 pt-4 pb-2'
             : onToggleCollapsed
-              ? 'flex h-16 items-center gap-1 border-b border-sidebar-border px-2'
+              ? 'flex h-12 items-center gap-1 border-b border-sidebar-border px-2'
               : 'flex h-12 items-center gap-1 border-b border-sidebar-border px-2',
         )}
       >
@@ -1155,7 +1155,7 @@ export function AiSidebarDock({
           账户菜单仍只在左侧栏，这里不重复。 */}
         <footer
           data-slot="ai-panel-footer"
-          className="flex shrink-0 items-center gap-1 border-t border-sidebar-border p-2 text-xs text-sidebar-foreground/70"
+          className="h-13 flex shrink-0 items-center gap-1 border-t border-sidebar-border p-2 text-xs text-sidebar-foreground/70"
         >
           <span className="flex min-w-0 flex-1 items-center gap-1.5 px-1">
             <Coins className="size-3.5 shrink-0" />
@@ -1169,7 +1169,7 @@ export function AiSidebarDock({
           </span>
           <GuardedLink
             href="/membership"
-            className="rounded-md px-2 py-1 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           >
             会员
           </GuardedLink>
@@ -1177,7 +1177,7 @@ export function AiSidebarDock({
             href="/settings"
             aria-label="设置"
             title="设置"
-            className="flex size-7 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           >
             <Settings className="size-4" />
           </GuardedLink>
