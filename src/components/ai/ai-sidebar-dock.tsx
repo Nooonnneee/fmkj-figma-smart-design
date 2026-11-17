@@ -1155,7 +1155,7 @@ export function AiSidebarDock({
           账户菜单仍只在左侧栏，这里不重复。 */}
         <footer
           data-slot="ai-panel-footer"
-          className="h-13 flex shrink-0 items-center gap-1 border-t border-sidebar-border p-2 text-xs text-sidebar-foreground/70"
+          className="flex h-13 shrink-0 items-center gap-1 border-t border-sidebar-border p-2 text-xs text-sidebar-foreground/70"
         >
           <span className="flex min-w-0 flex-1 items-center gap-1.5 px-1">
             <Coins className="size-3.5 shrink-0" />
