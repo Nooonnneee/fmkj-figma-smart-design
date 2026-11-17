@@ -49,7 +49,7 @@ export default async function TemplatesPage() {
               一份点位，{owner.length + construction.length} 种讲法。
             </h1>
             <p className="mt-6 max-w-2xl text-lead text-muted-foreground">
-              同一套点位与报价，换个模板就是另一份提案。每套模板都写清适合什么客户、什么时候用、有哪些章节；缩略图就是真实封面，点进去看整套样张。
+              同一套点位与报价，换个模板就是另一份提案，缩略图都是真实封面。
             </p>
             <dl className="mt-10 grid max-w-3xl grid-cols-3 gap-6 border-t pt-6">
               <div>

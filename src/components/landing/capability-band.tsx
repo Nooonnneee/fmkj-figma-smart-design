@@ -88,7 +88,7 @@ export function CapabilityBand({ products, brands }: { products: number; brands:
               width={b.width}
               height={b.height}
               unoptimized
-              className="max-h-6 w-auto max-w-none object-contain opacity-70 grayscale transition duration-200 hover:opacity-100 hover:grayscale-0 dark:hidden"
+              className="max-h-6 w-auto max-w-full object-contain opacity-70 grayscale transition duration-200 hover:opacity-100 hover:grayscale-0 dark:hidden"
             />
             <Image
               src={brandSrc(b.slug, 'mono')}
@@ -96,7 +96,7 @@ export function CapabilityBand({ products, brands }: { products: number; brands:
               width={b.width}
               height={b.height}
               unoptimized
-              className="hidden max-h-6 w-auto max-w-none object-contain opacity-70 transition-opacity hover:opacity-100 dark:block"
+              className="hidden max-h-6 w-auto max-w-full object-contain opacity-70 transition-opacity hover:opacity-100 dark:block"
             />
           </li>
         ))}
