@@ -1,6 +1,6 @@
 {
   "generatedBy": "scripts/build-mono-symbols.mjs",
-  "source": "src/board/packs/smart-home/cad-symbols.ts",
+  "source": "public/point-markers/*.svg",
   "viewBox": "0 0 32 32",
   "strokeWidth": 2,
   "background": "transparent",
@@ -10,140 +10,274 @@
   },
   "goldToken": "--color-brand-gold",
   "basePath": "/board/symbols/mono",
+  "required": [
+    "gateway",
+    "touch-panel",
+    "speaker",
+    "switch-2",
+    "switch-3",
+    "switch-4",
+    "spotlight",
+    "downlight",
+    "ceiling-light",
+    "light-strip",
+    "curtain-track",
+    "motion-sensor",
+    "ap-node",
+    "ac-router",
+    "smart-lock",
+    "camera"
+  ],
   "devices": {
     "gateway": {
       "white": "white/gateway.svg",
       "gold": "gold/gateway.svg",
       "label": "网关",
       "group": "网关",
-      "deviceType": "gateway",
-      "symbol": "hub"
+      "required": true
     },
     "touch-panel": {
       "white": "white/touch-panel.svg",
       "gold": "gold/touch-panel.svg",
       "label": "中控屏",
       "group": "网关",
-      "deviceType": "touch-panel",
-      "symbol": "touch-panel"
+      "required": true
     },
     "speaker": {
       "white": "white/speaker.svg",
       "gold": "gold/speaker.svg",
       "label": "音箱",
       "group": "网关",
-      "deviceType": "speaker",
-      "symbol": "speaker"
+      "required": true
     },
     "switch-2": {
       "white": "white/switch-2.svg",
       "gold": "gold/switch-2.svg",
       "label": "双开",
       "group": "开关",
-      "deviceType": "switch-2",
-      "symbol": "switch",
-      "keys": 2
+      "required": true
     },
     "switch-3": {
       "white": "white/switch-3.svg",
       "gold": "gold/switch-3.svg",
       "label": "三开",
       "group": "开关",
-      "deviceType": "switch-3",
-      "symbol": "switch",
-      "keys": 3
+      "required": true
     },
     "switch-4": {
       "white": "white/switch-4.svg",
       "gold": "gold/switch-4.svg",
       "label": "四开",
       "group": "开关",
-      "deviceType": "switch-4",
-      "symbol": "switch",
-      "keys": 4
+      "required": true
     },
     "spotlight": {
       "white": "white/spotlight.svg",
       "gold": "gold/spotlight.svg",
       "label": "射灯",
       "group": "灯光",
-      "deviceType": "spotlight",
-      "symbol": "spotlight"
+      "required": true
     },
     "downlight": {
       "white": "white/downlight.svg",
       "gold": "gold/downlight.svg",
       "label": "筒灯",
       "group": "灯光",
-      "deviceType": "downlight",
-      "symbol": "downlight"
+      "required": true
     },
     "ceiling-light": {
       "white": "white/ceiling-light.svg",
       "gold": "gold/ceiling-light.svg",
       "label": "吸顶灯",
       "group": "灯光",
-      "deviceType": "ceiling-light",
-      "symbol": "ceiling-light"
+      "required": true,
+      "glyph": "pendant-light",
+      "note": "圆叉字形易读成禁止符号，改用同灯类的吊灯字形"
     },
     "light-strip": {
       "white": "white/light-strip.svg",
       "gold": "gold/light-strip.svg",
       "label": "灯带",
       "group": "灯光",
-      "deviceType": "light-strip",
-      "symbol": "light-strip"
+      "required": true
     },
     "curtain-track": {
       "white": "white/curtain-track.svg",
       "gold": "gold/curtain-track.svg",
       "label": "窗帘",
       "group": "窗帘",
-      "deviceType": "curtain-track",
-      "symbol": "curtain"
+      "required": true
     },
     "motion-sensor": {
       "white": "white/motion-sensor.svg",
       "gold": "gold/motion-sensor.svg",
       "label": "人体",
       "group": "传感",
-      "deviceType": "motion-sensor",
-      "symbol": "motion-sensor"
+      "required": true
     },
     "ap-node": {
       "white": "white/ap-node.svg",
       "gold": "gold/ap-node.svg",
       "label": "AP",
       "group": "网络",
-      "deviceType": "ap-node",
-      "symbol": "mesh",
-      "alsoCovers": [
-        "ceiling-ap"
-      ]
+      "required": true
     },
     "ac-router": {
       "white": "white/ac-router.svg",
       "gold": "gold/ac-router.svg",
       "label": "路由",
       "group": "网络",
-      "deviceType": "ac-router",
-      "symbol": "router"
+      "required": true
     },
     "smart-lock": {
       "white": "white/smart-lock.svg",
       "gold": "gold/smart-lock.svg",
       "label": "门锁",
       "group": "安防",
-      "deviceType": "smart-lock",
-      "symbol": "lock"
+      "required": true
     },
     "camera": {
       "white": "white/camera.svg",
       "gold": "gold/camera.svg",
       "label": "摄像头",
       "group": "安防",
-      "deviceType": "camera",
-      "symbol": "camera"
+      "required": true
+    },
+    "ceiling-ap": {
+      "white": "white/ceiling-ap.svg",
+      "gold": "gold/ceiling-ap.svg",
+      "label": "吸顶AP",
+      "group": "网络",
+      "required": false,
+      "category": "network"
+    },
+    "contact-sensor": {
+      "white": "white/contact-sensor.svg",
+      "gold": "gold/contact-sensor.svg",
+      "label": "门磁",
+      "group": "传感",
+      "required": false,
+      "category": "sensor"
+    },
+    "doorbell": {
+      "white": "white/doorbell.svg",
+      "gold": "gold/doorbell.svg",
+      "label": "门铃",
+      "group": "安防",
+      "required": false,
+      "category": "lock"
+    },
+    "network-panel": {
+      "white": "white/network-panel.svg",
+      "gold": "gold/network-panel.svg",
+      "label": "网络面板",
+      "group": "网络",
+      "required": false,
+      "category": "network"
+    },
+    "other": {
+      "white": "white/other.svg",
+      "gold": "gold/other.svg",
+      "label": "其他设备",
+      "group": "其他",
+      "required": false,
+      "category": "other"
+    },
+    "other-light": {
+      "white": "white/other-light.svg",
+      "gold": "gold/other-light.svg",
+      "label": "其他灯具",
+      "group": "灯光",
+      "required": false,
+      "category": "lighting"
+    },
+    "panel-light": {
+      "white": "white/panel-light.svg",
+      "gold": "gold/panel-light.svg",
+      "label": "面板灯",
+      "group": "灯光",
+      "required": false,
+      "category": "lighting"
+    },
+    "smoke-sensor": {
+      "white": "white/smoke-sensor.svg",
+      "gold": "gold/smoke-sensor.svg",
+      "label": "烟雾",
+      "group": "传感",
+      "required": false,
+      "category": "sensor"
+    },
+    "socket": {
+      "white": "white/socket.svg",
+      "gold": "gold/socket.svg",
+      "label": "五孔",
+      "group": "其他",
+      "required": false,
+      "category": "socket"
+    },
+    "socket-double": {
+      "white": "white/socket-double.svg",
+      "gold": "gold/socket-double.svg",
+      "label": "双插",
+      "group": "其他",
+      "required": false,
+      "category": "socket"
+    },
+    "socket-usb": {
+      "white": "white/socket-usb.svg",
+      "gold": "gold/socket-usb.svg",
+      "label": "USB 插座",
+      "group": "其他",
+      "required": false,
+      "category": "socket"
+    },
+    "switch-1": {
+      "white": "white/switch-1.svg",
+      "gold": "gold/switch-1.svg",
+      "label": "单开",
+      "group": "开关",
+      "required": false,
+      "category": "switch"
+    },
+    "temp-sensor": {
+      "white": "white/temp-sensor.svg",
+      "gold": "gold/temp-sensor.svg",
+      "label": "温湿度",
+      "group": "传感",
+      "required": false,
+      "category": "sensor"
+    },
+    "track-light": {
+      "white": "white/track-light.svg",
+      "gold": "gold/track-light.svg",
+      "label": "轨道灯",
+      "group": "灯光",
+      "required": false,
+      "category": "lighting"
+    },
+    "vrf-controller": {
+      "white": "white/vrf-controller.svg",
+      "gold": "gold/vrf-controller.svg",
+      "label": "VRF 控制器",
+      "group": "其他",
+      "required": false,
+      "category": "vrf"
+    },
+    "wall-light": {
+      "white": "white/wall-light.svg",
+      "gold": "gold/wall-light.svg",
+      "label": "壁灯",
+      "group": "灯光",
+      "required": false,
+      "category": "lighting"
+    },
+    "water-sensor": {
+      "white": "white/water-sensor.svg",
+      "gold": "gold/water-sensor.svg",
+      "label": "水浸",
+      "group": "传感",
+      "required": false,
+      "category": "sensor"
     }
   }
 }
