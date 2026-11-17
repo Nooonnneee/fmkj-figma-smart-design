@@ -17,8 +17,11 @@ function sanitizeData(data) {
   try {
     const parsed = JSON.parse(JSON.stringify(data))
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
-    // entity_id 只能来自白名单校验过的参数，不能被 data 覆盖。
-    delete parsed.entity_id
+    // 只允许调用用户点选的那个实体：目标选择类字段一律剔除（大小写变体一起）。
+    const blocked = new Set(['entity_id', 'area_id', 'device_id', 'floor_id', 'label_id', 'exclude'])
+    for (const key of Object.keys(parsed)) {
+      if (blocked.has(key.toLowerCase())) delete parsed[key]
+    }
     return parsed
   } catch {
     return {}
@@ -88,8 +91,14 @@ function createHaBridge({ ipcMain, fromTrusted, fromLocal, tokenStore, clientFac
       const token = typedToken || (existing ? existing.token : '')
       if (!token) return { ok: false, error: '请填写 Home Assistant 长期访问令牌' }
 
-      if (!tokenStore.isEncryptionAvailable()) {
-        return { ok: false, error: '系统安全存储不可用，无法安全保存令牌（Linux 请确认已启用密钥环）' }
+      // basic_text 后端虽然 isEncryptionAvailable() 为 true，但用的是硬编码密钥，
+      // 等同于弱加密；必须和「完全不可用」一样拒绝保存。
+      const secureStorage =
+        typeof tokenStore.isSecureStorageAvailable === 'function'
+          ? tokenStore.isSecureStorageAvailable()
+          : tokenStore.isEncryptionAvailable()
+      if (!secureStorage) {
+        return { ok: false, error: '系统密钥环不可用，无法安全保存令牌（Linux 请安装并解锁 gnome-keyring 或 KWallet）' }
       }
 
       try {
@@ -121,10 +130,13 @@ function createHaBridge({ ipcMain, fromTrusted, fromLocal, tokenStore, clientFac
     'ha:get-states',
     guard(fromTrusted, async () => {
       const config = loadConfig()
+      // 未配置按契约返回空数组；读取失败必须 reject，让调用方走错误视图，
+      // 不能用 [] 伪装成「已连接但没有实体」。
       if (!config) return []
 
       const result = await clientFor(config).getStates()
-      if (!result.ok || !Array.isArray(result.data)) return []
+      if (!result || !result.ok) throw new Error((result && result.error) || '读取实体失败')
+      if (!Array.isArray(result.data)) throw new Error('Home Assistant 返回的实体列表格式不正确')
 
       lastEntities.clear()
       const states = []

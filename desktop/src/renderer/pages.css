@@ -161,13 +161,13 @@ button.link:hover:not(:disabled) {
 
 /* 服务器设置窗口 */
 body.settings {
-  padding: 28px;
+  padding: 24px;
 }
 
 .form-panel {
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 56px);
+  min-height: calc(100vh - 48px);
 }
 
 .form-header {
@@ -188,19 +188,19 @@ body.settings {
 }
 
 form {
-  margin-top: 28px;
+  margin-top: 20px;
 }
 
 label {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   font-size: 13px;
   font-weight: 500;
 }
 
 input {
   width: 100%;
-  height: 40px;
+  height: 38px;
   padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -215,11 +215,16 @@ input:disabled {
 }
 
 .status {
-  min-height: 20px;
-  margin-top: 10px;
+  min-height: 18px;
+  margin-top: 8px;
   color: var(--muted);
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.status:empty {
+  min-height: 0;
+  margin: 0;
 }
 
 .status[data-tone='ok'] {
@@ -238,7 +243,7 @@ input:disabled {
   display: flex;
   gap: 10px;
   align-items: center;
-  margin-top: 18px;
+  margin-top: 12px;
 }
 
 .spacer {
@@ -247,8 +252,8 @@ input:disabled {
 
 /* 智能家居区块 */
 .section {
-  margin-top: 26px;
-  padding-top: 22px;
+  margin-top: 16px;
+  padding-top: 14px;
   border-top: 1px solid var(--border);
 }
 
@@ -270,25 +275,27 @@ input:disabled {
 }
 
 .section-lead {
-  max-width: 340px;
+  max-width: 380px;
   color: var(--muted);
-  font-size: 12.5px;
-  line-height: 1.6;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .section label {
-  margin-top: 14px;
+  margin-top: 10px;
 }
 
 .section input + label {
-  margin-top: 14px;
+  margin-top: 10px;
 }
 
 .device-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 12px 0 4px;
+  gap: 6px;
+  max-height: 104px;
+  overflow-y: auto;
+  margin: 8px 0 0;
   padding: 0;
   list-style: none;
 }
@@ -301,7 +308,7 @@ input:disabled {
   display: flex;
   width: 100%;
   height: auto;
-  padding: 9px 12px;
+  padding: 7px 10px;
   border-radius: 10px;
   text-align: left;
   flex-direction: column;
@@ -323,5 +330,5 @@ input:disabled {
 
 .form-panel .meta {
   margin-top: auto;
-  padding-top: 20px;
+  padding-top: 14px;
 }

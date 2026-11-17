@@ -149,7 +149,7 @@
     const renderDevices = (list) => {
       clearDeviceList()
       if (!list.length) {
-        setDiscoverStatus('没有发现局域网内的 Home Assistant，可以手动填写地址。', 'warn')
+        setDiscoverStatus('没有发现局域网内的 Home Assistant（IPv6-only 设备可能发现不到），可以手动填写地址。', 'warn')
         return
       }
       setDiscoverStatus(`发现 ${list.length} 台设备，点选即可填入地址。`, 'ok')

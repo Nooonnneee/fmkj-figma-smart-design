@@ -37,6 +37,23 @@ test('getApi：成功返回版本，并带 Bearer 令牌', async () => {
   assert.deepEqual(result, { ok: true, data: { message: 'API running.', version: '2024.10.2' } })
   assert.equal(seen.url, 'http://ha.local:8123/api/')
   assert.equal(seen.init.headers.Authorization, `Bearer ${TOKEN}`)
+  assert.equal(seen.init.redirect, 'manual', '不能自动跟随重定向')
+})
+
+test('HTTP 重定向不跟随，直接映射为 HTTP 错误', async () => {
+  let calls = 0
+  const client = createHaClient({
+    baseUrl: 'http://ha.local:8123',
+    token: TOKEN,
+    fetchImpl: async () => {
+      calls += 1
+      return jsonResponse({}, 302)
+    },
+  })
+  const result = await client.getApi()
+  assert.equal(result.ok, false)
+  assert.match(result.error, /HTTP 302/)
+  assert.equal(calls, 1, '重定向后不应再发第二次请求')
 })
 
 test('getStates：解析数组；返回非数组时映射为错误', async () => {

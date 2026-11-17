@@ -84,6 +84,8 @@ function createHaClient({ baseUrl, token, timeoutMs = DEFAULT_TIMEOUT_MS, fetchI
         body: payload,
         signal: controller.signal,
         cache: 'no-store',
+        // 不跟随重定向，避免 HA（或中间设备）把主进程带向任意内网地址。
+        redirect: 'manual',
       })
 
       if (!response || typeof response.ok !== 'boolean') {

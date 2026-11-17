@@ -277,6 +277,11 @@ function resolveInstances(messages) {
  * 发现局域网内的 Home Assistant。
  * 无响应、网络不可用、报文异常时返回 []，不会抛错。
  *
+ * 监听的是临时端口：按 RFC 6762，查询源端口不是 5353 时响应方应单播回复。
+ * 少数只把响应组播回 5353 的设备会收不到，所以设置页始终保留手填地址。
+ * 另外只拿到 AAAA（IPv6-only）的设备本函数会拼出 http://[addr]:port，
+ * 若主机名无法解析仍可能连不上，同样以手填地址兜底。
+ *
  * @param {object} [options]
  * @param {number} [options.timeoutMs=3000]
  * @param {object} [options.dgramModule] 测试时可注入假的 dgram

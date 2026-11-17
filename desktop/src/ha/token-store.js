@@ -5,9 +5,9 @@
 // 令牌只能经 Electron safeStorage.encryptString 加密后落盘；系统安全存储不可用时
 // 直接拒绝保存，绝不退化成明文。读取接口只在主进程内部使用，桥不会把令牌返回给渲染进程。
 //
-// Linux 注意：safeStorage 在 Linux 上依赖桌面密钥环（gnome-libsecret / kwallet）。
-// 没有可用密钥环时 isEncryptionAvailable() 为 false，本模块会拒绝保存；某些环境下
-// Electron 会退回到 basic_text（可逆的固定密钥），加密强度有限，但也不会是明文。
+// Linux 注意：safeStorage 依赖桌面密钥环（gnome-libsecret / kwallet）。
+// 没有可用密钥环时 isEncryptionAvailable() 为 false；即使它返回 true，也可能
+// 退回到 basic_text（硬编码密钥的弱加密）。两种情况本模块都拒绝保存令牌。
 
 const fs = require('node:fs')
 const path = require('node:path')
@@ -29,6 +29,25 @@ function createTokenStore({ userDataPath, safeStorage, fileName = FILE_NAME } = 
     } catch {
       return false
     }
+  }
+
+  /** Linux 上的密钥环后端；非 Linux/旧版 Electron 可能没有这个方法，返回空串。 */
+  function storageBackend() {
+    try {
+      return typeof safeStorage.getSelectedStorageBackend === 'function'
+        ? String(safeStorage.getSelectedStorageBackend())
+        : ''
+    } catch {
+      return ''
+    }
+  }
+
+  /**
+   * 真正可用于保存密钥的状态：除了 isEncryptionAvailable()，还要排除 Linux 的
+   * basic_text 后端。basic_text 用的是硬编码密钥，虽然能加解密，但不应该拿来存令牌。
+   */
+  function isSecureStorageAvailable() {
+    return isEncryptionAvailable() && storageBackend() !== 'basic_text'
   }
 
   /** 只在主进程内部读取；文件缺失、损坏或无法解密时返回 null。 */
@@ -60,6 +79,7 @@ function createTokenStore({ userDataPath, safeStorage, fileName = FILE_NAME } = 
    */
   function save({ baseUrl, token } = {}) {
     if (!isEncryptionAvailable()) throw new Error('ENCRYPTION_UNAVAILABLE')
+    if (storageBackend() === 'basic_text') throw new Error('INSECURE_STORAGE_BACKEND')
     if (typeof token !== 'string' || !token.trim()) throw new Error('INVALID_TOKEN')
     if (typeof baseUrl !== 'string' || !baseUrl) throw new Error('INVALID_BASE_URL')
 
@@ -99,8 +119,10 @@ function createTokenStore({ userDataPath, safeStorage, fileName = FILE_NAME } = 
     clear,
     filePath: () => filePath,
     isEncryptionAvailable,
+    isSecureStorageAvailable,
     load,
     save,
+    storageBackend,
   }
 }
 

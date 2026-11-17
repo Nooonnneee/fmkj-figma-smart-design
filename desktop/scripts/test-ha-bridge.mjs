@@ -16,6 +16,7 @@ function harness(options = {}) {
   const tokenStore = {
     config: options.config || null,
     isEncryptionAvailable: () => options.encryptionAvailable !== false,
+    isSecureStorageAvailable: () => options.encryptionAvailable !== false && options.secureStorageAvailable !== false,
     load() {
       return this.config
     },
@@ -132,8 +133,15 @@ test('configure：地址/令牌格式校验、加密不可用、写入失败都�
   const noStorage = harness({ encryptionAvailable: false })
   const refused = await noStorage.invoke('ha:configure', { local: true }, { baseUrl: 'http://ha.local:8123', token: TOKEN })
   assert.equal(refused.ok, false)
-  assert.match(refused.error, /安全存储/)
+  assert.match(refused.error, /密钥环/)
   assert.equal(noStorage.tokenStore.config, null)
+
+  // Linux basic_text：Electron 报 available，但后端是硬编码密钥，也必须拒绝。
+  const weakBackend = harness({ secureStorageAvailable: false })
+  const weak = await weakBackend.invoke('ha:configure', { local: true }, { baseUrl: 'http://ha.local:8123', token: TOKEN })
+  assert.equal(weak.ok, false)
+  assert.match(weak.error, /密钥环/)
+  assert.equal(weakBackend.tokenStore.config, null)
 
   const saveFails = harness({ failSave: true })
   const failed = await saveFails.invoke('ha:configure', { local: true }, { baseUrl: 'http://ha.local:8123', token: TOKEN })
@@ -203,7 +211,16 @@ test('callService：实体必须出现在最近一次 getStates 结果里', asyn
     domain: 'light',
     service: 'turn_on',
     entityId: 'light.kitchen',
-    data: { brightness: 80, entity_id: 'light.evil' },
+    data: {
+      brightness: 80,
+      entity_id: 'light.evil',
+      area_id: 'area.evil',
+      AREA_ID: 'AREA.EVIL',
+      device_id: 'device.evil',
+      floor_id: 'floor.evil',
+      label_id: 'label.evil',
+      Exclude: ['light.evil'],
+    },
   })
   assert.deepEqual(allowed, { ok: true })
   assert.equal(h.calls.length, 1)
@@ -215,15 +232,31 @@ test('callService：实体必须出现在最近一次 getStates 结果里', asyn
   })
 })
 
-test('getStates 失败后返回空数组，也不会放行任何实体', async () => {
-  const h = harness({ statesResult: { ok: false, error: 'HTTP 500' } })
-  assert.deepEqual(await h.invoke('ha:get-states'), [])
-  const result = await h.invoke('ha:call-service', undefined, {
+test('getStates 读取失败时 reject（不能伪装成空列表）', async () => {
+  const config = { baseUrl: 'http://ha.local:8123', token: TOKEN }
+
+  const http500 = harness({ config, statesResult: { ok: false, error: 'Home Assistant 返回 HTTP 500' } })
+  await assert.rejects(async () => http500.invoke('ha:get-states'), /HTTP 500/)
+  const after500 = await http500.invoke('ha:call-service', undefined, {
     domain: 'light',
     service: 'toggle',
     entityId: 'light.kitchen',
   })
-  assert.equal(result.ok, false)
+  assert.equal(after500.ok, false)
+
+  const timeout = harness({ config, statesResult: { ok: false, error: '连接超时，请检查地址和网络' } })
+  await assert.rejects(async () => timeout.invoke('ha:get-states'), /超时/)
+
+  const badShape = harness({ config, statesResult: { ok: true, data: 'not-an-array' } })
+  await assert.rejects(async () => badShape.invoke('ha:get-states'), /格式不正确/)
+})
+
+test('getStates 成功但 0 个实体时返回空数组', async () => {
+  const h = harness({
+    config: { baseUrl: 'http://ha.local:8123', token: TOKEN },
+    statesResult: { ok: true, data: [] },
+  })
+  assert.deepEqual(await h.invoke('ha:get-states'), [])
 })
 
 test('clear 清除配置后 status 回到未配置', async () => {

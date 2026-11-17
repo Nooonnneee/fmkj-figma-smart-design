@@ -12,11 +12,12 @@ const { createTokenStore } = require('../src/ha/token-store.js')
 
 const TOKEN = 'secret-token-do-not-leak'
 
-function mockSafeStorage() {
-  const state = { available: true }
+function mockSafeStorage(backend = 'keychain') {
+  const state = { available: true, backend }
   return {
     state,
     isEncryptionAvailable: () => state.available,
+    getSelectedStorageBackend: () => state.backend,
     encryptString: (value) => Buffer.from(`enc:${Buffer.from(value, 'utf8').toString('base64')}`),
     decryptString: (buffer) => {
       const text = Buffer.from(buffer).toString('utf8')
@@ -59,6 +60,17 @@ test('安全存储不可用时拒绝保存，且不落任何文件', () => {
     assert.equal(fs.existsSync(store.filePath()), false, '不可用时不能写明文或空文件')
     assert.equal(store.load(), null)
     assert.equal(store.isEncryptionAvailable(), false)
+  })
+})
+
+test('Linux basic_text 后端（硬编码密钥）也拒绝保存', () => {
+  withStore(({ store, safeStorage }) => {
+    safeStorage.state.backend = 'basic_text'
+
+    assert.equal(store.isEncryptionAvailable(), true, 'Electron 在 basic_text 下仍报告可用')
+    assert.equal(store.isSecureStorageAvailable(), false)
+    assert.throws(() => store.save({ baseUrl: 'http://ha.local:8123', token: TOKEN }), /INSECURE_STORAGE_BACKEND/)
+    assert.equal(fs.existsSync(store.filePath()), false, '弱加密后端也不能落盘')
   })
 })
 
