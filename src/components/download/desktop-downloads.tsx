@@ -249,9 +249,11 @@ export function DesktopInlineDownload() {
     return <Skeleton data-slot="skeleton" className="block h-5 w-32 rounded-sm" aria-hidden />
   }
 
-  // 识别不出的系统（例如 Linux）退到 Windows 包，保证有发布时首页始终有安装包直链。
+  // 推荐的平台有包就用；没包（例如只发布了 Windows）或识别不出系统时，
+  // 退到任一有包的目标，保证有发布时首页始终有安装包直链。
+  const recommended = recommendedTarget(detected)
   const target =
-    recommendedTarget(detected) ??
+    (recommended && assetFor(manifest, recommended) ? recommended : null) ??
     TARGETS.find((candidate) => assetFor(manifest, candidate)) ??
     null
   const asset = target ? assetFor(manifest, target) : null
