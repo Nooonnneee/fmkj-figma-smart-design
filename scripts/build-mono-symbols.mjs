@@ -366,7 +366,7 @@ function readGlyph(file) {
 /**
  * 少数字形脱离彩色圆盘后语义会丢，这里在同一个 24×24 坐标系里补画：
  * - light-strip：5:1 圆角灯条 + 内部发光缝（原「胶囊三点」像更多菜单）
- * - spotlight：灯体圆 + 下方光锥（原「圆 + 四向射线」像准星）
+ * - spotlight：上方灯体圆 + 下方三根扇形短射线（原「圆 + 四向射线」像准星）
  * - switch-2/3/4：在 point-markers 按键块外加单色墙板外框（只描边不填充）
  * 自定义图元同样走 renderSvg 的归一化，最终墨迹 24、描边 2。
  */
@@ -399,12 +399,12 @@ const CUSTOM_GLYPHS = {
   }),
   spotlight: () => ({
     shapes: [
-      // 灯体：上方小圆 + 短颈；灯口：一条宽横线；光锥：从灯口两端向下张开的两条斜线
-      { tag: 'circle', attrs: { cx: '12', cy: '4.2', r: '2.3' } },
-      { tag: 'line', attrs: { x1: '12', y1: '6.5', x2: '12', y2: '7.2' } },
-      { tag: 'line', attrs: { x1: '7', y1: '7.2', x2: '17', y2: '7.2' } },
-      { tag: 'path', attrs: { d: 'M7 7.2 L2.5 21' } },
-      { tag: 'path', attrs: { d: 'M17 7.2 L21.5 21' } },
+      // 灯体：上方实心小圆；光束：圆下方三根等长短射线，朝左下 / 正下 / 右下（约 ±35°）。
+      // 射线长度 ≈ 1.2 × 圆的半径，不闭合、不做支架腿。
+      { tag: 'circle', attrs: { cx: '12', cy: '5.5', r: '3', fill: '#fff', stroke: 'none' } },
+      { tag: 'line', attrs: { x1: '9.59', y1: '8.94', x2: '7.53', y2: '11.89' } },
+      { tag: 'line', attrs: { x1: '12', y1: '9.7', x2: '12', y2: '13.3' } },
+      { tag: 'line', attrs: { x1: '14.41', y1: '8.94', x2: '16.47', y2: '11.89' } },
     ],
     linecap: 'round',
     linejoin: 'round',
@@ -416,7 +416,8 @@ const CUSTOM_GLYPHS = {
 
 const CUSTOM_NOTES = {
   'light-strip': '自定义补画：5:1 圆角灯条 + 内部发光缝（原「胶囊三点」易读成更多）',
-  spotlight: '自定义补画：上方灯体圆 + 下方光锥（原「圆 + 四向射线」像准星）',
+  spotlight:
+    '自定义补画：上方灯体圆 + 下方朝左下/正下/右下的三根短射线（原「圆 + 四向射线」像准星）',
   'switch-2': '自定义补画：在 point-markers 按键块外加单色墙板外框（只描边不填充）',
   'switch-3': '自定义补画：在 point-markers 按键块外加单色墙板外框（只描边不填充）',
   'switch-4': '自定义补画：在 point-markers 按键块外加单色墙板外框（只描边不填充）',

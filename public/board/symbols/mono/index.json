@@ -88,7 +88,7 @@
       "required": true,
       "custom": true,
       "glyph": "custom",
-      "note": "自定义补画：上方灯体圆 + 下方光锥（原「圆 + 四向射线」像准星）"
+      "note": "自定义补画：上方灯体圆 + 下方朝左下/正下/右下的三根短射线（原「圆 + 四向射线」像准星）"
     },
     "downlight": {
       "white": "white/downlight.svg",
