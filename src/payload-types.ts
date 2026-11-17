@@ -631,6 +631,7 @@ export interface Quote {
           | null;
         image?: (string | null) | Media;
         name: string;
+        shortName?: string | null;
         sku?: string | null;
         unit?: string | null;
         price: number;
@@ -678,6 +679,10 @@ export interface Quote {
 export interface Product {
   id: string;
   name: string;
+  /**
+   * 选填，只用于报价列表、手机端等空间有限的地方（如「易来 T2 开关」）。产品名称仍是正式名称，会出现在打印报价单、合同和导出文件里；留空则列表直接显示产品名称。
+   */
+  shortName?: string | null;
   sku: string;
   /**
    * 点位图和报价按设备类型匹配产品；分类会根据设备类型自动设置。
@@ -1766,6 +1771,7 @@ export interface QuotesSelect<T extends boolean = true> {
         deviceType?: T;
         image?: T;
         name?: T;
+        shortName?: T;
         sku?: T;
         unit?: T;
         price?: T;
@@ -1871,6 +1877,7 @@ export interface ClientFeedbackSelect<T extends boolean = true> {
  */
 export interface ProductsSelect<T extends boolean = true> {
   name?: T;
+  shortName?: T;
   sku?: T;
   deviceType?: T;
   brand?: T;

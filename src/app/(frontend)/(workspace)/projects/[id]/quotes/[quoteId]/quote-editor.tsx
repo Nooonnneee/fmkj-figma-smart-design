@@ -82,6 +82,8 @@ import { SwapProductDialog, type SwapScope } from './swap-product-dialog'
 export type ProductOption = {
   id: string
   name: string
+  /** 报价列表用的可选短名；空字符串表示列表直接显示 name */
+  shortName: string
   sku: string
   unit: string
   price: number
@@ -100,6 +102,7 @@ type Line = {
   deviceType: string | null
   image: string | null
   name: string
+  shortName: string
   sku: string
   unit: string
   price: number
@@ -114,6 +117,65 @@ type QuoteState = {
   notes: string
   items: Line[]
   fees: Fee[]
+}
+
+/** 报价列表里显示的名字：有短名用短名，没有就用完整产品名（不做截断推导）。 */
+export const quoteItemLabel = (item: { name: string; shortName?: string | null }) =>
+  item.shortName?.trim() || item.name
+
+/**
+ * 报价明细行标题：短名保持单行，完整名称放在 title / aria-label 里，
+ * 悬停和读屏都能拿到正式名称；打印 / 合同 / 导出仍直接用 item.name。
+ */
+export function QuoteItemName({
+  item,
+  className,
+}: {
+  item: { name: string; shortName?: string | null }
+  className?: string
+}) {
+  const label = quoteItemLabel(item)
+  const usesShortName = label !== item.name
+  return (
+    <span className={cn('block min-w-0 truncate', className)} title={item.name}>
+      {/* 可见文字保持短名单行；短名不是正式名称，对读屏器隐藏，另用 sr-only 提供完整名称。 */}
+      <span aria-hidden={usesShortName || undefined}>{label}</span>
+      {usesShortName ? <span className="sr-only">{item.name}</span> : null}
+    </span>
+  )
+}
+
+/** 从产品库新增一行时的快照：短名也一起快照，之后产品库改短名不影响已出的报价。 */
+export function newQuoteLine(p: ProductOption): Line {
+  return {
+    key: crypto.randomUUID(),
+    id: null,
+    product: p.id,
+    deviceType: p.deviceType,
+    image: p.image,
+    name: p.name,
+    shortName: p.shortName,
+    sku: p.sku,
+    unit: p.unit,
+    price: p.price,
+    quantity: 1,
+  }
+}
+
+/** 换型号：名称、短名、型号、单价全部换成新产品的快照，数量保持不变。 */
+export function swapQuoteLine(l: Line, p: ProductOption): Line {
+  return {
+    ...l,
+    product: p.id,
+    deviceType: p.deviceType,
+    image: p.image,
+    name: p.name,
+    shortName: p.shortName,
+    sku: p.sku,
+    unit: p.unit,
+    price: p.price,
+    rev: (l.rev ?? 0) + 1,
+  }
 }
 
 const toNum = (v: string) => (v.trim() === '' ? 0 : Number(v))
@@ -243,24 +305,7 @@ export function QuoteEditor({
     const existing = quote.items.find((l) => l.product === p.id)
     if (existing)
       updateLine(existing.key, { quantity: existing.quantity + 1, rev: (existing.rev ?? 0) + 1 })
-    else
-      update({
-        items: [
-          ...quote.items,
-          {
-            key: crypto.randomUUID(),
-            id: null,
-            product: p.id,
-            deviceType: p.deviceType,
-            image: p.image,
-            name: p.name,
-            sku: p.sku,
-            unit: p.unit,
-            price: p.price,
-            quantity: 1,
-          },
-        ],
-      })
+    else update({ items: [...quote.items, newQuoteLine(p)] })
     setPickerOpen(false)
   }
 
@@ -288,7 +333,7 @@ export function QuoteEditor({
     const q = productQuery.trim().toLowerCase()
     const matches = (p: ProductOption) =>
       !q ||
-      `${p.name} ${p.sku} ${p.brand?.name ?? ''} ${deviceTypeLabel(p.deviceType)}`
+      `${p.name} ${p.shortName} ${p.sku} ${p.brand?.name ?? ''} ${deviceTypeLabel(p.deviceType)}`
         .toLowerCase()
         .includes(q)
     const sections = pickerGroups
@@ -335,21 +380,7 @@ export function QuoteEditor({
     const keys = new Set(targets.map((l) => l.key))
     // 数量保持不变；单价改为新产品售价
     update({
-      items: quote.items.map((l) =>
-        keys.has(l.key)
-          ? {
-              ...l,
-              product: p.id,
-              deviceType: p.deviceType,
-              image: p.image,
-              name: p.name,
-              sku: p.sku,
-              unit: p.unit,
-              price: p.price,
-              rev: (l.rev ?? 0) + 1,
-            }
-          : l,
-      ),
+      items: quote.items.map((l) => (keys.has(l.key) ? swapQuoteLine(l, p) : l)),
     })
     showToast({ body: `已更换 ${targets.length} 行为「${p.name}」，记得保存` })
     if (setDefault && project && p.deviceType) {
@@ -370,7 +401,7 @@ export function QuoteEditor({
     const q = lineQuery.trim().toLowerCase()
     if (!q) return quote.items
     return quote.items.filter((l) =>
-      `${l.name} ${l.sku} ${l.deviceType ? deviceTypeLabel(l.deviceType) : ''}`
+      `${l.name} ${l.shortName} ${l.sku} ${l.deviceType ? deviceTypeLabel(l.deviceType) : ''}`
         .toLowerCase()
         .includes(q),
     )
@@ -514,6 +545,7 @@ export function QuoteEditor({
         id: l.id,
         product: l.product,
         name: l.name,
+        shortName: l.shortName || null,
         sku: l.sku,
         unit: l.unit,
         price: l.price,
@@ -1182,14 +1214,12 @@ export function QuoteEditor({
                                     className="size-10 shrink-0"
                                   />
                                   <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex min-w-0 items-center gap-1.5">
                                       <PointMarker
                                         type={line.deviceType}
                                         className="size-4 shrink-0"
                                       />
-                                      <span className="truncate text-sm font-medium">
-                                        {line.name}
-                                      </span>
+                                      <QuoteItemName item={line} className="text-sm font-medium" />
                                     </div>
                                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                                       <span>{line.typeName}</span>
@@ -1304,11 +1334,9 @@ export function QuoteEditor({
                         )}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <div className="line-clamp-2 text-sm font-medium leading-snug">
-                          {l.name}
-                        </div>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                          <span>
+                        <QuoteItemName item={l} className="text-sm font-medium leading-snug" />
+                        <div className="mt-0.5 flex min-w-0 items-center gap-x-2 text-xs text-muted-foreground">
+                          <span className="min-w-0 flex-1 truncate">
                             {[
                               l.deviceType ? deviceTypeLabel(l.deviceType) : null,
                               l.sku,
@@ -1321,7 +1349,7 @@ export function QuoteEditor({
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-auto p-0 text-xs text-muted-foreground no-underline hover:text-primary hover:no-underline"
+                              className="h-auto shrink-0 p-0 text-xs text-muted-foreground no-underline hover:text-primary hover:no-underline"
                               onClick={() => setSwapKey(l.key)}
                               icon={<ArrowLeftRight />}
                               label="更换型号"
@@ -1472,27 +1500,29 @@ export function QuoteEditor({
                                   <ImageIcon className="size-4 text-muted-foreground/50" />
                                 )}
                               </span>
-                              <div className="min-w-0">
-                                <div className="font-medium">{l.name}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {[
-                                    l.deviceType ? deviceTypeLabel(l.deviceType) : null,
-                                    l.sku,
-                                    l.unit && `单位：${l.unit}`,
-                                  ]
-                                    .filter(Boolean)
-                                    .join(' · ')}
+                              <div className="min-w-0 flex-1">
+                                <QuoteItemName item={l} className="font-medium" />
+                                <div className="mt-0.5 flex min-w-0 items-center gap-x-2 text-xs text-muted-foreground">
+                                  <span className="min-w-0 flex-1 truncate">
+                                    {[
+                                      l.deviceType ? deviceTypeLabel(l.deviceType) : null,
+                                      l.sku,
+                                      l.unit && `单位：${l.unit}`,
+                                    ]
+                                      .filter(Boolean)
+                                      .join(' · ')}
+                                  </span>
+                                  {!readOnly && l.deviceType ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-auto shrink-0 p-0 text-xs text-muted-foreground no-underline hover:text-primary hover:no-underline"
+                                      onClick={() => setSwapKey(l.key)}
+                                      icon={<ArrowLeftRight />}
+                                      label="更换型号"
+                                    />
+                                  ) : null}
                                 </div>
-                                {!readOnly && l.deviceType ? (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-auto p-0 text-xs text-muted-foreground no-underline hover:text-primary hover:no-underline"
-                                    onClick={() => setSwapKey(l.key)}
-                                    icon={<ArrowLeftRight />}
-                                    label="更换型号"
-                                  />
-                                ) : null}
                               </div>
                             </div>
                           </TableCell>

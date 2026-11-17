@@ -16,6 +16,7 @@ export type QuoteLineRef = {
   deviceType: string | null
   image: string | null
   name: string
+  shortName?: string | null
   sku: string
   unit: string
   price: number
@@ -29,6 +30,7 @@ export type RoomDeviceLine = {
   typeName: string
   productId: string | null
   name: string
+  shortName: string | null
   sku: string
   unit: string
   image: string | null
@@ -170,6 +172,7 @@ export function buildQuoteFloorGroups(
           typeName: deviceTypeOf(pt.deviceType)?.name ?? '设备',
           productId: matched.product,
           name: matched.name,
+          shortName: matched.shortName ?? null,
           sku: matched.sku,
           unit: matched.unit,
           image: matched.image,
@@ -227,6 +230,7 @@ export function buildQuoteFloorGroups(
       typeName: deviceTypeOf(dt)?.name ?? '增项设备',
       productId: item.product,
       name: item.name,
+      shortName: item.shortName ?? null,
       sku: item.sku,
       unit: item.unit,
       image: item.image,

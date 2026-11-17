@@ -31,6 +31,7 @@ export function presentProduct(p: CatalogProduct, detail = false) {
   return {
     id: p.id,
     name: p.name,
+    shortName: p.shortName ?? null,
     sku: p.sku,
     price: p.price,
     cost: p.cost,
@@ -123,6 +124,7 @@ export function presentQuote(q: Quote) {
       type: presentType(i.deviceType),
       image: mediaUrl(i.image),
       name: i.name,
+      shortName: i.shortName ?? null,
       sku: i.sku ?? '',
       unit: i.unit ?? '',
       price: i.price,

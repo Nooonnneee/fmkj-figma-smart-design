@@ -71,7 +71,8 @@ export function SwapProductDialog({
   const filtered = candidates.filter((p) => {
     const q = query.trim().toLowerCase()
     return (
-      (!q || `${p.name} ${p.sku} ${p.brand?.name ?? ''}`.toLowerCase().includes(q)) &&
+      (!q ||
+        `${p.name} ${p.shortName} ${p.sku} ${p.brand?.name ?? ''}`.toLowerCase().includes(q)) &&
       (!brand || p.brand?.slug === brand) &&
       (!platform || p.platforms.includes(platform))
     )

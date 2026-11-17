@@ -27,6 +27,7 @@ import { saveQuoteInput, syncQuoteWithPointMap } from './quote-service'
 const product = (over: Partial<CatalogProduct> = {}): CatalogProduct => ({
   id: 'prod-1',
   name: '智能开关（双键）',
+  shortName: '双键开关',
   sku: 'SW-2',
   price: 199,
   cost: null,
@@ -75,6 +76,7 @@ describe('saveQuoteInput：写进库的金额由服务端决定', () => {
         deviceType: 'switch-2',
         image: 'm-1',
         name: '旧名称',
+        shortName: '旧短名',
         sku: 'SW-2',
         unit: '只',
         price: 100,
@@ -180,6 +182,73 @@ describe('saveQuoteInput：写进库的金额由服务端决定', () => {
     if (!r.ok) expect(r.error).toContain('报价状态无效')
   })
 
+  it('新增明细行时复制产品库短名', async () => {
+    const payload = fakePayload({ findByID: vi.fn(async () => stored()) })
+    mocks.getPayloadClient.mockResolvedValue(payload)
+
+    const r = await saveQuoteInput(user, 'q-1', {
+      ...baseInput(),
+      items: [{ product: 'prod-1', name: '双键开关', price: 199, quantity: 1 }],
+    })
+
+    expect(r.ok).toBe(true)
+    expect(payload.update.mock.calls[0]![0].data.items[0]).toMatchObject({
+      product: 'prod-1',
+      shortName: '双键开关',
+    })
+  })
+
+  it('只改价格 / 数量时保留原短名快照，不因客户端漏传而清空', async () => {
+    const payload = fakePayload({ findByID: vi.fn(async () => stored()) })
+    mocks.getPayloadClient.mockResolvedValue(payload)
+
+    const r = await saveQuoteInput(user, 'q-1', {
+      ...baseInput(),
+      items: [{ id: 'row-1', product: 'prod-1', name: '旧名称', price: 120, quantity: 2 }],
+    })
+
+    expect(r.ok).toBe(true)
+    expect(payload.update.mock.calls[0]![0].data.items[0]).toMatchObject({
+      shortName: '旧短名',
+      price: 120,
+      quantity: 2,
+    })
+  })
+
+  it('换型号时不传短名也会换成新产品短名，不会留下旧短名', async () => {
+    mocks.getCatalog.mockResolvedValue([
+      product(),
+      product({ id: 'prod-2', name: '智能开关（单键）', shortName: '单键开关', sku: 'SW-1' }),
+    ])
+    const payload = fakePayload({
+      findByID: vi.fn(async () => ({
+        items: [
+          {
+            id: 'row-1',
+            product: 'prod-1',
+            deviceType: 'switch-2',
+            name: '旧名称',
+            shortName: '旧短名',
+            price: 100,
+            quantity: 1,
+          },
+        ],
+      })),
+    })
+    mocks.getPayloadClient.mockResolvedValue(payload)
+
+    const r = await saveQuoteInput(user, 'q-1', {
+      ...baseInput(),
+      items: [{ id: 'row-1', product: 'prod-2', name: '智能开关（单键）', price: 88, quantity: 1 }],
+    })
+
+    expect(r.ok).toBe(true)
+    expect(payload.update.mock.calls[0]![0].data.items[0]).toMatchObject({
+      product: 'prod-2',
+      shortName: '单键开关',
+    })
+  })
+
   it('不存在的产品关联被拒绝，不会留下悬空引用', async () => {
     mocks.getPayloadClient.mockResolvedValue(fakePayload({ findByID: vi.fn(async () => stored()) }))
 
@@ -204,6 +273,7 @@ describe('syncQuoteWithPointMap：同步后保留人工改过的价格', () => {
           product: 'prod-1',
           deviceType: 'switch-2',
           name: '人工改名',
+          shortName: '人工短名',
           sku: 'SW-2',
           unit: '只',
           price: 188.88, // 人工压价
@@ -241,6 +311,7 @@ describe('syncQuoteWithPointMap：同步后保留人工改过的价格', () => {
       price: 188.88,
       quantity: 3,
       name: '人工改名',
+      shortName: '人工短名',
     })
     if (r.ok) expect(r.total).toBe(566.64)
   })

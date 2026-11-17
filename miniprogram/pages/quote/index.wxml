@@ -48,7 +48,7 @@
       <view class="row gap-16">
         <image class="thumb-sm" src="{{item.imageUrl}}" mode="aspectFit" />
         <view class="grow">
-          <view class="clamp-2">{{item.name}}</view>
+          <view class="truncate" title="{{item.name}}">{{item.shortName || item.name}}</view>
           <view class="row gap-8 small muted mt-8">
             <view class="dot" style="background: {{item.type.color}}" />
             <text class="truncate">{{item.type.name}}{{item.sku ? ' · ' + item.sku : ''}}</text>
