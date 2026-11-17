@@ -233,6 +233,62 @@ export function DesktopHeroActions() {
   )
 }
 
+/** 能力带里的一行文字链，和首页其它入口同一视觉重量 */
+const inlineLinkClass = 'group inline-flex w-fit items-center gap-1 rounded-sm text-sm font-medium'
+
+/**
+ * 首页能力带的桌面端入口：和首屏按钮一样按访客的系统推荐安装包，
+ * 但只保留一行文字链，不把整块下载区搬回首页。
+ */
+export function DesktopInlineDownload() {
+  const { loading, manifest } = useDesktopReleases()
+  const detected = useDetectedPlatform()
+
+  // 清单和系统识别都很快；先占一行文字的高度，避免卡片高度跳动。
+  if (loading || !detected) {
+    return <Skeleton data-slot="skeleton" className="block h-5 w-32 rounded-sm" aria-hidden />
+  }
+
+  // 推荐的平台有包就用；没包（例如只发布了 Windows）或识别不出系统时，
+  // 退到任一有包的目标，保证有发布时首页始终有安装包直链。
+  const recommended = recommendedTarget(detected)
+  const target =
+    (recommended && assetFor(manifest, recommended) ? recommended : null) ??
+    TARGETS.find((candidate) => assetFor(manifest, candidate)) ??
+    null
+  const asset = target ? assetFor(manifest, target) : null
+
+  if (target && asset) {
+    return (
+      <>
+        {/* ⚠️ 安装包必须用原生 <a>，不能换成 next/link：App Router 会把
+            /downloads/desktop/<文件> 当站内路由预取，进首页就可能静默拉走整个安装包。 */}
+        <a href={asset.url} className={inlineLinkClass}>
+          <Download aria-hidden className="size-3.5" />
+          {target.cta}
+        </a>
+        <Link href="/download" className={inlineLinkClass}>
+          其他平台
+          <ArrowRight
+            aria-hidden
+            className="size-3.5 transition-transform group-hover:translate-x-0.5"
+          />
+        </Link>
+      </>
+    )
+  }
+
+  return (
+    <Link href="/projects" className={inlineLinkClass}>
+      使用网页版
+      <ArrowRight
+        aria-hidden
+        className="size-3.5 transition-transform group-hover:translate-x-0.5"
+      />
+    </Link>
+  )
+}
+
 /** 全部平台的下载卡片 */
 export function DesktopPlatformCards() {
   const { loading, manifest } = useDesktopReleases()
