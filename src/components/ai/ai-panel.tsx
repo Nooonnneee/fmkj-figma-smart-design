@@ -3,7 +3,7 @@
 import * as React from 'react'
 import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
-import { MessageSquareText, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
+import { MessageSquareText, X } from 'lucide-react'
 import { IconButton } from '@astryxdesign/core/IconButton'
 
 import type { AiModelOption, AiProjectContext } from '@/components/ai/ai-elements'
@@ -193,6 +193,10 @@ export function AiPanel({ plugins, projects, credits, configured, models, userId
       configured={configured}
       models={models}
       userId={userId}
+      // 抽屉不参与图标栏：即使 localStorage 里记着收起，也按展开渲染。
+      collapsed={mode === 'inline' && collapsed}
+      onToggleCollapsed={mode === 'inline' ? () => setCollapsed(!collapsed) : undefined}
+      transitionsEnabled={transitionsEnabled}
     />
   )
 
@@ -233,8 +237,12 @@ export function AiPanel({ plugins, projects, credits, configured, models, userId
       setWidth(AI_PANEL_DEFAULT_WIDTH)
     }
 
-    // 展开/收起共用同一棵 DOM：只改内联宽度，dock 始终挂载。内容外层 overflow-hidden，
-    // 内层保持「展开宽度」不跟着缩，避免动画过程中文字重排；收起时整块淡出并禁用交互。
+    // 展开/收起共用同一棵 DOM：只改 aside 的内联宽度，dock 始终挂载。dock 内部把
+    // header / 图标栏留在非 inert 区域，消息与输入区整体淡出并禁用交互。
+    //
+    // 内容层以「展开宽度」贴右缘绝对定位：收起时 aside 变窄，只是从左侧裁掉内容，
+    // 内层宽度不变，动画过程中不会重排文字；header 的收起/展开按钮也始终贴着
+    // 面板右缘（同一节点），不会横向跳到中间。
     return (
       <>
         {/* 拖拽分隔线：贴右栏左缘，横向调宽；双击恢复默认宽度。
@@ -255,48 +263,18 @@ export function AiPanel({ plugins, projects, credits, configured, models, userId
           aria-label={collapsed ? 'AI 对话（已收起）' : 'AI 对话'}
           style={{ width: collapsed ? AI_PANEL_COLLAPSED_WIDTH : width }}
           className={cn(
-            'sticky top-0 flex h-svh shrink-0 flex-col overflow-hidden bg-sidebar data-[dragging=true]:transition-none',
+            'sticky top-0 flex h-svh shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground data-[dragging=true]:transition-none',
             transitionsEnabled &&
               'transition-[width] duration-200 ease-linear motion-reduce:transition-none',
-            collapsed ? 'border-l border-border' : 'border-l-0',
+            collapsed ? 'border-l border-sidebar-border' : 'border-l-0',
           )}
         >
-          {/* 始终 justify-end：按钮贴着右缘随宽度收拢，避免收起瞬间横向跳到面板中间。
-              收起时 40px 内右留 6px，28px 按钮正好居中（6 / 28 / 6）。 */}
           <div
-            data-slot="ai-panel-header"
-            className={cn(
-              'flex h-12 shrink-0 items-center justify-end gap-1',
-              collapsed ? 'pe-1.5' : 'px-2 border-b border-border',
-            )}
+            data-slot="ai-panel-surface"
+            className="absolute inset-y-0 right-0"
+            style={{ width }}
           >
-            {/* 同一个按钮节点，切换 icon / label，点击后焦点不会丢。 */}
-            <IconButton
-              type="button"
-              variant="ghost"
-              size="sm"
-              label={collapsed ? '展开 AI 对话' : '收起 AI 对话'}
-              icon={collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
-              aria-expanded={!collapsed}
-              onClick={() => setCollapsed(!collapsed)}
-            />
-          </div>
-          <div
-            data-slot="ai-panel-content"
-            className="min-h-0 flex-1 overflow-hidden"
-            inert={collapsed}
-          >
-            <div
-              className={cn(
-                'flex h-full flex-col',
-                transitionsEnabled &&
-                  'transition-opacity duration-200 ease-linear motion-reduce:transition-none',
-                collapsed && 'pointer-events-none opacity-0',
-              )}
-              style={{ width }}
-            >
-              {dock}
-            </div>
+            {dock}
           </div>
         </aside>
       </>
@@ -307,10 +285,14 @@ export function AiPanel({ plugins, projects, credits, configured, models, userId
     <Sheet open={open} onOpenChange={setOpen}>
       {/* 宽度沿用 Sheet 的默认值：桌面 3/4 宽、sm 起封顶 24rem，移动端也一样。
           不写 w-* 是因为 `data-[side=right]:w-3/4` 的变体前缀优先级高于裸 w-*。 */}
-      <SheetContent side="right" showCloseButton={false} className="gap-0 p-0">
+      <SheetContent
+        side="right"
+        showCloseButton={false}
+        className="gap-0 bg-sidebar p-0 text-sidebar-foreground"
+      >
         <SheetTitle className="sr-only">AI 对话</SheetTitle>
-        <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-3">
-          <span className="text-sm font-semibold">AI 对话</span>
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-sidebar-border px-3">
+          <span className="text-sm font-semibold tracking-wide">AI 对话</span>
           <IconButton
             type="button"
             variant="ghost"
