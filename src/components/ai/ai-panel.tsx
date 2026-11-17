@@ -3,7 +3,7 @@
 import * as React from 'react'
 import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
-import { MessageSquareText, X } from 'lucide-react'
+import { MessageSquareText } from 'lucide-react'
 import { IconButton } from '@astryxdesign/core/IconButton'
 
 import type { AiModelOption, AiProjectContext } from '@/components/ai/ai-elements'
@@ -196,6 +196,9 @@ export function AiPanel({ plugins, projects, credits, configured, models, userId
       // 抽屉不参与图标栏：即使 localStorage 里记着收起，也按展开渲染。
       collapsed={mode === 'inline' && collapsed}
       onToggleCollapsed={mode === 'inline' ? () => setCollapsed(!collapsed) : undefined}
+      // 抽屉不再单独渲染一条 Sheet 标题栏：关闭按钮并入 dock header 最右侧，
+      // 避免「AI 对话 + ✕」和会话标题叠成两层头。
+      onClose={mode === 'drawer' ? () => setOpen(false) : undefined}
       transitionsEnabled={transitionsEnabled}
     />
   )
@@ -290,18 +293,8 @@ export function AiPanel({ plugins, projects, credits, configured, models, userId
         showCloseButton={false}
         className="gap-0 bg-sidebar p-0 text-sidebar-foreground"
       >
+        {/* 只剩一个不可见的对话框标题用于无障碍；可见的标题行在 dock header 里。 */}
         <SheetTitle className="sr-only">AI 对话</SheetTitle>
-        <div className="flex h-16 shrink-0 items-center justify-between border-b border-sidebar-border px-3">
-          <span className="text-sm font-semibold tracking-wide">AI 对话</span>
-          <IconButton
-            type="button"
-            variant="ghost"
-            size="sm"
-            label="关闭 AI 对话"
-            icon={<X />}
-            onClick={() => setOpen(false)}
-          />
-        </div>
         <div className="flex min-h-0 flex-1 flex-col">{dock}</div>
       </SheetContent>
     </Sheet>

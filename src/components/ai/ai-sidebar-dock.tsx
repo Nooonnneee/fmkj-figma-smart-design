@@ -20,6 +20,7 @@ import {
   SquarePen,
   Trash2,
   Upload,
+  X,
 } from 'lucide-react'
 
 import { Button } from '@astryxdesign/core/Button'
@@ -151,6 +152,7 @@ export function AiSidebarDock({
   userId,
   collapsed = false,
   onToggleCollapsed,
+  onClose,
   transitionsEnabled = true,
 }: {
   plugins: AiConnectablePlugin[]
@@ -166,6 +168,8 @@ export function AiSidebarDock({
   collapsed?: boolean
   /** 宽屏常驻列的收起/展开回调；抽屉模式不传（不显示收起按钮） */
   onToggleCollapsed?: () => void
+  /** 抽屉模式的关闭回调；传入后 header 最右侧显示关闭按钮 */
+  onClose?: () => void
   /**
    * 首帧先不开宽度/淡出过渡，等存储里的收起态落定后再启用，避免刷新时闪一下动画。
    * 与 ai-panel.tsx 的 transitionsEnabled 同源。
@@ -949,6 +953,19 @@ export function AiSidebarDock({
             }}
           />
         </DropdownMenu>
+
+        {onClose ? (
+          <IconButton
+            type="button"
+            variant="ghost"
+            size="sm"
+            label="关闭 AI 对话"
+            tooltip="关闭 AI 对话"
+            icon={<X />}
+            onClick={onClose}
+            className="order-4"
+          />
+        ) : null}
       </div>
 
       <div
