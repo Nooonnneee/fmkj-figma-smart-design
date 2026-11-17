@@ -80,6 +80,8 @@ function stringAttr(attributes: Record<string, unknown>, key: string): string | 
 
 function numberAttr(attributes: Record<string, unknown>, key: string): number | null {
   const value = attributes[key]
+  // Number(null) === 0、Number('') === 0 —— 缺失值不能变成 0。
+  if (value === null || value === undefined || value === '') return null
   const n = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(n) ? n : null
 }
@@ -159,12 +161,16 @@ function stateLabel(entity: EntityRow): string {
   return entity.state
 }
 
-/** 空调卡额外显示当前温度。 */
+/** 空调卡显示当前温度与设定温度；HA 的 `temperature` 是设定值，不是实测值。 */
 function deviceStatus(entity: EntityRow, attributes: Record<string, unknown>): string {
   if (entity.domain !== 'climate') return stateLabel(entity)
-  const temperature = numberAttr(attributes, 'temperature')
-  const mode = stateLabel(entity)
-  return temperature === null ? mode : `当前温度 ${temperature}°C · ${mode}`
+  const currentTemperature = numberAttr(attributes, 'current_temperature')
+  const targetTemperature = numberAttr(attributes, 'temperature')
+  const parts: string[] = []
+  if (currentTemperature !== null) parts.push(`当前温度 ${currentTemperature}°C`)
+  if (targetTemperature !== null) parts.push(`设定温度 ${targetTemperature}°C`)
+  parts.push(stateLabel(entity))
+  return parts.join(' · ')
 }
 
 function isOnEntity(entity: EntityRow): boolean {
@@ -175,12 +181,26 @@ function isOnEntity(entity: EntityRow): boolean {
   return false
 }
 
-/** 环境读数：sensor 里的温度 / 湿度（按 device_class 或单位识别）。 */
-function readingUnit(attributes: Record<string, unknown>): string | null {
+/**
+ * 环境读数：sensor 里的温度 / 湿度。
+ * 有 device_class 时只认 temperature / humidity（battery 等一律排除）；
+ * device_class 缺失才用单位兜底，并显式排除电池实体。
+ */
+function readingUnit(entityId: string, attributes: Record<string, unknown>): string | null {
   const deviceClass = stringAttr(attributes, 'device_class')
   const unit = stringAttr(attributes, 'unit_of_measurement')
-  if (deviceClass === 'temperature' || unit === '°C' || unit === '℃') return unit ?? '°C'
-  if (deviceClass === 'humidity' || unit === '%') return unit ?? '%'
+
+  if (deviceClass) {
+    if (deviceClass === 'temperature') return unit ?? '°C'
+    if (deviceClass === 'humidity') return unit ?? '%'
+    return null
+  }
+
+  if (unit === '°C' || unit === '℃') return unit
+  if (unit === '%') {
+    if (entityId.toLowerCase().includes('battery')) return null
+    return unit
+  }
   return null
 }
 
@@ -455,12 +475,17 @@ function ConnectionBar({
   status,
   updatedAt,
   error,
+  warning,
+  refreshing = false,
   onRefresh,
   onRetry,
 }: {
   status?: HaStatus
   updatedAt?: number | null
   error?: string
+  /** 刷新失败时的就地提示：保留旧数据，不清空视图。 */
+  warning?: string | null
+  refreshing?: boolean
   onRefresh?: () => void
   onRetry?: () => void
 }) {
@@ -498,38 +523,48 @@ function ConnectionBar({
   const baseUrl = status?.baseUrl ?? null
   const version = status?.version ?? null
   return (
-    <div className="flex flex-col gap-3 rounded-[var(--radius-container)] border border-border bg-card px-4 py-3 shadow-xs sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex min-w-0 items-center gap-2.5">
-        <span className="size-2.5 shrink-0 rounded-full bg-emerald-500" />
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="text-sm font-medium text-foreground">已连接</span>
-          {baseUrl ? (
-            <span className="truncate text-xs text-muted-foreground">{baseUrl}</span>
-          ) : null}
-          {version ? <Badge variant="neutral" label={`HA ${version}`} /> : null}
+    <div className="flex flex-col gap-2 rounded-[var(--radius-container)] border border-border bg-card px-4 py-3 shadow-xs">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            className={
+              warning
+                ? 'size-2.5 shrink-0 rounded-full bg-warning'
+                : 'size-2.5 shrink-0 rounded-full bg-emerald-500'
+            }
+          />
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="text-sm font-medium text-foreground">已连接</span>
+            {baseUrl ? (
+              <span className="truncate text-xs text-muted-foreground">{baseUrl}</span>
+            ) : null}
+            {version ? <Badge variant="neutral" label={`HA ${version}`} /> : null}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {updatedAt ? `最后更新 ${formatClock(updatedAt)}` : '最后更新 —'}
+          </span>
+          <Button
+            label={refreshing ? '刷新中…' : '刷新'}
+            variant="ghost"
+            size="sm"
+            icon={<RefreshCw className="size-4" />}
+            isDisabled={refreshing}
+            data-testid="ha-refresh"
+            onClick={onRefresh}
+          />
+          <Button
+            label="设置"
+            variant="ghost"
+            size="sm"
+            icon={<Settings className="size-4" />}
+            data-testid="ha-open-settings"
+            onClick={() => void openDesktopSettings()}
+          />
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {updatedAt ? `最后更新 ${formatClock(updatedAt)}` : '最后更新 —'}
-        </span>
-        <Button
-          label="刷新"
-          variant="ghost"
-          size="sm"
-          icon={<RefreshCw className="size-4" />}
-          data-testid="ha-refresh"
-          onClick={onRefresh}
-        />
-        <Button
-          label="设置"
-          variant="ghost"
-          size="sm"
-          icon={<Settings className="size-4" />}
-          data-testid="ha-open-settings"
-          onClick={() => void openDesktopSettings()}
-        />
-      </div>
+      {warning ? <p className="text-xs text-pretty text-warning">刷新失败：{warning}</p> : null}
     </div>
   )
 }
@@ -756,6 +791,9 @@ function AttentionList({ entities }: { entities: EntityRow[] }) {
           </div>
         ))}
       </div>
+      {entities.length > 20 ? (
+        <p className="text-xs text-muted-foreground">还有 {entities.length - 20} 个未列出。</p>
+      ) : null}
     </section>
   )
 }
@@ -950,6 +988,8 @@ function LiveView({
   status,
   states,
   updatedAt,
+  refreshing,
+  refreshWarning,
   onStates,
   onRefresh,
 }: {
@@ -957,6 +997,8 @@ function LiveView({
   status: HaStatus
   states: HaEntityState[]
   updatedAt: number | null
+  refreshing: boolean
+  refreshWarning: string | null
   onStates: (states: HaEntityState[]) => void
   onRefresh: () => void
 }) {
@@ -988,7 +1030,7 @@ function LiveView({
     return entities
       .filter((entity) => entity.domain === 'sensor')
       .map((entity) => {
-        const unit = readingUnit(attributesById.get(entity.entityId) ?? {})
+        const unit = readingUnit(entity.entityId, attributesById.get(entity.entityId) ?? {})
         return unit ? { entity, unit } : null
       })
       .filter((reading): reading is { entity: EntityRow; unit: string } => reading !== null)
@@ -1184,7 +1226,13 @@ function LiveView({
 
   return (
     <div className="flex flex-col gap-6">
-      <ConnectionBar status={status} updatedAt={updatedAt} onRefresh={onRefresh} />
+      <ConnectionBar
+        status={status}
+        updatedAt={updatedAt}
+        refreshing={refreshing}
+        warning={refreshWarning}
+        onRefresh={onRefresh}
+      />
       <SummaryStrip entities={entities} sensorCount={readings.length} />
 
       <section className="flex flex-col gap-4">
@@ -1216,15 +1264,22 @@ function LiveView({
         {readings.length === 0 ? (
           <p className="text-sm text-muted-foreground">没有读到温度或湿度传感器。</p>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {readings.slice(0, 8).map((reading) => (
-              <ReadingCard
-                key={reading.entity.entityId}
-                entity={reading.entity}
-                unit={reading.unit}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {readings.slice(0, 8).map((reading) => (
+                <ReadingCard
+                  key={reading.entity.entityId}
+                  entity={reading.entity}
+                  unit={reading.unit}
+                />
+              ))}
+            </div>
+            {readings.length > 8 ? (
+              <p className="text-xs text-muted-foreground">
+                还有 {readings.length - 8} 个读数未显示。
+              </p>
+            ) : null}
+          </>
         )}
       </section>
 
@@ -1274,7 +1329,7 @@ function DesktopErrorView({ message, onRetry }: { message: string; onRetry: () =
       <EmptyState
         icon={<PanelLeft className="size-5" />}
         title="无法读取 Home Assistant 数据"
-        description={message}
+        description="检查客户端设置中的地址和令牌后重试。"
       />
     </div>
   )
@@ -1288,6 +1343,8 @@ export function SmartHomeClient({ data }: { data: SmartHomeData }) {
   const [view, setView] = useState<BridgeView>({ kind: 'server' })
   const [attempt, setAttempt] = useState(0)
   const [updatedAt, setUpdatedAt] = useState<number | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshWarning, setRefreshWarning] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -1337,6 +1394,7 @@ export function SmartHomeClient({ data }: { data: SmartHomeData }) {
       }
 
       setUpdatedAt(Date.now())
+      setRefreshWarning(null)
       setView({ kind: 'live', ha, status, states })
     })()
 
@@ -1344,6 +1402,37 @@ export function SmartHomeClient({ data }: { data: SmartHomeData }) {
       cancelled = true
     }
   }, [attempt])
+
+  /**
+   * 原地刷新：保持 `kind:'live'`，只替换 states。这样搜索词、类型筛选、
+   * 分页、分组展开和滚动位置都不会被卸载重置；失败也保留上一份数据，
+   * 只在连接条里就地提示。
+   */
+  async function refreshLive() {
+    if (view.kind !== 'live' || refreshing) return
+    const ha = view.ha
+
+    setRefreshing(true)
+    setRefreshWarning(null)
+
+    const status = await readHaStatus(ha)
+    if (!status || !status.configured || !status.connected) {
+      setRefreshWarning(status?.error ?? '无法连接 Home Assistant，请检查地址或令牌。')
+      setRefreshing(false)
+      return
+    }
+
+    const states = await readHaStates(ha)
+    if (!states) {
+      setRefreshWarning(status.error ?? '无法读取 Home Assistant 实体状态，请检查连接或令牌。')
+      setRefreshing(false)
+      return
+    }
+
+    setUpdatedAt(Date.now())
+    setView((current) => (current.kind === 'live' ? { ...current, status, states } : current))
+    setRefreshing(false)
+  }
 
   if (view.kind === 'loading') return <LoadingView />
   if (view.kind === 'unconfigured') return <DesktopUnconfiguredView status={view.status} />
@@ -1357,11 +1446,13 @@ export function SmartHomeClient({ data }: { data: SmartHomeData }) {
         status={view.status}
         states={view.states}
         updatedAt={updatedAt}
+        refreshing={refreshing}
+        refreshWarning={refreshWarning}
         onStates={(states) => {
           setUpdatedAt(Date.now())
           setView((current) => (current.kind === 'live' ? { ...current, states } : current))
         }}
-        onRefresh={() => setAttempt((n) => n + 1)}
+        onRefresh={() => void refreshLive()}
       />
     )
   }
