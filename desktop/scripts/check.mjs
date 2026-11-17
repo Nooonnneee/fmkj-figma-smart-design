@@ -146,6 +146,10 @@ check('主进程安全选项', () => {
   for (const needle of required) assert.ok(main.includes(needle), `缺少 ${needle}`)
 })
 
+check('用户数据目录迁移行为', () => {
+  execFileSync(process.execPath, [path.join(root, 'scripts/test-migrate-user-data.mjs')], { stdio: 'pipe' })
+})
+
 if (failures) {
   console.error(`\n${failures} 项检查未通过`)
   process.exit(1)

@@ -28,7 +28,7 @@
   const info = await desktop.settings.get()
   overridden = info.overridden
   input.value = info.serverUrl
-  $('version').textContent = `繁梦空间桌面客户端 v${info.version} · 默认服务器 ${new URL(info.defaultServerUrl).host}`
+  $('version').textContent = `Eevee 桌面客户端 v${info.version} · 默认服务器 ${new URL(info.defaultServerUrl).host}`
   setBusy(false)
   if (overridden) setStatus('当前服务器由启动参数指定，这里的设置暂不生效。', 'warn')
   else {
