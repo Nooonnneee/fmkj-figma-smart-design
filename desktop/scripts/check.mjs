@@ -150,6 +150,25 @@ check('用户数据目录迁移行为', () => {
   execFileSync(process.execPath, [path.join(root, 'scripts/test-migrate-user-data.mjs')], { stdio: 'pipe' })
 })
 
+// 4. Home Assistant 主进程桥（HC-1/HC-2）
+const haTests = [
+  'test-ha-client.mjs',
+  'test-ha-discovery.mjs',
+  'test-ha-token-store.mjs',
+  'test-ha-bridge.mjs',
+  'test-ha-preload.mjs',
+]
+for (const name of haTests) {
+  check(`HA ${name}`, () => {
+    try {
+      execFileSync(process.execPath, [path.join(root, 'scripts', name)], { stdio: 'pipe' })
+    } catch (error) {
+      const output = [error.stdout, error.stderr].filter(Boolean).map(String).join('\n')
+      throw new Error(`\n${output}`)
+    }
+  })
+}
+
 if (failures) {
   console.error(`\n${failures} 项检查未通过`)
   process.exit(1)

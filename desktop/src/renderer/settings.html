@@ -27,6 +27,33 @@
           <button id="save" type="submit" class="primary">保存并连接</button>
         </div>
       </form>
+
+      <section id="ha" class="section" aria-labelledby="ha-title">
+        <div class="section-header">
+          <div>
+            <h2 id="ha-title">智能家居</h2>
+            <p class="section-lead">连接局域网里的 Home Assistant。令牌只保存在本机加密存储里，不会上传服务器。</p>
+          </div>
+          <button id="ha-discover" type="button">发现设备</button>
+        </div>
+        <p id="ha-discover-status" class="status" role="status" aria-live="polite"></p>
+        <ul id="ha-devices" class="device-list" hidden></ul>
+
+        <label for="ha-url">Home Assistant 地址</label>
+        <input id="ha-url" type="url" inputmode="url" autocomplete="url" spellcheck="false" placeholder="http://homeassistant.local:8123" />
+
+        <label for="ha-token">长期访问令牌</label>
+        <input id="ha-token" type="password" autocomplete="off" spellcheck="false" placeholder="在 Home Assistant「个人资料」页创建" />
+
+        <p id="ha-status" class="status" role="status" aria-live="polite"></p>
+        <div class="form-actions">
+          <button id="ha-clear" type="button" class="link">清除</button>
+          <span class="spacer"></span>
+          <button id="ha-test" type="button">测试连接</button>
+          <button id="ha-save" type="button" class="primary">保存</button>
+        </div>
+      </section>
+
       <footer id="version" class="meta"></footer>
     </main>
     <script src="settings.js"></script>

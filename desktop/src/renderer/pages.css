@@ -245,6 +245,82 @@ input:disabled {
   flex: 1;
 }
 
+/* 智能家居区块 */
+.section {
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+}
+
+.section-header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.section-header h2 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.section-header button {
+  flex: none;
+}
+
+.section-lead {
+  max-width: 340px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.section label {
+  margin-top: 14px;
+}
+
+.section input + label {
+  margin-top: 14px;
+}
+
+.device-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 4px;
+  padding: 0;
+  list-style: none;
+}
+
+.device-list li {
+  margin: 0;
+}
+
+.device {
+  display: flex;
+  width: 100%;
+  height: auto;
+  padding: 9px 12px;
+  border-radius: 10px;
+  text-align: left;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  line-height: 1.4;
+}
+
+.device-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.device-url {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
 .form-panel .meta {
   margin-top: auto;
   padding-top: 20px;
