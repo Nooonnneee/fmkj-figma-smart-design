@@ -183,6 +183,28 @@ describe('AiSidebarDock 收起态（右栏图标栏）', () => {
   })
 })
 
+describe('AiSidebarDock 抽屉模式', () => {
+  it('只渲染一条 header：右侧是关闭按钮，点击触发 onClose', async () => {
+    const onClose = vi.fn()
+    await mount(
+      <SidebarProvider>
+        <AiSidebarDock {...baseProps} onClose={onClose} />
+      </SidebarProvider>,
+    )
+
+    const header = container.querySelector('[data-slot="ai-panel-header"]')
+    expect(header).toBeTruthy()
+
+    const closeButton = header?.querySelector('[aria-label="关闭 AI 对话"]') as HTMLButtonElement
+    expect(closeButton).toBeTruthy()
+    await act(async () => {
+      closeButton.click()
+      await Promise.resolve()
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('AiSidebarDock 空态（常用任务）', () => {
   it('渲染「常用任务」分组行，点选后把模板填进输入框', async () => {
     await mount(<DockHarness />)
