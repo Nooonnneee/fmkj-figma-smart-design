@@ -3,11 +3,9 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowRight, Gift, MessageCircle, Sparkles } from 'lucide-react'
 
-import { AppsSection } from '@/components/landing/apps-section'
+import { CapabilityBand } from '@/components/landing/capability-band'
 import { DeliverySection } from '@/components/landing/delivery-section'
-import { DesktopSection } from '@/components/landing/desktop-section'
 import { LandingFooter, LandingNav } from '@/components/landing/landing-chrome'
-import { LibrarySection } from '@/components/landing/library-section'
 import { PlanDemo } from '@/components/landing/plan-demo'
 import { ProposalShowcase } from '@/components/landing/proposal-showcase'
 import { QuoteShowcase } from '@/components/landing/quote-showcase'
@@ -139,13 +137,13 @@ export default async function HomePage() {
         </section>
 
         {data && company ? (
-          <Section id="proposal" labelledBy="proposal-title" className="pt-28 sm:pt-36">
+          <Section id="proposal" labelledBy="proposal-title" className="pt-24 sm:pt-32">
             <ProposalShowcase data={data} company={company} />
           </Section>
         ) : null}
 
         {data?.quote && company ? (
-          <Section id="quote" labelledBy="quote-title" className="pt-28 sm:pt-36">
+          <Section id="quote" labelledBy="quote-title" className="pt-24 sm:pt-32">
             <QuoteShowcase
               data={data}
               quote={data.quote}
@@ -158,14 +156,12 @@ export default async function HomePage() {
 
         <DeliverySection total={data?.quote?.total ?? null} styles={DOC_STYLES} />
         {data ? (
-          <LibrarySection products={data.library.products} brands={data.library.brands} />
+          <CapabilityBand products={data.library.products} brands={data.library.brands} />
         ) : null}
-        <DesktopSection />
-        <AppsSection />
 
         <section
           aria-labelledby="closing-title"
-          className="border-t border-border/70 px-4 py-20 sm:px-6 sm:py-28 lg:px-8"
+          className="border-t border-border/70 px-4 pt-24 pb-20 sm:px-6 sm:pt-32 sm:pb-28 lg:px-8"
         >
           <div className="mx-auto grid max-w-5xl items-center gap-10 rounded-3xl border bg-card p-6 shadow-xs sm:p-10 lg:grid-cols-[1fr_auto]">
             <div className="space-y-5 text-left">
@@ -177,10 +173,10 @@ export default async function HomePage() {
                 下一个项目，从一张户型图开始
               </h2>
               <p className="max-w-xl text-base leading-relaxed text-muted-foreground">
-                免费注册即送 <strong className="font-semibold text-foreground">20 AI 积分</strong>{' '}
-                并自带完整三层别墅示例项目。添加微信可领取
-                <strong className="font-semibold text-foreground"> 7 天专业版体验兑换码</strong>
-                （解锁全套高定提案模板、施工水电布线表与一键交付包），或咨询团队私有化部署。
+                免费注册即送 <strong className="font-semibold text-foreground">20 AI 积分</strong>
+                ；添加微信可领{' '}
+                <strong className="font-semibold text-foreground">7 天专业版体验兑换码</strong>
+                ，或咨询团队私有化部署。
               </p>
               <div className="flex flex-wrap items-center gap-3 pt-1">
                 <Button

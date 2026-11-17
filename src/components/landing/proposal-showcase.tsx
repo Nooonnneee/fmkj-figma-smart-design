@@ -204,8 +204,8 @@ export function ProposalShowcase({
         <h2 id="proposal-title" className="text-headline font-medium">
           方案演示
         </h2>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          一套点位，出三种结构的方案；四种视觉主题，对应不同业主的偏好。
+        <p className="mt-5 text-lead text-muted-foreground">
+          三种方案结构、四种视觉主题，按业主偏好选。
         </p>
 
         {/* 方案结构：改成「分段选择器」——三种结构并排、当前项实心，一眼看出有几个选择 */}

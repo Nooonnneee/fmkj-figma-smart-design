@@ -62,8 +62,8 @@ export function QuoteShowcase({
         <h2 id="quote-title" className="text-headline font-medium">
           报价单
         </h2>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          同一份清单，6 种版式应对不同场合；7 套视觉风格跟着方案走。
+        <p className="mt-5 text-lead text-muted-foreground">
+          6 种版式应对不同场合，7 套风格跟着方案走。
         </p>
 
         <div className="mt-7 space-y-2">

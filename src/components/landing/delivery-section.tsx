@@ -40,7 +40,7 @@ export function DeliverySection({ total, styles }: { total: number | null; style
     },
   ]
   return (
-    <Section id="delivery" labelledBy="delivery-title">
+    <Section id="delivery" labelledBy="delivery-title" className="pt-24 sm:pt-32">
       <SectionHeader id="delivery-title" title="合同和交付文档，跟着报价走">
         报价确认后一键生成合同，金额、付款节点、工期和质保自动带入。
       </SectionHeader>
