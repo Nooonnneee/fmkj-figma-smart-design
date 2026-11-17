@@ -32,10 +32,7 @@ const JOBS = [
 const webpPath = (file) => file.replace(/\.(jpe?g|png)$/i, '.webp')
 
 async function render(file, out, maxEdge, resizeBy = 'edge', crop) {
-  const [srcStat, outStat] = await Promise.all([
-    fs.stat(file),
-    fs.stat(out).catch(() => null),
-  ])
+  const [srcStat, outStat] = await Promise.all([fs.stat(file), fs.stat(out).catch(() => null)])
   if (!force && outStat && outStat.mtimeMs >= srcStat.mtimeMs) return 'skipped'
 
   const resize =
