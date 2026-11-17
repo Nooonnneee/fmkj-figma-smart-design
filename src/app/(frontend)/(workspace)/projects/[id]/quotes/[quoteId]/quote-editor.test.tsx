@@ -75,23 +75,29 @@ afterEach(async () => {
 })
 
 describe('报价明细行的名称显示', () => {
-  it('有短名显示短名，完整名称仍可从 title / aria-label 读到', async () => {
+  it('有短名时视觉显示短名，读屏器拿到完整名称', async () => {
     await mount(<QuoteItemName item={{ name: LONG_NAME, shortName: SHORT_NAME }} />)
 
     const el = container.querySelector(`[title="${LONG_NAME}"]`) as HTMLElement
     expect(el).not.toBeNull()
-    expect(el.textContent).toBe(SHORT_NAME)
-    expect(el.getAttribute('aria-label')).toBe(LONG_NAME)
+    // 可见文字是短名，且对读屏器隐藏（不能把简称当成正式名称）
+    const visible = el.querySelector('[aria-hidden="true"]') as HTMLElement
+    expect(visible.textContent).toBe(SHORT_NAME)
+    // sr-only 完整名称供读屏器读取；不占用视觉排版
+    expect(el.querySelector('.sr-only')?.textContent).toBe(LONG_NAME)
+    expect(el.getAttribute('aria-label')).toBeNull()
     // 单行渲染：不允许换行撑高行高
     expect(el.className).toContain('truncate')
   })
 
-  it('没有短名时回退显示完整名称', async () => {
+  it('没有短名时回退显示完整名称，且不做多余的隐藏', async () => {
     await mount(<QuoteItemName item={{ name: LONG_NAME, shortName: null }} />)
 
-    const el = container.querySelector(`[aria-label="${LONG_NAME}"]`) as HTMLElement
+    const el = container.querySelector(`[title="${LONG_NAME}"]`) as HTMLElement
     expect(el).not.toBeNull()
     expect(el.textContent).toBe(LONG_NAME)
+    expect(el.querySelector('[aria-hidden]')).toBeNull()
+    expect(el.querySelector('.sr-only')).toBeNull()
   })
 
   it('挂载报价台明细列表时，两种行混排都按同一规则显示', async () => {
@@ -142,11 +148,23 @@ describe('报价明细行的名称显示', () => {
 
     const shortRow = container.querySelector(`[title="${LONG_NAME}"]`) as HTMLElement
     const fullRow = container.querySelector('[title="旧型号开关（无短名）"]') as HTMLElement
-    expect(shortRow?.textContent).toBe(SHORT_NAME)
-    expect(fullRow?.textContent).toBe('旧型号开关（无短名）')
+    expect(shortRow.querySelector('[aria-hidden="true"]')?.textContent).toBe(SHORT_NAME)
+    expect(shortRow.querySelector('.sr-only')?.textContent).toBe(LONG_NAME)
+    expect(fullRow.textContent).toBe('旧型号开关（无短名）')
     // 两行都只有一行标题文本；行高由同一套 truncate 样式控制
-    expect(shortRow?.className).toContain('truncate')
-    expect(fullRow?.className).toContain('truncate')
+    expect(shortRow.className).toContain('truncate')
+    expect(fullRow.className).toContain('truncate')
+    // 短名只影响名称列；单价 / 数量控件仍然可被读屏器访问
+    const price = container.querySelector(
+      `input[aria-label="${LONG_NAME} 单价"]`,
+    ) as HTMLElement | null
+    const quantity = container.querySelector(
+      `input[aria-label="${LONG_NAME} 数量"]`,
+    ) as HTMLElement | null
+    expect(price).not.toBeNull()
+    expect(quantity).not.toBeNull()
+    expect(price?.closest('[aria-hidden="true"]')).toBeNull()
+    expect(quantity?.closest('[aria-hidden="true"]')).toBeNull()
   })
 })
 

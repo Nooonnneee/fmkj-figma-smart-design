@@ -340,12 +340,12 @@ export async function saveQuoteInput(
       deviceType = (product.deviceType ?? null) as typeof deviceType
     }
     if (product && !image) image = product.image?.id ?? null
-    // 短名是快照：显式提交优先；新增 / 换型号时从产品库复制；只改价格等字段时保留原快照。
+    // 短名是快照：换型号时必须跟着新产品走（否则 AI / 部分接口漏传时会留下旧产品短名）；
+    // 未换型号时显式提交优先，未提交则保留原快照。
     const shortName =
-      text(raw.shortName, 24) ||
-      (product && productId !== beforeProduct ? text(product.shortName ?? '', 24) : '') ||
-      before?.shortName ||
-      null
+      product && productId !== beforeProduct
+        ? text(product.shortName ?? '', 24) || null
+        : text(raw.shortName, 24) || before?.shortName || null
     items.push({
       ...(rowId ? { id: rowId } : {}),
       product: productId,

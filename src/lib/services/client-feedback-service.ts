@@ -279,6 +279,7 @@ export async function createQuoteFromFeedback(
       deviceType: i.deviceType ?? null,
       image: relId(i.image),
       name: i.name,
+      shortName: i.shortName ?? null,
       sku: i.sku ?? null,
       unit: i.unit ?? null,
       price: i.price,

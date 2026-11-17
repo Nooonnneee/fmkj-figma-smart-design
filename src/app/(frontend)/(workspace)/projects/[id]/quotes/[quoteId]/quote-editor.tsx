@@ -134,13 +134,13 @@ export function QuoteItemName({
   item: { name: string; shortName?: string | null }
   className?: string
 }) {
+  const label = quoteItemLabel(item)
+  const usesShortName = label !== item.name
   return (
-    <span
-      className={cn('block min-w-0 truncate', className)}
-      title={item.name}
-      aria-label={item.name}
-    >
-      {quoteItemLabel(item)}
+    <span className={cn('block min-w-0 truncate', className)} title={item.name}>
+      {/* 可见文字保持短名单行；短名不是正式名称，对读屏器隐藏，另用 sr-only 提供完整名称。 */}
+      <span aria-hidden={usesShortName || undefined}>{label}</span>
+      {usesShortName ? <span className="sr-only">{item.name}</span> : null}
     </span>
   )
 }

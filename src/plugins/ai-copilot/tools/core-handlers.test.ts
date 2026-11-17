@@ -42,6 +42,7 @@ const storedQuote = () => ({
       deviceType: 'switch-3',
       image: null,
       name: '客厅灯',
+      shortName: '旧短名',
       sku: 'S1',
       unit: '个',
       price: 100,
@@ -66,6 +67,7 @@ const product = (id: string, deviceType: string, price = 88) => ({
   status: 'active',
   deviceType,
   name: `产品${id}`,
+  shortName: `短名${id}`,
   sku: `SKU-${id}`,
   unit: '个',
   price,
@@ -123,7 +125,7 @@ describe('create_or_update_quote 改明细', () => {
     expect(r.summary).toContain('合计')
   })
 
-  it('换型号 → 覆盖 product/name，其余行不动', async () => {
+  it('AI 换型号 → 短名跟着新产品走，不会保留旧产品短名', async () => {
     mocks.getCatalog.mockResolvedValue([
       product('p1', 'switch-3', 100),
       product('p2', 'switch-3', 88),
@@ -137,6 +139,8 @@ describe('create_or_update_quote 改明细', () => {
       id: 'r1',
       product: 'p2',
       name: '新灯',
+      // 旧行快照是「旧短名」；换产品后必须取 p2 的短名（AI 不会自己传 shortName）
+      shortName: '短名p2',
       deviceType: 'switch-3',
     })
     expect(data.items[1]).toMatchObject({ id: 'r2', name: '卧室灯' })
