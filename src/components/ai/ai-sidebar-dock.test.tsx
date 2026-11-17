@@ -95,6 +95,69 @@ describe('AiSidebarDock 收起态（右栏图标栏）', () => {
     expect(content?.hasAttribute('inert')).toBe(true)
   })
 
+  it('收起态点击「新对话」结束当前会话', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url === '/ai/conversations') {
+          return new Response(JSON.stringify({ conversations: [{ id: 'c1', title: '旧对话' }] }), {
+            status: 200,
+          })
+        }
+        if (url === '/ai/conversations/c1') {
+          return new Response(JSON.stringify({ ok: true, messages: [] }), { status: 200 })
+        }
+        return new Response(JSON.stringify({}), { status: 200 })
+      }),
+    )
+
+    await mount(<DockHarness initialCollapsed />)
+
+    const historyButton = container.querySelector(
+      '[data-slot="ai-panel-header"] [aria-label="会话历史"]',
+    ) as HTMLButtonElement
+    await act(async () => {
+      historyButton.click()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    const conversationItem = Array.from(
+      document.querySelectorAll<HTMLElement>('[role="menuitem"], button'),
+    ).find((element) => element.textContent?.includes('旧对话'))
+    expect(conversationItem).toBeTruthy()
+
+    await act(async () => {
+      conversationItem?.click()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    // 展开后标题变成刚打开的会话，再点「新对话」应回到「新对话」。
+    const expandButton = container.querySelector(
+      '[data-slot="ai-panel-header"] [aria-label="展开 AI 对话"]',
+    ) as HTMLButtonElement
+    await act(async () => {
+      expandButton.click()
+      await Promise.resolve()
+    })
+    expect(
+      container.querySelector('[data-slot="ai-panel-header"] [aria-label="AI 对话：旧对话"]'),
+    ).toBeTruthy()
+
+    const newButton = container.querySelector(
+      '[data-slot="ai-panel-header"] [aria-label="新对话"]',
+    ) as HTMLButtonElement
+    await act(async () => {
+      newButton.click()
+      await Promise.resolve()
+    })
+    expect(
+      container.querySelector('[data-slot="ai-panel-header"] [aria-label="AI 对话：新对话"]'),
+    ).toBeTruthy()
+  })
+
   it('展开/收起复用同一个按钮节点，焦点不丢', async () => {
     await mount(<DockHarness initialCollapsed />)
 

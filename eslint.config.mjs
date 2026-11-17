@@ -26,7 +26,6 @@ export default tseslint.config(
       'src/themes/**', // Astryx theme build 产物
       'scripts/**', // 一次性脚本，不进产品代码质量门禁
       '**/*.test.ts',
-      '**/*.test.tsx',
     ],
   },
   js.configs.recommended,

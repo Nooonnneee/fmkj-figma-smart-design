@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   AlertCircle,
@@ -42,6 +41,7 @@ import {
   type AiProjectContext,
   type AiToolCall,
 } from '@/components/ai/ai-elements'
+import { GuardedLink } from '@/components/guarded-link'
 import {
   SidebarGroupLabel,
   SidebarMenu,
@@ -827,6 +827,33 @@ export function AiSidebarDock({
               : 'flex h-12 items-center gap-1 border-b border-sidebar-border px-2',
         )}
       >
+        {/* DOM 顺序与收起态视觉/Tab 顺序一致：展开 → 新对话 → 会话历史 → 更多。
+            展开态用 order 把这几个按钮排回「标题 / 新对话 / 更多 / 收起」。 */}
+        {onToggleCollapsed ? (
+          <IconButton
+            type="button"
+            variant="ghost"
+            size="sm"
+            label={collapsed ? '展开 AI 对话' : '收起 AI 对话'}
+            tooltip={collapsed ? '展开 AI 对话' : '收起 AI 对话'}
+            icon={collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+            aria-expanded={!collapsed}
+            onClick={onToggleCollapsed}
+            className={cn(!collapsed && 'order-4')}
+          />
+        ) : null}
+
+        <IconButton
+          type="button"
+          variant="ghost"
+          size="sm"
+          label="新对话"
+          tooltip="新对话"
+          onClick={startNew}
+          icon={<SquarePen />}
+          className={cn(!collapsed && 'order-2')}
+        />
+
         <DropdownMenu
           menuWidth="16rem"
           // 收起时从图标栏向外展开（右侧没空间时浏览器会自动翻到左侧）。
@@ -841,7 +868,6 @@ export function AiSidebarDock({
                 label="会话历史"
                 tooltip="会话历史"
                 icon={<History />}
-                className="order-3"
               />
             ) : (
               // 与左侧栏 header 的菜单行同一套尺寸/圆角/hover；renderTrigger 的
@@ -851,7 +877,7 @@ export function AiSidebarDock({
                 type="button"
                 size="lg"
                 aria-label={`AI 对话：${activeTitle}`}
-                className="min-w-0 flex-1 justify-start gap-2.5 px-2 text-left"
+                className="order-1 min-w-0 flex-1 justify-start gap-2.5 px-2 text-left"
               >
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground">
                   <MessageSquareText className="size-4" />
@@ -892,17 +918,6 @@ export function AiSidebarDock({
           </DropdownMenuGroup>
         </DropdownMenu>
 
-        <IconButton
-          type="button"
-          variant="ghost"
-          size="sm"
-          label="新对话"
-          tooltip="新对话"
-          onClick={startNew}
-          icon={<SquarePen />}
-          className={cn(collapsed && 'order-2')}
-        />
-
         <DropdownMenu
           placement={collapsed ? 'end' : 'below'}
           alignment="end"
@@ -916,7 +931,7 @@ export function AiSidebarDock({
               label="更多"
               tooltip="更多"
               icon={<MoreHorizontal />}
-              className={cn(collapsed && 'order-4')}
+              className={cn(!collapsed && 'order-3')}
             />
           )}
         >
@@ -934,20 +949,6 @@ export function AiSidebarDock({
             }}
           />
         </DropdownMenu>
-
-        {onToggleCollapsed ? (
-          <IconButton
-            type="button"
-            variant="ghost"
-            size="sm"
-            label={collapsed ? '展开 AI 对话' : '收起 AI 对话'}
-            tooltip={collapsed ? '展开 AI 对话' : '收起 AI 对话'}
-            icon={collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
-            aria-expanded={!collapsed}
-            onClick={onToggleCollapsed}
-            className={cn(collapsed && 'order-1')}
-          />
-        ) : null}
       </div>
 
       <div
@@ -1149,20 +1150,20 @@ export function AiSidebarDock({
               积分
             </span>
           </span>
-          <Link
+          <GuardedLink
             href="/membership"
             className="rounded-md px-2 py-1 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           >
             会员
-          </Link>
-          <Link
+          </GuardedLink>
+          <GuardedLink
             href="/settings"
             aria-label="设置"
             title="设置"
             className="flex size-7 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           >
             <Settings className="size-4" />
-          </Link>
+          </GuardedLink>
         </footer>
       </div>
     </div>
