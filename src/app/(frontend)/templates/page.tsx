@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, ChevronDown } from 'lucide-react'
 
 import { LandingFooter, LandingNav } from '@/components/landing/landing-chrome'
 import { Section, SectionHeader } from '@/components/landing/section'
@@ -49,7 +49,7 @@ export default async function TemplatesPage() {
               一份点位，{owner.length + construction.length} 种讲法。
             </h1>
             <p className="mt-6 max-w-2xl text-lead text-muted-foreground">
-              同一套点位与报价，换个模板就是另一份提案。每套模板都写清适合什么客户、什么时候用、有哪些章节；缩略图就是真实封面，点进去看整套样张。
+              同一套点位与报价，换个模板就是另一份提案，缩略图都是真实封面。
             </p>
             <dl className="mt-10 grid max-w-3xl grid-cols-3 gap-6 border-t pt-6">
               <div>
@@ -68,47 +68,11 @@ export default async function TemplatesPage() {
           </div>
         </section>
 
-        <Section id="owner" labelledBy="owner-title" className="pt-16 sm:pt-20">
-          <SectionHeader id="owner-title" title="业主方案">
-            给业主看的横版提案。按版式分为{frameworks.map((f) => `「${f.label}」`).join('')}
-            ，样张使用平台内置的三层别墅示例项目生成。
-          </SectionHeader>
-          {frameworks.map((f) => (
-            <div key={f.value} className="mt-12">
-              <div className="flex flex-wrap items-baseline justify-between gap-2 border-b pb-3">
-                <h3 className="text-lg font-medium">{f.label}</h3>
-                <p className="text-sm text-muted-foreground">{f.description}</p>
-              </div>
-              <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {owner
-                  .filter((t) => t.framework === f.value)
-                  .map((t) => (
-                    <TemplateCard key={t.value} t={t} thumb={thumbs[t.value]} />
-                  ))}
-              </div>
-            </div>
-          ))}
-        </Section>
-
-        {construction.length ? (
-          <Section id="construction" labelledBy="construction-title" className="pt-0 sm:pt-0">
-            <SectionHeader id="construction-title" title="施工交底">
-              给安装团队的 A4
-              横版资料：点位代号、安装位置、房间配置与逐点核对表，不含任何价格，和业主方案分开生成。
-            </SectionHeader>
-            <div className="mt-8 grid gap-6 lg:grid-cols-2">
-              {construction.map((t) => (
-                <TemplateCard key={t.value} t={t} thumb={thumbs[t.value]} />
-              ))}
-            </div>
-          </Section>
-        ) : null}
-
-        <Section id="compare" labelledBy="compare-title" className="pt-0 sm:pt-0">
+        <Section id="compare" labelledBy="compare-title" className="pt-24 sm:pt-32">
           <SectionHeader id="compare-title" title="怎么选">
-            按客户和场合挑模板：第一次沟通用场景故事打动人，比价阶段用预算速览，正式汇报用完整提案。
+            按客户和场合挑：沟通用场景故事，比价用预算速览，正式汇报用完整提案。
           </SectionHeader>
-          <div className="mt-8 overflow-x-auto rounded-2xl border">
+          <div className="mt-12 overflow-x-auto rounded-2xl border">
             <table className="w-full min-w-[960px] text-left text-sm">
               <thead className="bg-muted/50 text-xs text-muted-foreground">
                 <tr>
@@ -150,53 +114,103 @@ export default async function TemplatesPage() {
           </div>
         </Section>
 
-        <Section id="rules" labelledBy="rules-title" className="pt-0 sm:pt-0">
-          <SectionHeader id="rules-title" title="编排规范">
-            所有模板（包括后台自定义的模板）都按同一套规则编排章节，内容只来自项目的真实数据。
+        <Section id="owner" labelledBy="owner-title" className="pt-24 sm:pt-32">
+          <SectionHeader id="owner-title" title="业主方案">
+            按版式分组，样张都用内置示例项目生成。
           </SectionHeader>
-          <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_1.4fr]">
-            <ol className="space-y-3">
-              {ORCHESTRATION_RULES.map((r, i) => (
-                <li
-                  key={r}
-                  className="flex gap-4 rounded-[var(--radius-container)] border bg-card p-4 text-sm leading-relaxed"
-                >
-                  <span className="font-medium text-muted-foreground tabular-nums">
-                    {String(i + 1).padStart(2, '0')}
-                  </span>
-                  <span>{r}</span>
-                </li>
-              ))}
-            </ol>
-            <div className="overflow-x-auto rounded-2xl border">
-              <table className="w-full min-w-[520px] text-left text-sm">
-                <thead className="bg-muted/50 text-xs text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-3 font-medium">章节</th>
-                    <th className="px-4 py-3 font-medium">内容</th>
-                    <th className="px-4 py-3 font-medium">页数</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {DECK_SECTIONS.map((s) => (
-                    <tr key={s.value} className="align-top">
-                      <td className="px-4 py-3 font-medium whitespace-nowrap">{s.label}</td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {s.description}
-                        {s.needsPoints ? '（需要点位）' : ''}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                        {s.pages}
-                      </td>
-                    </tr>
+          {frameworks.map((f) => (
+            <div key={f.value} className="mt-12">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 border-b pb-3">
+                <h3 className="text-lg font-medium">{f.label}</h3>
+                <p className="text-sm text-muted-foreground">{f.description}</p>
+              </div>
+              <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {owner
+                  .filter((t) => t.framework === f.value)
+                  .map((t) => (
+                    <TemplateCard key={t.value} t={t} thumb={thumbs[t.value]} />
                   ))}
-                </tbody>
-              </table>
+              </div>
             </div>
-          </div>
+          ))}
         </Section>
 
-        <section aria-labelledby="templates-cta" className="border-t px-4 py-20 sm:px-6 lg:px-8">
+        {construction.length ? (
+          <Section id="construction" labelledBy="construction-title" className="pt-24 sm:pt-32">
+            <SectionHeader id="construction-title" title="施工交底">
+              给安装团队的 A4 横版资料：点位代号、安装位置、房间配置与逐点核对表，不含价格。
+            </SectionHeader>
+            <div className="mt-12 grid gap-6 lg:grid-cols-2">
+              {construction.map((t) => (
+                <TemplateCard key={t.value} t={t} thumb={thumbs[t.value]} />
+              ))}
+            </div>
+          </Section>
+        ) : null}
+
+        <Section id="rules" labelledBy="rules-title" className="pt-24 sm:pt-32">
+          <details className="group rounded-2xl border bg-card">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 [&::-webkit-details-marker]:hidden sm:px-8">
+              <h2 id="rules-title" className="text-lg font-medium">
+                编排规范
+              </h2>
+              <ChevronDown
+                aria-hidden
+                className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+              />
+            </summary>
+            <div className="border-t px-6 py-6 sm:px-8 sm:py-8">
+              <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                所有模板（包括后台自定义的模板）都按同一套规则编排章节，内容只来自项目的真实数据。
+              </p>
+              <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_1.4fr]">
+                <ol className="space-y-3">
+                  {ORCHESTRATION_RULES.map((r, i) => (
+                    <li
+                      key={r}
+                      className="flex gap-4 rounded-[var(--radius-container)] border bg-card p-4 text-sm leading-relaxed"
+                    >
+                      <span className="font-medium text-muted-foreground tabular-nums">
+                        {String(i + 1).padStart(2, '0')}
+                      </span>
+                      <span>{r}</span>
+                    </li>
+                  ))}
+                </ol>
+                <div className="overflow-x-auto rounded-2xl border">
+                  <table className="w-full min-w-[520px] text-left text-sm">
+                    <thead className="bg-muted/50 text-xs text-muted-foreground">
+                      <tr>
+                        <th className="px-4 py-3 font-medium">章节</th>
+                        <th className="px-4 py-3 font-medium">内容</th>
+                        <th className="px-4 py-3 font-medium">页数</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {DECK_SECTIONS.map((s) => (
+                        <tr key={s.value} className="align-top">
+                          <td className="px-4 py-3 font-medium whitespace-nowrap">{s.label}</td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {s.description}
+                            {s.needsPoints ? '（需要点位）' : ''}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                            {s.pages}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </details>
+        </Section>
+
+        <section
+          aria-labelledby="templates-cta"
+          className="border-t px-4 pt-24 pb-20 sm:px-6 sm:pt-32 sm:pb-28 lg:px-8"
+        >
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-6">
             <div>
               <h2 id="templates-cta" className="text-headline font-medium">

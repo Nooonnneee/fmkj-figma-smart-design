@@ -100,14 +100,14 @@ export default function DownloadPage() {
       <LandingNav />
       <main>
         <section aria-labelledby="download-title">
-          <div className="mx-auto grid max-w-6xl items-center gap-14 px-4 pt-20 pb-16 sm:px-6 sm:pt-28 lg:grid-cols-2 lg:px-8">
+          <div className="mx-auto grid max-w-6xl items-center gap-14 px-4 pt-20 pb-16 sm:px-6 sm:pt-28 sm:pb-24 lg:grid-cols-2 lg:px-8">
             <div>
               <h1 id="download-title" className="text-display font-semibold">
                 {/* 按词组换行，避免窄屏断在「装 / 进」中间 */}
                 <span className="inline-block">把{APP_NAME}</span>
                 <span className="inline-block">装进你的电脑</span>
               </h1>
-              <p className="mt-6 max-w-xl text-lead text-balance text-muted-foreground">
+              <p className="mt-6 max-w-2xl text-lead text-balance text-muted-foreground">
                 独立窗口打开工作台，设计、报价、合同一气呵成。登录一次长期有效，新版本自动送达。
               </p>
               <DesktopHeroActions />
@@ -160,7 +160,8 @@ export default function DownloadPage() {
               id="platforms-title"
               eyebrow="选择你的平台"
               title="一个账号，所有电脑通用"
-              description="客户端连接同一个繁梦空间服务器，项目、报价和合同实时同步，网页版和小程序里的数据也一样。"
+              description="一个账号，客户端、网页版和小程序的项目与报价实时同步。"
+              className="max-w-2xl"
             />
             <DesktopPlatformCards />
           </div>
@@ -172,6 +173,7 @@ export default function DownloadPage() {
               id="features-title"
               eyebrow="为桌面而生"
               title="比浏览器更顺手的工作台"
+              className="max-w-2xl"
             />
             <div className="mt-12 grid gap-px overflow-hidden rounded-2xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">
               {FEATURES.map((feature) => (
@@ -203,7 +205,8 @@ export default function DownloadPage() {
               id="install-title"
               eyebrow="安装说明"
               title="三步装好，马上开工"
-              description="客户端暂未购买系统代码签名证书，首次安装时系统可能会提示风险，按下面的步骤确认即可。"
+              description="客户端暂未购买代码签名证书，首次安装可能提示风险，按下面步骤确认即可。"
+              className="max-w-2xl"
             />
             <div className="mt-12 grid gap-4 md:grid-cols-3">
               {INSTALL_STEPS.map((group) => (
@@ -222,7 +225,7 @@ export default function DownloadPage() {
                 </div>
               ))}
             </div>
-            <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+            <div className="mt-12 flex flex-wrap items-center justify-center gap-3">
               <Button
                 size="lg"
                 className="h-11 rounded-full bg-foreground px-6 text-base text-background hover:bg-foreground/85"

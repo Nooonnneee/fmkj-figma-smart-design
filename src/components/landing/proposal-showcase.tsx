@@ -204,8 +204,8 @@ export function ProposalShowcase({
         <h2 id="proposal-title" className="text-headline font-medium">
           方案演示
         </h2>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          一套点位，出三种结构的方案；四种视觉主题，对应不同业主的偏好。
+        <p className="mt-5 text-lead text-muted-foreground">
+          三种方案结构、四种视觉主题，按业主偏好选。
         </p>
 
         {/* 方案结构：改成「分段选择器」——三种结构并排、当前项实心，一眼看出有几个选择 */}
@@ -680,7 +680,7 @@ function ShowcaseSlide({
               <div className="flex flex-col gap-[6px] rounded-(--deck-radius-sm) border border-(--deck-panel-border) bg-(--deck-panel) px-[20px] py-[14px]">
                 <p className="doc-strong text-[14px]">本地执行 ≠ 无条件断网可用</p>
                 <p className="doc-body text-[12.5px] leading-[1.6] text-doc-muted">
-                  本地场景能否执行取决于网关、设备及规则支持，须在现场断网实测后写入验收记录。远程访问与推送依赖可用网络；不作绝对离线承诺。
+                  具体是否可用，以现场断网实测为准。
                 </p>
               </div>
             </div>
