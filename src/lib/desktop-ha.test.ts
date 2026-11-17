@@ -33,4 +33,17 @@ describe('callHaService 白名单', () => {
     expect(result.error).toContain('不支持的设备类型')
     expect(callCount()).toBe(0)
   })
+
+  it('service 不在白名单时页面侧直接拒绝，不打到桥', async () => {
+    const { bridge, callCount } = fakeBridge()
+
+    const result = await callHaService(
+      { domain: 'light', service: 'execute_script', entityId: 'light.living_room' },
+      bridge,
+    )
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('不支持的操作')
+    expect(callCount()).toBe(0)
+  })
 })

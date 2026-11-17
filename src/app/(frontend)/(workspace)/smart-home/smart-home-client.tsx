@@ -154,7 +154,11 @@ function OverviewStats({
   showArea?: boolean
 }) {
   return (
-    <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+    <div
+      className={
+        showArea ? 'grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3' : 'grid gap-3.5 sm:grid-cols-2'
+      }
+    >
       {showArea ? (
         <StatCard label="区域" value={data.areas.length} icon={Home} testId="ha-stat-areas" />
       ) : null}
