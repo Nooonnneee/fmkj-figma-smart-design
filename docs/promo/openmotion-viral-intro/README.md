@@ -1,24 +1,16 @@
-# 繁梦空间 · 爆款竖屏介绍（OpenMotion）
+# 繁梦空间 · 爆款竖屏介绍（OpenMotion）v3
 
-28 秒 / 1080×1920 / 30fps，面向抖音、小红书、视频号。
+28 秒 / 1080×1920 / 30fps。
 
-## 成片
+## 本版修正
 
-- [`fmkj-viral-intro.mp4`](./fmkj-viral-intro.mp4) — 可直接发布的静音优先竖屏片（静音也能看懂）
+1. **Excel**：真实表格截图（中文报价总表 + Wikimedia 估算表），不再用假卡片
+2. **同一项目**：点位图与方案页全部来自「湖山赋别墅」1F/2F/3F，去掉另一套房型的风格化渲染
+3. **方案显示全**：A4 横版方案页 `object-fit: contain`，完整入画不被裁切
 
-## 在本地 OpenMotion 继续改
+## 文件
 
-1. 打开本地 Studio（你之前的 `http://127.0.0.1:54722` 一类地址）
-2. **All projects → Import projects**
-3. 导入 [`fmkj-openmotion-project.zip`](./fmkj-openmotion-project.zip)
-4. 用 Agent / 时间轴改文案、节奏、配乐后再导出
-
-## 分镜意图
-
-见 [`Motion.md`](./Motion.md)。核心叙事：Excel/CAD/PPT 通宵 → 点位落下自动出方案报价 → 评论区扣「方案」。
-
-## 本版相对常见翻车点的取舍
-
-- 开场第 0 帧就是钩子文案，不是黑场 Logo
-- 中间用真实点位图 / 工作台 / 提案封面，不是纯卡片堆叠
-- 品牌落版在片尾，金点「点位图直接出报价」
+- `fmkj-viral-intro.mp4` — 成片
+- `fmkj-openmotion-project.zip` — 导入本地 OpenMotion 继续改
+- `viewer/` — 本地预览页
+- 直链：https://media.githubusercontent.com/media/lynnliuyu/fmkj-figma-smart-design/cursor/fmkj-viral-intro-video-3aa6/docs/promo/openmotion-viral-intro/fmkj-viral-intro.mp4
