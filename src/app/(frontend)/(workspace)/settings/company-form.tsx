@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, ImageIcon, Save, Upload, X } from 'lucide-react'
 
@@ -14,6 +14,8 @@ import { Switch } from '@astryxdesign/core/Switch'
 import { TextArea } from '@astryxdesign/core/TextArea'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { useToast } from '@astryxdesign/core/Toast'
+
+import { registerLeaveGuard } from '@/lib/leave-guard'
 
 import {
   DocumentTemplateSettings,
@@ -49,12 +51,15 @@ function ImageField({
   url,
   hint,
   squareCrop,
+  onChange,
 }: {
   name: 'logo' | 'qrCode'
   label: string
   url: string | null
   hint: string
   squareCrop?: boolean
+  /** 选了新文件或点了移除时通知父级：表单有了未保存修改。 */
+  onChange?: () => void
 }) {
   const [preview, setPreview] = useState(url)
   const [removed, setRemoved] = useState(false)
@@ -65,6 +70,7 @@ function ImageField({
     setPreview(URL.createObjectURL(f))
     setFileName(f.name)
     setRemoved(false)
+    onChange?.()
   }
   return (
     <Field label={label} inputID={name}>
@@ -117,6 +123,7 @@ function ImageField({
               setPreview(null)
               setFileName(null)
               setRemoved(true)
+              onChange?.()
             }}
             label={`移除${label}`}
             icon={<X />}
@@ -174,6 +181,11 @@ export function CompanyForm({
   const router = useRouter()
   const showToast = useToast()
   const [saving, setSaving] = useState(false)
+  // 未保存修改：任一字段（含图片、文档模板、插件开关）变动时置 true；
+  // 保存成功或点「撤销」后清除。保存条、beforeunload 和站内跳转守卫都看它。
+  const [dirty, setDirty] = useState(false)
+  // 撤销时 +1：图片和文档模板是子组件自己的 state，用 key 强制回到初始值
+  const [resetKey, setResetKey] = useState(0)
   const [error, setError] = useState<{ message: string; field?: string } | null>(null)
   const [quoteNotes, setQuoteNotes] = useState(initial.quoteNotes)
   const [contractTerms, setContractTerms] = useState(initial.contractTerms)
@@ -192,6 +204,41 @@ export function CompanyForm({
     Object.fromEntries(plugins.map((p) => [p.id, p.enabled])),
   )
 
+  // 有未保存修改时：刷新/关页由 beforeunload 提醒，站内跳转交给 leave guard。
+  // 保存成功或撤销后 dirty=false，effect 清理会自动注销两者。
+  useEffect(() => {
+    if (!dirty) return
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault()
+    window.addEventListener('beforeunload', warn)
+    const release = registerLeaveGuard(() =>
+      window.confirm('品牌与联系设置还没有保存，确定离开吗？'),
+    )
+    return () => {
+      window.removeEventListener('beforeunload', warn)
+      release()
+    }
+  }, [dirty])
+
+  /** 放弃本次所有修改，回到服务端下发的初始值。 */
+  function undo() {
+    setValues({
+      name: initial.name,
+      slogan: initial.slogan,
+      phone: initial.phone,
+      email: initial.email,
+      address: initial.address,
+      qrCaption: initial.qrCaption,
+    })
+    setQuoteNotes(initial.quoteNotes)
+    setContractTerms(initial.contractTerms)
+    setPrintProductImages(initial.printProductImages)
+    setPluginEnabled(Object.fromEntries(plugins.map((p) => [p.id, p.enabled])))
+    // 图片 input 的 FileList 无法直接清空，换 key 重新挂载；文档模板同理
+    setResetKey((k) => k + 1)
+    setError(null)
+    setDirty(false)
+  }
+
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setSaving(true)
@@ -208,6 +255,8 @@ export function CompanyForm({
       }
       if (!res.ok || !data.ok)
         return setError({ message: data.error ?? '保存失败，请稍后重试', field: data.field })
+      // 保存成功：清掉未保存状态（保存条随之消失、守卫注销），保留原有反馈
+      setDirty(false)
       showToast({ body: '设置已保存' })
       router.refresh()
     } catch {
@@ -223,14 +272,21 @@ export function CompanyForm({
       label={label}
       htmlName={name}
       value={values[name]}
-      onChange={(v) => setValues((s) => ({ ...s, [name]: v.slice(0, max) }))}
+      onChange={(v) => {
+        setValues((s) => ({ ...s, [name]: v.slice(0, max) }))
+        setDirty(true)
+      }}
       status={error?.field === name ? { type: 'error' } : undefined}
       {...props}
     />
   )
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
+    <form
+      onSubmit={submit}
+      // dirty 时给保存条留出等高的底部空间，避免它遮住表单最后一行（含页尾保存按钮）
+      className={dirty ? 'flex flex-col gap-4 pb-28' : 'flex flex-col gap-4'}
+    >
       {error ? (
         <div
           role="alert"
@@ -267,10 +323,12 @@ export function CompanyForm({
                 {field('slogan', '副标题', { max: 80 })}
                 <div className="md:col-span-2">
                   <ImageField
+                    key={`logo-${resetKey}`}
                     name="logo"
                     label="Logo"
                     url={initial.logoUrl}
                     hint="PNG 或 SVG，透明背景，≤ 3MB"
+                    onChange={() => setDirty(true)}
                   />
                 </div>
               </div>
@@ -300,11 +358,13 @@ export function CompanyForm({
                 <div className="md:col-span-2">{field('address', '地址', { max: 200 })}</div>
                 <div className="md:col-span-2">
                   <ImageField
+                    key={`qr-${resetKey}`}
                     name="qrCode"
                     label="二维码"
                     url={initial.qrCodeUrl}
                     hint="微信或公众号二维码，上传后可裁剪为正方形"
                     squareCrop
+                    onChange={() => setDirty(true)}
                   />
                 </div>
                 {field('qrCaption', '二维码说明', {
@@ -339,7 +399,10 @@ export function CompanyForm({
                     label="报价备注"
                     isLabelHidden
                     value={quoteNotes}
-                    onChange={setQuoteNotes}
+                    onChange={(v) => {
+                      setQuoteNotes(v)
+                      setDirty(true)
+                    }}
                     htmlName="quoteNotes"
                     rows={3}
                     maxLength={2000}
@@ -352,7 +415,10 @@ export function CompanyForm({
                     label="合同条款"
                     isLabelHidden
                     value={contractTerms}
-                    onChange={setContractTerms}
+                    onChange={(v) => {
+                      setContractTerms(v)
+                      setDirty(true)
+                    }}
                     htmlName="contractTerms"
                     rows={7}
                     maxLength={5000}
@@ -362,7 +428,10 @@ export function CompanyForm({
                 <Switch
                   label="打印报价单时显示产品缩略图"
                   value={printProductImages}
-                  onChange={setPrintProductImages}
+                  onChange={(v) => {
+                    setPrintProductImages(v)
+                    setDirty(true)
+                  }}
                   htmlName="printProductImages"
                   labelPosition="start"
                   labelSpacing="spread"
@@ -375,9 +444,11 @@ export function CompanyForm({
         />
       </Card>
       <DocumentTemplateSettings
+        key={`docs-${resetKey}`}
         kinds={documents.kinds}
         styles={documents.styles}
         defaults={documents.defaults}
+        onChange={() => setDirty(true)}
       />
       <Card
         padding={0}
@@ -410,9 +481,10 @@ export function CompanyForm({
                         isReady ? '' : '（未就绪）'
                       }`}
                       value={pluginEnabled[plugin.id] ?? false}
-                      onChange={(checked) =>
+                      onChange={(checked) => {
                         setPluginEnabled((s) => ({ ...s, [plugin.id]: checked }))
-                      }
+                        setDirty(true)
+                      }}
                       htmlName={`plugin-${plugin.id}`}
                       isDisabled={!isReady}
                       disabledMessage={isReady ? undefined : '功能尚未就绪，暂不可开启'}
@@ -429,22 +501,44 @@ export function CompanyForm({
         />
       </Card>
       {/*
-        保存条：吸底时必须是**不透明**背景 + 上边框，否则滚动过程中下方卡片的
-        标题会从半透明背景里透出来，看起来像「保存条压住了标题」。
-        用实心 bg-background，并加 border-t 与阴影把它与内容明确分开。
-      */}
-      {/*
-        保存条：不用 sticky。原因有两点：
-        1. sticky bottom-0 在「整页截图 / 打印 / 滚动到中间」时会被冻结在视口底部，
-           视觉上像一条浮在表单中间的横条，把上下内容切断——实测长截图里它正好
-           落在「名称/副标题」与「Logo」之间，看起来像遮挡。
-        2. 这个表单本身不长（外观 + 抬头 + 联系方式 + 文档默认值），
-           滚到底点保存是自然的操作，不需要吸底常驻。
-        改为普通文档流 + 上边框，保存按钮始终跟着表单末尾走。
+        表单末尾的保存按钮保留：用户滚到底仍可保存。
+        但设置页很长（外观 / 品牌 / 文档模板 / 插件 / 成本），改完名称时它可能在
+        好几屏之外，所以有未保存修改时再出现一条固定的保存条。
       */}
       <div className="flex justify-end border-t border-border pt-4">
         <Button type="submit" isLoading={saving} icon={<Save />} label="保存" />
       </div>
+
+      {/*
+        保存条（仅在 dirty 时出现）：
+        - fixed 吸底，不随页面滚动；实心 bg-background + 上边框 + 阴影，
+          避免背后卡片的标题从半透明背景里透出来。
+        - 必须放在 <form> 内部：主按钮是 type=submit，提交同一张表单。
+        - inset-x-0 + 内部 max-w-5xl + flex-wrap，375px 窄屏不横向溢出。
+        表单在 dirty 时加了 pb-28，底部字段不会被这条盖住。
+      */}
+      {dirty ? (
+        <div
+          data-testid="settings-save-bar"
+          role="region"
+          aria-label="未保存的修改"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background shadow-[0_-4px_16px_rgba(0,0,0,0.12)]"
+        >
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-3">
+            <span className="text-sm font-medium text-foreground">有未保存的修改</span>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                label="撤销"
+                onClick={undo}
+                isDisabled={saving}
+              />
+              <Button type="submit" isLoading={saving} icon={<Save />} label="保存" />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </form>
   )
 }
