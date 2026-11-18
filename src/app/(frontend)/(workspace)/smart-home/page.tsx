@@ -1,4 +1,4 @@
-import { BetaBadge } from '@/components/beta-badge'
+import { ClientAvailableBadge } from '@/components/client-available-badge'
 import { PageHeader, PageShell } from '@/components/page-header'
 import { loadOverview } from '@/plugins/ha-mcp/overview-loader'
 import { assembleOverview } from '@/plugins/ha-mcp/overview'
@@ -34,7 +34,7 @@ export default async function SmartHomePage() {
       <PageHeader
         title="智能家居"
         description="查看已连接现场 Home Assistant 的状态；桌面客户端内可直接控制设备。"
-        badge={<BetaBadge />}
+        badge={<ClientAvailableBadge />}
       />
       <SmartHomeClient data={data} />
     </PageShell>
