@@ -38,10 +38,13 @@ export function DocumentTemplateSettings({
   kinds,
   styles,
   defaults,
+  onChange,
 }: {
   kinds: DocKindOption[]
   styles: DocStyleOption[]
   defaults: Record<string, { style?: string; layout?: string }>
+  /** 任一风格/版式变动时通知父级表单：有了未保存修改。 */
+  onChange?: () => void
 }) {
   // 官方 Selector 只有受控写法：每类文档各记一份当前风格 + 版式，提交仍靠 htmlName。
   const [selection, setSelection] = useState<Record<string, { style: string; layout: string }>>(
@@ -62,8 +65,10 @@ export function DocumentTemplateSettings({
       ),
   )
 
-  const pick = (kind: string, key: 'style' | 'layout', value: string) =>
+  const pick = (kind: string, key: 'style' | 'layout', value: string) => {
     setSelection((s) => ({ ...s, [kind]: { ...s[kind]!, [key]: value } }))
+    onChange?.()
+  }
 
   const styleOptions = styles.map((s) => ({
     value: s.id,
