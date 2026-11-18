@@ -8,12 +8,16 @@ export default {
   //   src/app/(payload)/**                 — Payload 生成（AGENTS.md 明确不要改）
   //   miniprogram/**                       — 小程序，独立运行时、不在 CI 覆盖
   //   desktop/**                           — Electron，同上
+  //   .cursor/**                           — LoopForge Local 宿主包（loopforge-cli 安装，勿手改）
+  //   .devflow/**                          — LoopForge 安装状态
   ignorePatterns: [
     '**/payload-types.ts',
     'tsconfig.json',
     'src/app/(payload)/**',
     'miniprogram/**',
     'desktop/**',
+    '.cursor/**',
+    '.devflow/**',
   ],
   printWidth: 100,
   semi: false,
