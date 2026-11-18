@@ -41,33 +41,46 @@ function ShowcaseSheet({
   const url = sheet.url.includes('-showcase')
     ? sheet.url
     : sheet.url.replace('-light.png', '-showcase.png')
+  // 展示版 PNG 已把房间标签与彩色点位烘焙进去（export-showcase-plans.mjs），
+  // 不能在其上再叠一层 SVG 标记——导出脚本对点位做了画布居中+防碰撞偏移，
+  // 与页面上原样 rx/ry 画的不重合，会出现成对错位的双重点。
+  // 只有拿不到展示版、回退到施工版（light）时才需要在此叠加标记。
+  const isShowcase = url.includes('-showcase')
   return (
     <div className="relative aspect-16/9 overflow-hidden rounded-xl ring-1 ring-border">
-      <Image
-        src={url}
-        alt={`${data.project.name} 点位图`}
-        fill
-        sizes="1200px"
-        className="object-contain"
-        unoptimized
-        priority
-      />
-      <svg
-        viewBox={`0 0 ${VW} ${VH}`}
-        className="pointer-events-none absolute inset-0 size-full"
-        role="img"
-        aria-label={`${sheet.floor}点位图，共 ${data.pointCount} 个设备点位`}
-      >
-        {sheet.points.map((p) => {
-          const look = deviceLook(p.type)
-          return (
-            <g key={p.id} transform={`translate(${p.rx * VW} ${p.ry * VH})`}>
-              <circle r={12} fill="white" opacity={0.95} />
-              <circle r={10} fill={look.color} />
-            </g>
-          )
-        })}
-      </svg>
+      {/* 点位图 2400×1600（3:2）在 16:9 容器里占满高度、水平居中：
+          内层宽 = 高×3/2 = 27/32 容器宽，左右各留 5/64（7.8125%）。
+          内层 div 与图片显示区域严格重合，让回退路径的 SVG 覆盖层
+          与图片像素逐一对齐。 */}
+      <div className="absolute inset-y-0 left-[7.8125%] w-[84.375%]">
+        <Image
+          src={url}
+          alt={`${data.project.name} 点位图`}
+          fill
+          sizes="1200px"
+          className="object-contain"
+          unoptimized
+          priority
+        />
+        {!isShowcase && (
+          <svg
+            viewBox={`0 0 ${VW} ${VH}`}
+            className="pointer-events-none absolute inset-0 size-full"
+            role="img"
+            aria-label={`${sheet.floor}点位图，共 ${data.pointCount} 个设备点位`}
+          >
+            {sheet.points.map((p) => {
+              const look = deviceLook(p.type)
+              return (
+                <g key={p.id} transform={`translate(${p.rx * VW} ${p.ry * VH})`}>
+                  <circle r={12} fill="white" opacity={0.95} />
+                  <circle r={10} fill={look.color} />
+                </g>
+              )
+            })}
+          </svg>
+        )}
+      </div>
     </div>
   )
 }
@@ -84,8 +97,8 @@ function QuoteSummary({
     .slice(0, 5)
   return (
     <div className="grid gap-x-6 gap-y-1.5 text-sm">
-      {rows.map((l) => (
-        <div key={l.type} className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+      {rows.map((l, i) => (
+        <div key={`${l.type}-${i}`} className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
           <PointMarker type={l.type} className="size-4" />
           <span className="truncate text-foreground/80">{typeName(l.type)}</span>
           <span className="tabular-nums text-foreground">{yuan(l.price * l.qty)}</span>
