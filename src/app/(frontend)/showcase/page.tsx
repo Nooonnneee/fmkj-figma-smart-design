@@ -102,7 +102,7 @@ function QuoteSummary({
 export default async function ShowcasePage() {
   const data = await getLandingShowcase().catch(() => null)
   if (!data) return null
-  const { project, roomCount, quote } = data
+  const { project, roomCount } = data
   const shownCount = data.sheets.reduce((s, sh) => s + sh.points.length, 0)
   return (
     <main className="flex min-h-dvh w-full items-center justify-center overflow-hidden p-8">
