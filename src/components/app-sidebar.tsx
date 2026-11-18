@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 
 import { BetaBadge } from '@/components/beta-badge'
+import { ClientAvailableBadge } from '@/components/client-available-badge'
 import { BrandMark } from '@/components/brand/brand-mark'
 import { GuardedLink } from '@/components/guarded-link'
 import { LinkPending } from '@/components/link-pending'
@@ -69,11 +70,13 @@ const workNav = [
   { icon: PackageSearch, label: '产品库', url: '/products' },
 ] as const
 
-/** HA 助手：只读查看已连接现场 Home Assistant（第一期只读模组，开发中） */
-const homeNav = [{ icon: Home, label: '智能家居', url: '/smart-home', beta: true }] as const
+/** HA 助手：只读查看已连接现场 Home Assistant（客户端可用 → 下载桌面客户端） */
+export const homeNav = [
+  { icon: Home, label: '智能家居', url: '/smart-home', desktopOnly: true },
+] as const
 
 /** KNX / ETS：第一期只留模块位，点进去是空态页（开发中） */
-const knxNav = [{ icon: Cable, label: 'KNX 工程', url: '/knx', beta: true }] as const
+export const knxNav = [{ icon: Cable, label: 'KNX 工程', url: '/knx', beta: true }] as const
 
 /** 营销工具：第一期只放名片（页面与 URL 沿用现有的能力页） */
 const marketingNav = [{ icon: IdCard, label: '名片', url: '/capabilities/business-card' }] as const
@@ -118,6 +121,7 @@ function NavItem({
   url,
   active,
   beta = false,
+  desktopOnly = false,
 }: {
   icon: React.ComponentType
   label: string
@@ -125,10 +129,17 @@ function NavItem({
   active: boolean
   /** 开发中的模块：在 label 后显示 Beta 标签（折叠成图标栏时隐藏） */
   beta?: boolean
+  /** 客户端可用：在行右侧放一个真正的下载链接标签（折叠成图标栏时隐藏） */
+  desktopOnly?: boolean
 }) {
   return (
-    <SidebarMenuItem>
-      <SidebarMenuButton asChild isActive={active} tooltip={label}>
+    <SidebarMenuItem className={desktopOnly ? 'flex items-center' : undefined}>
+      <SidebarMenuButton
+        asChild
+        isActive={active}
+        tooltip={label}
+        className={cn(desktopOnly && 'min-w-0 flex-1')}
+      >
         <GuardedLink href={url}>
           <Icon />
           <span>{label}</span>
@@ -136,6 +147,12 @@ function NavItem({
           <LinkPending className="ml-auto size-3.5" />
         </GuardedLink>
       </SidebarMenuButton>
+      {/* 客户端可用标签是独立的下载链接：放在 <GuardedLink>（<a>）之外，
+          与行链接作为 li 的 flex 兄弟，避免 a 套 a 的非法 HTML；
+          点它只进 /download，行的其它区域仍进 /smart-home。 */}
+      {desktopOnly ? (
+        <ClientAvailableBadge className="pr-1 group-data-[collapsible=icon]:hidden" />
+      ) : null}
     </SidebarMenuItem>
   )
 }
