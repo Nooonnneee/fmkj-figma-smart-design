@@ -1,3 +1,5 @@
+import type { PayloadRequest } from 'payload'
+
 import { getPayloadClient } from '@/lib/payload'
 import { computeDefaults, estimateArea, type NeedHouse } from '@/lib/need-defaults'
 import { computePricing, QUANTITY_FACTORS, type PricingResult } from '@/lib/need-pricing'
@@ -25,7 +27,7 @@ export type NeedBuildResult = {
 }
 
 /** 从在售产品取每类设备的京东日常价中位数（缺失即待查，不猜） */
-export async function marketPriceByDeviceType() {
+export async function marketPriceByDeviceType(req?: Partial<PayloadRequest>) {
   const payload = await getPayloadClient()
   const catalog = await payload.find({
     collection: 'products',
@@ -34,6 +36,7 @@ export async function marketPriceByDeviceType() {
     depth: 0,
     overrideAccess: true,
     select: { name: true, deviceType: true, marketPrice: true, priceSource: true },
+    req,
   })
   const byType = new Map<string, { prices: number[]; name: string; source: string | null }>()
   for (const p of catalog.docs as unknown as Record<string, unknown>[]) {
@@ -57,30 +60,41 @@ export async function marketPriceByDeviceType() {
   return out
 }
 
+function roomCount(value: unknown, fallback: number) {
+  const count = Number(value ?? fallback)
+  // A draft can also come from the anonymous API. Keep room generation bounded.
+  return Number.isFinite(count) ? Math.min(100, Math.max(0, Math.trunc(count))) : fallback
+}
+
+function choices(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item) => typeof item === 'string').slice(0, 8) : []
+}
+
 export function parseAnswers(answers: Record<string, unknown>) {
   const houseRaw = (answers.house ?? {}) as Partial<NeedHouse>
+  const area = Number(houseRaw.area)
   const house: NeedHouse = {
     type: (houseRaw.type as NeedHouse['type']) ?? 'flat',
-    bedrooms: Number(houseRaw.bedrooms ?? 3),
-    livingRooms: Number(houseRaw.livingRooms ?? 2),
-    area: houseRaw.area === null || houseRaw.area === undefined ? null : Number(houseRaw.area),
+    bedrooms: roomCount(houseRaw.bedrooms, 3),
+    livingRooms: roomCount(houseRaw.livingRooms, 2),
+    area: Number.isFinite(area) && area > 0 ? area : null,
     stage: (houseRaw.stage as NeedHouse['stage']) ?? 'rough',
   }
   return {
     house,
     lighting: ((answers.lighting as { design?: string })?.design ?? 'main') as NeedLightingDesign,
     tier: ((answers.level as { tier?: string })?.tier ?? 'light') as NeedTier,
-    sensors: (((answers.security as { sensors?: string[] })?.sensors ?? []) as string[]).slice(
-      0,
-      8,
-    ),
+    sensors: choices((answers.security as { sensors?: unknown })?.sensors),
     camera: ((answers.security as { camera?: string })?.camera ?? 'none') as NeedCamera,
-    sceneCards: ((answers.sceneCards ?? []) as string[]).slice(0, 8),
+    sceneCards: choices(answers.sceneCards),
     edits: (answers.deviceEdits ?? {}) as Record<string, number>,
   }
 }
 
-export async function buildNeedResult(answers: Record<string, unknown>): Promise<NeedBuildResult> {
+export async function buildNeedResult(
+  answers: Record<string, unknown>,
+  req?: Partial<PayloadRequest>,
+): Promise<NeedBuildResult> {
   const { house, lighting, tier, sensors, camera, sceneCards, edits } = parseAnswers(answers)
   const wantsCurtain = sceneCards.includes('curtain')
 
@@ -93,7 +107,7 @@ export async function buildNeedResult(answers: Record<string, unknown>): Promise
         : d.qty,
   }))
 
-  const marketPriceByType = await marketPriceByDeviceType()
+  const marketPriceByType = await marketPriceByDeviceType(req)
   const area = house.area ?? estimateArea(house)
 
   // 型材（按米）：与默认值同一套系数，避免预览/提交两处漂移

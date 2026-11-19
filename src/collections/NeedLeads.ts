@@ -1,6 +1,13 @@
-import type { CollectionConfig } from 'payload'
-
 import { randomBytes } from 'node:crypto'
+import type { Access, CollectionConfig } from 'payload'
+
+import { cmsAdminOnly, isCmsAdmin, isMember } from '@/lib/access'
+
+const adminOrLeadOwner: Access = ({ req }) => {
+  if (isCmsAdmin(req)) return true
+  if (isMember(req) && req.user) return { owner: { equals: req.user.id } }
+  return false
+}
 
 /**
  * 需求小助手：业主需求单（issue #194）。
@@ -19,12 +26,12 @@ export const NeedLeads: CollectionConfig = {
     group: '营销与线索',
   },
   access: {
-    // 业主端凭 token 创建；服务端校验字段白名单与体积上限
-    create: () => true,
-    // 只有销售（owner）或后台管理员能读/改；公开读走专用接口按 token 精确查
-    read: ({ req }) => (req.user ? true : false),
-    update: ({ req }) => (req.user ? true : false),
-    delete: ({ req }) => (req.user ? true : false),
+    // 匿名创建只经需求单接口，避免绕过草稿凭证、字段校验与限流。
+    create: cmsAdminOnly,
+    // 公开读写走专用接口按 token 精确查。工作台成员只管理被指派的需求单。
+    read: adminOrLeadOwner,
+    update: adminOrLeadOwner,
+    delete: adminOrLeadOwner,
   },
   fields: [
     {
