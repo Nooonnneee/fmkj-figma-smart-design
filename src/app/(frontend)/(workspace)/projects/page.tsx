@@ -1,9 +1,8 @@
 import Form from 'next/form'
 import Link from 'next/link'
-import { FolderKanban, Plus, Search, Sparkles } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FolderKanban, Plus, Search, Sparkles } from 'lucide-react'
 import type { Where } from 'payload'
 
-import { Banner } from '@astryxdesign/core/Banner'
 import { EmptyState } from '@/components/empty-state'
 import { FilterTabs } from '@/components/filter-tabs'
 import { PageHeader } from '@/components/page-header'
@@ -23,6 +22,7 @@ import { SearchSubmit } from '@/components/search-submit'
 import { relId } from '@/lib/access'
 import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
+import { clampPage, PAGE_SIZE } from '@/lib/projects-pagination'
 import { getPayloadClient } from '@/lib/payload'
 import { countScenePoints } from '@/lib/point-count'
 import { fmtDate } from '@/lib/projects'
@@ -34,9 +34,6 @@ import { redirectToLogin } from '@/lib/login-redirect'
 
 export const metadata = { title: pageTitle('项目') }
 
-/** 列表一次最多取多少条。超过时必须如实说明，不能让用户以为项目丢了（#210）。 */
-const LIST_LIMIT = 500
-
 type Amount = { value: number; caption: string }
 
 /** 系统为新成员发放的示例项目，名称带「【示例】」前缀 */
@@ -45,11 +42,11 @@ const isDemo = isDemoProjectName
 export default async function ProjectsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; view?: string }>
+  searchParams: Promise<{ q?: string; view?: string; page?: string }>
 }) {
   const user = await appAuth.getCurrentUser()
   if (!user) return redirectToLogin()
-  const { q = '', view = '' } = await searchParams
+  const { q = '', view = '', page: pageParam = '' } = await searchParams
   const archived = view === 'archived'
   const keyword = q.trim()
   const payload = await getPayloadClient()
@@ -74,12 +71,17 @@ export default async function ProjectsPage({
       }
     : statusWhere
 
+  // 页码先夹到 1..MAX_PAGE：非数字 / 0 / 负数 / 小数回落第 1 页；过大的（1e18、Infinity）夹到上限，
+  // 再由下面的 totalDocs 回落末页。必须夹，否则数据库会拼出溢出 offset 直接 500（#213 实测 1e18）。
+  const requestedPage = clampPage(pageParam)
+
   const [result, activeCount, archivedCount] = await Promise.all([
     payload.find({
       collection: 'projects',
       where,
       depth: 0,
-      limit: LIST_LIMIT,
+      limit: PAGE_SIZE,
+      page: requestedPage,
       sort: '-updatedAt',
       user,
       overrideAccess: false,
@@ -107,7 +109,44 @@ export default async function ProjectsPage({
       overrideAccess: false,
     }),
   ])
-  const projects = result.docs
+  // 页码超过末页（例如手改 ?page=999）时，回落显示末页内容，而不是空白页。
+  // 越界页的 find 会返回空 docs 且 totalPages 不可信，所以按总数重新算末页。
+  let totalPages = Math.max(1, result.totalPages ?? 1)
+  let page = Math.min(requestedPage, totalPages)
+  if (requestedPage > 1 && result.docs.length === 0) {
+    const counted = await payload.count({
+      collection: 'projects',
+      where,
+      user,
+      overrideAccess: false,
+    })
+    totalPages = Math.max(1, Math.ceil(counted.totalDocs / PAGE_SIZE))
+    page = Math.min(requestedPage, totalPages)
+  }
+  const listResult =
+    page === requestedPage
+      ? result
+      : await payload.find({
+          collection: 'projects',
+          where,
+          depth: 0,
+          limit: PAGE_SIZE,
+          page,
+          sort: '-updatedAt',
+          user,
+          overrideAccess: false,
+          select: {
+            name: true,
+            customerName: true,
+            community: true,
+            platform: true,
+            status: true,
+            pointCount: true,
+            updatedAt: true,
+          },
+        })
+
+  const projects = listResult.docs
   const ids = projects.map((p) => p.id)
 
   // 还没有点位数统计的旧项目：一次查询补算（下次保存点位图时会写入）
@@ -172,6 +211,7 @@ export default async function ProjectsPage({
       : { value: stat.latest, caption: '最新报价' }
   }
 
+  /** 切状态页签、改搜索词都不带 page —— 自然回到第 1 页；只有翻页才显式传 page。 */
   const href = (patch: Record<string, string>) => {
     const params = new URLSearchParams({ q, view, ...patch })
     for (const [k, v] of [...params]) if (!v) params.delete(k)
@@ -252,16 +292,6 @@ export default async function ProjectsPage({
           <SearchSubmit />
         </Form>
       </div>
-
-      {/* 列表有上限：超过时如实说明，而不是让用户以为项目丢了（#210） */}
-      {result.totalDocs > projects.length ? (
-        <Banner
-          status="warning"
-          container="card"
-          title={`仅显示最近 ${LIST_LIMIT} 条（共 ${result.totalDocs} 条）`}
-          description="用搜索或顶部筛选缩小范围，就能找到更早的项目。"
-        />
-      ) : null}
 
       {projects.length === 0 ? (
         <EmptyState
@@ -380,6 +410,33 @@ export default async function ProjectsPage({
           </Table>
         </Card>
       )}
+
+      {/* 分页：页码走 URL，切页签/改搜索词都会回到第 1 页（#210 A） */}
+      {totalPages > 1 ? (
+        <nav className="flex items-center justify-center gap-2 pt-1" aria-label="项目分页">
+          {page > 1 ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              href={href({ page: String(page - 1) })}
+              icon={<ChevronLeft />}
+              label="上一页"
+            />
+          ) : null}
+          <span className="px-2 text-sm text-muted-foreground tabular-nums">
+            {page} / {totalPages}
+          </span>
+          {page < totalPages ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              href={href({ page: String(page + 1) })}
+              icon={<ChevronRight />}
+              label="下一页"
+            />
+          ) : null}
+        </nav>
+      ) : null}
     </section>
   )
 }
