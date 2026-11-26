@@ -1,13 +1,19 @@
 import type { Metadata } from 'next'
-import Image from 'next/image'
+import { Button } from '@astryxdesign/core/Button'
 
 import { BrandLogo } from '@/components/landing/landing-chrome'
 import { PointMarker } from '@/components/point-marker'
 import { deviceLook } from '@/board/packs/smart-home/look'
 import { categoryOfType, DEVICE_CATEGORIES, deviceTypeOf } from '@/lib/device-types'
 import { APP_NAME, COMPANY_NAME } from '@/lib/brand'
-import { getLandingShowcase } from '@/lib/landing-showcase'
+import {
+  getLandingShowcase,
+  type LandingShowcase,
+  type ShowcaseSheet as SheetData,
+} from '@/lib/landing-showcase'
 import { yuan } from '@/lib/quotes'
+
+import { ShowcaseSheet } from './showcase-sheet'
 
 export const metadata: Metadata = {
   title: `展示 · ${APP_NAME}`,
@@ -30,68 +36,28 @@ const catSlug = (type: string) => categoryOfType(type)?.slug ?? 'other'
 const catOrder = (type: string) => DEVICE_CATEGORIES.findIndex((c) => c.slug === catSlug(type))
 const typeName = (type: string) => deviceTypeOf(type)?.name ?? '设备'
 
-function ShowcaseSheet({
-  data,
-}: {
-  data: NonNullable<Awaited<ReturnType<typeof getLandingShowcase>>>
-}) {
-  const sheet = data.sheets[0]
-  if (!sheet) return null
-  // 展示版点位图（与施工版同尺寸），回退到 ordinary light 图
-  const url = sheet.url.includes('-showcase')
-    ? sheet.url
-    : sheet.url.replace('-light.png', '-showcase.png')
-  // 展示版 PNG 已把房间标签与彩色点位烘焙进去（export-showcase-plans.mjs），
-  // 不能在其上再叠一层 SVG 标记——导出脚本对点位做了画布居中+防碰撞偏移，
-  // 与页面上原样 rx/ry 画的不重合，会出现成对错位的双重点。
-  // 只有拿不到展示版、回退到施工版（light）时才需要在此叠加标记。
-  const isShowcase = url.includes('-showcase')
+function SheetMarkers({ sheet }: { sheet: SheetData }) {
+  // 展示图已经烘焙点位，只在施工图上叠加原始坐标标记。
   return (
-    <div className="relative aspect-16/9 overflow-hidden rounded-xl ring-1 ring-border">
-      {/* 点位图 2400×1600（3:2）在 16:9 容器里占满高度、水平居中：
-          内层宽 = 高×3/2 = 27/32 容器宽，左右各留 5/64（7.8125%）。
-          内层 div 与图片显示区域严格重合，让回退路径的 SVG 覆盖层
-          与图片像素逐一对齐。 */}
-      <div className="absolute inset-y-0 left-[7.8125%] w-[84.375%]">
-        <Image
-          src={url}
-          alt={`${data.project.name} 点位图`}
-          fill
-          sizes="1200px"
-          className="object-contain"
-          unoptimized
-          priority
-        />
-        {!isShowcase && (
-          <svg
-            viewBox={`0 0 ${VW} ${VH}`}
-            className="pointer-events-none absolute inset-0 size-full"
-            role="img"
-            aria-label={`${sheet.floor}点位图，共 ${data.pointCount} 个设备点位`}
-          >
-            {sheet.points.map((p) => {
-              const look = deviceLook(p.type)
-              return (
-                <g key={p.id} transform={`translate(${p.rx * VW} ${p.ry * VH})`}>
-                  <circle r={12} fill="white" opacity={0.95} />
-                  <circle r={10} fill={look.color} />
-                </g>
-              )
-            })}
-          </svg>
-        )}
-      </div>
-    </div>
+    <svg
+      viewBox={`0 0 ${VW} ${VH}`}
+      className="pointer-events-none absolute inset-0 size-full"
+      role="img"
+      aria-label={`${sheet.floor}点位图，共 ${sheet.points.length} 个设备点位`}
+    >
+      {sheet.points.map((p) => (
+        <g key={p.id} transform={`translate(${p.rx * VW} ${p.ry * VH})`}>
+          <circle r={12} fill="white" opacity={0.95} />
+          <circle r={10} fill={deviceLook(p.type).color} />
+        </g>
+      ))}
+    </svg>
   )
 }
 
-function QuoteSummary({
-  data,
-}: {
-  data: NonNullable<Awaited<ReturnType<typeof getLandingShowcase>>>
-}) {
+function QuoteSummary({ data }: { data: LandingShowcase }) {
   const quote = data.quote
-  if (!quote) return null
+  if (!quote) return <p className="text-sm text-muted-foreground">此方案暂无报价。</p>
   const rows = [...quote.lines]
     .sort((a, b) => catOrder(a.type) - catOrder(b.type) || b.price * b.qty - a.price * a.qty)
     .slice(0, 5)
@@ -106,24 +72,38 @@ function QuoteSummary({
       ))}
       <div className="mt-1 flex items-center justify-between border-t border-border pt-2 text-base font-medium">
         <span>报价合计</span>
-        <span className="tabular-nums text-accent">{yuan(quote.total)}</span>
+        <span className="tabular-nums text-foreground">{yuan(quote.total)}</span>
       </div>
     </div>
   )
 }
 
 export default async function ShowcasePage() {
-  const data = await getLandingShowcase().catch(() => null)
-  if (!data) return null
+  const data = await getLandingShowcase().catch((error: unknown) => {
+    console.error('[showcase] failed to load demo data', error)
+    return null
+  })
+  if (!data) {
+    return (
+      <main className="grid min-h-dvh place-items-center bg-background p-8 text-foreground">
+        <section className="space-y-4 text-center">
+          <h1 className="text-2xl font-semibold">方案暂时无法加载</h1>
+          <p className="text-muted-foreground">请稍后重试。</p>
+          <Button href="/showcase" label="重试" />
+        </section>
+      </main>
+    )
+  }
   const { project, roomCount } = data
+  const sheet = data.sheets[0]
   const shownCount = data.sheets.reduce((s, sh) => s + sh.points.length, 0)
   return (
     <main className="flex min-h-dvh w-full items-center justify-center overflow-hidden p-8">
-      <div className="relative w-full max-w-[1920px] overflow-hidden rounded-2xl bg-[var(--background)] p-10 shadow-window ring-1 ring-border">
+      <div className="relative w-full max-w-[1920px] overflow-hidden rounded-2xl bg-background p-10 shadow-window ring-1 ring-border">
         {/* 顶栏：品牌 + 项目名 */}
         <header className="mb-8 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <BrandLogo className="h-5 w-auto text-accent" />
+            <BrandLogo className="h-5 w-auto text-foreground" />
             <span className="text-sm text-muted-foreground">全屋智能方案</span>
           </div>
           <div className="text-right">
@@ -146,17 +126,24 @@ export default async function ShowcasePage() {
             <dl className="mt-8 space-y-5">
               <div>
                 <dt className="text-xs uppercase tracking-wide text-muted-foreground">设备点位</dt>
-                <dd className="text-5xl font-semibold tabular-nums text-accent">{shownCount}</dd>
+                <dd className="text-5xl font-semibold tabular-nums text-foreground">
+                  {shownCount}
+                </dd>
               </div>
               <div>
                 <dt className="text-xs uppercase tracking-wide text-muted-foreground">房间</dt>
-                <dd className="text-5xl font-semibold tabular-nums text-accent">{roomCount}</dd>
+                <dd className="text-5xl font-semibold tabular-nums text-foreground">{roomCount}</dd>
               </div>
             </dl>
           </div>
 
           <div className="col-span-6">
-            <ShowcaseSheet data={data} />
+            <ShowcaseSheet
+              key={sheet?.url}
+              constructionUrl={sheet?.url}
+              alt={`${project.name} 点位图`}
+              markers={sheet ? <SheetMarkers sheet={sheet} /> : null}
+            />
           </div>
 
           <div className="col-span-3">
