@@ -40,8 +40,11 @@ import { Card as AstryxCard } from '@astryxdesign/core/Card'
 import { CheckboxInput } from '@astryxdesign/core/CheckboxInput'
 import { DropdownMenu } from '@astryxdesign/core/DropdownMenu'
 import { Field } from '@astryxdesign/core/Field'
+import { Link } from '@astryxdesign/core/Link'
 import { Popover } from '@astryxdesign/core/Popover'
+import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl'
 import { Selector } from '@astryxdesign/core/Selector'
+import { Tab, TabList } from '@astryxdesign/core/TabList'
 import {
   Table,
   TableBody,
@@ -72,7 +75,13 @@ import {
   type MarginSummary,
   type UnitCost,
 } from '@/lib/quote-costs'
-import { QUOTE_STATUSES, quoteTotals, yuan } from '@/lib/quotes'
+import {
+  isPositiveQuotePrice,
+  QUOTE_STATUSES,
+  quoteTotals,
+  requiresManualQuotePrice,
+  yuan,
+} from '@/lib/quotes'
 import { cn } from '@/lib/utils'
 
 import { createContract } from '../../contract/actions'
@@ -88,6 +97,7 @@ export type ProductOption = {
   unit: string
   price: number
   status: string
+  tags?: string[]
   deviceType: string | null
   brand: { slug: string; name: string; logo: string | null } | null
   platforms: string[]
@@ -157,7 +167,7 @@ export function newQuoteLine(p: ProductOption): Line {
     shortName: p.shortName,
     sku: p.sku,
     unit: p.unit,
-    price: p.price,
+    price: requiresManualQuotePrice(p) ? 0 : p.price,
     quantity: 1,
   }
 }
@@ -197,19 +207,22 @@ function EditableNumber({
   onChange,
   label,
   disabled,
+  manualPrice = false,
   className = 'w-24',
 }: {
   value: number
   onChange: (n: number) => void
   label: string
   disabled?: boolean
+  manualPrice?: boolean
   className?: string
 }) {
-  const [text, setText] = useState(() => String(value))
+  const displayValue = manualPrice && value === 0 ? '' : String(value)
+  const [text, setText] = useState(displayValue)
   const [focused, setFocused] = useState(false)
   useEffect(() => {
-    if (!focused) setText(String(value))
-  }, [value, focused])
+    if (!focused) setText(displayValue)
+  }, [displayValue, focused])
   return (
     <input
       type="number"
@@ -217,18 +230,20 @@ function EditableNumber({
       step="any"
       inputMode="decimal"
       aria-label={label}
-      value={focused ? text : String(value)}
+      placeholder={manualPrice ? '手填单价' : undefined}
+      value={focused ? text : displayValue}
       disabled={disabled}
       className={cn(NATIVE_NUM_CLASS, 'h-7 px-2 text-right tabular-nums', className)}
       onFocus={() => {
         setFocused(true)
-        setText(String(value))
+        setText(displayValue)
       }}
       onBlur={() => setFocused(false)}
       onChange={(e) => {
         setText(e.target.value)
         const n = toNum(e.target.value)
-        if (Number.isFinite(n) && n >= 0) onChange(n)
+        if (manualPrice) onChange(isPositiveQuotePrice(n) ? n : 0)
+        else if (Number.isFinite(n) && n >= 0) onChange(n)
       }}
     />
   )
@@ -290,6 +305,10 @@ export function QuoteEditor({
   )
   const [viewMode, setViewMode] = useState<'floors' | 'summary'>('summary')
   const [planMode, setPlanMode] = useState<'symbol' | 'product' | 'hide'>('symbol')
+  const roomCount = useMemo(
+    () => floorGroups.reduce((sum, floor) => sum + floor.rooms.length, 0),
+    [floorGroups],
+  )
   const currentScope = useMemo(() => inferScopeFromTitle(quote.title), [quote.title])
 
   const update = (patch: Partial<QuoteState>) => {
@@ -309,10 +328,18 @@ export function QuoteEditor({
     setPickerOpen(false)
   }
 
-  const activeProducts = useMemo(() => products.filter((p) => p.status === 'active'), [products])
+  const quoteProducts = useMemo(
+    () => products.filter((p) => p.status === 'active' || requiresManualQuotePrice(p)),
+    [products],
+  )
+  const manualPriceIds = useMemo(
+    () => new Set(products.filter(requiresManualQuotePrice).map((p) => p.id)),
+    [products],
+  )
   const catalogPriceById = useMemo(() => new Map(products.map((p) => [p.id, p.price])), [products])
   // 产品库未定价（0 元）时没有可参照的原价，不提示「已改价」
   const catalogPriceOf = (productId: string | null) => {
+    if (productId && manualPriceIds.has(productId)) return undefined
     const price = productId ? catalogPriceById.get(productId) : undefined
     return price && price > 0 ? price : undefined
   }
@@ -320,11 +347,11 @@ export function QuoteEditor({
     () =>
       DEVICE_TYPE_ORDER.map((t) => ({
         type: t,
-        items: activeProducts.filter((p) => p.deviceType === t),
+        items: quoteProducts.filter((p) => p.deviceType === t),
       }))
-        .concat([{ type: '', items: activeProducts.filter((p) => !p.deviceType) }])
+        .concat([{ type: '', items: quoteProducts.filter((p) => !p.deviceType) }])
         .filter((g) => g.items.length),
-    [activeProducts],
+    [quoteProducts],
   )
 
   // 旧 cmdk 命令面板换成官方 DropdownMenu 的数据模式：搜索框进 header，产品按设备类型分组。
@@ -362,7 +389,11 @@ export function QuoteEditor({
               )}
             </span>
           ),
-          endContent: <span className="text-xs tabular-nums">{yuan(p.price)}</span>,
+          endContent: (
+            <span className="text-xs tabular-nums">
+              {requiresManualQuotePrice(p) ? '手填单价' : yuan(p.price)}
+            </span>
+          ),
           onClick: () => addProduct(p),
         })),
       }))
@@ -536,6 +567,14 @@ export function QuoteEditor({
   }, [dirty])
 
   const persist = async () => {
+    const missingPrice = quote.items.find(
+      (line) =>
+        line.product && manualPriceIds.has(line.product) && !isPositiveQuotePrice(line.price),
+    )
+    if (missingPrice) {
+      showToast({ body: `「${missingPrice.name}」请填写大于 0 的单价`, type: 'error' })
+      return false
+    }
     const result = await saveQuote(quote.id, {
       title: quote.title,
       status: quote.status,
@@ -552,7 +591,7 @@ export function QuoteEditor({
         quantity: l.quantity,
       })),
       fees: quote.fees.map(({ key: _k, ...f }) => f),
-    })
+    }).catch(() => ({ ok: false as const, error: '暂时无法保存报价，请检查网络后重试。' }))
     if (!result.ok) {
       showToast({ body: result.error, type: 'error' })
       return false
@@ -634,12 +673,14 @@ export function QuoteEditor({
     onChange: (n: number) => void,
     label: string,
     className = 'w-24',
+    manualPrice = false,
   ) => (
     <EditableNumber
       value={value}
       onChange={onChange}
       label={label}
       disabled={readOnly}
+      manualPrice={manualPrice}
       className={cn('h-8', className)}
     />
   )
@@ -682,6 +723,8 @@ export function QuoteEditor({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
           <Button
+            as={GuardedLink}
+            href={`/projects/${project.id}/quotes`}
             variant="ghost"
             size="sm"
             className="-ml-2 h-8 text-xs font-medium text-muted-foreground hover:text-foreground"
@@ -772,6 +815,15 @@ export function QuoteEditor({
           <Lock className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
           <span>{lockReason}</span>
         </div>
+      ) : null}
+
+      {margin ? (
+        <MarginCapsule
+          margin={margin}
+          settings={costSettings}
+          hidden={hideInternal}
+          onToggle={toggleInternal}
+        />
       ) : null}
 
       {/* Untitled UI + IBM Carbon 顶部报价概览与 4 格 KPI 指标条 */}
@@ -872,13 +924,9 @@ export function QuoteEditor({
             <AlertTriangle className="size-4 shrink-0 text-warning" />
             <span>点位图中有 {pendingPoints} 个点位尚未匹配型号，未计入本报价</span>
           </span>
-          <button
-            type="button"
-            className="text-xs font-medium underline underline-offset-2"
-            onClick={() => switchToPointMap()}
-          >
+          <Link type="inherit" hasUnderline onClick={() => switchToPointMap()}>
             去点位图查看
-          </button>
+          </Link>
         </div>
       ) : null}
 
@@ -955,70 +1003,35 @@ export function QuoteEditor({
             </div>
             {floorGroups.length > 0 ? (
               <div className="flex flex-wrap items-center gap-2">
-                <div
-                  className="flex rounded-lg border border-border bg-muted/90 p-0.5"
+                <TabList
                   role="tablist"
                   aria-label="明细视图"
+                  className="workspace-view-tabs"
+                  size="sm"
+                  value={viewMode}
+                  onChange={(v) => setViewMode(v as 'floors' | 'summary')}
                 >
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    role="tab"
-                    aria-selected={viewMode === 'floors'}
-                    className={cn(
-                      'h-7 rounded-md px-2.5 text-xs',
-                      viewMode === 'floors' &&
-                        'bg-background font-semibold text-primary shadow-2xs',
-                    )}
-                    onClick={() => setViewMode('floors')}
+                  <Tab
+                    value="floors"
+                    panelId="quote-lines-panel"
                     icon={<Layers />}
-                    label={`按房间（${floorGroups.reduce((s, f) => s + f.rooms.length, 0)}）`}
+                    label="按房间"
+                    endContent={<span className="text-xs tabular-nums">{roomCount}</span>}
                   />
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    role="tab"
-                    aria-selected={viewMode === 'summary'}
-                    className={cn(
-                      'h-7 rounded-md px-2.5 text-xs',
-                      viewMode === 'summary' &&
-                        'bg-background font-semibold text-primary shadow-2xs',
-                    )}
-                    onClick={() => setViewMode('summary')}
-                    label="整单汇总"
-                  />
-                </div>
+                  <Tab value="summary" panelId="quote-lines-panel" label="整单汇总" />
+                </TabList>
                 {viewMode === 'floors' ? (
-                  <div
-                    className="flex rounded-lg border border-border bg-muted/90 p-0.5"
-                    role="radiogroup"
-                    aria-label="点位图显示"
+                  <SegmentedControl
+                    label="点位图显示"
+                    size="sm"
+                    layout="hug"
+                    value={planMode}
+                    onChange={(v) => setPlanMode(v as 'symbol' | 'product' | 'hide')}
                   >
-                    {(
-                      [
-                        ['symbol', '设备图标'],
-                        ['product', '产品图'],
-                        ['hide', '隐藏图纸'],
-                      ] as const
-                    ).map(([v, label]) => (
-                      <Button
-                        key={v}
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        role="radio"
-                        aria-checked={planMode === v}
-                        className={cn(
-                          'h-7 rounded-md px-2 text-xs',
-                          planMode === v && 'bg-background font-semibold text-primary shadow-2xs',
-                        )}
-                        onClick={() => setPlanMode(v)}
-                        label={label}
-                      />
-                    ))}
-                  </div>
+                    <SegmentedControlItem value="symbol" label="设备图标" />
+                    <SegmentedControlItem value="product" label="产品图" />
+                    <SegmentedControlItem value="hide" label="隐藏图纸" />
+                  </SegmentedControl>
                 ) : null}
               </div>
             ) : null}
@@ -1032,19 +1045,9 @@ export function QuoteEditor({
                   value={lineQuery}
                   onChange={(v) => setLineQuery(v)}
                   placeholder="筛选型号、SKU 或分类…"
-                  aria-label="筛选报价明细"
+                  hasClear
                   controlClassName="h-8 border-border bg-background pl-8 text-xs"
                 />
-                {lineQuery ? (
-                  <button
-                    type="button"
-                    onClick={() => setLineQuery('')}
-                    aria-label="清空筛选"
-                    className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                ) : null}
               </div>
             ) : null}
           </div>
@@ -1124,7 +1127,7 @@ export function QuoteEditor({
             </div>
           )}
         </div>
-        <div>
+        <div id="quote-lines-panel">
           {quote.items.length === 0 ? (
             <p className="px-6 py-10 text-center text-sm text-muted-foreground">
               还没有产品。可以在点位图里放置设备后重新生成，或点击「添加产品」。
@@ -1230,14 +1233,14 @@ export function QuoteEditor({
                                           {line.codes.map((code, idx) => (
                                             <span key={code}>
                                               {project ? (
-                                                <button
-                                                  type="button"
-                                                  title={`在点位图中定位并选中 ${code}`}
-                                                  className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+                                                <Link
+                                                  type="inherit"
+                                                  hasUnderline
+                                                  tooltip={`在点位图中定位并选中 ${code}`}
                                                   onClick={() => switchToPointMap({ point: code })}
                                                 >
                                                   {code}
-                                                </button>
+                                                </Link>
                                               ) : (
                                                 code
                                               )}
@@ -1267,6 +1270,9 @@ export function QuoteEditor({
                                       value={line.price}
                                       disabled={readOnly || !line.lineKey}
                                       label={`${room.name} ${line.name} 单价`}
+                                      manualPrice={Boolean(
+                                        line.productId && manualPriceIds.has(line.productId),
+                                      )}
                                       className={cn('h-6 w-20 px-1.5 text-xs', INLINE_NUM)}
                                       onChange={(n) =>
                                         line.lineKey && updateLine(line.lineKey, { price: n })
@@ -1380,6 +1386,7 @@ export function QuoteEditor({
                           (n) => updateLine(l.key, { price: n }),
                           `${l.name} 单价`,
                           'w-24',
+                          Boolean(l.product && manualPriceIds.has(l.product)),
                         )}
                         <span className="text-muted-foreground">×</span>
                         {numInput(
@@ -1534,6 +1541,7 @@ export function QuoteEditor({
                                 (n) => updateLine(l.key, { price: n }),
                                 `${l.name} 单价`,
                                 cn('ml-auto w-28', INLINE_NUM),
+                                Boolean(l.product && manualPriceIds.has(l.product)),
                               )}
                               {(() => {
                                 const originPrice = catalogPriceOf(l.product)
@@ -1652,9 +1660,13 @@ export function QuoteEditor({
                   { name: '强弱电布线技术交底', amount: 600 },
                   { name: '专属场景定制与一年上门维保', amount: 0 },
                 ].map((preset) => (
-                  <button
+                  <Button
                     key={preset.name}
                     type="button"
+                    variant="secondary"
+                    size="sm"
+                    icon={<Plus />}
+                    label={preset.name}
                     onClick={() =>
                       update({
                         fees: [
@@ -1663,10 +1675,7 @@ export function QuoteEditor({
                         ],
                       })
                     }
-                    className="rounded-md border border-border bg-subtle/80 px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/6 hover:text-primary"
-                  >
-                    + {preset.name}
-                  </button>
+                  />
                 ))}
               </div>
             ) : null}
@@ -1786,15 +1795,6 @@ export function QuoteEditor({
           </Field>
         </div>
       </AstryxCard>
-
-      {margin ? (
-        <MarginCapsule
-          margin={margin}
-          settings={costSettings}
-          hidden={hideInternal}
-          onToggle={toggleInternal}
-        />
-      ) : null}
     </section>
   )
 }
@@ -1908,7 +1908,7 @@ function MarginBreakdown({
   )
 }
 
-/** 右下角浮动的内部毛利胶囊：滚动到哪里都能看到毛利率；点开看明细；一键隐藏防止业主看到 */
+/** 窄屏放在顶栏下方，避免覆盖编辑控件；桌面继续浮动显示。 */
 function MarginCapsule({
   margin,
   settings,
@@ -1928,7 +1928,7 @@ function MarginCapsule({
         variant="secondary"
 
         onClick={onToggle}
-        className="fixed right-4 bottom-4 z-30 size-10 rounded-full bg-background shadow-lg md:right-6 md:bottom-6 print:hidden"
+        className="size-10 self-start rounded-full bg-background shadow-lg md:fixed md:right-6 md:bottom-6 md:z-30 print:hidden"
         aria-label="显示内部成本与毛利"
         tooltip="显示内部成本与毛利"
         label="显示内部成本与毛利"
@@ -1938,7 +1938,7 @@ function MarginCapsule({
     )
   }
   return (
-    <div className="fixed right-4 bottom-4 z-30 flex items-center rounded-full bg-foreground text-background shadow-xl md:right-6 md:bottom-6 print:hidden">
+    <div className="flex w-fit max-w-full items-center rounded-full bg-foreground text-background shadow-xl md:fixed md:right-6 md:bottom-6 md:z-30 print:hidden">
       <Popover
         label="内部毛利核算"
         // 原 `side="top" align="end"` → 官方 `placement` / `alignment`。

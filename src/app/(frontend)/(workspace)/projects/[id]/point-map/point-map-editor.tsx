@@ -50,8 +50,9 @@ import { Layout, LayoutContent, LayoutFooter } from '@astryxdesign/core/Layout'
 import type { StyleTransferHandoff } from '@/lib/style-templates'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { ScrollableArea } from '@astryxdesign/core/ScrollableArea'
+import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl'
 import { Selector } from '@astryxdesign/core/Selector'
-import { useSidebar } from '@/components/ui/sidebar'
+import { useWorkspaceChrome } from '@/components/workspace-chrome'
 import { Switch } from '@astryxdesign/core/Switch'
 import { Tab, TabList } from '@astryxdesign/core/TabList'
 import { useToast } from '@astryxdesign/core/Toast'
@@ -286,7 +287,7 @@ export function PointMapEditor({
   const { resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
-  const sidebar = useSidebar()
+  const { sidebarCollapsed, setSidebarCollapsed } = useWorkspaceChrome()
   const showToast = useToast()
   const board = useBoardHistory(() => decodeScene(initialScene))
   const { doc, commit } = board
@@ -572,13 +573,13 @@ export function PointMapEditor({
   }, [savedVersion, board.version])
 
   // 画布页默认收起左侧导航；离开时恢复
-  const sidebarRef = useRef(sidebar)
-  sidebarRef.current = sidebar
+  const chromeRef = useRef({ sidebarCollapsed, setSidebarCollapsed })
+  chromeRef.current = { sidebarCollapsed, setSidebarCollapsed }
   useEffect(() => {
-    const was = sidebarRef.current.open
-    if (was) sidebarRef.current.setOpen(false)
+    const wasExpanded = !chromeRef.current.sidebarCollapsed
+    if (wasExpanded) chromeRef.current.setSidebarCollapsed(true)
     return () => {
-      if (was) sidebarRef.current.setOpen(true)
+      if (wasExpanded) chromeRef.current.setSidebarCollapsed(false)
     }
   }, [])
 
@@ -1780,32 +1781,20 @@ export function PointMapEditor({
                   {scopedPoints.length} 个点位
                 </span>
               </div>
-              <div
-                className="grid grid-cols-4 gap-0.5 rounded-lg bg-muted p-0.5"
-                role="radiogroup"
-                aria-label="显示范围"
+              <SegmentedControl
+                label="显示范围"
+                value={scope}
+                onChange={(v: string) => {
+                  setScope(v as PointScope)
+                  setSelection(new Set())
+                }}
+                size="sm"
+                layout="fill"
               >
                 {POINT_SCOPES.map(({ value: v, label }) => (
-                  <button
-                    key={v}
-                    type="button"
-                    role="radio"
-                    aria-checked={scope === v}
-                    className={cn(
-                      'h-6 rounded-md px-1 text-[11px] whitespace-nowrap transition-all',
-                      scope === v
-                        ? 'bg-background font-semibold text-primary shadow-2xs'
-                        : 'text-muted-foreground hover:text-foreground',
-                    )}
-                    onClick={() => {
-                      setScope(v)
-                      setSelection(new Set())
-                    }}
-                  >
-                    {label}
-                  </button>
+                  <SegmentedControlItem key={v} value={v} label={label} />
                 ))}
-              </div>
+              </SegmentedControl>
               <p className="px-1 text-[11px] text-muted-foreground">
                 只显示所选专业的点位，同步报价也按这个范围。
               </p>
@@ -1822,14 +1811,13 @@ export function PointMapEditor({
               icon={<Minus />}
               size="sm"
             />
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => fitSheet(activeSheetId)}
-              title="图纸铺满画布（100%，Ctrl/⌘ + 0）"
-              className="h-7 min-w-11 rounded-md px-1 text-center text-xs font-medium text-fg-secondary tabular-nums transition-colors hover:bg-background hover:text-foreground"
-            >
-              {zoomPct}%
-            </button>
+              label={`${zoomPct}%`}
+              className="h-7 min-w-11 px-1 text-xs font-medium text-fg-secondary tabular-nums"
+            />
             <IconButton
               variant="ghost"
 

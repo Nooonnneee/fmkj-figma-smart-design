@@ -18,10 +18,19 @@ import { DeviceSymbol } from '@/components/device-symbol'
 import { LinkPending } from '@/components/link-pending'
 import { FilterTabs } from '@/components/filter-tabs'
 import { PageHeader } from '@/components/page-header'
-import { SearchSubmit } from '@/components/search-submit'
 import { Badge } from '@astryxdesign/core/Badge'
+import { Card } from '@astryxdesign/core/Card'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableHeaderCell,
+  TableRow,
+} from '@astryxdesign/core/Table'
 import { Button } from '@astryxdesign/core/Button'
 import { SearchField } from '@/components/search-field'
+import { SearchSubmit } from '@/components/search-submit'
 import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
 import { getBrands, getCatalog } from '@/lib/cached-data'
@@ -65,22 +74,9 @@ type Params = {
   sort?: string
   page?: string
 }
-const KEYS = [
-  'q',
-  'cat',
-  'type',
-  'brand',
-  'platform',
-  'min',
-  'max',
-  'status',
-  'img',
-  'sort',
-  'page',
-] as const
-
-const toNumber = (v: string) =>
-  v.trim() === '' ? null : Number.isFinite(Number(v)) ? Number(v) : null
+// 只保留**有 UI** 的筛选参数（issue #199）：type/min/max/img 曾只有过滤分支、
+// 侧栏没有任何输入控件，只能靠手改 URL 触发，属死参数，已删除。
+const KEYS = ['q', 'cat', 'brand', 'platform', 'status', 'sort', 'page'] as const
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<Params> }) {
   const user = await appAuth.getCurrentUser()
@@ -90,8 +86,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
     KEYS.map((k) => [k, typeof sp[k] === 'string' ? sp[k]!.trim() : '']),
   ) as Record<(typeof KEYS)[number], string>
   const brandSet = new Set(f.brand ? f.brand.split(',').filter(Boolean) : [])
-  const min = toNumber(f.min)
-  const max = toNumber(f.max)
   const [catalog, brands] = await Promise.all([getCatalog(), getBrands()])
 
   // 状态之外的条件先算一遍，用于给各筛选项计数
@@ -103,23 +97,17 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         : p.status === 'active',
   )
   const keyword = f.q.toLowerCase()
-  const match = (p: (typeof catalog)[number], skip?: 'cat' | 'type' | 'brand' | 'platform') =>
+  const match = (p: (typeof catalog)[number], skip?: 'cat' | 'brand' | 'platform') =>
     (!keyword ||
       (
         p.searchText ??
         `${p.name} ${p.sku} ${p.brand?.name ?? ''} ${p.description ?? ''}`.toLowerCase()
       ).includes(keyword)) &&
     (skip === 'cat' ||
-      skip === 'type' ||
       !f.cat ||
       (p.categorySlug ?? deviceTypeOf(p.deviceType)?.category) === f.cat) &&
-    (skip === 'type' || !f.type || p.deviceType === f.type) &&
     (skip === 'brand' || brandSet.size === 0 || (p.brand && brandSet.has(p.brand.slug))) &&
-    (skip === 'platform' || !f.platform || p.platforms.includes(f.platform)) &&
-    (min === null || p.price >= min) &&
-    (max === null || p.price <= max) &&
-    (f.img !== 'yes' || Boolean(p.image)) &&
-    (f.img !== 'no' || !p.image)
+    (skip === 'platform' || !f.platform || p.platforms.includes(f.platform))
 
   const products = byStatus.filter((p) => match(p))
   products.sort((a, b) =>
@@ -186,7 +174,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   const seg = (
     items: readonly { value: string; label: string }[],
     current: string,
-    key: 'status' | 'img',
+    key: 'status',
     label: string,
   ) => (
     <FilterTabs
@@ -245,11 +233,11 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           </>
         }
         actions={
-          <Form action="/products" className="flex flex-wrap items-center gap-2">
-            {KEYS.filter((k) => !['q', 'min', 'max', 'page'].includes(k) && f[k]).map((k) => (
+          <Form action="/products" className="flex w-full items-center gap-2">
+            {KEYS.filter((k) => !['q', 'page'].includes(k) && f[k]).map((k) => (
               <input key={k} type="hidden" name={k} value={f[k]} />
             ))}
-            <div className="relative w-full sm:w-72">
+            <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <SearchField
                 name="q"
@@ -259,7 +247,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                 controlClassName="pl-9"
               />
             </div>
-            <SearchSubmit variant="primary" />
+            <SearchSubmit />
           </Form>
         }
       />
@@ -290,7 +278,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             {section(
               '类别',
               <>
-                {navItem('全部类别', !f.cat, href({ cat: '', type: '' }))}
+                {navItem('全部类别', !f.cat, href({ cat: '' }))}
                 {DEVICE_GROUPS.map(({ category }) => {
                   const active = f.cat === category.slug
                   return (
@@ -304,7 +292,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                           <span className="truncate">{category.name}</span>
                         </>,
                         active,
-                        href({ cat: active ? '' : category.slug, type: '' }),
+                        href({ cat: active ? '' : category.slug }),
                       )}
                     </div>
                   )
@@ -364,63 +352,94 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             action={<Button variant="secondary" size="sm" href="/products" label="清除筛选" />}
           />
         ) : (
-          <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-            {shown.map((p) => {
-              const t = deviceTypeOf(p.deviceType)
-              const color = categoryOf(t?.category)?.color ?? '#525252'
-              return (
-                <li
-                  key={p.id}
-                  className="group flex flex-col overflow-hidden rounded-[var(--radius-container)] border bg-card transition-all hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  <div className="relative flex aspect-square w-full items-center justify-center bg-white p-5">
-                    {p.image?.url ? (
-                      <span className="relative block size-full">
-                        <Image
-                          src={p.image.url}
-                          alt={p.image.alt ?? p.name}
-                          fill
-                          sizes="(min-width: 1536px) 18vw, (min-width: 1280px) 22vw, (min-width: 768px) 30vw, 45vw"
-                          className="object-contain transition-transform duration-300 group-hover:scale-105"
-                        />
-                      </span>
-                    ) : (
-                      <ImageIcon className="size-8 text-muted-foreground/40" aria-hidden="true" />
-                    )}
-                    <span
-                      className="absolute top-2 left-2 flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-xs font-medium shadow-sm ring-1 ring-black/5"
-                      style={{ color: `color-mix(in oklch, ${color} 70%, black)` }}
-                    >
-                      <span className="size-3.5" style={{ color }}>
-                        <DeviceSymbol type={p.deviceType} />
-                      </span>
-                      {t?.name ?? '设备'}
-                    </span>
-                    {p.status === 'inactive' ? (
-                      <Badge
-                        variant="neutral"
-                        className="absolute top-2 right-2"
-                        label={'已下架'}
-                      />
-                    ) : null}
-                  </div>
-                  <div className="flex flex-1 flex-col justify-between gap-2 border-t p-3">
-                    <h2 className="truncate text-sm font-medium" title={p.name}>
-                      {p.name}
-                    </h2>
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="truncate text-xs text-muted-foreground">
-                        {p.brand?.name ?? p.sku}
-                      </span>
-                      <span className="shrink-0 text-sm font-semibold tabular-nums">
+          <Card
+            padding={0}
+            className="overflow-hidden border-0 bg-card text-sm text-card-foreground shadow-2xs ring-1 ring-border"
+          >
+            {/* Dense catalogue data: edge-to-edge rows with dividers, per the Astryx rule that
+                Card is for discrete items and dense data renders as rows. The product image stays
+                as the row's leading visual so the catalogue still reads visually. */}
+            <Table hasHover>
+              <TableHeader>
+                <TableRow isHeaderRow>
+                  <TableHeaderCell className="min-w-64 max-w-none pl-4 sm:pl-6">
+                    产品
+                  </TableHeaderCell>
+                  <TableHeaderCell className="hidden w-40 max-w-none whitespace-nowrap md:table-cell">
+                    设备类型
+                  </TableHeaderCell>
+                  <TableHeaderCell className="hidden w-32 max-w-none lg:table-cell">
+                    品牌
+                  </TableHeaderCell>
+                  <TableHeaderCell className="w-24 max-w-none whitespace-nowrap">
+                    状态
+                  </TableHeaderCell>
+                  <TableHeaderCell className="w-32 max-w-none whitespace-nowrap pr-4 text-right sm:pr-6">
+                    售价
+                  </TableHeaderCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {shown.map((p) => {
+                  const t = deviceTypeOf(p.deviceType)
+                  const color = categoryOf(t?.category)?.color ?? '#525252'
+                  return (
+                    <TableRow key={p.id}>
+                      <TableCell className="min-w-64 max-w-none py-2.5 pl-4 sm:pl-6">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <span className="relative block size-10 shrink-0 overflow-hidden rounded-md bg-white ring-1 ring-border">
+                            {p.image?.url ? (
+                              <Image
+                                src={p.image.url}
+                                alt={p.image.alt ?? p.name}
+                                fill
+                                sizes="40px"
+                                className="object-contain p-1"
+                              />
+                            ) : (
+                              <ImageIcon
+                                className="absolute inset-0 m-auto size-4 text-muted-foreground/50"
+                                aria-hidden="true"
+                              />
+                            )}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="truncate font-medium" title={p.name}>
+                              {p.name}
+                            </div>
+                            <div className="truncate text-xs text-muted-foreground">{p.sku}</div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden max-w-none whitespace-nowrap md:table-cell">
+                        <span className="inline-flex items-center gap-1.5 text-xs">
+                          <span className="size-3.5" style={{ color }}>
+                            <DeviceSymbol type={p.deviceType} />
+                          </span>
+                          {t?.name ?? '设备'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="hidden max-w-none whitespace-nowrap lg:table-cell">
+                        <span className="text-xs text-muted-foreground">
+                          {p.brand?.name ?? '—'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="w-24 max-w-none whitespace-nowrap">
+                        {p.status === 'inactive' ? (
+                          <Badge variant="neutral" label="已下架" />
+                        ) : (
+                          <Badge variant="neutral" label="在售" />
+                        )}
+                      </TableCell>
+                      <TableCell className="w-32 max-w-none whitespace-nowrap pr-4 text-right font-medium tabular-nums sm:pr-6">
                         {p.price > 0 ? yuan(p.price) : '—'}
-                      </span>
-                    </div>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </Card>
         )}
 
         {pages > 1 ? (
@@ -433,15 +452,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                 icon={<ChevronLeft />}
                 label="上一页"
               />
-            ) : (
-              <Button
-                variant="secondary"
-                size="sm"
-                isDisabled
-                icon={<ChevronLeft />}
-                label="上一页"
-              />
-            )}
+            ) : null}
             <span className="px-2 text-sm text-muted-foreground tabular-nums">
               {page} / {pages}
             </span>
@@ -453,15 +464,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                 icon={<ChevronRight />}
                 label="下一页"
               />
-            ) : (
-              <Button
-                variant="secondary"
-                size="sm"
-                isDisabled
-                icon={<ChevronRight />}
-                label="下一页"
-              />
-            )}
+            ) : null}
           </nav>
         ) : null}
       </ProductsResizableLayout>

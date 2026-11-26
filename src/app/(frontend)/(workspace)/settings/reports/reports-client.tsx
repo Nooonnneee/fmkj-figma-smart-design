@@ -1,7 +1,7 @@
 'use client'
 
 import { EmptyState } from '@/components/empty-state'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -27,23 +27,18 @@ import { Layout, LayoutContent, LayoutHeader } from '@astryxdesign/core/Layout'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { Tab, TabList } from '@astryxdesign/core/TabList'
 import { useToast } from '@astryxdesign/core/Toast'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableHeaderCell,
+  TableRow,
+} from '@astryxdesign/core/Table'
 import type { CustomerUsageReport } from '@/lib/usage-diagnostics'
 import { cn } from '@/lib/utils'
 
-function formatDateTime(iso: string) {
-  if (!iso || iso.startsWith('1970-')) return '暂无记录'
-  try {
-    const d = new Date(iso)
-    return d.toLocaleString('zh-CN', {
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  } catch {
-    return iso
-  }
-}
+import { formatDateTime } from './format-date-time'
 
 function methodLabel(m?: string) {
   switch (m) {
@@ -84,7 +79,7 @@ function methodLabel(m?: string) {
 export function UsageReportsClient({ report }: { report: CustomerUsageReport }) {
   const router = useRouter()
   const showToast = useToast()
-  const [refreshing, setRefreshing] = useState(false)
+  const [refreshing, startRefresh] = useTransition()
   const [copiedSummary, setCopiedSummary] = useState(false)
   const [activeTab, setActiveTab] = useState('customers')
   const [customerQuery, setCustomerQuery] = useState('')
@@ -103,12 +98,6 @@ export function UsageReportsClient({ report }: { report: CustomerUsageReport }) 
     if (!onlyZeroSheet) return report.sheetInspections
     return report.sheetInspections.filter((s) => s.pointCount === 0)
   }, [report.sheetInspections, onlyZeroSheet])
-
-  function handleRefresh() {
-    setRefreshing(true)
-    router.refresh()
-    setTimeout(() => setRefreshing(false), 600)
-  }
 
   function exportCsv() {
     const headers = [
@@ -220,8 +209,8 @@ export function UsageReportsClient({ report }: { report: CustomerUsageReport }) 
           <Button
             variant="secondary"
             size="sm"
-            onClick={handleRefresh}
-            isDisabled={refreshing}
+            onClick={() => startRefresh(() => router.refresh())}
+            isLoading={refreshing}
             icon={<RefreshCw />}
             label="刷新数据"
           />
@@ -236,7 +225,8 @@ export function UsageReportsClient({ report }: { report: CustomerUsageReport }) 
         </div>
       </div>
 
-      {/* 4 张核心运维指标卡 */}
+      {/* 4 项核心运维指标：同一行内并排的度量块（官方 dashboard 的 headline band），
+          用 Section 承载而不是四张独立卡片 —— 它们不是可独立操作的对象。 */}
       <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
         <AstryxCard
           padding={0}
@@ -479,86 +469,96 @@ export function UsageReportsClient({ report }: { report: CustomerUsageReport }) 
                 }
                 content={
                   <LayoutContent padding={0} isScrollable={false}>
-                    <div className="py-5">
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                          <thead className="border-y bg-muted/50 text-muted-foreground">
-                            <tr>
-                              <th className="px-4 py-2.5 font-medium">客户 / 账号</th>
-                              <th className="px-3 py-2.5 text-right font-medium">
-                                剩余 / 已用积分
-                              </th>
-                              <th className="px-3 py-2.5 text-right font-medium">项目数</th>
-                              <th className="px-3 py-2.5 text-right font-medium">户型图 / 点位</th>
-                              <th className="px-3 py-2.5 text-right font-medium">报价 / 合同</th>
-                              <th className="px-3 py-2.5 text-right font-medium">AI 对话 / 消息</th>
-                              <th className="px-4 py-2.5 text-right font-medium">最近活跃</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y">
-                            {filteredCustomers.length === 0 ? (
-                              <tr>
-                                <td
-                                  colSpan={8}
-                                  className="px-4 py-8 text-center text-muted-foreground"
-                                >
-                                  没有匹配的客户记录
-                                </td>
-                              </tr>
-                            ) : (
-                              filteredCustomers.map((c) => (
-                                <tr key={c.userId} className="hover:bg-muted/35">
-                                  <td className="px-4 py-2.5">
-                                    <div className="font-medium text-foreground">{c.name}</div>
-                                    <div className="text-[11px] text-muted-foreground">
+                    <div className="min-w-0 [&_table]:min-w-3xl">
+                      <Table aria-label="客户使用明细" density="compact" hasHover>
+                        <TableHeader>
+                          <TableRow isHeaderRow>
+                            <TableHeaderCell className="w-44 min-w-44 max-w-none pl-4 sm:pl-6">
+                              客户 / 账号
+                            </TableHeaderCell>
+                            <TableHeaderCell className="w-32 max-w-none text-right">
+                              剩余 / 已用积分
+                            </TableHeaderCell>
+                            <TableHeaderCell className="w-20 max-w-none text-right">
+                              项目数
+                            </TableHeaderCell>
+                            <TableHeaderCell className="w-28 max-w-none text-right">
+                              户型图 / 点位
+                            </TableHeaderCell>
+                            <TableHeaderCell className="w-24 max-w-none text-right">
+                              报价 / 合同
+                            </TableHeaderCell>
+                            <TableHeaderCell className="w-28 max-w-none text-right">
+                              AI 对话 / 消息
+                            </TableHeaderCell>
+                            <TableHeaderCell className="w-28 max-w-none whitespace-nowrap pr-4 text-right sm:pr-6">
+                              最近活跃
+                            </TableHeaderCell>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredCustomers.length === 0 ? (
+                            <TableRow>
+                              <TableCell
+                                colSpan={7}
+                                className="py-8 text-center text-muted-foreground"
+                              >
+                                没有匹配的客户记录
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredCustomers.map((c) => (
+                              <TableRow key={c.userId}>
+                                <TableCell className="w-44 min-w-44 max-w-none pl-4 sm:pl-6">
+                                  <div className="min-w-0">
+                                    <div className="truncate font-medium text-foreground">
+                                      {c.name}
+                                    </div>
+                                    <div className="truncate text-[11px] text-muted-foreground">
                                       {c.email}
                                       {c.phone ? ` · ${c.phone}` : ''}
                                     </div>
-                                  </td>
-                                  <td className="px-3 py-2.5 text-right tabular-nums">
-                                    <span
-                                      className={cn(
-                                        'font-medium',
-                                        c.aiCredits < 5 && 'text-destructive',
-                                      )}
-                                    >
-                                      {c.aiCredits}
-                                    </span>
-                                    <span className="text-muted-foreground">
-                                      {' '}
-                                      / {c.creditsConsumed}
-                                    </span>
-                                  </td>
-                                  <td className="px-3 py-2.5 text-right font-medium tabular-nums">
-                                    {c.projectCount}
-                                  </td>
-                                  <td className="px-3 py-2.5 text-right tabular-nums">
-                                    {c.sheetCount} 张{' '}
-                                    <span className="text-muted-foreground">
-                                      ({c.pointCount} 点)
-                                    </span>
-                                  </td>
-                                  <td className="px-3 py-2.5 text-right tabular-nums">
-                                    {c.quoteCount}{' '}
-                                    <span className="text-muted-foreground">
-                                      / {c.contractCount}
-                                    </span>
-                                  </td>
-                                  <td className="px-3 py-2.5 text-right tabular-nums">
-                                    {c.conversationCount}{' '}
-                                    <span className="text-muted-foreground">
-                                      ({c.messageCount} 条)
-                                    </span>
-                                  </td>
-                                  <td className="px-4 py-2.5 text-right text-muted-foreground tabular-nums">
-                                    {formatDateTime(c.lastActiveAt)}
-                                  </td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="w-32 max-w-none text-right tabular-nums">
+                                  <span
+                                    className={cn(
+                                      'font-medium',
+                                      c.aiCredits < 5 && 'text-destructive',
+                                    )}
+                                  >
+                                    {c.aiCredits}
+                                  </span>
+                                  <span className="text-muted-foreground">
+                                    {' '}
+                                    / {c.creditsConsumed}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="w-20 max-w-none text-right font-medium tabular-nums">
+                                  {c.projectCount}
+                                </TableCell>
+                                <TableCell className="w-28 max-w-none text-right tabular-nums">
+                                  {c.sheetCount} 张{' '}
+                                  <span className="text-muted-foreground">({c.pointCount} 点)</span>
+                                </TableCell>
+                                <TableCell className="w-24 max-w-none text-right tabular-nums">
+                                  {c.quoteCount}{' '}
+                                  <span className="text-muted-foreground">/ {c.contractCount}</span>
+                                </TableCell>
+                                <TableCell className="w-28 max-w-none text-right tabular-nums">
+                                  {c.conversationCount}{' '}
+                                  <span className="text-muted-foreground">
+                                    ({c.messageCount} 条)
+                                  </span>
+                                </TableCell>
+                                <TableCell className="w-28 max-w-none whitespace-nowrap pr-4 text-right text-muted-foreground tabular-nums sm:pr-6">
+                                  {formatDateTime(c.lastActiveAt)}
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
                     </div>
                   </LayoutContent>
                 }
@@ -616,16 +616,17 @@ export function UsageReportsClient({ report }: { report: CustomerUsageReport }) 
                               className="flex flex-col justify-between rounded-[var(--radius-container)] border bg-card p-3 shadow-2xs"
                             >
                               <div className="flex gap-3">
-                                <button
+                                <Button
                                   type="button"
+                                  variant="ghost"
+                                  label={`放大查看图纸：${sh.sheetName}`}
                                   onClick={() =>
                                     setPreviewImg({
                                       url: sh.url,
                                       title: `${sh.projectName} · ${sh.sheetName}`,
                                     })
                                   }
-                                  className="group relative h-20 w-28 shrink-0 overflow-hidden rounded-lg border bg-muted"
-                                  title="点击放大查看客户上传的原图"
+                                  className="group relative h-20 w-28 shrink-0 overflow-hidden rounded-lg border bg-muted p-0 [&_img]:block"
                                 >
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img
@@ -633,7 +634,7 @@ export function UsageReportsClient({ report }: { report: CustomerUsageReport }) 
                                     alt={sh.sheetName}
                                     className="size-full object-cover transition-transform group-hover:scale-105"
                                   />
-                                </button>
+                                </Button>
                                 <div className="min-w-0 flex-1 space-y-1">
                                   <div className="flex items-center justify-between gap-1">
                                     <span className="truncate text-xs font-semibold text-foreground">
@@ -707,51 +708,59 @@ export function UsageReportsClient({ report }: { report: CustomerUsageReport }) 
                   }
                   content={
                     <LayoutContent padding={0} isScrollable={false}>
-                      <div className="py-5">
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left text-xs">
-                            <thead className="border-y bg-muted/50 text-muted-foreground">
-                              <tr>
-                                <th className="px-4 py-2 font-medium">时间</th>
-                                <th className="px-3 py-2 font-medium">上传文件名</th>
-                                <th className="px-3 py-2 font-medium">识别通道</th>
-                                <th className="px-3 py-2 text-right font-medium">
-                                  开关 / 灯具 / 区域
-                                </th>
-                                <th className="px-4 py-2 text-right font-medium">识别耗时</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                              {report.uploadLogs.slice(0, 15).map((u) => {
-                                const mb = methodLabel(u.method)
-                                return (
-                                  <tr key={u.id}>
-                                    <td className="px-4 py-2 text-muted-foreground tabular-nums">
-                                      {formatDateTime(u.createdAt)}
-                                    </td>
-                                    <td className="px-3 py-2 font-medium">{u.fileName}</td>
-                                    <td className="px-3 py-2">
-                                      <span
-                                        className={cn(
-                                          'rounded border px-1.5 py-0.2 text-[10px]',
-                                          mb.cls,
-                                        )}
-                                      >
-                                        {mb.text}
-                                      </span>
-                                    </td>
-                                    <td className="px-3 py-2 text-right tabular-nums">
-                                      开关 {u.switches} · 灯具 {u.lights} · 区域 {u.areas}
-                                    </td>
-                                    <td className="px-4 py-2 text-right text-muted-foreground tabular-nums">
-                                      {u.durationMs} ms
-                                    </td>
-                                  </tr>
-                                )
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
+                      <div className="min-w-0 [&_table]:min-w-3xl">
+                        <Table aria-label="上传识别日志" density="compact" hasHover>
+                          <TableHeader>
+                            <TableRow isHeaderRow>
+                              <TableHeaderCell className="w-32 max-w-none pl-4 sm:pl-6">
+                                时间
+                              </TableHeaderCell>
+                              <TableHeaderCell className="w-48 max-w-none">
+                                上传文件名
+                              </TableHeaderCell>
+                              <TableHeaderCell className="w-32 max-w-none">
+                                识别通道
+                              </TableHeaderCell>
+                              <TableHeaderCell className="w-36 max-w-none text-right">
+                                开关 / 灯具 / 区域
+                              </TableHeaderCell>
+                              <TableHeaderCell className="w-24 max-w-none whitespace-nowrap pr-4 text-right sm:pr-6">
+                                识别耗时
+                              </TableHeaderCell>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {report.uploadLogs.slice(0, 15).map((u) => {
+                              const mb = methodLabel(u.method)
+                              return (
+                                <TableRow key={u.id}>
+                                  <TableCell className="w-32 max-w-none text-muted-foreground tabular-nums pl-4 sm:pl-6">
+                                    {formatDateTime(u.createdAt)}
+                                  </TableCell>
+                                  <TableCell className="w-48 max-w-none font-medium">
+                                    {u.fileName}
+                                  </TableCell>
+                                  <TableCell className="w-32 max-w-none">
+                                    <span
+                                      className={cn(
+                                        'rounded border px-1.5 py-0.2 text-[10px]',
+                                        mb.cls,
+                                      )}
+                                    >
+                                      {mb.text}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="w-36 max-w-none text-right tabular-nums">
+                                    开关 {u.switches} · 灯具 {u.lights} · 区域 {u.areas}
+                                  </TableCell>
+                                  <TableCell className="w-24 max-w-none whitespace-nowrap pr-4 text-right text-muted-foreground tabular-nums sm:pr-6">
+                                    {u.durationMs} ms
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })}
+                          </TableBody>
+                        </Table>
                       </div>
                     </LayoutContent>
                   }
@@ -882,65 +891,73 @@ export function UsageReportsClient({ report }: { report: CustomerUsageReport }) 
                 }
                 content={
                   <LayoutContent padding={0} isScrollable={false}>
-                    <div className="py-5">
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                          <thead className="border-y bg-muted/50 text-muted-foreground">
-                            <tr>
-                              <th className="px-4 py-2.5 font-medium">时间</th>
-                              <th className="px-3 py-2.5 font-medium">客户</th>
-                              <th className="px-3 py-2.5 font-medium">对话标题 / 关联项目</th>
-                              <th className="px-3 py-2.5 font-medium">调度模型</th>
-                              <th className="px-3 py-2.5 text-right font-medium">
-                                消息 / 工具 / 积分
-                              </th>
-                              <th className="px-4 py-2.5 font-medium">AI 最后回复摘要</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y">
-                            {report.recentConversations.length === 0 ? (
-                              <tr>
-                                <td
-                                  colSpan={6}
-                                  className="px-4 py-8 text-center text-muted-foreground"
-                                >
-                                  暂无对话记录
-                                </td>
-                              </tr>
-                            ) : (
-                              report.recentConversations.map((c) => (
-                                <tr key={c.id} className="hover:bg-muted/35">
-                                  <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground tabular-nums">
-                                    {formatDateTime(c.updatedAt)}
-                                  </td>
-                                  <td className="px-3 py-2.5 font-medium whitespace-nowrap">
-                                    {c.userName}
-                                  </td>
-                                  <td className="px-3 py-2.5">
-                                    <div className="max-w-48 truncate font-medium">{c.title}</div>
-                                    {c.projectName ? (
-                                      <div className="max-w-48 truncate text-[11px] text-muted-foreground">
-                                        项目：{c.projectName}
-                                      </div>
-                                    ) : null}
-                                  </td>
-                                  <td className="px-3 py-2.5 whitespace-nowrap">
-                                    <span className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
-                                      {c.model}
-                                    </span>
-                                  </td>
-                                  <td className="px-3 py-2.5 text-right whitespace-nowrap tabular-nums">
-                                    {c.messageCount} 条 · {c.toolCount} 工具 · {c.totalCost} 分
-                                  </td>
-                                  <td className="max-w-xs truncate px-4 py-2.5 text-muted-foreground">
-                                    {c.lastAssistantPreview || '—'}
-                                  </td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
+                    <div className="min-w-0 [&_table]:min-w-3xl">
+                      <Table aria-label="AI 对话会话" density="compact" hasHover>
+                        <TableHeader>
+                          <TableRow isHeaderRow>
+                            <TableHeaderCell className="w-32 max-w-none pl-4 sm:pl-6">
+                              时间
+                            </TableHeaderCell>
+                            <TableHeaderCell className="w-24 max-w-none">客户</TableHeaderCell>
+                            <TableHeaderCell className="min-w-[200px] max-w-none">
+                              对话标题 / 关联项目
+                            </TableHeaderCell>
+                            <TableHeaderCell className="w-24 max-w-none text-center">
+                              调度模型
+                            </TableHeaderCell>
+                            <TableHeaderCell className="w-32 max-w-none text-right">
+                              消息 / 工具 / 积分
+                            </TableHeaderCell>
+                            <TableHeaderCell className="w-56 max-w-none pr-4 sm:pr-6">
+                              AI 最后回复摘要
+                            </TableHeaderCell>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {report.recentConversations.length === 0 ? (
+                            <TableRow>
+                              <TableCell
+                                colSpan={6}
+                                className="py-8 text-center text-muted-foreground"
+                              >
+                                暂无对话记录
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            report.recentConversations.map((c) => (
+                              <TableRow key={c.id}>
+                                <TableCell className="w-32 max-w-none whitespace-nowrap text-muted-foreground tabular-nums pl-4 sm:pl-6">
+                                  {formatDateTime(c.updatedAt)}
+                                </TableCell>
+                                <TableCell className="w-24 max-w-none font-medium">
+                                  {c.userName}
+                                </TableCell>
+                                <TableCell className="w-64 min-w-64 max-w-0">
+                                  <div className="truncate font-medium">{c.title}</div>
+                                  {c.projectName ? (
+                                    <div className="truncate text-[11px] text-muted-foreground">
+                                      项目：{c.projectName}
+                                    </div>
+                                  ) : null}
+                                </TableCell>
+                                <TableCell className="w-24 max-w-none text-center">
+                                  <span className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
+                                    {c.model}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="w-32 max-w-none text-right whitespace-nowrap tabular-nums">
+                                  {c.messageCount} 条 · {c.toolCount} 工具 · {c.totalCost} 分
+                                </TableCell>
+                                <TableCell className="w-56 max-w-0 pr-4 text-muted-foreground sm:pr-6">
+                                  {/* 摘要上游给的是 100 字：单元格必须留 Astryx 的 max-width:0，
+                                      再在内部 truncate，否则整张表会被撑宽（实测 792 → 1782px）。 */}
+                                  <div className="truncate">{c.lastAssistantPreview || '—'}</div>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
                     </div>
                   </LayoutContent>
                 }

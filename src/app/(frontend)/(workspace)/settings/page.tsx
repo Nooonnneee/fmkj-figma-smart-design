@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { Activity, ArrowRight } from 'lucide-react'
 
 import { PageHeader } from '@/components/page-header'
+import { Button } from '@astryxdesign/core/Button'
+import { Section } from '@astryxdesign/core/Section'
 import { allStyles, availableStyles, DOC_KIND_LIST, DOC_KINDS } from '@/documents/registry'
 import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
@@ -66,20 +68,21 @@ export default async function SettingsPage() {
       */}
       <nav
         aria-label="设置分区"
-        className="sticky top-12 z-10 -mx-1 flex flex-wrap items-center gap-1 rounded-[var(--radius-container)] border bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+        className="sticky top-0 z-10 -mx-1 flex flex-wrap items-center gap-1 rounded-[var(--radius-container)] border bg-background/95 px-1 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80"
       >
         {[
           { href: '#settings-appearance', label: '外观' },
           { href: '#settings-brand', label: '品牌与联系' },
           { href: '#settings-cost', label: '成本与毛利' },
         ].map((item) => (
-          <a
+          <Button
             key={item.href}
             href={item.href}
-            className="rounded-[var(--radius-inner)] px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            {item.label}
-          </a>
+            variant="ghost"
+            size="sm"
+            label={item.label}
+            className="text-muted-foreground hover:text-foreground"
+          />
         ))}
       </nav>
       {operator ? (
@@ -101,10 +104,11 @@ export default async function SettingsPage() {
           <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
         </Link>
       ) : null}
-      <div id="settings-appearance" className="scroll-mt-24">
+      {/* 三个设置分组用官方 Section（页面区域），不再自己拼 div + Card。 */}
+      <Section id="settings-appearance" variant="transparent" padding={0} className="scroll-mt-24">
         <AppearanceSettings />
-      </div>
-      <div id="settings-brand" className="scroll-mt-24">
+      </Section>
+      <Section id="settings-brand" variant="transparent" padding={0} className="scroll-mt-24">
         <CompanyForm
           initial={{
             name: company.name ?? '',
@@ -143,10 +147,10 @@ export default async function SettingsPage() {
             defaults: company.documentDefaults,
           }}
         />
-      </div>
-      <div id="settings-cost" className="scroll-mt-24">
+      </Section>
+      <Section id="settings-cost" variant="transparent" padding={0} className="scroll-mt-24">
         <CostSettingsCard initial={costSettings} brands={costBrands} />
-      </div>
+      </Section>
     </section>
   )
 }

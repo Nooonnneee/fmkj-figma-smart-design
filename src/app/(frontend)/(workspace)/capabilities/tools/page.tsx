@@ -1,7 +1,8 @@
 import Image from 'next/image'
 import { ArrowLeft, ArrowUpRight, Blocks } from 'lucide-react'
 
-import { EmptyState } from '@/components/empty-state'
+import { Center } from '@astryxdesign/core/Center'
+import { EmptyState } from '@astryxdesign/core/EmptyState'
 import { HoverPrefetchLink } from '@/components/hover-prefetch-link'
 import { PageHeader } from '@/components/page-header'
 import { Button } from '@astryxdesign/core/Button'
@@ -79,7 +80,12 @@ export default async function PluginToolsPage() {
       </div>
       {tools.length === 0 ? (
         <EmptyState
-          icon={<Blocks className="size-5" />}
+          className="min-h-42.5 rounded-2xl border border-dashed border-workspace-outline bg-workspace-paper dark:border-workspace-outline-dark dark:bg-workspace-panel-dark"
+          icon={
+            <Center className="size-10 rounded-full bg-workspace-icon-surface dark:bg-workspace-icon-surface-dark">
+              <Blocks className="size-5" />
+            </Center>
+          }
           title="还没有可用的工具"
           description="启用能力中心的插件后，工具会自动出现在这里。"
         />

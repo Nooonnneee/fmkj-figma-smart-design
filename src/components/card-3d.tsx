@@ -14,7 +14,7 @@
  * three 依赖 window/WebGL，服务端渲染会直接崩。它自己带 'use client'
  * 只是为了让事件处理合法，不代表能进 SSR 图。
  */
-import { useEffect, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
@@ -38,15 +38,39 @@ export type Card3DProps = {
   /** 侧边颜色：跟着当前面走，深色卡配深侧边 */
   edgeColor?: string
   className?: string
+  spinning: boolean
+  onSpinningChange: (spinning: boolean) => void
+  reduceMotion: boolean
+  /** WebGL 初始化失败时通知宿主（宿主应回落到平面预览，不能挡住导出） */
+  onError?: (message: string) => void
 }
 
-export function Card3D({ frontSrc, backSrc, edgeColor = '#1B1E38', className }: Card3DProps) {
+export type Card3DHandle = {
+  /** 转到指定面（0 / π），带 260ms 缓动；同时暂停自转 */
+  flipTo: (side: 'front' | 'back') => void
+  /** 回到初始斜角 */
+  reset: () => void
+}
+
+export const Card3D = forwardRef<Card3DHandle, Card3DProps>(function Card3D(
+  {
+    frontSrc,
+    backSrc,
+    edgeColor = '#1B1E38',
+    className,
+    spinning,
+    onSpinningChange,
+    reduceMotion,
+    onError,
+  },
+  ref,
+) {
   const hostRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
-  const [spinning, setSpinning] = useState(true)
-  // 用 ref 让按钮改状态时不必重建场景
-  const spinRef = useRef(true)
+  // 用 ref 同步工作台与画布的自转状态，不必重建场景。
+  const spinRef = useRef(spinning)
   const resetRef = useRef<() => void>(() => {})
+  const flipRef = useRef<(side: 'front' | 'back') => void>(() => {})
 
   useEffect(() => {
     spinRef.current = spinning
@@ -60,7 +84,9 @@ export function Card3D({ frontSrc, backSrc, edgeColor = '#1B1E38', className }: 
     try {
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'WebGL 初始化失败')
+      const msg = e instanceof Error ? e.message : 'WebGL 初始化失败'
+      setError(msg)
+      onError?.(msg)
       return
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
@@ -84,8 +110,9 @@ export function Card3D({ frontSrc, backSrc, edgeColor = '#1B1E38', className }: 
     scene.add(rim)
 
     const card = new THREE.Group()
-    // 微微前倾，正好露出一点厚度，不是一张死平的纸
+    // 初始斜角：正面看得到右侧厚度，不是一张死平的纸
     card.rotation.x = -0.055
+    card.rotation.y = 0.46
     scene.add(card)
 
     const geometry = new THREE.BoxGeometry(CARD_W3, CARD_H3, CARD_D)
@@ -151,13 +178,26 @@ export function Card3D({ frontSrc, backSrc, edgeColor = '#1B1E38', className }: 
     controls.rotateSpeed = 0.85
     controls.target.set(0, 0, 0)
 
+    /** 目标 Y 角（正面 0 / 背面 π），用于 flipTo 的缓动 */
+    let targetY: number | null = null
     const reset = () => {
       camera.position.set(0, 0.12, 3.35)
       controls.target.set(0, 0, 0)
-      card.rotation.y = 0
+      card.rotation.y = 0.46
+      controls.autoRotate = false
+      spinRef.current = false
+      onSpinningChange(false)
+      targetY = null
       controls.update()
     }
     resetRef.current = reset
+    flipRef.current = (side) => {
+      targetY = side === 'front' ? 0 : Math.PI
+      card.rotation.x = -0.055
+      controls.autoRotate = false
+      spinRef.current = false
+      onSpinningChange(false)
+    }
 
     // 拖拽期间暂停自转，松手 1.6s 后恢复，避免「刚拖住就被转走」
     let resumeTimer: number | undefined
@@ -176,12 +216,6 @@ export function Card3D({ frontSrc, backSrc, edgeColor = '#1B1E38', className }: 
 
     controls.autoRotate = spinRef.current
     controls.autoRotateSpeed = AUTO_ROTATE_SPEED
-
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (reduceMotion) {
-      controls.autoRotate = false
-      setSpinning(false)
-    }
 
     const resize = () => {
       const w = host.clientWidth || 1
@@ -221,7 +255,7 @@ export function Card3D({ frontSrc, backSrc, edgeColor = '#1B1E38', className }: 
     renderer.setAnimationLoop(() => {
       const dt = Math.min(clock.getDelta(), 0.05)
       if (!visible) return
-      const isSpinning = spinRef.current && !reduceMotion
+      const isSpinning = spinRef.current
       if (isSpinning) {
         bobPhase += dt
         card.position.y = Math.sin(bobPhase * 0.9) * BOB
@@ -234,6 +268,16 @@ export function Card3D({ frontSrc, backSrc, edgeColor = '#1B1E38', className }: 
         card.rotation.x = -0.055
         shadow.scale.setScalar(1)
         settled = true
+      }
+      if (targetY !== null) {
+        // 260ms 缓动到目标面（余弦缓出）
+        const diff = targetY - card.rotation.y
+        if (Math.abs(diff) < 0.004) {
+          card.rotation.y = targetY
+          targetY = null
+        } else {
+          card.rotation.y += diff * 0.22
+        }
       }
       controls.autoRotate = isSpinning
       controls.update(dt)
@@ -261,7 +305,16 @@ export function Card3D({ frontSrc, backSrc, edgeColor = '#1B1E38', className }: 
       renderer.domElement.remove()
     }
     // 贴图变了要重建材质；场景很小，重建代价可忽略
-  }, [frontSrc, backSrc, edgeColor])
+  }, [frontSrc, backSrc, edgeColor, onError, onSpinningChange])
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      flipTo: (side) => flipRef.current(side),
+      reset: () => resetRef.current(),
+    }),
+    [],
+  )
 
   return (
     <div className={cn('relative', className)}>
@@ -276,44 +329,8 @@ export function Card3D({ frontSrc, backSrc, edgeColor = '#1B1E38', className }: 
             3D 预览不可用：{error}
           </p>
         ) : null}
-        {/* 控制条放画布外：窄屏时画布本身很矮，叠在上面会盖住卡片 */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 hidden justify-center gap-1.5 pb-2.5 sm:flex">
-          <button
-            type="button"
-            onClick={() => setSpinning((v) => !v)}
-            className="pointer-events-auto cursor-pointer rounded-full border border-border bg-background/90 px-2.5 py-0.5 text-[11px] whitespace-nowrap text-foreground backdrop-blur hover:bg-background"
-          >
-            {spinning ? '暂停旋转' : '继续旋转'}
-          </button>
-          <button
-            type="button"
-            onClick={() => resetRef.current()}
-            className="pointer-events-auto cursor-pointer rounded-full border border-border bg-background/90 px-2.5 py-0.5 text-[11px] whitespace-nowrap text-foreground backdrop-blur hover:bg-background"
-          >
-            重置视角
-          </button>
-          <span className="rounded-full bg-background/70 px-2 py-0.5 text-[11px] whitespace-nowrap text-muted-foreground backdrop-blur">
-            拖动旋转 · 滚轮缩放
-          </span>
-        </div>
       </div>
-      {/* 窄屏：控制条移到画布下方，不遮挡卡片 */}
-      <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 sm:hidden">
-        <button
-          type="button"
-          onClick={() => setSpinning((v) => !v)}
-          className="cursor-pointer rounded-full border border-border bg-background px-2.5 py-0.5 text-[11px] whitespace-nowrap text-foreground hover:bg-muted"
-        >
-          {spinning ? '暂停旋转' : '继续旋转'}
-        </button>
-        <button
-          type="button"
-          onClick={() => resetRef.current()}
-          className="cursor-pointer rounded-full border border-border bg-background px-2.5 py-0.5 text-[11px] whitespace-nowrap text-foreground hover:bg-muted"
-        >
-          重置视角
-        </button>
-      </div>
+      {/* Controls live in the studio toolbar so the canvas never has a second, clipped copy. */}
     </div>
   )
-}
+})

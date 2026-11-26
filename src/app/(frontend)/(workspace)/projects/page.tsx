@@ -1,13 +1,11 @@
-import { StatTile } from '@/components/stat-tile'
 import Form from 'next/form'
 import Link from 'next/link'
-import { FolderKanban, Plus, Search, Sparkles } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FolderKanban, Plus, Search, Sparkles } from 'lucide-react'
 import type { Where } from 'payload'
 
 import { EmptyState } from '@/components/empty-state'
 import { FilterTabs } from '@/components/filter-tabs'
 import { PageHeader } from '@/components/page-header'
-import { SearchSubmit } from '@/components/search-submit'
 import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
 import { Card } from '@astryxdesign/core/Card'
@@ -20,9 +18,11 @@ import {
   TableRow,
 } from '@astryxdesign/core/Table'
 import { SearchField } from '@/components/search-field'
+import { SearchSubmit } from '@/components/search-submit'
 import { relId } from '@/lib/access'
 import { appAuth } from '@/lib/app-auth'
 import { pageTitle } from '@/lib/brand'
+import { clampPage, PAGE_SIZE } from '@/lib/projects-pagination'
 import { getPayloadClient } from '@/lib/payload'
 import { countScenePoints } from '@/lib/point-count'
 import { fmtDate } from '@/lib/projects'
@@ -42,11 +42,11 @@ const isDemo = isDemoProjectName
 export default async function ProjectsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; view?: string }>
+  searchParams: Promise<{ q?: string; view?: string; page?: string }>
 }) {
   const user = await appAuth.getCurrentUser()
   if (!user) return redirectToLogin()
-  const { q = '', view = '' } = await searchParams
+  const { q = '', view = '', page: pageParam = '' } = await searchParams
   const archived = view === 'archived'
   const keyword = q.trim()
   const payload = await getPayloadClient()
@@ -71,12 +71,17 @@ export default async function ProjectsPage({
       }
     : statusWhere
 
+  // 页码先夹到 1..MAX_PAGE：非数字 / 0 / 负数 / 小数回落第 1 页；过大的（1e18、Infinity）夹到上限，
+  // 再由下面的 totalDocs 回落末页。必须夹，否则数据库会拼出溢出 offset 直接 500（#213 实测 1e18）。
+  const requestedPage = clampPage(pageParam)
+
   const [result, activeCount, archivedCount] = await Promise.all([
     payload.find({
       collection: 'projects',
       where,
       depth: 0,
-      limit: 500,
+      limit: PAGE_SIZE,
+      page: requestedPage,
       sort: '-updatedAt',
       user,
       overrideAccess: false,
@@ -104,7 +109,44 @@ export default async function ProjectsPage({
       overrideAccess: false,
     }),
   ])
-  const projects = result.docs
+  // 页码超过末页（例如手改 ?page=999）时，回落显示末页内容，而不是空白页。
+  // 越界页的 find 会返回空 docs 且 totalPages 不可信，所以按总数重新算末页。
+  let totalPages = Math.max(1, result.totalPages ?? 1)
+  let page = Math.min(requestedPage, totalPages)
+  if (requestedPage > 1 && result.docs.length === 0) {
+    const counted = await payload.count({
+      collection: 'projects',
+      where,
+      user,
+      overrideAccess: false,
+    })
+    totalPages = Math.max(1, Math.ceil(counted.totalDocs / PAGE_SIZE))
+    page = Math.min(requestedPage, totalPages)
+  }
+  const listResult =
+    page === requestedPage
+      ? result
+      : await payload.find({
+          collection: 'projects',
+          where,
+          depth: 0,
+          limit: PAGE_SIZE,
+          page,
+          sort: '-updatedAt',
+          user,
+          overrideAccess: false,
+          select: {
+            name: true,
+            customerName: true,
+            community: true,
+            platform: true,
+            status: true,
+            pointCount: true,
+            updatedAt: true,
+          },
+        })
+
+  const projects = listResult.docs
   const ids = projects.map((p) => p.id)
 
   // 还没有点位数统计的旧项目：一次查询补算（下次保存点位图时会写入）
@@ -148,12 +190,12 @@ export default async function ProjectsPage({
       ])
     : [{ docs: [] }, { docs: [] }]
 
-  const quoteStats = new Map<string, { count: number; latest: number; accepted: number | null }>()
+  // 只留每行「方案报价 / 合同」列真正显示的两种值；条数在表格里另有出处，不再计数。
+  const quoteStats = new Map<string, { latest: number; accepted: number | null }>()
   for (const quote of quotes.docs) {
     const pid = relId(quote.project)
     if (!pid) continue
-    const stat = quoteStats.get(pid) ?? { count: 0, latest: quote.total ?? 0, accepted: null }
-    stat.count++
+    const stat = quoteStats.get(pid) ?? { latest: quote.total ?? 0, accepted: null }
     if (quote.status === 'accepted' && stat.accepted === null) stat.accepted = quote.total ?? 0
     quoteStats.set(pid, stat)
   }
@@ -169,6 +211,7 @@ export default async function ProjectsPage({
       : { value: stat.latest, caption: '最新报价' }
   }
 
+  /** 切状态页签、改搜索词都不带 page —— 自然回到第 1 页；只有翻页才显式传 page。 */
   const href = (patch: Record<string, string>) => {
     const params = new URLSearchParams({ q, view, ...patch })
     for (const [k, v] of [...params]) if (!v) params.delete(k)
@@ -184,12 +227,7 @@ export default async function ProjectsPage({
     user,
   })
   const canClaimDemo = demoCount.totalDocs === 0
-  const totalPoints = projects.reduce((sum, p) => sum + (p.pointCount ?? 0), 0)
-  const totalQuoteAmount = projects.reduce((sum, p) => {
-    const a = amountOf(String(p.id))
-    return sum + (a?.value ?? 0)
-  }, 0)
-  const signedContractsCount = contracts.docs.filter((c) => c.status === 'signed').length
+  const showEmptyActions = projects.length === 0 && !keyword && !archived
   const claimButton = canClaimDemo ? (
     <form action={claimDemoProject}>
       <Button type="submit" variant="secondary" icon={<Sparkles />} label="领取示例项目" />
@@ -204,52 +242,25 @@ export default async function ProjectsPage({
           keyword ? (
             <>
               匹配「{keyword}」共{' '}
-              <span className="font-medium text-foreground tabular-nums">{projects.length}</span> 个
+              <span className="font-medium text-foreground tabular-nums">{result.totalDocs}</span>{' '}
+              个
             </>
           ) : (
             '管理全屋智能设计项目、户型彩平点位图、多版本报价与交付归档'
           )
         }
         actions={
-          <div className="flex items-center gap-2">
-            {claimButton}
+          <div className="flex flex-wrap items-center gap-2">
+            {showEmptyActions ? null : claimButton}
             <Button href="/projects/new" icon={<Plus />} label="新建项目" />
           </div>
         }
       />
 
-      {/*
-        指标条：一条带发丝分隔线的横条，而不是四张浮起的等权卡片。
-        四张卡片会让首屏视觉中心停在数字上、把真正要操作的「项目列表」压下去，
-        也带来最重的「通用后台」观感（视觉评审指出的首要问题）。
-      */}
-      {projects.length > 0 ? (
-        <div className="grid grid-cols-2 divide-x divide-y divide-border overflow-hidden rounded-[var(--radius-container)] border bg-card sm:grid-cols-4 sm:divide-y-0">
-          <StatTile
-            size="inline"
-            label={archived ? '已归档项目' : '进行中项目'}
-            value={projects.length}
-            unit="个项目"
-          />
-          <StatTile
-            size="inline"
-            label="累计设计点位"
-            value={totalPoints.toLocaleString('zh-CN')}
-            unit="个点位"
-          />
-          <StatTile size="inline" label="方案报价总额" value={yuan(totalQuoteAmount)} />
-          <StatTile
-            size="inline"
-            label="报价 / 签约"
-            value={quotes.docs.length}
-            unit={`份 · 已签 ${signedContractsCount}`}
-          />
-        </div>
-      ) : null}
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <FilterTabs
           label="项目状态"
+          trackClassName="max-sm:h-9"
           items={[
             {
               key: 'active',
@@ -269,7 +280,7 @@ export default async function ProjectsPage({
         />
         <Form action="/projects" className="flex w-full items-center gap-2 sm:w-auto">
           {archived ? <input type="hidden" name="view" value="archived" /> : null}
-          <div className="relative flex-1 sm:w-72 sm:flex-none">
+          <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <SearchField
               name="q"
@@ -301,7 +312,7 @@ export default async function ProjectsPage({
                 : '创建项目后即可上传户型图并布置点位'
           }
           action={
-            !keyword && !archived ? (
+            showEmptyActions ? (
               <>
                 <Button size="sm" href="/projects/new" icon={<Plus />} label="新建项目" />
                 {claimButton}
@@ -400,6 +411,33 @@ export default async function ProjectsPage({
           </Table>
         </Card>
       )}
+
+      {/* 分页：页码走 URL，切页签/改搜索词都会回到第 1 页（#210 A） */}
+      {totalPages > 1 ? (
+        <nav className="flex items-center justify-center gap-2 pt-1" aria-label="项目分页">
+          {page > 1 ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              href={href({ page: String(page - 1) })}
+              icon={<ChevronLeft />}
+              label="上一页"
+            />
+          ) : null}
+          <span className="px-2 text-sm text-muted-foreground tabular-nums">
+            {page} / {totalPages}
+          </span>
+          {page < totalPages ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              href={href({ page: String(page + 1) })}
+              icon={<ChevronRight />}
+              label="下一页"
+            />
+          ) : null}
+        </nav>
+      ) : null}
     </section>
   )
 }
